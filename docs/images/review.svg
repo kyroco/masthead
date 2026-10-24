@@ -1,70 +1,52 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="960" height="560" viewBox="0 0 960 560" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="14">
-  <rect width="960" height="560" fill="#ffffff"/>
-  <text x="40" y="40" font-size="22" font-weight="600" fill="#1f2937">The review: reviewers who read cold, a judge that keeps only what it can prove</text>
-
-  <!-- Author -->
-  <rect x="40" y="100" width="160" height="76" rx="10" fill="#eef2ff" stroke="#6366f1"/>
-  <text x="120" y="128" text-anchor="middle" font-weight="600" fill="#312e81">the worker</text>
-  <text x="120" y="148" text-anchor="middle" font-size="12" fill="#4338ca">finishes the change</text>
-  <text x="120" y="164" text-anchor="middle" font-size="12" fill="#4338ca">and sends only the diff</text>
-
-  <line x1="200" y1="138" x2="248" y2="138" stroke="#6b7280" stroke-width="2" marker-end="url(#a)"/>
-
-  <!-- Reviewers -->
-  <g font-size="13">
-    <rect x="250" y="60" width="180" height="36" rx="8" fill="#fef3c7" stroke="#d97706"/><text x="340" y="83" text-anchor="middle" fill="#78350f">reviewer: bugs</text>
-    <rect x="250" y="104" width="180" height="36" rx="8" fill="#fef3c7" stroke="#d97706"/><text x="340" y="127" text-anchor="middle" fill="#78350f">reviewer: edge cases</text>
-    <rect x="250" y="148" width="180" height="36" rx="8" fill="#fef3c7" stroke="#d97706"/><text x="340" y="171" text-anchor="middle" fill="#78350f">reviewer: contracts</text>
-    <rect x="250" y="192" width="180" height="36" rx="8" fill="#fef3c7" stroke="#d97706"/><text x="340" y="215" text-anchor="middle" fill="#78350f">reviewer: reuse</text>
-    <rect x="250" y="236" width="180" height="36" rx="8" fill="#fef3c7" stroke="#d97706"/><text x="340" y="259" text-anchor="middle" fill="#78350f">reviewer: cleanup</text>
-    <rect x="250" y="280" width="180" height="36" rx="8" fill="#fee2e2" stroke="#dc2626"/><text x="340" y="303" text-anchor="middle" fill="#7f1d1d">security reviewer</text>
-  </g>
-  <rect x="250" y="328" width="180" height="58" rx="8" fill="#f9fafb" stroke="#d1d5db"/>
-  <text x="340" y="348" text-anchor="middle" font-size="12" fill="#4b5563">each one reads the code cold:</text>
-  <text x="340" y="364" text-anchor="middle" font-size="12" fill="#4b5563">no author's notes, no editing,</text>
-  <text x="340" y="380" text-anchor="middle" font-size="12" fill="#4b5563">no network</text>
-
-  <!-- Findings to the judge -->
-  <line x1="430" y1="188" x2="488" y2="188" stroke="#6b7280" stroke-width="2" marker-end="url(#a)"/>
-  <text x="459" y="178" text-anchor="middle" font-size="12" fill="#6b7280">findings</text>
-
-  <!-- Judge -->
-  <rect x="490" y="140" width="190" height="96" rx="10" fill="#ecfeff" stroke="#0891b2"/>
-  <text x="585" y="166" text-anchor="middle" font-weight="600" fill="#164e63">the judge</text>
-  <text x="585" y="186" text-anchor="middle" font-size="12" fill="#155e75">reads the code and the findings,</text>
-  <text x="585" y="202" text-anchor="middle" font-size="12" fill="#155e75">nothing from the worker,</text>
-  <text x="585" y="218" text-anchor="middle" font-size="12" fill="#155e75">and sorts them three ways</text>
-
-  <!-- Three outputs -->
-  <line x1="680" y1="160" x2="738" y2="128" stroke="#16a34a" stroke-width="2" marker-end="url(#g)"/>
-  <rect x="740" y="90" width="190" height="72" rx="10" fill="#dcfce7" stroke="#16a34a"/>
-  <text x="835" y="112" text-anchor="middle" font-weight="600" fill="#14532d">the fix list</text>
-  <text x="835" y="130" text-anchor="middle" font-size="12" fill="#166534">real, proven, worth fixing here;</text>
-  <text x="835" y="146" text-anchor="middle" font-size="12" fill="#166534">a file and line for each one</text>
-
-  <line x1="680" y1="188" x2="738" y2="226" stroke="#6b7280" stroke-width="2" marker-end="url(#a)"/>
-  <rect x="740" y="196" width="190" height="72" rx="10" fill="#f3f4f6" stroke="#9ca3af"/>
-  <text x="835" y="218" text-anchor="middle" font-weight="600" fill="#374151">new issues to file</text>
-  <text x="835" y="236" text-anchor="middle" font-size="12" fill="#4b5563">serious, but outside this change:</text>
-  <text x="835" y="252" text-anchor="middle" font-size="12" fill="#4b5563">filed, linked, not fixed here</text>
-
-  <line x1="680" y1="216" x2="738" y2="318" stroke="#9ca3af" stroke-width="2" stroke-dasharray="4 4" marker-end="url(#a)"/>
-  <rect x="740" y="302" width="190" height="72" rx="10" fill="#f9fafb" stroke="#d1d5db"/>
-  <text x="835" y="324" text-anchor="middle" font-weight="600" fill="#6b7280">thrown out</text>
-  <text x="835" y="342" text-anchor="middle" font-size="12" fill="#6b7280">not real, not proven, or not</text>
-  <text x="835" y="358" text-anchor="middle" font-size="12" fill="#6b7280">worth a change; gone for good</text>
-
-  <!-- Fix loop back to the worker -->
-  <path d="M 930 126 L 946 126 L 946 500 L 120 500 L 120 182" fill="none" stroke="#6366f1" stroke-width="2" stroke-linejoin="round" marker-end="url(#p)"/>
-  <rect x="300" y="420" width="400" height="60" rx="10" fill="#eef2ff" stroke="#6366f1"/>
-  <text x="500" y="443" text-anchor="middle" font-size="13" fill="#312e81">the worker fixes each item on the list, test first,</text>
-  <text x="500" y="462" text-anchor="middle" font-size="13" fill="#312e81">and the fixes get a check of their own, up to three rounds</text>
-
-  <text x="40" y="530" font-size="13" fill="#4b5563">Then: a reader checks the customer-facing text, the tests run on the final commit, and one pull request goes up.</text>
-
-  <defs>
-    <marker id="a" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#6b7280"/></marker>
-    <marker id="g" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#16a34a"/></marker>
-    <marker id="p" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#6366f1"/></marker>
-  </defs>
+<svg xmlns="http://www.w3.org/2000/svg" width="1160" height="536" viewBox="0 0 1160 536" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="14">
+  <rect width="1160" height="536" fill="#ffffff"/>
+  <defs><marker id="m16a34a" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#16a34a"/></marker><marker id="m6366f1" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#6366f1"/></marker><marker id="m6b7280" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#6b7280"/></marker><marker id="md97706" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#d97706"/></marker><marker id="mdb2777" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#db2777"/></marker><marker id="mdc2626" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#dc2626"/></marker></defs>
+  <text x="40" y="40" text-anchor="start" font-size="20" font-weight="600" fill="#1f2937">The review: reviewers who read cold, and a judge that keeps only what it can prove</text>
+  <rect x="40" y="120" width="194" height="74" rx="10" fill="#eef2ff" stroke="#6366f1" stroke-width="1.5"/>
+  <text x="137" y="146" text-anchor="middle" font-size="14" font-weight="600" fill="#312e81">the worker</text>
+  <text x="137" y="162" text-anchor="middle" font-size="12" fill="#4338ca">finishes the change</text>
+  <text x="137" y="178" text-anchor="middle" font-size="12" fill="#4338ca">and sends only the diff</text>
+  <rect x="284" y="70" width="170" height="32" rx="10" fill="#fef3c7" stroke="#d97706" stroke-width="1.5"/>
+  <text x="369" y="90" text-anchor="middle" font-size="12" fill="#92400e">reviewer: bugs</text>
+  <rect x="284" y="110" width="170" height="32" rx="10" fill="#fef3c7" stroke="#d97706" stroke-width="1.5"/>
+  <text x="369" y="130" text-anchor="middle" font-size="12" fill="#92400e">reviewer: edge cases</text>
+  <rect x="284" y="150" width="170" height="32" rx="10" fill="#fef3c7" stroke="#d97706" stroke-width="1.5"/>
+  <text x="369" y="170" text-anchor="middle" font-size="12" fill="#92400e">reviewer: contracts</text>
+  <rect x="284" y="190" width="170" height="32" rx="10" fill="#fef3c7" stroke="#d97706" stroke-width="1.5"/>
+  <text x="369" y="210" text-anchor="middle" font-size="12" fill="#92400e">reviewer: reuse</text>
+  <rect x="284" y="230" width="170" height="32" rx="10" fill="#fef3c7" stroke="#d97706" stroke-width="1.5"/>
+  <text x="369" y="250" text-anchor="middle" font-size="12" fill="#92400e">reviewer: cleanup</text>
+  <rect x="284" y="270" width="170" height="32" rx="10" fill="#fee2e2" stroke="#dc2626" stroke-width="1.5"/>
+  <text x="369" y="290" text-anchor="middle" font-size="12" fill="#7f1d1d">security reviewer</text>
+  <rect x="284" y="312" width="315" height="48" rx="10" fill="#f9fafb" stroke="#d1d5db" stroke-width="1.5"/>
+  <text x="441" y="332" text-anchor="middle" font-size="12" fill="#6b7280">each one reads the code cold:</text>
+  <text x="441" y="348" text-anchor="middle" font-size="12" fill="#6b7280">no author's notes, no editing, no network</text>
+  <line x1="234" y1="160" x2="282" y2="160" stroke="#6b7280" stroke-width="2" marker-end="url(#m6b7280)"/>
+  <rect x="524" y="150" width="258" height="90" rx="10" fill="#ecfeff" stroke="#0891b2" stroke-width="1.5"/>
+  <text x="653" y="176" text-anchor="middle" font-size="14" font-weight="600" fill="#164e63">the judge</text>
+  <text x="653" y="192" text-anchor="middle" font-size="12" fill="#155e75">reads the code and the findings,</text>
+  <text x="653" y="208" text-anchor="middle" font-size="12" fill="#155e75">nothing from the worker,</text>
+  <text x="653" y="224" text-anchor="middle" font-size="12" fill="#155e75">and sorts them three ways</text>
+  <line x1="454" y1="168" x2="522" y2="168" stroke="#6b7280" stroke-width="2" marker-end="url(#m6b7280)"/>
+  <text x="489" y="158" text-anchor="middle" font-size="12" fill="#6b7280">findings</text>
+  <rect x="842" y="90" width="258" height="74" rx="10" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5"/>
+  <text x="971" y="116" text-anchor="middle" font-size="14" font-weight="600" fill="#14532d">the fix list</text>
+  <text x="971" y="132" text-anchor="middle" font-size="12" fill="#166534">real, proven, worth fixing here;</text>
+  <text x="971" y="148" text-anchor="middle" font-size="12" fill="#166534">a file and a line for each one</text>
+  <rect x="842" y="188" width="266" height="74" rx="10" fill="#f3f4f6" stroke="#9ca3af" stroke-width="1.5"/>
+  <text x="975" y="214" text-anchor="middle" font-size="14" font-weight="600" fill="#374151">new issues to file</text>
+  <text x="975" y="230" text-anchor="middle" font-size="12" fill="#4b5563">serious, but outside this change:</text>
+  <text x="975" y="246" text-anchor="middle" font-size="12" fill="#4b5563">filed and linked, not fixed here</text>
+  <rect x="842" y="286" width="273" height="74" rx="10" fill="#f9fafb" stroke="#d1d5db" stroke-width="1.5"/>
+  <text x="978" y="312" text-anchor="middle" font-size="14" font-weight="600" fill="#6b7280">thrown out</text>
+  <text x="978" y="328" text-anchor="middle" font-size="12" fill="#6b7280">not real, not proven, or not worth</text>
+  <text x="978" y="344" text-anchor="middle" font-size="12" fill="#6b7280">a change; gone for good</text>
+  <line x1="782" y1="180" x2="840" y2="127" stroke="#16a34a" stroke-width="2" marker-end="url(#m16a34a)"/>
+  <line x1="782" y1="200" x2="840" y2="225" stroke="#6b7280" stroke-width="2" marker-end="url(#m6b7280)"/>
+  <line x1="782" y1="220" x2="840" y2="323" stroke="#6b7280" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#m6b7280)"/>
+  <rect x="430" y="390" width="446" height="56" rx="10" fill="#eef2ff" stroke="#6366f1" stroke-width="1.5"/>
+  <text x="653" y="414" text-anchor="middle" font-size="12" fill="#4338ca">the worker fixes each item on the list, test first,</text>
+  <text x="653" y="430" text-anchor="middle" font-size="12" fill="#4338ca">and the fixes get a check of their own, up to three rounds</text>
+  <path d="M 1100 110 L 1124 110 L 1124 476 L 137 476 L 137 196" fill="none" stroke="#6366f1" stroke-width="2" stroke-linejoin="round" marker-end="url(#m6366f1)"/>
+  <text x="40" y="516" text-anchor="start" font-size="13" fill="#4b5563">Then: a reader checks the text a customer would read, the tests run on the final commit, and one pull request goes up.</text>
 </svg>

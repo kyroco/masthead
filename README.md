@@ -31,12 +31,16 @@ Claude Code in the repository and type one thing:
 /work-on milestone 4
 ```
 
+![You type one command; the milestone has nine issues](docs/images/day-1-start.svg)
+
 A foreman wakes up. It doesn't build anything yet. It reads. The project's
 README first, because that's the brief: why this work exists, what shape it
 has, what rules it follows. Then every issue, with every comment, because
 your rulings tend to arrive as comments. Then the decision records the
 issues point at, the architecture notes, the mockups, and what earlier
 sessions wrote down in memory.
+
+![The foreman reads everything first](docs/images/day-2-read.svg)
 
 Then it sends a small reader to every issue, all nine at once. Each reader
 comes back with the same report. Does this issue say what has to be true
@@ -47,6 +51,8 @@ README, something you actually said? Is it too big for one pull request?
 What would a builder have to guess? One more reader looks at the milestone
 as a whole: are two issues building the same thing, does one contradict the
 decision record, is there a decision nobody is building, is the order right.
+
+![Nine readers, one per issue, and one for the milestone](docs/images/day-3-check.svg)
 
 The foreman shows you the first issue rewritten, old body beside new, and
 you say go. The rest get rewritten the same way. The big ones get split into
@@ -63,6 +69,8 @@ on which, which can run side by side without touching the same files, how
 much effort each one needs, and how many workers it would run at once. You
 pick a number. Say three.
 
+![The foreman's plan; you pick how many run at once](docs/images/day-4-plan.svg)
+
 Three fresh sessions start, each with its own copy of the repository and a
 branch tied to its issue. Each worker reads its issue, the README and the
 decision record cover to cover, looks up what earlier sessions learned, and
@@ -70,6 +78,8 @@ sends the foreman a plan in five lines or fewer: for each scenario, what it
 will change and the test that proves it. The foreman holds that plan against
 the scenarios and the README's rule that the simplest thing that meets the
 result wins, and says go, or sends it back naming the line.
+
+![Three workers, each with its own session, send their plans](docs/images/day-5-workers.svg)
 
 Then they build. A bug is fixed test first: a failing test in its own commit,
 then the fix. When an issue builds a decision record, a fresh reviewer reads
@@ -96,6 +106,8 @@ line quoted. Only when nothing settles it does the question reach you, and
 your answer goes on the issue so the next session finds it. A worker that
 stops on a failure gets one message; a second failure parks the issue with a
 comment saying what happened, and the run goes on without it.
+
+![You have coffee; questions reach you only when nothing settles them](docs/images/day-6-coffee.svg)
 
 When a pull request's checks are green, its review is clean and the worker
 has cleaned up after itself, the foreman queues it for merge, closes the

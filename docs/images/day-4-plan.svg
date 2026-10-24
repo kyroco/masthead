@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="218" viewBox="0 0 1000 218" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="14">
+  <rect width="1000" height="218" fill="#ffffff"/>
+  <defs><marker id="m16a34a" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#16a34a"/></marker><marker id="m6366f1" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#6366f1"/></marker><marker id="m6b7280" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#6b7280"/></marker><marker id="md97706" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#d97706"/></marker><marker id="mdb2777" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#db2777"/></marker><marker id="mdc2626" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#dc2626"/></marker></defs>
+  <rect x="40" y="30" width="464" height="158" rx="10" fill="#eef2ff" stroke="#6366f1" stroke-width="1.5"/>
+  <text x="272" y="58" text-anchor="middle" font-size="14" font-weight="600" fill="#312e81">the foreman's plan, one table</text>
+  <text x="272" y="74" text-anchor="middle" font-size="12" font-family="Menlo, Consolas, monospace" fill="#4338ca">issue   after    with     effort   why</text>
+  <text x="272" y="90" text-anchor="middle" font-size="12" font-family="Menlo, Consolas, monospace" fill="#4338ca">#41     none     #42      medium   small screen change</text>
+  <text x="272" y="106" text-anchor="middle" font-size="12" font-family="Menlo, Consolas, monospace" fill="#4338ca">#42     none     #41      medium   one module, one test file</text>
+  <text x="272" y="122" text-anchor="middle" font-size="12" font-family="Menlo, Consolas, monospace" fill="#4338ca">#43     #41      none     high     touches the plan limits</text>
+  <text x="272" y="138" text-anchor="middle" font-size="12" font-family="Menlo, Consolas, monospace" fill="#4338ca">#44     none     #45      medium   read side only</text>
+  <text x="272" y="154" text-anchor="middle" font-size="12" font-family="Menlo, Consolas, monospace" fill="#4338ca">#45     none     #44      medium   ...</text>
+  <text x="272" y="170" text-anchor="middle" font-size="12" font-family="Menlo, Consolas, monospace" fill="#4338ca">suggested: 3 workers at once</text>
+  <line x1="504" y1="120" x2="554" y2="120" stroke="#6b7280" stroke-width="2" marker-end="url(#m6b7280)"/>
+  <circle cx="664" cy="70" r="26" fill="#fce7f3" stroke="#db2777" stroke-width="2"/>
+  <text x="664" y="75" text-anchor="middle" font-size="13" font-weight="600" fill="#9d174d">you</text>
+  <text x="664" y="34" text-anchor="middle" font-size="12" fill="#6b7280">you pick how many run at once</text>
+  <rect x="584" y="120" width="294" height="58" rx="10" fill="#fce7f3" stroke="#db2777" stroke-width="1.5"/>
+  <text x="731" y="146" text-anchor="middle" font-size="14" font-weight="600" fill="#9d174d">"three"</text>
+  <text x="731" y="162" text-anchor="middle" font-size="12" fill="#9d174d">nothing starts until you say a number</text>
+</svg>
