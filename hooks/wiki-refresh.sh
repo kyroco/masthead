@@ -24,17 +24,21 @@ esac
 clone="$(dirname "${adr_dir%/}")"
 remote="$(fact ADR_REMOTE)"
 
-# Send WIKI_GIT_TOKEN as a header and keep it in the clone's config for later pulls and pushes.
+# WIKI_GIT_TOKEN is a GitHub token: it goes only to github.com over https, with the remote the repo names.
 header=""
-if [ -n "${WIKI_GIT_TOKEN:-}" ]; then
-  header="Authorization: Basic $(printf 'x-access-token:%s' "$WIKI_GIT_TOKEN" | base64 | tr -d '\n')"
-fi
+case "$remote" in
+  https://github.com/*)
+    [ -n "${WIKI_GIT_TOKEN:-}" ] && header="Authorization: Basic $(printf 'x-access-token:%s' "$WIKI_GIT_TOKEN" | base64 | tr -d '\n')" ;;
+esac
 keep_header() {
   [ -n "$header" ] || return 0
   git -C "$clone" config http.extraHeader "$header" && chmod 600 "$clone/.git/config"
 }
 
 if [ -d "$clone/.git" ]; then
+  # Only the clone of the named remote is pulled or given the token; another repository at that path is left alone.
+  origin="$(git -C "$clone" config --get remote.origin.url 2>/dev/null)"
+  [ -n "$remote" ] && [ "$origin" = "$remote" ] || exit 0
   (keep_header; git -C "$clone" pull -q --ff-only >/dev/null 2>&1 &)
 elif [ ! -e "$clone" ] && [ -n "$remote" ]; then
   (git ${header:+-c "http.extraHeader=$header"} clone -q "$remote" "$clone" >/dev/null 2>&1 \
