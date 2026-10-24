@@ -151,6 +151,14 @@ def main():
         print("{:4}  {:<32} expected {:<5} got {}".format(
             "ok" if ok else "FAIL", label, expected, actual))
 
+    # The refusal must not send the user to the masked reader: it cannot mask every shape.
+    raw = subprocess.run([sys.executable, HOOK],
+                         input=json.dumps({"tool_name": "Read", "tool_input": {"file_path": HOME + "/.aws/credentials"}}),
+                         capture_output=True, text=True, check=False).stdout
+    sends_to_reader = "read-redacted" in raw
+    failures += 1 if sends_to_reader else 0
+    print("{:4}  {:<32}".format("FAIL" if sends_to_reader else "ok", "the refusal sends nobody to the reader"))
+
     print("")
     if failures:
         print("{} of {} cases wrong".format(failures, len(CASES)))
