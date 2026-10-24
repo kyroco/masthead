@@ -22,6 +22,7 @@ run() {
   fi
 }
 
+run "install options"        bash "$here/tests/run-sh-test.sh"
 run "brief gates"            python3 "$here/test-brief-gates.py"
 run "shared safety gates"    python3 "$here/test-shared-safety-gates.py"
 run "commit attribution"     python3 "$here/test-commit-attribution-gate.py"

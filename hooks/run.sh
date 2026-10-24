@@ -6,6 +6,7 @@ name="${1:-}"
 [ -n "$name" ] || exit 0
 shift
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+[ -f "$here/$name" ] || exit 0
 off() { case "$(printf '%s' "${1:-}" | tr '[:upper:]' '[:lower:]')" in false|0|no|off) return 0 ;; *) return 1 ;; esac; }
 case "$name" in
   engram-protocol.sh|capture-finding-reminder.py|korium-index-on-stop.sh)
