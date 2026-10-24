@@ -193,6 +193,8 @@ PYEOF
 run_gate "$d"
 ok "$STATUS" "2" "an AWS access key in a changed .js exits 2"
 contains "$ERR" "possible secret" "it names what it found"
+leaked="$(printf '%s' "$ERR" | grep -c "AKIAQQQQ")"
+ok "$leaked" "0" "the refusal does not print the secret itself"
 
 echo "11. a waived placeholder does not block"
 d="$(newrepo secret-waived)"

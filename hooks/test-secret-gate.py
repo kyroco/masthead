@@ -55,6 +55,7 @@ CASES = [
     ("ssh known_hosts", "Read", {"file_path": HOME + "/.ssh/known_hosts"}, "allow"),
     ("ordinary source file", "Read", {"file_path": "products/apps/salon_web/lib/foo.ex"}, "allow"),
     ("ordinary command", "Bash", {"command": "mix test --only browser"}, "allow"),
+    ("a path that is not a string is refused, not crashed on", "Read", {"file_path": ["x"]}, "deny"),
     ("git command", "Bash", {"command": "git status --short"}, "allow"),
     ("the redacting reader itself", "Bash",
      {"command": "python3 " + HOME + "/.claude/hooks/read-redacted.py"}, "allow"),
