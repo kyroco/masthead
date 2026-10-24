@@ -1,0 +1,4 @@
+machine api.example.invalid login robot password Hunter2Fake
+machine other.example.invalid
+  login robot
+  password AnotherFakePw9

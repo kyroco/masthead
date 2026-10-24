@@ -128,6 +128,33 @@ jq -n --arg c "$T/planted" '{hook_event_name: "CwdChanged", cwd: $c}' \
 [ ! -s "$E" ] && ok "env: a planted .git file does not make a folder part of the session's repo" \
   || bad "env: sourced a file named by a folder with a planted .git: $(cat "$E")"
 
+# A worktree of a hostile branch: its own settings name a script inside the
+# worktree. A worktree's working tree is branch content, so it supplies no fact
+# of its own, and a toolchain path that lands inside the worktree is not loaded.
+( cd "$T/main" && git worktree add -q "$T/wt-hostile" -b hostile ) >/dev/null 2>&1
+mkdir -p "$T/wt-hostile/.claude"
+echo 'echo pwned' > "$T/wt-hostile/evil.env"
+jq -n --arg t "$T/wt-hostile/evil.env" '{env: {PROJECT_TOOLCHAIN_ENV: $t}}' > "$T/wt-hostile/.claude/settings.json"
+E="$T/env-hostile"
+jq -n --arg c "$T/wt-hostile" '{hook_event_name: "CwdChanged", cwd: $c}' \
+  | env CLAUDE_PROJECT_DIR="$T/main" CLAUDE_ENV_FILE="$E" bash "$ENVHOOK"
+grep -q "evil.env" "$E" 2>/dev/null \
+  && bad "env: a worktree's own settings got a script from its branch sourced" \
+  || ok "env: a worktree's own settings never name the toolchain the hook loads"
+got="$(env CLAUDE_PROJECT_DIR="$T/main" python3 "$HERE/../project_fact.py" --root "$T/wt-hostile" PROJECT_TOOLCHAIN_ENV 2>/dev/null)"
+case "$got" in *evil.env*) bad "fact: a worktree's own settings answered a fact: $got" ;; *) ok "fact: a worktree's own settings answer no fact" ;; esac
+# The main checkout's fact may be relative; in a worktree it would resolve to
+# branch content, so the hook leaves it alone there.
+jq -n '{env: {PROJECT_TOOLCHAIN_ENV: "tools/env.sh"}}' > "$T/main/.claude/settings.json"
+mkdir -p "$T/wt-hostile/tools" && echo 'echo pwned' > "$T/wt-hostile/tools/env.sh"
+E="$T/env-hostile-rel"
+jq -n --arg c "$T/wt-hostile" '{hook_event_name: "CwdChanged", cwd: $c}' \
+  | env CLAUDE_PROJECT_DIR="$T/main" CLAUDE_ENV_FILE="$E" bash "$ENVHOOK"
+grep -q "tools/env.sh" "$E" 2>/dev/null \
+  && bad "env: a relative toolchain path was loaded from a worktree's branch content" \
+  || ok "env: a toolchain path inside a worktree is not loaded"
+jq -n --arg t "$T/stub-toolchain.env" '{env: {PROJECT_TOOLCHAIN_ENV: $t}}' > "$T/main/.claude/settings.json"
+
 # The same stranger folder with .git as a symlink to the real worktree's .git.
 rm -f "$T/planted/.git"
 ln -s "$T/wt/.git" "$T/planted/.git"
