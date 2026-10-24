@@ -11,6 +11,9 @@
 #   bash .claude/hooks/proof/gate-discovery-bash-selftest.sh
 set -uo pipefail
 HOOKS="${GATE_HOOKS_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
+# The code gates stand aside on a machine without korium-cli, so this proof gets a stub on PATH:
+# it is about the gate's own judgement, on a machine that has the tool.
+STUBBIN="$(mktemp -d)/bin"; mkdir -p "$STUBBIN"; printf '#!/bin/sh\nexit 0\n' > "$STUBBIN/korium-cli"; chmod +x "$STUBBIN/korium-cli"; export PATH="$STUBBIN:$PATH"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 cp "$HOOKS/engram-protocol.sh" "$HOOKS/shell-search-pattern.py" "$WORK/"
