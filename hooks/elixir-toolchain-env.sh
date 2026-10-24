@@ -20,6 +20,10 @@ done
 [ -e "$d/.git" ] || exit 0
 toolchain="$(python3 "$(dirname "$0")/project_fact.py" --root "$d" --path PROJECT_TOOLCHAIN_ENV 2>/dev/null)"
 [ -n "$toolchain" ] && [ -f "$toolchain" ] || exit 0
+# In a worktree, a toolchain file inside it is branch content: never load it from there.
+if [ -f "$d/.git" ]; then
+  case "$(cd "$(dirname "$toolchain")" 2>/dev/null && pwd -P)/" in "$(cd "$d" && pwd -P)/"*) exit 0 ;; esac
+fi
 
 line=". \"$toolchain\""
 grep -qxF "$line" "$CLAUDE_ENV_FILE" 2>/dev/null || printf '%s\n' "$line" >> "$CLAUDE_ENV_FILE"

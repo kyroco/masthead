@@ -97,15 +97,13 @@ def cloud_cloned(root):
 
 
 def fact(name, default=None, root=None):
-    """The checkout's own fact, else its main checkout's, else DEFAULT."""
+    """The main checkout's fact for the repository `root` is in, else DEFAULT."""
     root = root or project_root()
     if not trusted(root):
         return default
-    value = settings_fact(root, name)
-    if value is None:
-        main = main_checkout(root)
-        if main:
-            value = settings_fact(main, name)
+    # A worktree's working tree is branch content, so only the main checkout's
+    # settings supply a fact; a relative value still resolves in the worktree.
+    value = settings_fact(main_checkout(root) or root, name)
     return value if value is not None else default
 
 
