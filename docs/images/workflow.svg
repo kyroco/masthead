@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="460" viewBox="0 0 960 460" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="14">
+  <rect width="960" height="460" fill="#ffffff"/>
+  <text x="40" y="40" font-size="22" font-weight="600" fill="#1f2937">One issue, one session, one pull request</text>
+  <text x="40" y="66" fill="#4b5563">What happens after you type /work-on #123</text>
+
+  <!-- Steps row -->
+  <g>
+    <rect x="40" y="100" width="130" height="64" rx="10" fill="#eef2ff" stroke="#6366f1"/>
+    <text x="105" y="126" text-anchor="middle" font-weight="600" fill="#312e81">read</text>
+    <text x="105" y="146" text-anchor="middle" font-size="12" fill="#4338ca">the issue, its project</text>
+
+    <line x1="170" y1="132" x2="196" y2="132" stroke="#6b7280" stroke-width="2" marker-end="url(#a)"/>
+    <rect x="198" y="100" width="130" height="64" rx="10" fill="#eef2ff" stroke="#6366f1"/>
+    <text x="263" y="126" text-anchor="middle" font-weight="600" fill="#312e81">branch</text>
+    <text x="263" y="146" text-anchor="middle" font-size="12" fill="#4338ca">a worktree of its own</text>
+
+    <line x1="328" y1="132" x2="354" y2="132" stroke="#6b7280" stroke-width="2" marker-end="url(#a)"/>
+    <rect x="356" y="100" width="130" height="64" rx="10" fill="#f5f3ff" stroke="#7c3aed" stroke-dasharray="5 3"/>
+    <text x="421" y="126" text-anchor="middle" font-weight="600" fill="#4c1d95">remember</text>
+    <text x="421" y="146" text-anchor="middle" font-size="12" fill="#5b21b6">search memory (optional)</text>
+
+    <line x1="486" y1="132" x2="512" y2="132" stroke="#6b7280" stroke-width="2" marker-end="url(#a)"/>
+    <rect x="514" y="100" width="130" height="64" rx="10" fill="#eef2ff" stroke="#6366f1"/>
+    <text x="579" y="126" text-anchor="middle" font-weight="600" fill="#312e81">build</text>
+    <text x="579" y="146" text-anchor="middle" font-size="12" fill="#4338ca">tests first, then code</text>
+
+    <line x1="644" y1="132" x2="670" y2="132" stroke="#6b7280" stroke-width="2" marker-end="url(#a)"/>
+    <rect x="672" y="100" width="130" height="64" rx="10" fill="#fef3c7" stroke="#d97706"/>
+    <text x="737" y="126" text-anchor="middle" font-weight="600" fill="#78350f">review wave</text>
+    <text x="737" y="146" text-anchor="middle" font-size="12" fill="#92400e">blind reviewers, a judge</text>
+
+    <line x1="802" y1="132" x2="828" y2="132" stroke="#6b7280" stroke-width="2" marker-end="url(#a)"/>
+    <rect x="830" y="100" width="100" height="64" rx="10" fill="#eef2ff" stroke="#6366f1"/>
+    <text x="880" y="126" text-anchor="middle" font-weight="600" fill="#312e81">fix</text>
+    <text x="880" y="146" text-anchor="middle" font-size="12" fill="#4338ca">the fix list</text>
+  </g>
+
+  <!-- loop arrow from fix back to review -->
+  <path d="M 880 164 C 880 200, 737 200, 737 166" fill="none" stroke="#d97706" stroke-width="2" marker-end="url(#o)"/>
+  <text x="808" y="206" text-anchor="middle" font-size="12" fill="#92400e">until the list is empty</text>
+
+  <!-- Second row -->
+  <g>
+    <rect x="514" y="240" width="130" height="64" rx="10" fill="#fef3c7" stroke="#d97706"/>
+    <text x="579" y="266" text-anchor="middle" font-weight="600" fill="#78350f">push check</text>
+    <text x="579" y="286" text-anchor="middle" font-size="12" fill="#92400e">tests pass on this commit</text>
+    <path d="M 880 164 C 900 240, 700 272, 646 272" fill="none" stroke="#6b7280" stroke-width="2" marker-end="url(#a)"/>
+
+    <line x1="514" y1="272" x2="488" y2="272" stroke="#6b7280" stroke-width="2" marker-end="url(#a)"/>
+    <rect x="356" y="240" width="130" height="64" rx="10" fill="#dcfce7" stroke="#16a34a"/>
+    <text x="421" y="266" text-anchor="middle" font-weight="600" fill="#14532d">one pull request</text>
+    <text x="421" y="286" text-anchor="middle" font-size="12" fill="#166534">Fixes #123</text>
+
+    <line x1="356" y1="272" x2="330" y2="272" stroke="#6b7280" stroke-width="2" marker-end="url(#a)"/>
+    <rect x="198" y="240" width="130" height="64" rx="10" fill="#f5f3ff" stroke="#7c3aed" stroke-dasharray="5 3"/>
+    <text x="263" y="266" text-anchor="middle" font-weight="600" fill="#4c1d95">save</text>
+    <text x="263" y="286" text-anchor="middle" font-size="12" fill="#5b21b6">what was learned (optional)</text>
+  </g>
+
+  <!-- Foreman note -->
+  <rect x="40" y="340" width="890" height="90" rx="10" fill="#f9fafb" stroke="#d1d5db"/>
+  <text x="60" y="366" font-weight="600" fill="#374151">Several issues at once: the foreman</text>
+  <text x="60" y="390" fill="#4b5563">/work-on foreman proposes a plan for a project or milestone, you say how many run at once,</text>
+  <text x="60" y="412" fill="#4b5563">and each issue gets a fresh session of its own that follows the row above. Questions come back to the foreman, then to you.</text>
+
+  <defs>
+    <marker id="a" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#6b7280"/></marker>
+    <marker id="o" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#d97706"/></marker>
+  </defs>
+</svg>

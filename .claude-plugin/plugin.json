@@ -1,0 +1,31 @@
+{
+  "name": "masthead",
+  "displayName": "Masthead",
+  "version": "0.1.0",
+  "description": "Working rules that hold: memory-first work, blind review, one issue per session, and the safety gates that make them real.",
+  "author": { "name": "Kyroco, LLC", "url": "https://kyroco.ai" },
+  "homepage": "https://github.com/kyroco/masthead",
+  "repository": "https://github.com/kyroco/masthead",
+  "license": "Apache-2.0",
+  "keywords": ["hooks", "gates", "review", "memory", "workflow", "korium"],
+  "userConfig": {
+    "korium": {
+      "type": "boolean",
+      "title": "Connect Korium memory",
+      "description": "Korium is Kyroco's memory for AI agents. With it on, Masthead asks each session to search memory before its first change and to save what it learned before it finishes. Needs a Korium account (free plan available). You can turn this on later.",
+      "default": false
+    },
+    "strict_commits": {
+      "type": "boolean",
+      "title": "Keep AI attribution out of commits",
+      "description": "Refuse a commit message or pull request body that carries an AI co-author line, a session link or a generated-with footer, so the git history reads as the team's own.",
+      "default": true
+    },
+    "haiku_default": {
+      "type": "boolean",
+      "title": "Ask for a reason before a subagent runs on Opus",
+      "description": "Subagents run on Haiku unless the brief says why Opus is needed. Keeps parallel work cheap. Turn off if you never want to be asked.",
+      "default": false
+    }
+  }
+}

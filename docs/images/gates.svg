@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="420" viewBox="0 0 960 420" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="16">
+  <rect width="960" height="420" fill="#ffffff"/>
+  <!-- Left: a rule in prose -->
+  <text x="40" y="44" font-size="22" font-weight="600" fill="#1f2937">A rule written in prose</text>
+  <text x="40" y="70" fill="#4b5563">"Never push without running the tests."</text>
+  <rect x="40" y="96" width="400" height="150" rx="10" fill="#f9fafb" stroke="#d1d5db"/>
+  <text x="60" y="124" fill="#374151">How strongly Claude follows it</text>
+  <line x1="60" y1="222" x2="420" y2="222" stroke="#9ca3af"/>
+  <text x="60" y="240" font-size="13" fill="#6b7280">hour 1</text>
+  <text x="225" y="240" font-size="13" fill="#6b7280">hour 2</text>
+  <text x="390" y="240" font-size="13" fill="#6b7280">hour 3</text>
+  <path d="M 60 140 C 160 142, 240 170, 300 200 S 400 222, 420 222" fill="none" stroke="#dc2626" stroke-width="4" stroke-linecap="round"/>
+  <text x="40" y="282" fill="#4b5563">It fades as the session gets long, and nobody is told.</text>
+  <text x="40" y="306" fill="#4b5563">The rule fails the day it matters.</text>
+
+  <!-- Right: a gate -->
+  <text x="520" y="44" font-size="22" font-weight="600" fill="#1f2937">The same rule as a gate</text>
+  <text x="520" y="70" fill="#4b5563">A small check runs before the action, every time.</text>
+  <!-- Claude box -->
+  <rect x="520" y="110" width="110" height="56" rx="10" fill="#eef2ff" stroke="#6366f1"/>
+  <text x="575" y="144" text-anchor="middle" fill="#312e81" font-weight="600">Claude</text>
+  <!-- arrow -->
+  <line x1="630" y1="138" x2="690" y2="138" stroke="#6b7280" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="660" y="128" text-anchor="middle" font-size="13" fill="#6b7280">git push</text>
+  <!-- gate -->
+  <rect x="692" y="104" width="120" height="68" rx="10" fill="#fef3c7" stroke="#d97706"/>
+  <text x="752" y="132" text-anchor="middle" fill="#78350f" font-weight="600">gate</text>
+  <text x="752" y="154" text-anchor="middle" font-size="13" fill="#78350f">tests passed on</text>
+  <text x="752" y="168" text-anchor="middle" font-size="13" fill="#78350f">this commit?</text>
+  <!-- yes -->
+  <line x1="812" y1="124" x2="870" y2="124" stroke="#16a34a" stroke-width="2" marker-end="url(#arrowgreen)"/>
+  <text x="841" y="114" text-anchor="middle" font-size="13" fill="#16a34a">yes</text>
+  <rect x="872" y="104" width="70" height="40" rx="8" fill="#dcfce7" stroke="#16a34a"/>
+  <text x="907" y="129" text-anchor="middle" font-size="14" fill="#14532d">pushed</text>
+  <!-- no -->
+  <line x1="752" y1="172" x2="752" y2="230" stroke="#dc2626" stroke-width="2" marker-end="url(#arrowred)"/>
+  <text x="768" y="206" font-size="13" fill="#dc2626">no</text>
+  <rect x="640" y="232" width="224" height="64" rx="10" fill="#fee2e2" stroke="#dc2626"/>
+  <text x="752" y="257" text-anchor="middle" font-size="14" fill="#7f1d1d" font-weight="600">refused, with the reason</text>
+  <text x="752" y="280" text-anchor="middle" font-size="13" fill="#7f1d1d">"run the tests, then push again"</text>
+  <text x="520" y="336" fill="#4b5563">Claude reads the reason and does the right thing instead.</text>
+  <text x="520" y="360" fill="#4b5563">A gate cannot forget, and it never passes silently.</text>
+
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#6b7280"/></marker>
+    <marker id="arrowgreen" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#16a34a"/></marker>
+    <marker id="arrowred" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#dc2626"/></marker>
+  </defs>
+</svg>

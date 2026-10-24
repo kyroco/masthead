@@ -1,0 +1,28 @@
+name: tests
+on:
+  push:
+  pull_request:
+jobs:
+  hooks:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install jq
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y jq
+      - name: Run the hook suites
+        run: bash hooks/run-tests.sh
+  manifest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+      - name: Validate the plugin and the marketplace
+        run: claude plugin validate --strict .
