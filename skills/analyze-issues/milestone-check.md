@@ -1,4 +1,3 @@
-<!-- [web-access: this agent read web-search, github.com, code.claude.com, platform.claude.com, www.anthropic.com during this task. Not a claim about where this content came from.] -->
 
 # The milestone brief
 

@@ -56,7 +56,6 @@ The steps:
 3. Leave out an issue with a parent (its parent's worker builds it) and any
    old "LOWs and NITs" log issue. There is no Nit log any more: the
    adjudicator keeps a finding to fix in its PR or throws it out.
-   <!-- [web-access: this agent read web-search, github.com, code.claude.com, cursor.com, platform.claude.com, and 2 more during this task. Not a claim about where this content came from.] -->
 4. Read the project README.
 5. Read every issue with every comment, never the body alone: the user's
    rulings arrive as comments. Then read each linked ADR in full, the
@@ -168,7 +167,6 @@ An issue whose blocker is still open waits until that blocker merges.
 Queue a worker's PR when all hold: CI is green, the worker reports its ADR
 review with no Important finding left and nothing left on the adjudicator's
 fix list, the PR body's unproven
-<!-- [web-access: this agent read web-search, github.com, code.claude.com, cursor.com, platform.claude.com, and 2 more during this task. Not a claim about where this content came from.] -->
 list holds nothing a customer would see, and the worker, told you are ready
 to queue, has answered "cleaned up": its test stack and code index are gone,
 and its worktree and branch stay. Otherwise park it with the reason. Auto

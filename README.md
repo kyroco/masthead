@@ -1,68 +1,166 @@
 # Masthead
 
-Masthead is a plugin for [Claude Code](https://code.claude.com). It takes the
-rules a team writes down for its AI and turns the ones that matter into
-checks that run before the action, so they hold whether the session is five
-minutes old or five hours old.
+Masthead is a plugin for [Claude Code](https://code.claude.com). You give it
+a list of things to build, as GitHub issues, and it builds them: each one in
+its own session, checked, reviewed by people who weren't in the room, tested
+on the exact commit that ships, and merged. You decide the things only you
+can decide. Here's what a day with it looks like.
 
-We built it because we had the rules written down and they still broke. We'd
-put "search memory before you change anything" in the file Claude reads at
-the start of every session, took out the small script that was enforcing it,
-and within two days shipped a whole piece of work with nothing saved. Nobody
-noticed until later. A rule in prose is a suggestion. A rule in front of the
-action is a rule.
+## A day with Masthead
+
+It's Monday. You have a milestone with nine issues in it, the kind of list
+that used to mean a week of watching over someone's shoulder. You open
+Claude Code in the repository and type one thing:
+
+```
+/work-on milestone 4
+```
+
+A foreman wakes up. It doesn't build anything yet. It reads. The project's
+README first, because that's the brief: why this work exists, what shape it
+has, what rules it follows. Then every issue, with every comment, because
+your rulings tend to arrive as comments. Then the decision records the
+issues point at, the architecture notes, the mockups, and what earlier
+sessions wrote down in memory.
+
+Then it sends a small reader to every issue, all nine at once. Each reader
+comes back with the same report. Does this issue say what has to be true
+when it's done, or does it tell the builder how to do its job? Can I read
+scenarios out of it, "Given this, When that, Then this is true," and does
+each one rest on something real: a decision that was made, a rule in the
+README, something you actually said? Is it too big for one pull request?
+What would a builder have to guess? One more reader looks at the milestone
+as a whole: are two issues building the same thing, does one contradict the
+decision record, is there a decision nobody is building, is the order right.
+
+The foreman shows you the first issue rewritten, old body beside new, and
+you say go. The rest get rewritten the same way. The big ones get split into
+sub-issues. Every open question gets looked up in the sources, in order: the
+issue's own comments, the README, the decision record, the architecture doc,
+the mockups, the memory. Whatever a source settles is answered on the issue
+with the line quoted, so nobody has to ask twice. Whatever nothing settles
+comes to you, one question at a time, with a recommendation. You answer in a
+sentence. It goes on the issue in your words. An issue with a question still
+open stays out of the run until you've answered it.
+
+Now the foreman hands you one table: the issues in build order, which depend
+on which, which can run side by side without touching the same files, how
+much effort each one needs, and how many workers it would run at once. You
+pick a number. Say three.
+
+Three fresh sessions start, each with its own copy of the repository and a
+branch tied to its issue. Each worker reads its issue, the README and the
+decision record cover to cover, looks up what earlier sessions learned, and
+sends the foreman a plan in five lines or fewer: for each scenario, what it
+will change and the test that proves it. The foreman holds that plan against
+the scenarios and the README's rule that the simplest thing that meets the
+result wins, and says go, or sends it back naming the line.
+
+Then they build. A bug is fixed test first: a failing test in its own commit,
+then the fix. When an issue builds a decision record, a fresh reviewer reads
+the whole record and checks the work against it, assuming it was done wrong.
+
+When a worker thinks it's done, it doesn't grade its own work. It sends the
+diff, and nothing else, to five reviewers at once, one angle each: bugs, edge
+cases, contracts, reuse, cleanup, and a security reviewer when the change
+touches sign-in, secrets or input from outside. None of them saw the
+worker's notes. None of them can edit anything. None of them can reach the
+network. Then a judge reads the code and their findings, throws out whatever
+it can't prove, and hands back a fix list with a file and a line for each
+item. The worker fixes those, test first again, and the fixes get a check of
+their own. A reader goes over any sentence a customer would read and says
+which is false against the scenarios and which isn't plain English. The
+tests run on the final commit and leave a receipt that names it, and nothing
+can be pushed until the receipt matches. Then one pull request goes up, with
+`Fixes #41`, the list of what wasn't proved, and the issue moves to In
+Review.
+
+Meanwhile you're having coffee. A worker's question lands at the foreman,
+which re-reads the issue's comments and the sources and answers with the
+line quoted. Only when nothing settles it does the question reach you, and
+your answer goes on the issue so the next session finds it. A worker that
+stops on a failure gets one message; a second failure parks the issue with a
+comment saying what happened, and the run goes on without it.
+
+When a pull request's checks are green, its review is clean and the worker
+has cleaned up after itself, the foreman queues it for merge, closes the
+sub-issues that shipped, and gives that worker the next ready issue. By the
+end of the day every issue is merged, parked or skipped, and you get one
+line per issue saying which.
+
+![A run: issues checked, a foreman plan, workers in parallel, merges](docs/images/workflow.svg)
+
+The whole time, a set of small checks runs underneath. Nobody, not a worker,
+not a reviewer, not Claude in a hurry, reads a secret, force-pushes, pushes
+untested code, or sends a helper a brief that hides what wasn't proved. You
+don't see those checks unless one says no, and when it does, it says why and
+what to do instead.
+
+![The review wave: blind reviewers, one judge, one fix list](docs/images/review.svg)
+
+### Why we built it
+
+We'd had the rules written down for a long time. "Search memory before you
+change anything" sat in the file Claude reads at the start of every session.
+Then we took out the small script that was enforcing it, and within two days
+a whole piece of work shipped with nothing saved. Nobody noticed until later.
+A rule in prose is a suggestion. A rule in front of the action is a rule.
+That's the idea under all of it: write the spec into the issue before the
+session starts, let the session run on its own, and put the rules that
+matter where they can't be forgotten.
 
 ![A rule in prose fades over a session; a check holds](docs/images/gates.svg)
 
-## Install
+### One issue on its own
 
-In a terminal:
+`/work-on #123` does the same for a single issue with you as the foreman.
+The worker reports its brief and waits for your go before building, and an
+issue with the `design-sheet` label gets a one-page sheet written into the
+issue for you to approve first.
+
+## Install
 
 ```
 claude plugin marketplace add kyroco/masthead
 claude plugin install masthead@masthead
 ```
 
-Then open Claude Code in a repository and run:
+Then open Claude Code in a repository and run `/masthead:setup`. It asks
+three questions and writes nothing until you say yes: just you or the team
+(whether the settings are committed with the code), tests before a push
+(it finds your test command), and whether to connect a memory now, later or
+not at all. Run it again whenever you want to change an answer.
 
-```
-/masthead:setup
-```
-
-Setup asks three questions and writes nothing until you say yes.
-
-1. Just you, or the team? That decides whether the settings are committed
-   with the code or stay on your machine.
-2. Tests before a push? It finds your test command and asks whether a push
-   should wait for it.
-3. A memory across sessions? Connect Korium now, later, or not at all.
-   Everything else works without it.
-
-Run `/masthead:setup` again whenever you want to change an answer. The
-install options are under `/plugin configure masthead@masthead`:
+The install options are under `/plugin configure masthead@masthead`:
 
 | Option | Default | What it does |
 |---|---|---|
-| Connect Korium memory | off | Each session looks up what earlier sessions learned before its first change, and saves what it learned at the end. Needs a [Korium](https://kyroco.ai) account; there's a free plan. |
+| Connect Korium memory | off | Each session looks up what earlier sessions learned before its first change, and saves what it learned at the end. Needs a [Korium](https://kyroco.ai) account; there's a free plan. Everything else works without it. |
 | Keep AI attribution out of commits | on | Refuses a commit message or pull request body with an AI co-author line, a session link or a generated-with footer. |
 | Ask for a reason before a helper runs on the biggest model | off | Helpers run on the small model unless the brief says why the big one is needed. |
 
 To remove it: `claude plugin uninstall masthead@masthead`. The settings file
-setup wrote (`.claude/settings.json` or `.claude/settings.local.json`) and the
-push check script (`.claude/push-check.sh`) are yours to delete.
+setup wrote and the push check script (`.claude/push-check.sh`) are yours to
+delete.
+
+## What an issue has to say
+
+An issue says what is true when the work is done, never how to get there,
+in four parts: **Why** (what a person can't do today, with the file and line
+when known), **Scenarios** (one to five lines of "Given, When, Then", each
+naming the decision, README rule or your own words it rests on), **Out of
+scope** (what this issue leaves to another), and **Questions** (what the
+sources don't settle, each marked `[NEEDS CLARIFICATION]`). One issue is one
+pull request, built and proved by one worker in one session. The
+`analyze-issues` skill rewrites issues into this shape and splits the ones
+that are too big, so you don't have to write them this way yourself.
 
 ## Every check, what it refuses, and where it falls short
 
 Each check is a short script under `hooks/`, run by Claude Code at a fixed
 moment: before a tool call, after one, or when a session or helper stops. It
 reads what is about to happen and either lets it through or refuses it with a
-reason Claude can act on. `hooks/hooks.json` wires them. `bash
-hooks/run-tests.sh` runs every check's tests, and CI runs them on Linux and
-macOS.
-
-The off switches are environment variables read from the check's own
-environment, so a session can't switch a check off for itself. Set one in your
-shell before starting Claude Code if you ever need to.
+reason Claude can act on.
 
 ### Always on
 
@@ -75,7 +173,7 @@ shell before starting Claude Code if you ever need to.
 | `untrusted-domain-deny.py` | before a web fetch or search | requests to paste sites and other hosts code shouldn't reach | the host list is in the script |
 | `web-to-memory-gate.py` | after a web fetch; before a write | copying text fetched from the web into files every session loads, or into memory, without a marker saying the web was read | files inside a git repository are left alone, since a pull request shows them |
 | `agent-brief-gates.sh` | before a helper is sent | a brief to a reviewer that leaves out the author's claims or the code outside the diff the change depends on; a brief asking for a fix without saying how it's proved; a brief that passes a conclusion off as a rule | checks the shape of the brief, not whether it's true |
-| `dispatch-record-gate.sh` | before a helper is sent | nothing; records which model each helper ran on, in the repository's state folder | |
+| `dispatch-record-gate.sh` | before a helper is sent | nothing; records which model each helper ran on | |
 | `review-write-fence.py` | before a file write | a reviewer writing anything but its own findings file, or a scratch copy under the review folder | a shell write isn't seen |
 | `bash-scope-reviewer.sh` | before a shell command | a reviewer reaching the network | scoped by the agent's type |
 | `bash-scope-diagnoser.sh` | before a shell command | the diagnoser or reader doing anything but running tests, reading git history and inspecting files | scoped by the agent's type |
@@ -101,109 +199,11 @@ shell before starting Claude Code if you ever need to.
 | `commit-attribution-gate.py` | Keep AI attribution out of commits | a commit message or pull request body with an AI co-author line, a session link or a generated-with footer |
 | `model-choice-gate.sh` | Ask for a reason before the biggest model | a helper sent to the big model with no reason on the first line of its brief |
 
-### Off switches
-
-| Variable | Turns off |
-|---|---|
-| `MASTHEAD_CODE_GATE=off` | the code index check |
-| `MASTHEAD_SEARCH_GATE=off` | the search-before-edit check |
-| `MASTHEAD_CAPTURE_GATE=off` | the capture-name check |
-| `MASTHEAD_MODEL_GATE=off` | the model check |
-| `MASTHEAD_BRIEF_GATE=off` | the brief checks |
-| `MASTHEAD_DONE_GATE=off` | the push check |
-| `MASTHEAD_INDEX_ON_STOP=off` | the index refresh at stop |
-
-## What a session looks like
-
-You type one command with an issue number. Claude reads the issue and its
-project README, makes a branch and a worktree, looks up memory if it's
-connected, builds on the branch, sends the change to the blind reviewers,
-fixes what the judge kept, runs the push check, and opens one pull request.
-It asks you only when something is yours to decide.
-
-![One issue, one session, one pull request](docs/images/workflow.svg)
-
-You don't see the checks while this happens. You see one only when it refuses
-something, and the refusal says what to do instead.
-
-## The review, up close
-
-When the change is done, Claude doesn't grade its own work. It sends the
-diff, and nothing else, to reviewers who each take one angle: bugs, edge
-cases, contracts, reuse and cleanup, plus a security reviewer when the change
-touches sign-in, secrets or input from outside. They can't edit, can't reach
-the network, and never see the author's explanation. A separate judge reads
-the code and the findings, throws out what it can't prove, and gives the
-author a list to fix, each item with a file and a line.
-
-![The review wave: blind reviewers, one judge, one fix list](docs/images/review.svg)
-
-## Why it's built this way
-
-### Rules as checks, not as sentences
-
-The rules that matter are small programs that run just before Claude acts.
-If the action breaks the rule, the program says no and Claude sees why. We
-only turn a rule into a check when we're prepared to enforce it, and we leave
-out the rules we aren't, rather than pretend.
-
-### Secrets are never read
-
-A secret that gets into the conversation is in the transcript, in the logs,
-and in whatever Claude writes next, so the only place to stop it is the read
-itself. Claude asks you for the value instead. There's a masked reader for
-the rare case where the shape of a file matters and the values don't.
-
-### Nothing it can't undo
-
-Everything else Claude does can be reviewed and reverted. A force push, a
-rewritten history or a dropped table can't be, so those are refused outright
-and you get one sentence saying why.
-
-### Tests pass on the commit being pushed
-
-When you say yes at setup, a push waits until your test command has passed on
-the exact commit going out. Claude runs the tests itself and the check only
-reads the receipt, which names the commit. That last part matters, because
-the usual way a green run ends up attached to the wrong code is pushing a
-different commit than the one that was tested.
-
-### The reviewers are blind, and the judge decides
-
-A reviewer who reads the author's explanation ends up reviewing the
-explanation. A reviewer who can edit stops reviewing and starts fixing. A
-reviewer who can reach the network can be talked to. We took all three away.
-The judge is there because reviewers disagree, and the author shouldn't be
-the one deciding which findings count.
-
-### One issue per session
-
-A session that carries several pieces of work drifts, and the second piece
-gets a tired reviewer. Many short sessions cost little, so Masthead gives
-each issue a fresh one, and a foreman mode runs several of them side by side.
-
-### Helpers get the whole story
-
-A helper starts with only its brief, and whatever is left out it never
-learns. So a brief has to say what the author claims works, what isn't
-proved, and how a fix will be proved, and a brief that passes the author's
-conclusion off as a rule is sent back.
-
-### Memory is optional
-
-Korium is a product from Kyroco, the company behind Masthead. It has a free
-plan, but it's an account and a sign-in, and that's your call. With it on,
-Claude stops re-deriving what you settled last week. Without it, every other
-check works the same.
-
-### Your repository states its facts
-
-A small settings file tells Masthead your test command, where your decision
-records live if you keep any, and where it may keep its own working files. A
-repository that states nothing still gets every always-on check, and the ones
-that need a fact wait until it's there. Facts belong to the repository, so a
-teammate who clones it gets the same checks without configuring anything.
-Setup writes the file for you after you confirm it.
+The off switches are environment variables read from the check's own
+environment, so a session can't switch a check off for itself:
+`MASTHEAD_CODE_GATE`, `MASTHEAD_SEARCH_GATE`, `MASTHEAD_CAPTURE_GATE`,
+`MASTHEAD_MODEL_GATE`, `MASTHEAD_BRIEF_GATE`, `MASTHEAD_DONE_GATE` and
+`MASTHEAD_INDEX_ON_STOP`, each set to `off`.
 
 ## What Masthead never does
 
@@ -217,11 +217,12 @@ Setup writes the file for you after you confirm it.
 ## For the curious
 
 The skills under `skills/` are the written procedures Claude follows:
-`work-on` for the issue-to-pull-request flow, `setup` for the three
-questions, `analyze-issues` to tighten issues before they're built,
-`github-issues` for how the tracker is used, and the two Korium skills for
-memory and code search. `agents/` holds the five reviewers and the judge.
-`references/` holds the procedures the checks inject.
+`work-on` (the foreman and the worker), `analyze-issues` (the checks before a
+build), `github-issues` (how the tracker is used), `setup`, and the two
+Korium skills. `agents/` holds the reviewers, the judge, the diagnoser and
+the reader. `references/` holds the pull request steps and the brief
+format. `bash hooks/run-tests.sh` runs every check's tests, and CI runs them
+on Linux and macOS.
 
 Masthead is made by [Kyroco](https://kyroco.ai). It's the setup we run on our
 own repositories every day. Apache 2.0.

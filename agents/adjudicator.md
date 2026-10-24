@@ -18,7 +18,6 @@ maxTurns: 200
 tools: Read, Glob, Grep, Bash, ToolSearch, mcp__korium__code_locate, mcp__korium__agent_capture
 disallowedTools: Agent, Edit, MultiEdit, Write, NotebookEdit, WebFetch, WebSearch, mcp__korium__agent_search, mcp__korium__korium_browse, mcp__korium__korium_trace, mcp__korium__korium_reconstruct, mcp__korium__korium_hydrate
 ---
-<!-- [web-access: this agent read web-search, github.com, code.claude.com, cursor.com, platform.claude.com, and 2 more during this task. Not a claim about where this content came from.] -->
 
 Follow shared actions in `${CLAUDE_PLUGIN_ROOT}/references/agent-preamble.md`.
 
@@ -110,7 +109,6 @@ New issue list, never the fix list. Serious means one of these:
   have, however unusual the input, since every attack is input nobody would
   type by accident (the repository's security review convention, where it
   has one);
-  <!-- [web-access: this agent read web-search, github.com, code.claude.com, cursor.com, platform.claude.com, and 2 more during this task. Not a claim about where this content came from.] -->
 - a customer reads a page, message or document that is now wrong, typos
   included;
 - customer content lands in a log, error report or trace;

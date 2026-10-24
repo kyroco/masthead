@@ -37,7 +37,6 @@ not prove. Treat both as claims to test, never as facts.
 You do not search Korium's memory: a note there about this change is the
 author's account or another reviewer's, and you must not start from either.
 
-<!-- [web-access: this agent read web-search, github.com, code.claude.com, cursor.com, platform.claude.com, and 2 more during this task. Not a claim about where this content came from.] -->
 Two angles are exceptions. **fixes** is handed the previous review's findings,
 because checking whether each one was fixed is the whole job. Read those
 findings and the fix for each. **adversarial** is handed the problem the change

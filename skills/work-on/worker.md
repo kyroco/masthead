@@ -1,6 +1,5 @@
 # The worker: one issue, worktree to one PR
 
-<!-- [web-access: this agent read cognition.ai, www.anthropic.com, cognition.com, web-search, code.claude.com during this task. Not a claim about where this content came from.] -->
 
 You were started with `/work-on #1418` (the user is waiting) or
 `/work-on #1418 dispatched` (a foreman started you). They differ in how the
@@ -225,7 +224,6 @@ from another session.
    fixes, the changelog, the pre-push check and the PR. A work-on issue adds
    one thing: once the PR is open, set the Status to In Review with
    `set-status.sh`. Nothing goes on a Nit log.
-   <!-- [web-access: this agent read web-search, github.com, code.claude.com, cursor.com, platform.claude.com, and 2 more during this task. Not a claim about where this content came from.] -->
 5. **Report.** Capture the result in Korium, then finish with one table and
    the PR number: one row per change, whether it meets the criteria (yes or
    no), and the evidence (a command and its result, a `file:line`, or a PR
@@ -245,7 +243,6 @@ route around, when a gate refuses the same action twice, a decision would
 change the requested outcome (replacing the approach after a review is one),
 credentials the work needs are missing, or a fix check leaves something on the
 adjudicator's fix list that step 5 of **Opening a PR** says to stop on (code or design after
-<!-- [web-access: this agent read web-search, github.com, code.claude.com, cursor.com, platform.claude.com, and 2 more during this task. Not a claim about where this content came from.] -->
 the second check, or anything after the third). A gate that refuses because of
 a rule the ADR you build does not mention is reported to the user with the
 exact refusal; never add an exception to a gate's list to get past it. Apart

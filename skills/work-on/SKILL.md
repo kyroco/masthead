@@ -37,7 +37,6 @@ Work in the repo the session was started in; this skill never moves a session
 to another repo, and every `gh` command runs against this one. The repo's own
 facts come first: where its `CLAUDE.md` or `docs/conventions/` sets a test
 command, a pre-push check, its changelog or a worktree
-<!-- [web-access: this agent read web-search, github.com, code.claude.com, cursor.com, platform.claude.com, and 2 more during this task. Not a claim about where this content came from.] -->
 standard, those bind. The PR steps themselves are **Opening a PR** in
 `${CLAUDE_PLUGIN_ROOT}/references/session-cliffs.md`. When a step names a
 file this repo does not have, do what the step is for with what the repo has,
@@ -62,4 +61,3 @@ gives and search again.
 test receipt matches the commit. Nothing else in this skill or its files is
 checked by a hook, including the ADR review; it rests on the text.
 
-<!-- [web-access: this agent read cognition.ai, www.anthropic.com, cognition.com, web-search, code.claude.com during this task. Not a claim about where this content came from.] -->

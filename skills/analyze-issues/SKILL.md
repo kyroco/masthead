@@ -3,7 +3,6 @@ name: analyze-issues
 description: Check a milestone, a project or a list of issues before any of them is built, rewrite each issue into its four parts (Why, Scenarios, Out of scope, Questions), split the ones that are too big, and bring the user the questions nothing else answers. /analyze-issues milestone 4, /analyze-issues <project>, or /analyze-issues #3074 #3075. The foreman runs it as its first step; the user runs it alone any time after planning. Run it from the repo the issues live in.
 disable-model-invocation: true
 ---
-<!-- [web-access: this agent read web-search, github.com, code.claude.com, platform.claude.com, www.anthropic.com during this task. Not a claim about where this content came from.] -->
 
 # Analyze issues before they are built
 
