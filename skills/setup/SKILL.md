@@ -105,5 +105,9 @@ its small working files there.
 Finish with a table: each guard rail, on or off, and the one way to change it.
 Keep it to the rails this repository has: dangerous-command and secret
 refusals (always on), blind review (always on), push check (on if set), memory
-(on if connected), decision records (on if a folder was named). End with:
-"Run `/masthead:setup` again to change any of this."
+(on if connected), decision records (on if a folder was named). Then name the
+three install options and their defaults, because a terminal install never
+asked them: connect Korium memory (off), keep AI attribution out of commits
+(on), ask for a reason before a helper runs on the biggest model (off), all
+under `/plugin configure masthead@masthead`. End with: "Run `/masthead:setup`
+again to change any of this."

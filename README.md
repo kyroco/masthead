@@ -134,18 +134,25 @@ issue for you to approve first.
 
 ## Install
 
+Open Claude Code in a repository and run these two inside the session,
+not in a terminal, because only the in-session install asks you the three
+install options (a terminal install takes the defaults silently):
+
 ```
-claude plugin marketplace add kyroco/masthead
-claude plugin install masthead@masthead
+/plugin marketplace add kyroco/masthead
+/plugin install masthead@masthead
 ```
 
-Then open Claude Code in a repository and run `/masthead:setup`. It asks
-three questions and writes nothing until you say yes: just you or the team
+It asks whether to connect Korium memory (off unless you say so), whether to
+keep AI attribution out of commits (on), and whether a helper needs a reason
+before running on the biggest model (off). Then run `/masthead:setup`. It
+asks three questions about the repository and writes nothing until you say
+yes: just you or the team
 (whether the settings are committed with the code), tests before a push
 (it finds your test command), and whether to connect a memory now, later or
 not at all. Run it again whenever you want to change an answer.
 
-The install options are under `/plugin configure masthead@masthead`:
+To change an install option later, run `/plugin configure masthead@masthead`:
 
 | Option | Default | What it does |
 |---|---|---|
