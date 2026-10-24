@@ -193,15 +193,20 @@ def main():
 
     target = None
 
-    if tool in ("Read", "NotebookRead"):
-        target = ti.get("file_path") if is_secret_path(ti.get("file_path")) else None
-    elif tool == "Grep":
-        for key in ("path", "glob"):
-            if is_secret_path(ti.get(key)):
-                target = ti.get(key)
-                break
-    elif tool == "Bash":
-        target = secret_mentioned_in_command(ti.get("command"), data.get("cwd"))
+    try:
+        if tool in ("Read", "NotebookRead"):
+            target = ti.get("file_path") if is_secret_path(ti.get("file_path")) else None
+        elif tool == "Grep":
+            for key in ("path", "glob"):
+                if is_secret_path(ti.get(key)):
+                    target = ti.get(key)
+                    break
+        elif tool == "Bash":
+            target = secret_mentioned_in_command(ti.get("command"), data.get("cwd"))
+    except Exception:
+        # A path or command this gate cannot read is refused, never guessed about.
+        deny("Blocked: this call's input could not be read by the secret gate, so it is refused rather than guessed about. Give the path or command as plain text.")
+        return 0
 
     if not target:
         return 0
@@ -212,9 +217,8 @@ def main():
         "rule and there is no exception for 'I only need one line' - that is the "
         "exact call that leaked a live 1Password token on 2026-07-31.\n\n"
         "No command reads it, the masked reader included: it cannot mask every "
-        "way a shell file holds a secret. Ask the user for the lines or the value "
-        "you need, and say why. They can run `! {reader} {target}` themselves if they "
-        "choose to show you the file.".format(target=target, reader=READER)
+        "way a file holds a secret. Ask the user for the lines or the value "
+        "you need, and say why.".format(target=target)
     )
     return 0
 

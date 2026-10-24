@@ -83,10 +83,22 @@ def opens_quote(value):
     return quote if quote not in body else None
 
 
+MACHINE_PASSWORD = re.compile(r"^(\s*password\s+)(\S+)(.*)$")
+FIVE_FIELD = re.compile(r"^([^:\s]*:[^:\s]*:[^:\s]*:[^:\s]*:)(\S+)\s*$")
+
+
 def redact(line):
     # Mask only secret-shaped text in a comment.
     if line.lstrip().startswith("#"):
         return mask_values(line)
+    # A machine/login/password file keeps the word "password" and a value with no sign between them.
+    match = MACHINE_PASSWORD.match(line.rstrip("\n"))
+    if match:
+        return match.group(1) + MASK + match.group(3) + "\n"
+    # A five-field database password line ends in the password.
+    match = FIVE_FIELD.match(line.rstrip("\n"))
+    if match:
+        return match.group(1) + MASK + "\n"
 
     match = ASSIGNMENT.match(line.rstrip("\n"))
     if match and (SECRET_NAME.search(match.group("name"))

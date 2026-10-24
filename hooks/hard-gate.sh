@@ -122,7 +122,7 @@ api_key: \"$(rep a 16)\""
         if (tolower(line) ~ tolower(assign)) hit = 1
         if (hit && index(line, waiver) == 0 && index(prev, waiver) == 0 \
             && line !~ /[$#]\{/ && line !~ /\$\(/ && line !~ /\\\(/) {
-          printf "%d:%s\n", NR, line
+          printf "line %d\n", NR
         }
         prev = line
       }' "$f" 2>/dev/null)"
@@ -143,7 +143,7 @@ api_key: \"$(rep a 16)\""
       if (tolower(line) ~ tolower(assign)) hit = 1
       if (hit && index(line, waiver) == 0 && index(prev, waiver) == 0 \
           && line !~ /[$#]\{/ && line !~ /\$\(/ && line !~ /\\\(/) {
-        printf "%s: %s\n", file, line
+        printf "%s\n", file
       }
       prev = line
       next
