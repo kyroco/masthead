@@ -9,6 +9,9 @@
 # temp folder with a fake judge that prints a chosen word.
 set -u
 HOOKS="$(cd "$(dirname "$0")/.." && pwd)"
+# The code gates stand aside on a machine without korium-cli, so these cases get a stub on PATH:
+# they are about the gate's own judgement, on a machine that has the tool.
+STUBBIN="$(mktemp -d)/bin"; mkdir -p "$STUBBIN"; printf '#!/bin/sh\nexit 0\n' > "$STUBBIN/korium-cli"; chmod +x "$STUBBIN/korium-cli"; export PATH="$STUBBIN:$PATH"
 pass=0
 fail=0
 
