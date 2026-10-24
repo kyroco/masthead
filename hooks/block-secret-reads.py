@@ -21,6 +21,13 @@ SECRET_BASENAMES = {
     "id_dsa",
     "id_ecdsa",
     "id_ed25519",
+    ".claude.json",
+    ".vault-token",
+    ".terraformrc",
+    ".zsh_history",
+    ".bash_history",
+    ".python_history",
+    ".node_repl_history",
 }
 
 # Shell profiles, which often hold exported tokens.
@@ -140,6 +147,14 @@ def is_secret_path(path):
         return True
     if re.search(r"(^|/)\.gnupg/", normalised):
         return True
+    if re.search(r"(^|/)\.config/gh/hosts\.yml$", normalised):
+        return True
+    if re.search(r"(^|/)\.docker/config\.json$", normalised):
+        return True
+    if re.search(r"(^|/)\.kube/config$", normalised):
+        return True
+    if re.search(r"(^|/)\.terraform\.d/", normalised):
+        return True
 
     return False
 
@@ -156,8 +171,11 @@ def secret_mentioned_in_command(command, cwd=None):
     if not command or (MASKED_READ_ALLOWED and is_masked_read(command, cwd)):
         return None
 
+    # Remove quote characters first so a name split by quotes is seen whole.
+    command = command.replace('"', "").replace("'", "")
+
     # Split on whitespace and shell metacharacters and test each fragment as a path.
-    for token in re.split(r"[\s;|&<>()\[\]{}\"'`,]+", command):
+    for token in re.split(r"[\s;|&<>()\[\]{}`,]+", command):
         token = token.strip().rstrip(".:;")
         if not token or token.startswith("-"):
             continue

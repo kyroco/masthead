@@ -95,12 +95,74 @@ CMD_BARE="$(printf '%s' "$CMD" | awk '
   }
 ')"
 
-# Refuse a network program named as a whole word, so a filename containing its name passes.
-for bin in curl wget nc netcat telnet ssh scp sftp rsync ftp; do
-  case " $CMD_BARE " in
-    *" $bin "*|*" $bin"|*"|$bin "*|*";$bin "*|*"/$bin "*) deny "$bin" ;;
+# Refuse a network program as the first word of any command segment. The text is split on ;, &&, ||, |, &, newlines, backticks, $( and parentheses, runs of whitespace (tabs too) collapse, and quotes and backslashes are stripped from each word, so "curl", 'curl' and curl<TAB> are all just curl. A filename or an argument that merely contains the name is not a first word and passes.
+judge_segment() {
+  local seg="$1" w prog sub i j k
+  local -a words clean
+  IFS=$' \t' read -ra words <<<"$seg"
+  clean=()
+  for w in "${words[@]+"${words[@]}"}"; do
+    w="${w//[\'\"\\\\]/}"
+    [ -n "$w" ] && clean+=("$w")
+  done
+  [ "${#clean[@]}" -gt 0 ] || return 0
+  i=0
+  # Step over assignments, shell keywords and wrappers (and the flags a wrapper takes) to reach the program.
+  while [ "$i" -lt "${#clean[@]}" ]; do
+    w="${clean[$i]}"
+    case "$w" in
+      [A-Za-z_]*=*|'!'|'{'|then|do|else|elif|if|while|until) i=$((i + 1)) ;;
+      env|sudo|command|exec|nice|nohup|time|xargs|builtin)
+        i=$((i + 1))
+        while [ "$i" -lt "${#clean[@]}" ]; do
+          case "${clean[$i]}" in -*|[A-Za-z_]*=*) i=$((i + 1)) ;; *) break ;; esac
+        done ;;
+      *) break ;;
+    esac
+  done
+  [ "$i" -lt "${#clean[@]}" ] || return 0
+  prog="${clean[$i]##*/}"
+  case "$prog" in
+    curl|wget|nc|ncat|netcat|telnet|ssh|scp|sftp|rsync|ftp|dig|nslookup|host)
+      deny "$prog" ;;
+    gh)
+      deny "gh talks to GitHub" ;;
+    git)
+      j=$((i + 1))
+      while [ "$j" -lt "${#clean[@]}" ]; do
+        case "${clean[$j]}" in
+          -C|-c|--git-dir|--work-tree|--namespace) j=$((j + 2)) ;;
+          -*) j=$((j + 1)) ;;
+          *) break ;;
+        esac
+      done
+      sub="${clean[$j]:-}"
+      case "$sub" in
+        push|fetch|pull|clone|remote|ls-remote) deny "git $sub" ;;
+      esac ;;
+    sh|bash|zsh|dash|ksh|eval)
+      # A shell's -c payload, or eval's argument, is a command wearing quotes: judge it too.
+      for ((k = i + 1; k < ${#clean[@]}; k++)); do
+        if [ "$prog" = "eval" ] || [ "${clean[$k]}" = "-c" ]; then
+          judge_segment "${clean[*]:$((k + 1))}"
+          break
+        fi
+      done ;;
   esac
-done
+}
+
+SPLIT="$CMD_BARE"
+SPLIT="${SPLIT//\`/$'\n'}"
+SPLIT="${SPLIT//[;|&()]/$'\n'}"
+while IFS= read -r segment; do
+  judge_segment "$segment"
+done <<<"$SPLIT"
+
+# Refuse an inline script that reaches the network from python or node, which need no network program.
+if printf '%s' "$CMD_BARE" | grep -qE '(^|[^[:alnum:]_./-])(python[0-9.]*|node)[[:space:]]+(-[A-Za-z]*[ce])([[:space:]]|$)' \
+   && printf '%s' "$CMD_BARE" | grep -qE 'urllib|requests|http\.client|socket|fetch|net'; then
+  deny "an inline python or node script reaches the network"
+fi
 
 # Refuse a URL anywhere in the command, whatever the binary.
 case "$CMD_BARE" in

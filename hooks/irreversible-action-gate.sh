@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# irreversible-action-gate.sh - PreToolUse Bash: refuse a command nothing can undo (force push, hard reset, git clean, --no-verify, tofu destroy, state edits or prod apply, dropped data, deleted memory files).
+# irreversible-action-gate.sh - PreToolUse Bash: refuse a command nothing can undo (force push, hard reset, git clean, --no-verify, tofu destroy, state edits or prod apply, dropped data, deleted memory files, recursive deletes outside scratch and build folders, deleted remote branches, gh repo, release and API deletes).
 # Appends every match to a record file in the session directory, fails open on any internal error, and always exits 0 printing a deny decision as JSON or nothing.
 
 set -uo pipefail
@@ -16,7 +16,19 @@ CMD="$(printf '%s' "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null |
 [ -n "$CMD" ] || exit 0
 
 SID="$(printf '%s' "$INPUT" | jq -r '.session_id // "nosession"' 2>/dev/null || echo nosession)"
-RECORD_DIR="${TMPDIR:-/tmp}/claude-irreversible/${SID//[^A-Za-z0-9_-]/}"
+# The user's private state root: $CLAUDE_PLUGIN_DATA/state, else $TMPDIR/masthead-<uid>. Mode 0700; refused when a symlink or not ours.
+state_root() {
+  local r
+  if [ -n "${CLAUDE_PLUGIN_DATA:-}" ]; then r="$CLAUDE_PLUGIN_DATA/state"; else r="${TMPDIR:-/tmp}/masthead-$(id -u)"; fi
+  (umask 077; mkdir -p "$r") 2>/dev/null
+  [ -d "$r" ] && [ ! -L "$r" ] && [ -O "$r" ] || return 1
+  chmod 700 "$r" 2>/dev/null
+  printf '%s' "${r%/}"
+}
+SID="${SID//[^A-Za-z0-9_-]/}"
+[ -n "$SID" ] || SID="nosession"
+RECORD_DIR=""
+if _root="$(state_root)"; then RECORD_DIR="$_root/claude-irreversible/$SID"; fi
 
 # Return the segment's real command: strip leading VAR=value assignments, wrappers and quoted-assignment fragments.
 segment_command() {
@@ -55,7 +67,7 @@ segment_command() {
     *=*|*\"*|*\'*)
       # Re-read from the first governed binary when the first word still holds a quote or equals sign.
       r="$(printf '%s' "$s" \
-        | grep -oE '(^|[[:space:]"'"'"'])(git|tofu|terraform|psql|mysql|mix|rm|cp|mv|install|patch|tee|dd|rsync|ed|truncate|sed|perl|awk|python|python3|ruby|node|just|bash|sh|make)["'"'"']?[[:space:]].*' \
+        | grep -oE '(^|[[:space:]"'"'"'])(git|gh|tofu|terraform|psql|mysql|mix|rm|cp|mv|install|patch|tee|dd|rsync|ed|truncate|sed|perl|awk|python|python3|ruby|node|just|bash|sh|make)["'"'"']?[[:space:]].*' \
         | head -1)"
       [ -n "$r" ] && s="${r#"${r%%[![:space:]]*}"}"
       ;;
@@ -304,7 +316,8 @@ can_match() {
           (t ~ /(^|[^a-z0-9_-])(tofu|terraform|terragrunt)([^a-z0-9_-]|$)/ &&
            t ~ /destroy|state|taint|import|force-unlock|apply/) ||
           (t ~ /(^|[^a-z0-9_-])(psql|mysql|mix|sql)([^a-z0-9_-]|$)/ && t ~ /drop|truncate/) ||
-          (t ~ /(^|[^a-z0-9_-])rm([^a-z0-9_-]|$)/ && t ~ /memory|claude\.md/)) { print; next }
+          (t ~ /(^|[^a-z0-9_-])rm([^a-z0-9_-]|$)/ && t ~ /memory|claude\.md|[[:space:]]-[a-z]*r|--recursive/) ||
+          (t ~ /(^|[^a-z0-9_-])gh([^a-z0-9_-]|$)/ && t ~ /delete|-x|--method/)) { print; next }
       # Pass a glob that could spell a command name: in the command word past any assignment or wrapper, or in any path word.
       w = $0; sub(/^[[:space:]]*/, "", w)
       while (sub(/^[A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*[[:space:]]+/, "", w)) {}
@@ -317,11 +330,35 @@ can_match() {
   '
 }
 
+# Succeed when an rm segment is recursive and names a path that is not scratch or a build folder.
+rm_recursive_unsafe() {
+  local w recursive=0 bad=0 endopts=0 words
+  read -r -a words <<<"$1"
+  for w in "${words[@]:1}"; do
+    w="${w//\"/}"; w="${w//\'/}"
+    case "$w" in *'>'*|*'<'*) continue ;; esac
+    if [ "$endopts" = 0 ]; then
+      case "$w" in
+        --) endopts=1; continue ;;
+        --recursive) recursive=1; continue ;;
+        --*) continue ;;
+        -*) case "$w" in *[rR]*) recursive=1 ;; esac; continue ;;
+      esac
+    fi
+    case "$w" in
+      *..*) bad=1 ;;
+      /tmp/?*|/private/tmp/?*|'$TMPDIR'/?*|'${TMPDIR}'/?*) ;;
+      *) printf '/%s/' "$w" | grep -qE '/(node_modules|_build|deps|\.cache|dist)/' || bad=1 ;;
+    esac
+  done
+  [ "$recursive" = 1 ] && [ "$bad" = 1 ]
+}
+
 deny() {
   # Record the attempt before refusing; a failure to record never changes the decision.
-  mkdir -p "$RECORD_DIR" 2>/dev/null && \
+  [ -n "$RECORD_DIR" ] && (umask 077; mkdir -p "$RECORD_DIR" 2>/dev/null && \
     printf '%s\t%s\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$1" "$CMD" \
-    >> "$RECORD_DIR/attempts.tsv" 2>/dev/null || true
+    >> "$RECORD_DIR/attempts.tsv" 2>/dev/null) || true
 
   jq -n --arg r "$1"$'\n\n'"$2"$'\n\nCommand: '"$CMD" '{
     hookSpecificOutput: {
@@ -379,6 +416,12 @@ while IFS= read -r seg; do
         deny "'git clean' deletes untracked files, and untracked means nothing has a copy." \
              "List what would go with 'git clean -nd' first, then delete the specific files you actually meant."
 
+      # Refuse deleting a remote branch, by --delete, -d or an empty-source refspec such as :branch.
+      printf '%s' "$seg" | grep -qE '^[[:space:]]*git[[:space:]]+push([[:space:]]|$)' &&
+        printf '%s' "$seg" | grep -qE '(^|[[:space:]])(--delete|-d)([[:space:]]|$)|[[:space:]]["'"'"']?:[^[:space:]]' &&
+        deny "Deleting a remote branch removes the only shared copy of any commits on it." \
+             "Leave the branch, or ask the operator to delete it once the work is merged. Pushing a branch normally never needs a delete."
+
       # Refuse --no-verify, which bypasses the checks before a commit or push.
       printf '%s' "$seg" | grep -qE '(^|[[:space:]])--no-verify([[:space:]]|$)' &&
         deny "'--no-verify' turns off the checks that run before a commit or a push." \
@@ -423,6 +466,25 @@ while IFS= read -r seg; do
       printf '%s' "$seg" | grep -qE '/\.claude[^/]*/.*/memory/|MEMORY\.md|CLAUDE\.md' &&
         deny "That deletes a memory file, and memory is the one thing here that no build step can rebuild." \
              "If the memory is wrong, rewrite it so the next session reads the correct thing. If it genuinely has to go, the operator removes it themselves."
+
+      # Refuse a recursive delete of anything but a scratch or build folder, since a source tree has no copy.
+      rm_recursive_unsafe "$seg" &&
+        deny "A recursive delete of a path that is not a scratch or build folder removes source that may have no copy." \
+             "Delete a build folder by naming it (node_modules, _build, deps, .cache, dist) or a path under /tmp or \$TMPDIR. To remove tracked source, use 'git rm' on the specific files so the change is committed and can be undone."
+      ;;
+
+    gh)
+      # Refuse the gh commands that delete a repository, a release or any API object.
+      printf '%s' "$seg" | grep -qE '^gh[[:space:]]+repo[[:space:]]+delete([[:space:]]|$)' &&
+        deny "'gh repo delete' removes a repository with its issues and history." \
+             "Archive it with 'gh repo archive' if it is only retired. Deleting a repository is the operator's call while awake."
+      printf '%s' "$seg" | grep -qE '^gh[[:space:]]+release[[:space:]]+delete([[:space:]]|$)' &&
+        deny "'gh release delete' removes a release that people may already depend on." \
+             "Edit it with 'gh release edit' (mark it a draft or pre-release) instead. Deleting a release is the operator's call."
+      printf '%s' "$seg" | grep -qE '^gh[[:space:]]+api[[:space:]]' &&
+        printf '%s' "$seg" | grep -qiE '(^|[[:space:]])(-X|--method)[[:space:]=]*["'"'"']?DELETE|(^|[[:space:]])-XDELETE' &&
+        deny "A DELETE call through the API removes the object with no undo." \
+             "Read it with a GET first. If it really must go, name the exact object to the operator and let them make the call."
       ;;
   esac
 done <<EOF

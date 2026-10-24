@@ -65,9 +65,10 @@ only the verdict, never the value or any part of it:
       --output text | jq -r '.KEY // ""' | wc -c
 
 To call an API with a 1Password token as a request header, without the token
-reaching the transcript, use the one sanctioned wrapper:
+reaching the transcript, let 1Password hand it to the command as an environment
+variable, which the command reads and the transcript never sees:
 
-    scripts/kyroco/op-header-curl.sh op://<vault>/<item>/<field> <Header-Name> <curl args...>
+    op run --env-file=<file with TOKEN=op://vault/item/field> -- curl -H "Authorization: Bearer $TOKEN" <url>
 
 And do not write the guard the incident that produced this hook wrote. It was
 `if echo "$V" | grep -q "ERROR"`, meant to print AWS's error on a denial; the

@@ -5,7 +5,6 @@ import json
 import os
 import re
 import sys
-import tempfile
 import time
 
 # The repo's state folder, from project_fact.py, with a default when it is absent.
@@ -14,6 +13,13 @@ try:
     STATE_DIR = _state_dir()
 except Exception:
     STATE_DIR = ".claude/state"
+try:
+    from project_fact import private_dir, private_open, safe_session
+except Exception:
+    def private_dir(*parts):
+        return None
+
+    private_open = safe_session = None
 SCOPE_REL = STATE_DIR + "/scope.json"
 # Where reviewer and security-reviewer write their findings, whatever the task's scope.
 REVIEW_STATE_RELS = (STATE_DIR + "/review",)
@@ -21,7 +27,11 @@ SELF_PROTECTED = (".claude/hooks/scope-gate.py", ".claude/settings.json", ".clau
 PROTECTED = (SCOPE_REL,) + SELF_PROTECTED
 TOOLS = {"Write", "Edit", "MultiEdit", "NotebookEdit", "Bash"}
 EDIT_TOOLS = TOOLS - {"Bash"}
-SNAP_DIR = os.path.join(tempfile.gettempdir(), "claude-scope-gate")
+
+
+def snap_dir():
+    """The private folder snapshots live in, or None when the state root cannot be trusted."""
+    return private_dir("scope-gate")
 
 
 def deny(reason):
@@ -228,8 +238,12 @@ def read_state(path):
 
 
 def snap_path(payload):
-    key = f"{payload.get('session_id', 'nosession')}-{payload.get('tool_use_id', 'nocall')}"
-    return os.path.join(SNAP_DIR, re.sub(r"[^A-Za-z0-9_.-]", "_", key) + ".json")
+    """Where this call's snapshot lives, or None when there is no trusted folder for it."""
+    directory = snap_dir()
+    if not directory:
+        return None
+    key = f"{safe_session(payload.get('session_id'))}-{safe_session(payload.get('tool_use_id'))}"
+    return os.path.join(directory, key + ".json")
 
 
 def exempt_files(root):
@@ -245,8 +259,9 @@ def exempt_files(root):
 def sweep():
     """Drop snapshot copies older than a day."""
     try:
-        for name in os.listdir(SNAP_DIR):
-            p = os.path.join(SNAP_DIR, name)
+        directory = snap_dir()
+        for name in os.listdir(directory):
+            p = os.path.join(directory, name)
             if os.path.getmtime(p) < time.time() - 86400:
                 os.unlink(p)
     except OSError:
@@ -262,12 +277,14 @@ def snapshot(payload, roots):
         state[root] = {"exempt": exempt_files(root), "files": entries}
     if not state:
         return
-    os.makedirs(SNAP_DIR, exist_ok=True)
+    path = snap_path(payload)
+    if not path:
+        return
     sweep()
-    tmp = snap_path(payload) + ".tmp"
-    with open(tmp, "w") as f:
+    tmp = path + ".tmp"
+    with private_open(tmp) as f:
         json.dump(state, f)
-    os.replace(tmp, snap_path(payload))
+    os.replace(tmp, path)
 
 
 def restore(path, saved):
@@ -289,6 +306,8 @@ def restore(path, saved):
 
 def post(payload):
     path = snap_path(payload)
+    if not path:
+        return
     try:
         state = json.load(open(path))
     except (OSError, ValueError):

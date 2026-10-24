@@ -404,7 +404,8 @@ roots() {
     for marker in $markers; do
       d="$(dirname "$f")"; found=""
       while [ "${d#"$TOP"}" != "$d" ]; do
-        if [ -e "$d/$marker" ]; then found="$d"; break; fi
+        # Only a tracked marker makes a root, so an unpacked archive or a scratch folder never gets its build files run.
+        if [ -e "$d/$marker" ] && git -C "$TOP" ls-files --error-unmatch "$d/$marker" >/dev/null 2>&1; then found="$d"; break; fi
         [ "$d" = "$TOP" ] && break
         d="$(dirname "$d")"
       done

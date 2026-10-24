@@ -2,7 +2,71 @@
 """Read one fact about the repo a session is working in, from the env block of its .claude/settings.json."""
 import json
 import os
+import re
+import stat
 import sys
+import tempfile
+
+
+def state_root():
+    """The user's private folder for hook state, or None when it cannot be trusted.
+
+    $CLAUDE_PLUGIN_DATA/state when that is set, else $TMPDIR/masthead-<uid>. Made with
+    mode 0700; refused when it is a symlink or owned by someone else. Callers fail open.
+    """
+    try:
+        data = os.environ.get("CLAUDE_PLUGIN_DATA")
+        if data:
+            root = os.path.join(data, "state")
+        else:
+            tmp = os.environ.get("TMPDIR") or tempfile.gettempdir()
+            root = os.path.join(tmp, "masthead-{}".format(os.getuid()))
+        try:
+            os.makedirs(root, mode=0o700)
+        except FileExistsError:
+            pass
+        info = os.lstat(root)
+        if stat.S_ISLNK(info.st_mode) or not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid():
+            return None
+        if info.st_mode & 0o077:
+            os.chmod(root, 0o700)
+        return root
+    except Exception:
+        return None
+
+
+def safe_session(value):
+    """A session id reduced to [A-Za-z0-9_-], for use in a path."""
+    return re.sub(r"[^A-Za-z0-9_-]", "", str(value or "")) or "nosession"
+
+
+def private_dir(*parts):
+    """A 0700 folder under the state root, or None. Never follows a symlink out of the root."""
+    root = state_root()
+    if not root:
+        return None
+    path = root
+    try:
+        for part in parts:
+            path = os.path.join(path, part)
+            try:
+                os.mkdir(path, 0o700)
+            except FileExistsError:
+                pass
+            info = os.lstat(path)
+            if stat.S_ISLNK(info.st_mode) or not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid():
+                return None
+            if info.st_mode & 0o077:
+                os.chmod(path, 0o700)
+        return path
+    except Exception:
+        return None
+
+
+def private_open(path, append=False):
+    """Open `path` for text writing with mode 0600, never following a symlink at the path."""
+    flags = os.O_WRONLY | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0) | (os.O_APPEND if append else os.O_TRUNC)
+    return os.fdopen(os.open(path, flags, 0o600), "a" if append else "w")
 
 
 def project_root():

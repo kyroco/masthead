@@ -5,6 +5,8 @@ import os
 import re
 import sys
 
+from project_fact import private_dir, private_open, safe_session
+
 # Set how many consecutive words count as a copy.
 COPY_RUN_WORDS = 7
 
@@ -64,9 +66,8 @@ def normalise(text):
 
 
 def state_dir(data):
-    session = data.get("session_id") or "nosession"
-    session = re.sub(r"[^A-Za-z0-9_-]", "", str(session)) or "nosession"
-    return os.path.join(os.environ.get("TMPDIR", "/tmp"), "claude-websource", session)
+    """The session's private state folder, or None when the state root cannot be trusted."""
+    return private_dir("claude-websource", safe_session(data.get("session_id")))
 
 
 def agent_key(data):
@@ -78,8 +79,10 @@ def agent_key(data):
 
 def ledger_path(data):
     """Return the path of this agent's host ledger."""
-    return os.path.join(state_dir(data),
-                        "sources-{}.txt".format(agent_key(data)))
+    directory = state_dir(data)
+    if not directory:
+        return None
+    return os.path.join(directory, "sources-{}.txt".format(agent_key(data)))
 
 
 def host_of(url):
@@ -102,7 +105,8 @@ def record(data):
     blob = response if isinstance(response, str) else json.dumps(response)
 
     directory = state_dir(data)
-    os.makedirs(directory, exist_ok=True)
+    if not directory:
+        return
 
     # Add the host to this agent's ledger once, append only; a search with no url books the host web-search.
     host = host_of(url)
@@ -117,7 +121,7 @@ def record(data):
             with open(ledger) as handle:
                 known = {line.strip() for line in handle if line.strip()}
         if host not in known:
-            with open(ledger, "a") as handle:
+            with private_open(ledger, append=True) as handle:
                 handle.write(host + "\n")
 
     words = normalise("{} {}".format(url, blob))
@@ -134,14 +138,14 @@ def record(data):
     if len(combined) > FETCH_STORE_BYTES:
         combined = combined[-FETCH_STORE_BYTES:]
 
-    with open(path, "w") as handle:
+    with private_open(path) as handle:
         handle.write(combined)
 
 
 def agent_hosts(data):
     """Return every host this agent read, in the order first read."""
     ledger = ledger_path(data)
-    if not os.path.exists(ledger):
+    if not ledger or not os.path.exists(ledger):
         return []
     with open(ledger) as handle:
         return [line.strip() for line in handle if line.strip()]
@@ -432,6 +436,8 @@ def main():
         return 0
 
     directory = state_dir(data)
+    if not directory:
+        return 0
 
     # Layer 1: refuse a write that copies a run of fetched words.
     path = os.path.join(directory, "fetched.txt")
