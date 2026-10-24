@@ -135,7 +135,7 @@ issue for you to approve first.
 ## Install
 
 Open Claude Code in a repository and run these two inside the session,
-not in a terminal, because only the in-session install asks you the three
+not in a terminal, because only the in-session install asks you the four
 install options (a terminal install takes the defaults silently):
 
 ```
@@ -144,7 +144,7 @@ install options (a terminal install takes the defaults silently):
 ```
 
 It asks whether to connect Korium memory (off unless you say so), whether to
-keep AI attribution out of commits (on), and whether a helper needs a reason
+keep a code index in Korium (off), whether to keep AI attribution out of commits (on), and whether a helper needs a reason
 before running on the biggest model (off). Then run `/masthead:setup`. It
 asks three questions about the repository and writes nothing until you say
 yes: just you or the team
@@ -157,6 +157,7 @@ To change an install option later, run `/plugin configure masthead@masthead`:
 | Option | Default | What it does |
 |---|---|---|
 | Connect Korium memory | off | Each session looks up what earlier sessions learned before its first change, and saves what it learned at the end. Needs a [Korium](https://kyroco.ai) account; there's a free plan. Everything else works without it. |
+| Keep a code index in Korium | off | Only with Korium memory on and korium-cli installed. The names and structure of the code in each repository you open, and the names you search for, go to your Korium account, so Claude can ask the index before it greps. Leave it off for a repository you may not send to Korium. |
 | Keep AI attribution out of commits | on | Refuses a commit message or pull request body with an AI co-author line, a session link or a generated-with footer. |
 | Ask for a reason before a helper runs on the biggest model | off | Helpers run on the small model unless the brief says why the big one is needed. |
 
@@ -211,12 +212,20 @@ reason Claude can act on.
 | `adr-sections-gate.py`, `adr-structure-gate.sh`, `wiki-refresh.sh` | before a write; at stop; at session start | a decision record written without its sections; a finish that leaves one with an unchecked claims list; keeps the records folder fresh | a decision records folder (`ADR_DIR`) |
 | `elixir-toolchain-env.sh`, `elixir-format-after-edit.sh` | at session start; after an edit | nothing; pins the Elixir toolchain and formats an edited file | an Elixir root (`PROJECT_ELIXIR_ROOT`) |
 
+Where these three fall short, together: the fact names a file, and the copy
+that runs is the one in the checkout you are in. A branch can change the push
+check script or the toolchain file, the same way CI runs a pull request's own
+tests. The record of which commit passed is a file in the checkout too. So the
+push check is a guard against forgetting, not against intent; a pull request
+review is the guard against intent.
+
 ### On or off with an install option
 
 | Check | Option | Refuses |
 |---|---|---|
-| `engram-protocol.sh` | Connect Korium memory | the first edit before a memory search; a finish with nothing saved; a brief that hides what memory found; a capture filed under another agent's name; a grep for a name the code index already answered |
-| `capture-finding-reminder.py`, `korium-index-on-stop.sh` | Connect Korium memory | nothing; reminders and index refreshes |
+| `engram-protocol.sh` | Connect Korium memory | the first edit before a memory search; a finish with nothing saved; a brief that hides what memory found; a capture filed under another agent's name |
+| `capture-finding-reminder.py` | Connect Korium memory | nothing; reminders only |
+| `korium-index-on-stop.sh` and the code index gates in `engram-protocol.sh` | Keep a code index in Korium | a grep for a name the code index already answered; otherwise nothing, the index refresh runs at the end of a session |
 | `commit-attribution-gate.py` | Keep AI attribution out of commits | a commit message or pull request body with an AI co-author line, a session link or a generated-with footer |
 | `model-choice-gate.sh` | Ask for a reason before the biggest model | a helper sent to the big model with no reason on the first line of its brief |
 
@@ -224,12 +233,15 @@ The off switches are environment variables read from the check's own
 environment, so a session can't switch a check off for itself:
 `MASTHEAD_CODE_GATE`, `MASTHEAD_SEARCH_GATE`, `MASTHEAD_CAPTURE_GATE`,
 `MASTHEAD_MODEL_GATE`, `MASTHEAD_BRIEF_GATE`, `MASTHEAD_DONE_GATE` and
-`MASTHEAD_INDEX_ON_STOP`, each set to `off`.
+`MASTHEAD_INDEX_ON_STOP`, each set to `off`. A switch that a repository's
+own committed settings file sets is ignored, so a clone can't turn a check off
+for the sessions that open it.
 
 ## What Masthead never does
 
 - Send anything anywhere. There's no telemetry. The only network use is the
-  Korium memory, and only if you connect it.
+  Korium memory, and only if you connect it; the code index is a second
+  switch, off unless you turn it on.
 - Change your code on its own. The checks refuse actions; they don't take
   them.
 - Read a secret file, not even to check it.

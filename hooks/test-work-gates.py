@@ -722,6 +722,7 @@ def main():
     audit_hooks = os.path.join(audit_root, ".claude", "hooks")
     os.makedirs(audit_hooks)
     shutil.copy(WEB_GATE, audit_hooks)
+    shutil.copy(os.path.join(HOOKS, "project_fact.py"), audit_hooks)
     audit_gate = os.path.join(audit_hooks, os.path.basename(WEB_GATE))
     audit_tmp = tempfile.mkdtemp()
     elsewhere = tempfile.mkdtemp()
@@ -794,6 +795,34 @@ def main():
     check("drop column in a migration", bash_decision("mix run -e 'ALTER TABLE x DROP COLUMN y'"), "deny")
     check("deleting a memory file", bash_decision("rm " + MEMORY_FILE), "deny")
 
+    # Finding N7: the header promised destructive git and data actions, but a
+    # recursive delete of a source tree, a remote branch delete and the gh
+    # deletes all passed with no refusal.
+    check("rm -rf of a source tree", bash_decision("rm -rf lib/engram"), "deny")
+    check("rm -rf of an absolute source path",
+          bash_decision("rm -rf /Users/me/projects/repo/src"), "deny")
+    check("rm -r of a source tree", bash_decision("rm -r src"), "deny")
+    check("rm -Rf of a source tree", bash_decision("rm -Rf lib"), "deny")
+    check("rm --recursive of a source tree",
+          bash_decision("rm --recursive --force lib"), "deny")
+    check("rm -rf with a dotdot out of a build folder",
+          bash_decision("rm -rf _build/../lib"), "deny")
+    check("rm -rf of a build folder and a source tree together",
+          bash_decision("rm -rf node_modules lib"), "deny")
+    check("prefixed rm -rf of a source tree",
+          bash_decision("FOO=1 rm -rf lib"), "deny")
+    check("git push --delete",
+          bash_decision("git push --delete origin old-branch"), "deny")
+    check("git push -d", bash_decision("git push -d origin old-branch"), "deny")
+    check("git push with an empty source refspec",
+          bash_decision("git push origin :old-branch"), "deny")
+    check("gh repo delete", bash_decision("gh repo delete kyroco/x --yes"), "deny")
+    check("gh release delete", bash_decision("gh release delete v1.0.0"), "deny")
+    check("gh api -X DELETE",
+          bash_decision("gh api -X DELETE repos/x/y/git/refs/heads/z"), "deny")
+    check("gh api --method DELETE",
+          bash_decision("gh api --method DELETE repos/x/y/releases/1"), "deny")
+
     # Added 2026-09-13 with the Tinker teardown. tendai-apply-gate.sh held these
     # and went away with the personas; every one of them was measured ALLOWED by
     # this gate before the rules below were written.
@@ -826,6 +855,17 @@ def main():
     check("the word force in a message",
           bash_decision("git commit -m 'never force push to main'"), "allow")
     check("running the tests", bash_decision("mix test --only browser"), "allow")
+    check("rm -rf node_modules", bash_decision("rm -rf node_modules"), "allow")
+    check("rm -rf _build/test", bash_decision("rm -rf _build/test"), "allow")
+    check("rm -rf under /tmp", bash_decision("rm -rf /tmp/scratch-x"), "allow")
+    check("rm -rf under TMPDIR", bash_decision('rm -rf "$TMPDIR/x"'), "allow")
+    check("rm -rf a nested dist folder", bash_decision("rm -rf web/dist"), "allow")
+    check("rm -f of one file, no -r", bash_decision("rm -f lib/old.ex"), "allow")
+    check("git push of a branch", bash_decision("git push origin feature",
+                                                root=PROVEN_BRANCH_PUSH), "allow")
+    check("gh pr create", bash_decision("gh pr create --fill"), "allow")
+    check("gh api read", bash_decision("gh api repos/x/y/issues"), "allow")
+    check("gh api -X POST", bash_decision("gh api -X POST repos/x/y/issues"), "allow")
 
     print("\n--- a command cannot hide behind its own environment ---")
     print("      (every rule matched on the first word, so one prefix defeated all of them)")
@@ -1277,6 +1317,7 @@ def main():
               "tool_input": {"content": PASTED_CAPTURE}})), "allow")
 
     unreadable = os.path.join(os.environ.get("TMPDIR", "/tmp"),
+                              "masthead-{}".format(os.getuid()),
                               "claude-websource", "web-unreadable")
     shutil.rmtree(unreadable, ignore_errors=True)
     os.makedirs(os.path.join(unreadable, "fetched.txt"), exist_ok=True)

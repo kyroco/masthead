@@ -6,6 +6,8 @@ import re
 import sys
 import time
 
+from project_fact import private_dir, private_open, safe_session, state_root
+
 LOG = os.path.expanduser("~/.claude/capture-reminder.log")
 
 # Words that mark a reply as delivering a finding; each entry is a name and a pattern, kept narrow.
@@ -24,19 +26,17 @@ QUESTION_TAIL = re.compile(r"\?\s*$")
 
 
 def state_dir():
-    directory = os.path.join(os.environ.get("TMPDIR", "/tmp"), "claude-capture-reminder")
-    os.makedirs(directory, exist_ok=True)
-    return directory
+    return private_dir("claude-capture-reminder")
 
 
 def safe_name(value):
-    return "".join(c if (c.isalnum() or c in "-_") else "_" for c in str(value))
+    return safe_session(value)
 
 
 def capture_marker_mtime(session):
     """The time of the last successful capture in this session, or 0."""
-    base = os.path.join(os.environ.get("TMPDIR", "/tmp"), "claude-engram", safe_name(session))
     try:
+        base = os.path.join(state_root(), "claude-engram", safe_name(session))
         return os.path.getmtime(os.path.join(base, "captured"))
     except Exception:
         return 0.0
@@ -44,17 +44,17 @@ def capture_marker_mtime(session):
 
 def turn_started_mtime(session):
     """The time the user last spoke, taken from the marker this hook writes each turn, or 0."""
-    path = os.path.join(state_dir(), safe_name(session) + "--turn")
     try:
+        path = os.path.join(state_dir(), safe_name(session) + "--turn")
         return os.path.getmtime(path)
     except Exception:
         return 0.0
 
 
 def stamp_turn(session):
-    path = os.path.join(state_dir(), safe_name(session) + "--turn")
     try:
-        open(path, "w").close()
+        path = os.path.join(state_dir(), safe_name(session) + "--turn")
+        private_open(path).close()
     except Exception:
         pass
 

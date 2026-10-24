@@ -69,6 +69,14 @@ with tempfile.TemporaryDirectory() as tmp:
     ranged = read(path, str(first_pem), str(first_pem + 1))
     check("a range that starts inside a multi-line value still masks it",
           PEM_BODY[1] not in ranged and PEM_BODY[2] not in ranged and ranged.count("\n") >= 2)
+    machine_file = os.path.join(tmp, "machine-sample.txt")
+    with open(machine_file, "w") as handle:
+        handle.write("machine api.example.com\nlogin alice\npassword Hunter2Fake\n")
+    check("a machine-login-password line is masked", "Hunter2Fake" not in read(machine_file))
+    pg_file = os.path.join(tmp, "pg-sample.txt")
+    with open(pg_file, "w") as handle:
+        handle.write("localhost:5432:appdb:appuser:FakePgPw77\n")
+    check("a five-field database password line is masked", "FakePgPw77" not in read(pg_file))
 
 print()
 print("{} failed".format(failures) if failures else "all cases correct")

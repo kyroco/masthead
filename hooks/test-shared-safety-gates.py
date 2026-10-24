@@ -265,7 +265,7 @@ def main():
     KCWD = tempfile.mkdtemp()
 
     def kstate(sid, rows=None, searched=True):
-        d = os.path.join(KTMP, "claude-engram", sid)
+        d = os.path.join(KTMP, "masthead-{}".format(os.getuid()), "claude-engram", sid)
         shutil.rmtree(d, ignore_errors=True)
         os.makedirs(d, exist_ok=True)
         if searched:
@@ -288,6 +288,26 @@ def main():
 
     kstate("k-none", searched=False)
     check("no search at all is still refused", edit_gate("k-none"), "deny")
+
+    print("\n--- hook state is private and a session id cannot leave it ---")
+    ESC = tempfile.mkdtemp()
+    ESC_TMP = os.path.join(ESC, "a", "b")
+    os.makedirs(ESC_TMP)
+    run(["bash", PROTOCOL, "mark-edit"], json.dumps({
+        "session_id": "../../../escaped", "tool_name": "Write",
+        "tool_input": {"file_path": "/tmp/x"}}), env={"TMPDIR": ESC_TMP})
+    check("a session id with slashes and .. stays inside the state root",
+          " ".join(sorted(os.listdir(ESC)) + sorted(os.listdir(os.path.join(ESC, "a")))), "a b")
+    inside = [os.path.join(dp, n) for dp, dn, fn in os.walk(ESC_TMP) for n in dn + fn]
+    uid_root = os.path.join(ESC_TMP, "masthead-{}".format(os.getuid()))
+    check("every state path sits under the user's private root",
+          all(p.startswith(uid_root) for p in inside) and bool(inside), True)
+    modes = {os.path.relpath(p, ESC_TMP): oct(os.stat(p).st_mode & 0o777) for p in inside}
+    check("state folders are 0700 and state files 0600",
+          " ".join(sorted({m for p, m in modes.items() if os.path.isdir(os.path.join(ESC_TMP, p))}) +
+                   sorted({m for p, m in modes.items() if os.path.isfile(os.path.join(ESC_TMP, p))})),
+          "0o700 0o600")
+    shutil.rmtree(ESC, ignore_errors=True)
     kstate("k-hit", [("8", "heredoc strip hook gate bypass")])
     check("a search that returned something", edit_gate("k-hit"), "allow")
     kstate("k-zero", [("0", "heredoc gate")])

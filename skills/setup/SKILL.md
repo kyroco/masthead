@@ -63,8 +63,10 @@ If you found none, ask: "What command runs this repository's tests? Say
 On yes:
 
 1. Copy `${CLAUDE_PLUGIN_ROOT}/skills/setup/push-check.sh` to
-   `.claude/push-check.sh` in the repository, replacing `__TEST_COMMAND__` with
-   the command and `__STATE_DIR__` with `.claude/state`.
+   `.claude/push-check.sh` in the repository, replacing `__STATE_DIR__` with
+   `.claude/state`. Write the command, exactly as the user gave it, as the one
+   line of `.claude/push-check.cmd`; the script runs that file, so quotes and
+   `$( )` in the command stay as written.
 2. Add `"PROJECT_PUSH_CHECK": ".claude/push-check.sh"` to the env block.
 
 ## 5. Question three: a memory across sessions
@@ -106,8 +108,8 @@ Finish with a table: each guard rail, on or off, and the one way to change it.
 Keep it to the rails this repository has: dangerous-command and secret
 refusals (always on), blind review (always on), push check (on if set), memory
 (on if connected), decision records (on if a folder was named). Then name the
-three install options and their defaults, because a terminal install never
-asked them: connect Korium memory (off), keep AI attribution out of commits
-(on), ask for a reason before a helper runs on the biggest model (off), all
-under `/plugin configure masthead@masthead`. End with: "Run `/masthead:setup`
+four install options and their defaults, because a terminal install never
+asked them: connect Korium memory (off), keep a code index in Korium (off),
+keep AI attribution out of commits (on), ask for a reason before a helper runs
+on the biggest model (off), all under `/plugin configure masthead@masthead`. End with: "Run `/masthead:setup`
 again to change any of this."

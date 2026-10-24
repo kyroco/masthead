@@ -40,9 +40,9 @@ run() {
     chmod +x "$tmp/hooks/korium-index-judge.py"
   fi
   sid="probe-$RANDOM"
-  mkdir -p "$tmp/claude-engram/$sid"
-  printf '%s' "$2" > "$tmp/claude-engram/$sid/codesearches.tsv"
-  [ "$3" = down ] && : > "$tmp/claude-engram/$sid/judge-down"
+  mkdir -p "$tmp/masthead-$(id -u)/claude-engram/$sid"
+  printf '%s' "$2" > "$tmp/masthead-$(id -u)/claude-engram/$sid/codesearches.tsv"
+  [ "$3" = down ] && : > "$tmp/masthead-$(id -u)/claude-engram/$sid/judge-down"
   out="$(printf '{"tool_name":"Grep","session_id":"%s","tool_input":{"pattern":"SubmitLimits"}}' "$sid" \
     | env TMPDIR="$tmp" ${4:+"$4"} bash "$tmp/hooks/engram-protocol.sh" gate-discovery 2>/dev/null)"
   rm -rf "$tmp"

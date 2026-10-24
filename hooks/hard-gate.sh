@@ -122,7 +122,7 @@ api_key: \"$(rep a 16)\""
         if (tolower(line) ~ tolower(assign)) hit = 1
         if (hit && index(line, waiver) == 0 && index(prev, waiver) == 0 \
             && line !~ /[$#]\{/ && line !~ /\$\(/ && line !~ /\\\(/) {
-          printf "%d:%s\n", NR, line
+          printf "line %d\n", NR
         }
         prev = line
       }' "$f" 2>/dev/null)"
@@ -143,7 +143,7 @@ api_key: \"$(rep a 16)\""
       if (tolower(line) ~ tolower(assign)) hit = 1
       if (hit && index(line, waiver) == 0 && index(prev, waiver) == 0 \
           && line !~ /[$#]\{/ && line !~ /\$\(/ && line !~ /\\\(/) {
-        printf "%s: %s\n", file, line
+        printf "%s\n", file
       }
       prev = line
       next
@@ -404,7 +404,8 @@ roots() {
     for marker in $markers; do
       d="$(dirname "$f")"; found=""
       while [ "${d#"$TOP"}" != "$d" ]; do
-        if [ -e "$d/$marker" ]; then found="$d"; break; fi
+        # Only a tracked marker makes a root, so an unpacked archive or a scratch folder never gets its build files run.
+        if [ -e "$d/$marker" ] && git -C "$TOP" ls-files --error-unmatch "$d/$marker" >/dev/null 2>&1; then found="$d"; break; fi
         [ "$d" = "$TOP" ] && break
         d="$(dirname "$d")"
       done

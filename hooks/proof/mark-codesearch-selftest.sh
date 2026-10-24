@@ -8,7 +8,7 @@ INNER='{"results":[{"rel_path":"products/apps/engram_core/lib/engram/read/hybrid
 
 run() { # name, shape, expect_n, expect_sha_prefix, expect_span_substr
   sid="cstest-$RANDOM$RANDOM"
-  d="${TMPDIR:-/tmp}/claude-engram/$sid"; mkdir -p "$d"
+  d="${TMPDIR:-/tmp}/masthead-$(id -u)/claude-engram/$sid"; mkdir -p "$d"
   python3 - "$sid" "$2" "$INNER" <<'PY' | bash "$HOOK" mark-codesearch >/dev/null 2>&1
 import json,sys
 sid,shape,inner=sys.argv[1],sys.argv[2],sys.argv[3]

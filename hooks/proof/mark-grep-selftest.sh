@@ -4,7 +4,7 @@ HOOK="${GATE_HOOKS_DIR:-$(cd "$(dirname "$0")/.." && pwd)}/engram-protocol.sh"
 pass=0; fail=0
 run() { # name, expect(yes|no), command
   sid="mgtest-$RANDOM$RANDOM"
-  d="${TMPDIR:-/tmp}/claude-engram/$sid"; mkdir -p "$d"
+  d="${TMPDIR:-/tmp}/masthead-$(id -u)/claude-engram/$sid"; mkdir -p "$d"
   printf '{"session_id":"%s","tool_name":"Bash","tool_input":{"command":%s}}' \
     "$sid" "$(printf '%s' "$3" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')" \
     | bash "$HOOK" mark-grep >/dev/null 2>&1

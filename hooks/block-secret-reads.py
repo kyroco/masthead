@@ -21,6 +21,13 @@ SECRET_BASENAMES = {
     "id_dsa",
     "id_ecdsa",
     "id_ed25519",
+    ".claude.json",
+    ".vault-token",
+    ".terraformrc",
+    ".zsh_history",
+    ".bash_history",
+    ".python_history",
+    ".node_repl_history",
 }
 
 # Shell profiles, which often hold exported tokens.
@@ -140,6 +147,14 @@ def is_secret_path(path):
         return True
     if re.search(r"(^|/)\.gnupg/", normalised):
         return True
+    if re.search(r"(^|/)\.config/gh/hosts\.yml$", normalised):
+        return True
+    if re.search(r"(^|/)\.docker/config\.json$", normalised):
+        return True
+    if re.search(r"(^|/)\.kube/config$", normalised):
+        return True
+    if re.search(r"(^|/)\.terraform\.d/", normalised):
+        return True
 
     return False
 
@@ -156,8 +171,11 @@ def secret_mentioned_in_command(command, cwd=None):
     if not command or (MASKED_READ_ALLOWED and is_masked_read(command, cwd)):
         return None
 
+    # Remove quote characters first so a name split by quotes is seen whole.
+    command = command.replace('"', "").replace("'", "")
+
     # Split on whitespace and shell metacharacters and test each fragment as a path.
-    for token in re.split(r"[\s;|&<>()\[\]{}\"'`,]+", command):
+    for token in re.split(r"[\s;|&<>()\[\]{}`,]+", command):
         token = token.strip().rstrip(".:;")
         if not token or token.startswith("-"):
             continue
@@ -193,15 +211,20 @@ def main():
 
     target = None
 
-    if tool in ("Read", "NotebookRead"):
-        target = ti.get("file_path") if is_secret_path(ti.get("file_path")) else None
-    elif tool == "Grep":
-        for key in ("path", "glob"):
-            if is_secret_path(ti.get(key)):
-                target = ti.get(key)
-                break
-    elif tool == "Bash":
-        target = secret_mentioned_in_command(ti.get("command"), data.get("cwd"))
+    try:
+        if tool in ("Read", "NotebookRead"):
+            target = ti.get("file_path") if is_secret_path(ti.get("file_path")) else None
+        elif tool == "Grep":
+            for key in ("path", "glob"):
+                if is_secret_path(ti.get(key)):
+                    target = ti.get(key)
+                    break
+        elif tool == "Bash":
+            target = secret_mentioned_in_command(ti.get("command"), data.get("cwd"))
+    except Exception:
+        # A path or command this gate cannot read is refused, never guessed about.
+        deny("Blocked: this call's input could not be read by the secret gate, so it is refused rather than guessed about. Give the path or command as plain text.")
+        return 0
 
     if not target:
         return 0
@@ -212,9 +235,8 @@ def main():
         "rule and there is no exception for 'I only need one line' - that is the "
         "exact call that leaked a live 1Password token on 2026-07-31.\n\n"
         "No command reads it, the masked reader included: it cannot mask every "
-        "way a shell file holds a secret. Ask the user for the lines or the value "
-        "you need, and say why. They can run `! {reader} {target}` themselves if they "
-        "choose to show you the file.".format(target=target, reader=READER)
+        "way a file holds a secret. Ask the user for the lines or the value "
+        "you need, and say why.".format(target=target)
     )
     return 0
 

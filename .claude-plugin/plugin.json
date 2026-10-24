@@ -3,16 +3,32 @@
   "displayName": "Masthead",
   "version": "0.1.0",
   "description": "Working rules that hold: memory-first work, blind review, one issue per session, and the safety gates that make them real.",
-  "author": { "name": "Kyroco, LLC", "url": "https://kyroco.ai" },
+  "author": {
+    "name": "Kyroco, LLC",
+    "url": "https://kyroco.ai"
+  },
   "homepage": "https://github.com/kyroco/masthead",
   "repository": "https://github.com/kyroco/masthead",
   "license": "Apache-2.0",
-  "keywords": ["hooks", "gates", "review", "memory", "workflow", "korium"],
+  "keywords": [
+    "hooks",
+    "gates",
+    "review",
+    "memory",
+    "workflow",
+    "korium"
+  ],
   "userConfig": {
     "korium": {
       "type": "boolean",
       "title": "Connect Korium memory",
-      "description": "Korium is Kyroco's memory for AI agents. With it on, Masthead asks each session to search memory before its first change and to save what it learned before it finishes. Needs a Korium account (free plan available). You can turn this on later.",
+      "description": "Korium is Kyroco's memory for AI agents. With it on, Masthead asks each session to search memory before its first change and to save what it learned before it finishes. What leaves this machine: the text of each memory search and each saved note, sent to your Korium account. Needs a Korium account (free plan available). You can turn this on later.",
+      "default": false
+    },
+    "code_index": {
+      "type": "boolean",
+      "title": "Keep a code index in Korium",
+      "description": "Only with Korium memory on and korium-cli installed. Masthead re-indexes the repository you are working in at the end of each session, and asks the index before a text search whether it already knows the name. What leaves this machine: the names and structure of the code in every repository you open with this on, and the names you search for. Leave it off for a repository you may not send to Korium.",
       "default": false
     },
     "strict_commits": {

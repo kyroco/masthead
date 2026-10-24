@@ -19,8 +19,22 @@ payload="$(cat 2>/dev/null || echo '{}')"
 
 field() { printf '%s' "$payload" | jq -r "$1" 2>/dev/null || echo ""; }
 
+# The user's private state root: $CLAUDE_PLUGIN_DATA/state, else $TMPDIR/masthead-<uid>. Mode 0700; refused when a symlink or not ours.
+state_root() {
+  local r
+  if [ -n "${CLAUDE_PLUGIN_DATA:-}" ]; then r="$CLAUDE_PLUGIN_DATA/state"; else r="${TMPDIR:-/tmp}/masthead-$(id -u)"; fi
+  (umask 077; mkdir -p "$r") 2>/dev/null
+  [ -d "$r" ] && [ ! -L "$r" ] && [ -O "$r" ] || return 1
+  chmod 700 "$r" 2>/dev/null
+  printf '%s' "${r%/}"
+}
+
 sid="$(field '.session_id // "nosession"')"
-dir="${TMPDIR:-/tmp}/claude-engram/${sid}"
+sid="${sid//[^A-Za-z0-9_-]/}"
+[ -n "$sid" ] || sid="nosession"
+umask 077
+root="$(state_root)" || exit 0
+dir="$root/claude-engram/${sid}"
 mkdir -p "$dir" 2>/dev/null || exit 0
 
 # The folder this hook lives in; empty when unknown.

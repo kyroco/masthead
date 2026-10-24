@@ -55,6 +55,7 @@ CASES = [
     ("ssh known_hosts", "Read", {"file_path": HOME + "/.ssh/known_hosts"}, "allow"),
     ("ordinary source file", "Read", {"file_path": "products/apps/salon_web/lib/foo.ex"}, "allow"),
     ("ordinary command", "Bash", {"command": "mix test --only browser"}, "allow"),
+    ("a path that is not a string is refused, not crashed on", "Read", {"file_path": ["x"]}, "deny"),
     ("git command", "Bash", {"command": "git status --short"}, "allow"),
     ("the redacting reader itself", "Bash",
      {"command": "python3 " + HOME + "/.claude/hooks/read-redacted.py"}, "allow"),
@@ -117,6 +118,33 @@ CASES = [
      {"command": "echo 'the value came from ~/.zshenv today'"}, "deny"),
     ("secrets.yaml is a store, not a word", "Read",
      {"file_path": "deploy/secrets.yaml"}, "deny"),
+    # S8: tool and account credential files the first lists missed.
+    ("gh hosts file", "Read", {"file_path": HOME + "/.config/gh/hosts.yml"}, "deny"),
+    ("docker config", "Read", {"file_path": HOME + "/.docker/config.json"}, "deny"),
+    ("kube config", "Read", {"file_path": HOME + "/.kube/config"}, "deny"),
+    ("claude account file", "Read", {"file_path": HOME + "/.claude.json"}, "deny"),
+    ("vault token", "Read", {"file_path": HOME + "/.vault-token"}, "deny"),
+    ("terraformrc", "Read", {"file_path": HOME + "/.terraformrc"}, "deny"),
+    ("terraform credentials file", "Read",
+     {"file_path": HOME + "/.terraform.d/credentials.tfrc.json"}, "deny"),
+    ("zsh history", "Read", {"file_path": HOME + "/.zsh_history"}, "deny"),
+    ("bash history", "Read", {"file_path": HOME + "/.bash_history"}, "deny"),
+    ("python history", "Read", {"file_path": HOME + "/.python_history"}, "deny"),
+    ("node repl history", "Read", {"file_path": HOME + "/.node_repl_history"}, "deny"),
+    ("grep into kube config", "Grep", {"pattern": "token", "path": HOME + "/.kube/config"}, "deny"),
+    ("kube config via cat", "Bash", {"command": "cat ~/.kube/config"}, "deny"),
+    ("gh settings are not credentials", "Read", {"file_path": HOME + "/.config/gh/config.yml"}, "allow"),
+    ("kube cache is not credentials", "Read", {"file_path": HOME + "/.kube/cache/x"}, "allow"),
+    ("a history.md in a repo", "Read", {"file_path": "docs/history.md"}, "allow"),
+    ("claude settings are not credentials", "Read", {"file_path": HOME + "/.claude/settings.json"}, "allow"),
+    ("project claude settings", "Read", {"file_path": ".claude/settings.json"}, "allow"),
+    # S8-b: a name split with quote characters is still the name.
+    ("ssh folder split by quotes", "Bash", {"command": 'cat ~/."ssh"/id_rsa'}, "deny"),
+    ("aws name split by quotes", "Bash", {"command": 'cat ~/.aw"s"/credentials'}, "deny"),
+    ("single quote split", "Bash", {"command": "cat ~/.ss'h'/id_rsa"}, "deny"),
+    ("leaf split by quotes", "Bash", {"command": 'cat ~/.ssh/id_"rsa"'}, "deny"),
+    ("kube split by quotes", "Bash", {"command": "cat ~/.ku'be'/config"}, "deny"),
+    ("quoted ordinary command", "Bash", {"command": 'echo "hello" \'world\''}, "allow"),
 ]
 
 
@@ -149,6 +177,14 @@ def main():
         failures += 0 if ok else 1
         print("{:4}  {:<32} expected {:<5} got {}".format(
             "ok" if ok else "FAIL", label, expected, actual))
+
+    # The refusal must not send the user to the masked reader: it cannot mask every shape.
+    raw = subprocess.run([sys.executable, HOOK],
+                         input=json.dumps({"tool_name": "Read", "tool_input": {"file_path": HOME + "/.aws/credentials"}}),
+                         capture_output=True, text=True, check=False).stdout
+    sends_to_reader = "read-redacted" in raw
+    failures += 1 if sends_to_reader else 0
+    print("{:4}  {:<32}".format("FAIL" if sends_to_reader else "ok", "the refusal sends nobody to the reader"))
 
     print("")
     if failures:
