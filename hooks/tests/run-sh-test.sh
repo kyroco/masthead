@@ -34,6 +34,12 @@ out="$(printf '%s' "$commit" | CLAUDE_PLUGIN_OPTION_STRICT_COMMITS=false bash "$
 out="$(printf '%s' "$fetch" | CLAUDE_PLUGIN_OPTION_KORIUM=false CLAUDE_PLUGIN_OPTION_STRICT_COMMITS=false bash "$RUN" untrusted-domain-deny.py 2>&1)"
 [ "$(decision "$out")" = deny ] && ok || bad "a paste site should be refused whatever the options say, got: $out"
 
+# With Korium on but no korium-cli on the machine, the code index gate stands aside.
+grep_call='{"session_id":"run-sh-test","cwd":"'"$T"'","tool_name":"Grep","tool_input":{"pattern":"SomeModuleName","path":"'"$T"'"}}'
+mkdir -p "$T/emptybin"
+out="$(printf '%s' "$grep_call" | env PATH="$T/emptybin:/usr/bin:/bin" HOME="$T" CLAUDE_PLUGIN_OPTION_KORIUM=true bash "$RUN" engram-protocol.sh gate-discovery 2>&1)"
+[ "$(decision "$out")" = allow ] && ok || bad "no korium-cli: the code gate should stand aside, got: $out"
+
 # An unknown hook name is a no-op, and no name at all is a no-op.
 printf '%s' "$edit" | bash "$RUN" no-such-hook.py >/dev/null 2>&1 && ok || bad "an unknown hook name should exit 0"
 printf '%s' "$edit" | bash "$RUN" >/dev/null 2>&1 && ok || bad "no hook name should exit 0"

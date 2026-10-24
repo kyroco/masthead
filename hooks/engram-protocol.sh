@@ -210,6 +210,8 @@ case "$mode" in
   gate-discovery)
     # Operator off switch.
     case "${MASTHEAD_CODE_GATE:-}" in off|0|false|no) exit 0 ;; esac
+    # No korium-cli on this machine means no index this person can build: stand aside.
+    command -v korium-cli >/dev/null 2>&1 || exit 0
 
     judge="$hook_dir/korium-index-judge.py"
     [ -x "$judge" ] || exit 0
@@ -297,6 +299,8 @@ case "$mode" in
   # gate-redundant-grep: refuse, once, a search that repeats a name code_locate just answered.
   gate-redundant-grep)
     case "${MASTHEAD_CODE_GATE:-}" in off|0|false|no) exit 0 ;; esac
+    # No korium-cli on this machine means no index this person can build: stand aside.
+    command -v korium-cli >/dev/null 2>&1 || exit 0
     [ -s "$dir/codesearches.tsv" ] || exit 0
 
     # For a shell command, only the pattern of an rg or grep.
@@ -344,6 +348,8 @@ EOF
   gate-span-read)
     [ -s "$dir/codesearches.tsv" ] || exit 0
     case "${MASTHEAD_CODE_GATE:-}" in off|0|false|no) exit 0 ;; esac
+    # No korium-cli on this machine means no index this person can build: stand aside.
+    command -v korium-cli >/dev/null 2>&1 || exit 0
     [ -f "$dir/span-refused" ] && exit 0
 
     # An offset means the read is already scoped. Nothing to say.

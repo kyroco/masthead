@@ -25,6 +25,6 @@ run "ls"                no  'ls -la .claude/hooks/'
 run "git log"           no  'git log --oneline -20'
 run "grep as filename"  no  'cat notes-about-grep.md'
 run "grep in message"   no  'git commit -m "use grep here"'
-run "aws cli"           no  'aws ecs describe-services --cluster engram-prod'
+run "aws cli"           no  'aws ecs describe-services --cluster example'
 echo; echo "pass=$pass fail=$fail"
 [ "$fail" -eq 0 ]
