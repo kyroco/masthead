@@ -42,6 +42,14 @@ def main():
         if got != expected:
             failures.append((expected, got, command))
 
+    # The refusal must not send the model to a script inside the repository, which any clone could plant.
+    sample = "op read op://vault/item/field"
+    payload = json.dumps({"tool_name": "Bash", "tool_input": {"command": sample}})
+    reason = subprocess.run([sys.executable, str(GATE)], input=payload, capture_output=True, text=True).stdout
+    total += 1
+    if "scripts/" in reason or "op-header-curl" in reason:
+        failures.append(("no repository script in the refusal", "named one", sample))
+
     for expected, got, command in failures:
         print("FAIL expected %s got %s: %s" % (expected, got, command))
     print("%d cases, %d failures" % (total, len(failures)))

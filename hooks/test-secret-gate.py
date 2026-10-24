@@ -118,6 +118,33 @@ CASES = [
      {"command": "echo 'the value came from ~/.zshenv today'"}, "deny"),
     ("secrets.yaml is a store, not a word", "Read",
      {"file_path": "deploy/secrets.yaml"}, "deny"),
+    # S8: tool and account credential files the first lists missed.
+    ("gh hosts file", "Read", {"file_path": HOME + "/.config/gh/hosts.yml"}, "deny"),
+    ("docker config", "Read", {"file_path": HOME + "/.docker/config.json"}, "deny"),
+    ("kube config", "Read", {"file_path": HOME + "/.kube/config"}, "deny"),
+    ("claude account file", "Read", {"file_path": HOME + "/.claude.json"}, "deny"),
+    ("vault token", "Read", {"file_path": HOME + "/.vault-token"}, "deny"),
+    ("terraformrc", "Read", {"file_path": HOME + "/.terraformrc"}, "deny"),
+    ("terraform credentials file", "Read",
+     {"file_path": HOME + "/.terraform.d/credentials.tfrc.json"}, "deny"),
+    ("zsh history", "Read", {"file_path": HOME + "/.zsh_history"}, "deny"),
+    ("bash history", "Read", {"file_path": HOME + "/.bash_history"}, "deny"),
+    ("python history", "Read", {"file_path": HOME + "/.python_history"}, "deny"),
+    ("node repl history", "Read", {"file_path": HOME + "/.node_repl_history"}, "deny"),
+    ("grep into kube config", "Grep", {"pattern": "token", "path": HOME + "/.kube/config"}, "deny"),
+    ("kube config via cat", "Bash", {"command": "cat ~/.kube/config"}, "deny"),
+    ("gh settings are not credentials", "Read", {"file_path": HOME + "/.config/gh/config.yml"}, "allow"),
+    ("kube cache is not credentials", "Read", {"file_path": HOME + "/.kube/cache/x"}, "allow"),
+    ("a history.md in a repo", "Read", {"file_path": "docs/history.md"}, "allow"),
+    ("claude settings are not credentials", "Read", {"file_path": HOME + "/.claude/settings.json"}, "allow"),
+    ("project claude settings", "Read", {"file_path": ".claude/settings.json"}, "allow"),
+    # S8-b: a name split with quote characters is still the name.
+    ("ssh folder split by quotes", "Bash", {"command": 'cat ~/."ssh"/id_rsa'}, "deny"),
+    ("aws name split by quotes", "Bash", {"command": 'cat ~/.aw"s"/credentials'}, "deny"),
+    ("single quote split", "Bash", {"command": "cat ~/.ss'h'/id_rsa"}, "deny"),
+    ("leaf split by quotes", "Bash", {"command": 'cat ~/.ssh/id_"rsa"'}, "deny"),
+    ("kube split by quotes", "Bash", {"command": "cat ~/.ku'be'/config"}, "deny"),
+    ("quoted ordinary command", "Bash", {"command": 'echo "hello" \'world\''}, "allow"),
 ]
 
 

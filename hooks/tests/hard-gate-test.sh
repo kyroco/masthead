@@ -479,6 +479,25 @@ ok "$STATUS" "2" "pushing another commit to a new name is refused"
 run_gate "$d" "git push --all origin"
 ok "$STATUS" "2" "pushing every branch is refused"
 
+echo "22. a tracked package.json root runs its test script on push"
+d="$(newrepo node-tracked)"
+mkdir -p "$d/web"
+printf '%s\n' '{"name":"w","scripts":{"test":"touch ran-here"}}' > "$d/web/package.json"
+( cd "$d" && git add web/package.json && git commit -qm base ) >/dev/null 2>&1
+echo 'const a = 1;' > "$d/web/a.js"
+run_gate "$d"
+if [ -e "$d/web/ran-here" ]; then pass=$((pass + 1)); echo "  ok: the tracked root's test script ran"; else fail=$((fail + 1)); echo "  FAIL: the tracked root's test script did not run (stderr: $(printf '%s' "$ERR" | head -3 | tr '\n' ' '))" >&2; fi
+
+echo "23. an untracked folder's package.json is not a root, so its test script never runs"
+d="$(newrepo node-untracked)"
+( cd "$d" && echo "# notes" > README.md && git add README.md && git commit -qm base ) >/dev/null 2>&1
+mkdir -p "$d/scratch"
+printf '%s\n' '{"name":"s","scripts":{"test":"touch ran-here"}}' > "$d/scratch/package.json"
+echo 'const a = 1;' > "$d/scratch/a.js"
+run_gate "$d"
+if [ -e "$d/scratch/ran-here" ]; then fail=$((fail + 1)); echo "  FAIL: an untracked folder's test script ran on push" >&2; else pass=$((pass + 1)); echo "  ok: the untracked folder's test script did not run"; fi
+contains "$ERR" "no package.json above them" "it says the node rung found no tracked root"
+
 echo ""
 echo "passed $pass, failed $fail"
 [ "$fail" -eq 0 ] || exit 1

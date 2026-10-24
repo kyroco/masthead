@@ -13,6 +13,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 T="$(cd "$(mktemp -d "${TMPDIR:-/tmp}/scope-gate-test.XXXXXX")" && pwd)"
 trap 'rm -rf "$T"' EXIT
 export TMPDIR="$T/tmp"
+unset CLAUDE_PLUGIN_DATA
 mkdir -p "$TMPDIR"
 # The gate guards its own file, the runner beside it and the user settings.
 # A copy in a throwaway user folder is what runs, so these cases
@@ -239,6 +240,38 @@ run allow "a repo's own state folder: an edit its scope allows"      "$(edit "$K
 run deny  "a repo's own state folder: an edit outside its scope"     "$(edit "$K/src/b.ex" "$K")"
 run deny  "a repo's own state folder: its scope file is protected"   "$(edit "$K/.kyroco/scope.json" "$K")"
 export CLAUDE_PROJECT_DIR="$R"
+
+# ------------------------------------------------------- private state folder
+# Snapshots hold copies of the user's settings and name the paths to write back,
+# so the folder must be private, and one that is not ours must not be trusted.
+mode_of() { stat -c %a "$1" 2>/dev/null || stat -f %Lp "$1"; }
+SNAP_PAYLOAD="$(jq -n --arg c "$R" '{tool_name: "Bash", tool_input: {command: "true"}, cwd: $c, session_id: "s", tool_use_id: "modes"}')"
+umask 022
+printf '%s' "$SNAP_PAYLOAD" | python3 "$GATE" >/dev/null
+SROOT="$TMPDIR/masthead-$(id -u)"
+SSNAP="$(find "$SROOT" -name 's-modes.json' 2>/dev/null | head -1)"
+[ -d "$SROOT" ] && [ "$(mode_of "$SROOT")" = 700 ] && ok "state root is mode 700" || bad "state root mode: $(mode_of "$SROOT" 2>&1)"
+[ -n "$SSNAP" ] && [ "$(mode_of "$(dirname "$SSNAP")")" = 700 ] && ok "snapshot folder is mode 700" || bad "snapshot folder missing or not 700"
+[ -n "$SSNAP" ] && [ "$(mode_of "$SSNAP")" = 600 ] && ok "snapshot file is mode 600" || bad "snapshot file missing or not 600: $SSNAP"
+umask 077
+
+# A state root that is a symlink (stands in for a folder someone else made first)
+# is refused: a snapshot planted in it must not be written back.
+EVIL="$T/evil"; VICTIM="$T/victim"
+mkdir -p "$EVIL/scope-gate" "$EVIL/claude-scope-gate" "$VICTIM" "$T/tmp2"
+chmod 777 "$EVIL" "$EVIL/scope-gate" "$EVIL/claude-scope-gate"
+ln -s "$EVIL" "$T/tmp2/masthead-$(id -u)"
+mkdir -p "$T/tmp2/claude-scope-gate"
+PLANT="$(jq -n --arg r "$VICTIM" '{($r): {exempt: [], files: {"pwned.txt": ["file", "cHduZWQK"]}}}')"
+for d in "$EVIL/scope-gate" "$EVIL/claude-scope-gate" "$T/tmp2/claude-scope-gate"; do printf '%s' "$PLANT" > "$d/s-sym.json"; done
+sym_payload="$(jq -n --arg c "$R" '{tool_name: "Bash", tool_input: {command: "true"}, cwd: $c, session_id: "s", tool_use_id: "sym"}')"
+out="$(printf '%s' "$sym_payload" | TMPDIR="$T/tmp2" python3 "$GATE" post)"
+[ ! -e "$VICTIM/pwned.txt" ] && ok "a snapshot in a symlinked state folder is not written back" \
+  || bad "post wrote $VICTIM/pwned.txt from a planted snapshot"
+printf '%s' "$sym_payload" | TMPDIR="$T/tmp2" python3 "$GATE" >/dev/null
+[ -z "$(find "$EVIL" -name '*.json' -newer "$VICTIM" 2>/dev/null | grep -v 's-sym.json')" ] \
+  && ok "the before half writes no snapshot into a symlinked state folder" \
+  || bad "the before half wrote a snapshot into the symlinked folder"
 
 echo
 echo "$pass passed, $failures failed"

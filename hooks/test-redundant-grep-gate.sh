@@ -4,7 +4,7 @@
 #
 # TWO THINGS THIS PROBE GOT WRONG FIRST, both worth keeping written down because
 # each made a WORKING gate look dead:
-#   1. The hook resolves its state as $TMPDIR/claude-engram/<session_id>, so a
+#   1. The hook resolves its state as $TMPDIR/masthead-<uid>/claude-engram/<session_id>, so a
 #      probe must set TMPDIR and put the matching session_id in the payload. The
 #      first version invented an env var the hook does not read.
 #   2. These gates refuse by printing a JSON permissionDecision and exiting 0,
@@ -36,8 +36,8 @@ run() {
   local tmp sid payload
   tmp="$(mktemp -d)"
   sid="probe-$RANDOM"
-  mkdir -p "$tmp/claude-engram/$sid"
-  printf '%s' "$1" > "$tmp/claude-engram/$sid/codesearches.tsv"
+  mkdir -p "$tmp/masthead-$(id -u)/claude-engram/$sid"
+  printf '%s' "$1" > "$tmp/masthead-$(id -u)/claude-engram/$sid/codesearches.tsv"
   payload="$(printf '{"tool_name":"Grep","session_id":"%s","tool_input":{"pattern":"%s"}}' "$sid" "$2")"
   local out
   out="$(printf '%s' "$payload" \

@@ -81,7 +81,7 @@ run() {
   else
     bad "$name" "got $got judged [$judged], want $want judged [$want_pat]"
   fi
-  rm -rf "${TMPDIR:-/tmp}/claude-engram/$sid"
+  rm -rf "${TMPDIR:-/tmp}/masthead-$(id -u)/claude-engram/$sid"
 }
 sh() { jq -n --arg c "$1" '{command:$c}'; }
 
@@ -107,7 +107,7 @@ record_search "$sid" empty fresh "test user call"
 got="$(gate "$sid" Bash "$(sh 'rg handle_call products/')")"
 [ "$got" = deny ] && ok "a lookup of another name does not unlock it" "$got" \
   || bad "a lookup of another name does not unlock it" "$got"
-rm -rf "${TMPDIR:-/tmp}/claude-engram/$sid"
+rm -rf "${TMPDIR:-/tmp}/masthead-$(id -u)/claude-engram/$sid"
 sid="gdtest-cli-$RANDOM"; : > "$JUDGE_LOG"
 jq -n --arg s "$sid" '{session_id:$s, tool_name:"Bash",
   tool_input:{command:"korium-cli search handle_call"}}' \
@@ -115,7 +115,7 @@ jq -n --arg s "$sid" '{session_id:$s, tool_name:"Bash",
 got="$(gate "$sid" Bash "$(sh 'rg handle_call products/')")"
 [ "$got" = allow ] && ok "a korium-cli search counts as the lookup" "$got" \
   || bad "a korium-cli search counts as the lookup" "$got"
-rm -rf "${TMPDIR:-/tmp}/claude-engram/$sid"
+rm -rf "${TMPDIR:-/tmp}/masthead-$(id -u)/claude-engram/$sid"
 
 echo "== a judge that is down =="
 # Since 2026-10-09 a judge that cannot be read refuses (the way through is a
@@ -130,7 +130,7 @@ if [ "$got" = deny ] && [ "$calls" = 1 ]; then
 else
   bad "a judge that is down refuses, and is not asked again for five minutes" "$got, $calls calls"
 fi
-rm -rf "${TMPDIR:-/tmp}/claude-engram/$sid"
+rm -rf "${TMPDIR:-/tmp}/masthead-$(id -u)/claude-engram/$sid"
 
 echo "== the nudge =="
 sid="gdtest-nudge-$RANDOM"; : > "$JUDGE_LOG"
@@ -141,7 +141,7 @@ if [ "$first" = nudge ] && [ "$second" = allow ]; then
 else
   bad "nudges on the first allowed search only, with no decision" "$first then $second"
 fi
-rm -rf "${TMPDIR:-/tmp}/claude-engram/$sid"
+rm -rf "${TMPDIR:-/tmp}/masthead-$(id -u)/claude-engram/$sid"
 
 echo "== one model call per distinct search =="
 sid="gdtest-cache-$RANDOM"; : > "$JUDGE_LOG"
@@ -153,7 +153,7 @@ if [ "$again" = deny ] && [ "$calls" = 1 ]; then
 else
   bad "a repeated search reads the cached verdict" "$again, $calls judge calls"
 fi
-rm -rf "${TMPDIR:-/tmp}/claude-engram/$sid"
+rm -rf "${TMPDIR:-/tmp}/masthead-$(id -u)/claude-engram/$sid"
 
 echo "== how the pattern is found =="
 run "grep -e value is the pattern" deny "fuse_scores" Bash "$(sh 'grep -rn -e fuse_scores products/')"
@@ -214,7 +214,7 @@ if [ "$judged_path" = "infra/ (files: *.tf)" ]; then
 else
   bad "-g reaches the judge with the path" "[$judged_path]"
 fi
-rm -rf "${TMPDIR:-/tmp}/claude-engram/$sid"
+rm -rf "${TMPDIR:-/tmp}/masthead-$(id -u)/claude-engram/$sid"
 
 echo; echo "pass=$pass fail=$fail"
 [ "$fail" -eq 0 ]
