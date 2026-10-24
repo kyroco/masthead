@@ -1,7 +1,7 @@
 <title>How Masthead Works</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <style>
-/* Layout: one reading column, figures on paper cards, decisions as a numbered ledger because the order is the order setup asks. */
+/* Layout: one reading column; the story first, the pictures where the story reaches them, the reference tables last. */
 :root {
   --bg: #fbfaf7; --fg: #1f2430; --muted: #5b6270; --line: #e3e0d8;
   --paper: #ffffff; --accent: #b4551f; --accent-soft: #fbeee4; --good: #1f7a4d;
@@ -15,52 +15,44 @@
 :root[data-theme="dark"] {
   --bg: #15181f; --fg: #e8e6e0; --muted: #a2a8b3; --line: #2b303a; --paper: #ffffff;
   --accent: #e08a55; --accent-soft: #2d231b; --good: #5fc48f; color-scheme: dark }
-body { background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 18px; line-height: 1.55;
+body { background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 18px; line-height: 1.6;
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 0 64px; }
-main { max-width: 760px; margin: 0 auto; }
+main { max-width: 740px; margin: 0 auto; }
 h1, h2, h3 { font-family: var(--display); text-wrap: balance; line-height: 1.15; }
 h1 { font-size: clamp(38px, 7vw, 56px); font-weight: 600; margin: 48px 0 8px; }
 h2 { font-size: clamp(26px, 4vw, 32px); font-weight: 600; margin: 56px 0 12px; }
-h3 { font-size: 21px; font-weight: 600; margin: 28px 0 6px; }
-p { max-width: 65ch; margin: 0 0 14px; }
+h3 { font-size: 21px; font-weight: 600; margin: 32px 0 6px; }
+p { max-width: 66ch; margin: 0 0 16px; }
 .lede { font-size: 21px; color: var(--muted); max-width: 60ch; }
 .eyebrow { font-family: var(--mono); font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); margin-top: 40px; }
-figure { margin: 24px 0; }
+figure { margin: 28px 0; }
 .paper { background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 12px; overflow-x: auto; }
 .paper svg { display: block; width: 100%; height: auto; min-width: 640px; }
 figcaption { font-size: 15px; color: var(--muted); margin-top: 8px; }
-.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin: 18px 0 8px; }
-.card { border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; min-width: 0; background: color-mix(in srgb, var(--bg) 92%, var(--fg)); }
-.card b { display: block; font-family: var(--display); font-size: 19px; margin-bottom: 4px; }
-.card span { color: var(--muted); font-size: 16px; }
-.card .on { font-family: var(--mono); font-size: 12px; color: var(--good); letter-spacing: 0.06em; text-transform: uppercase; }
-.card .opt { font-family: var(--mono); font-size: 12px; color: var(--accent); letter-spacing: 0.06em; text-transform: uppercase; }
-ol.ledger { list-style: none; padding: 0; margin: 0; counter-reset: d; }
-ol.ledger li { counter-increment: d; border-top: 1px solid var(--line); padding: 20px 0 6px; display: grid; grid-template-columns: 56px 1fr; gap: 12px; }
-ol.ledger li::before { content: counter(d, decimal-leading-zero); font-family: var(--mono); color: var(--accent); font-size: 15px; padding-top: 4px; }
-ol.ledger li > div { min-width: 0; }
-ol.ledger h3 { margin-top: 0; }
-.why { background: var(--accent-soft); border-left: 3px solid var(--accent); padding: 10px 14px; border-radius: 0 8px 8px 0; margin: 10px 0 0; }
-.why p { margin: 0; font-size: 17px; }
 pre { font-family: var(--mono); font-size: 15px; background: color-mix(in srgb, var(--bg) 88%, var(--fg)); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; overflow-x: auto; margin: 12px 0; }
 code { font-family: var(--mono); font-size: 0.92em; }
-.qa dt { font-weight: 600; margin-top: 16px; }
-.qa dd { margin: 4px 0 0; color: var(--muted); }
+.tablewrap { overflow-x: auto; margin: 12px 0 24px; }
+table { border-collapse: collapse; width: 100%; font-size: 15px; }
+th, td { text-align: left; vertical-align: top; padding: 8px 10px; border-top: 1px solid var(--line); }
+th { font-family: var(--mono); font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); border-top: 0; }
+td code { white-space: nowrap; }
+ul { padding-left: 22px; }
 footer { margin-top: 64px; border-top: 1px solid var(--line); padding-top: 16px; color: var(--muted); font-size: 15px; }
 a { color: var(--accent); }
 a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-@media (max-width: 480px) { ol.ledger li { grid-template-columns: 40px 1fr; } body { font-size: 17px; } }
+@media (max-width: 480px) { body { font-size: 17px; } }
 </style>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Source+Sans+3:wght@400;600&family=IBM+Plex+Mono:wght@400&display=swap">
 <main>
 <div class="eyebrow">Masthead, a plugin for Claude Code</div>
-<h1>Rules that hold, even when the session is long</h1>
-<p class="lede">Masthead turns a team's working rules into small checks the AI cannot talk its way past. This page explains what you get, how a session looks with it on, and why each piece is built the way it is. No programming knowledge needed.</p>
+<h1>Give it the issues. Get back merged pull requests.</h1>
+<p class="lede">Masthead runs your GitHub issues for you: each one in its own session, checked before it starts, reviewed by readers who weren't in the room, tested on the exact commit that ships, and merged. You decide the things only you can decide.</p>
 
-<h2>The idea in one picture</h2>
-<p>Write "never push without running the tests" into the file Claude reads at the start, and it works for a while. Long sessions forget, and a forgotten rule fails quietly. Masthead puts the rule in front of the action instead, every time.</p>
-<figure><div class="paper">
-<svg xmlns="http://www.w3.org/2000/svg" role="img" viewBox="0 0 960 420" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="16">
+<h2>Why we built it</h2>
+<p>We'd had the rules written down for a long time. "Search memory before you change anything" sat in the file Claude reads at the start of every session. Then we took out the small script that was enforcing it, and within two days a whole piece of work shipped with nothing saved. Nobody noticed until later.</p>
+<p>A rule in prose is a suggestion. A rule in front of the action is a rule. That's the idea under all of it: write the spec into the issue before the session starts, let the session run on its own, and put the rules that matter where they can't be forgotten.</p>
+<figure><div class="paper"><svg xmlns="http://www.w3.org/2000/svg" role="img" viewBox="0 0 960 420" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="16">
+    <!-- Left: a rule in prose -->
   <text x="40" y="44" font-size="22" font-weight="600" fill="#1f2937">A rule written in prose</text>
   <text x="40" y="70" fill="#4b5563">"Never push without running the tests."</text>
   <rect x="40" y="96" width="400" height="150" rx="10" fill="#f9fafb" stroke="#d1d5db"/>
@@ -70,29 +62,37 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   <text x="225" y="240" font-size="13" fill="#6b7280">hour 2</text>
   <text x="390" y="240" font-size="13" fill="#6b7280">hour 3</text>
   <path d="M 60 140 C 160 142, 240 170, 300 200 S 400 222, 420 222" fill="none" stroke="#dc2626" stroke-width="4" stroke-linecap="round"/>
-  <text x="40" y="282" fill="#4b5563">It fades as the session gets long, and nobody is told.</text>
-  <text x="40" y="306" fill="#4b5563">The rule fails the day it matters.</text>
+  <text x="40" y="282" fill="#4b5563">It fades as the session gets long, and nobody notices</text>
+  <text x="40" y="306" fill="#4b5563">until something has already slipped through.</text>
+
+  <!-- Right: a gate -->
   <text x="520" y="44" font-size="22" font-weight="600" fill="#1f2937">The same rule as a gate</text>
   <text x="520" y="70" fill="#4b5563">A small check runs before the action, every time.</text>
+  <!-- Claude box -->
   <rect x="520" y="110" width="110" height="56" rx="10" fill="#eef2ff" stroke="#6366f1"/>
   <text x="575" y="144" text-anchor="middle" fill="#312e81" font-weight="600">Claude</text>
+  <!-- arrow -->
   <line x1="630" y1="138" x2="690" y2="138" stroke="#6b7280" stroke-width="2" marker-end="url(#g-arrow)"/>
   <text x="660" y="128" text-anchor="middle" font-size="13" fill="#6b7280">git push</text>
+  <!-- gate -->
   <rect x="692" y="104" width="120" height="68" rx="10" fill="#fef3c7" stroke="#d97706"/>
   <text x="752" y="132" text-anchor="middle" fill="#78350f" font-weight="600">gate</text>
   <text x="752" y="154" text-anchor="middle" font-size="13" fill="#78350f">tests passed on</text>
   <text x="752" y="168" text-anchor="middle" font-size="13" fill="#78350f">this commit?</text>
+  <!-- yes -->
   <line x1="812" y1="124" x2="870" y2="124" stroke="#16a34a" stroke-width="2" marker-end="url(#g-arrowgreen)"/>
   <text x="841" y="114" text-anchor="middle" font-size="13" fill="#16a34a">yes</text>
   <rect x="872" y="104" width="70" height="40" rx="8" fill="#dcfce7" stroke="#16a34a"/>
   <text x="907" y="129" text-anchor="middle" font-size="14" fill="#14532d">pushed</text>
+  <!-- no -->
   <line x1="752" y1="172" x2="752" y2="230" stroke="#dc2626" stroke-width="2" marker-end="url(#g-arrowred)"/>
   <text x="768" y="206" font-size="13" fill="#dc2626">no</text>
   <rect x="640" y="232" width="224" height="64" rx="10" fill="#fee2e2" stroke="#dc2626"/>
   <text x="752" y="257" text-anchor="middle" font-size="14" fill="#7f1d1d" font-weight="600">refused, with the reason</text>
   <text x="752" y="280" text-anchor="middle" font-size="13" fill="#7f1d1d">"run the tests, then push again"</text>
   <text x="520" y="336" fill="#4b5563">Claude reads the reason and does the right thing instead.</text>
-  <text x="520" y="360" fill="#4b5563">A gate cannot forget, and it never passes silently.</text>
+  <text x="520" y="360" fill="#4b5563">The check runs the same way at hour one and at hour ten.</text>
+
   <defs>
     <marker id="g-arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#6b7280"/></marker>
     <marker id="g-arrowgreen" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#16a34a"/></marker>
@@ -100,115 +100,184 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   </defs>
 </svg>
 </div>
-<figcaption>Left: a rule in prose fades over a long session. Right: the same rule as a gate, which runs before every push and refuses with a reason when the tests have not passed on that commit.</figcaption></figure>
+<figcaption>Left: a rule in prose fades over a long session. Right: the same rule as a check that runs before every push and refuses, with a reason, when the tests haven't passed on that commit.</figcaption></figure>
 
-<h2>What you get</h2>
-<div class="cards">
-  <div class="card"><b>Secrets stay secret</b><span>Claude cannot read your environment files, keys or password files, and cannot fetch a secret out of a vault.</span><br><span class="on">always on</span></div>
-  <div class="card"><b>Nothing irreversible</b><span>Force pushes, history rewrites and destructive commands are refused before they run.</span><br><span class="on">always on</span></div>
-  <div class="card"><b>No surprise web traffic</b><span>Fetches to paste sites and other places code should not go are refused.</span><br><span class="on">always on</span></div>
-  <div class="card"><b>Tests before a push</b><span>A push is refused until the tests passed on that exact commit.</span><br><span class="opt">your choice at setup</span></div>
-  <div class="card"><b>Blind review</b><span>Separate reviewers read the change cold; a judge keeps only what it can prove.</span><br><span class="on">always on</span></div>
-  <div class="card"><b>One issue per session</b><span>/work-on #123 takes one issue from a fresh branch to one reviewed pull request.</span><br><span class="on">always on</span></div>
-  <div class="card"><b>Honest handoffs</b><span>Work sent to a helper must say what is claimed and what is not proved.</span><br><span class="on">always on</span></div>
-  <div class="card"><b>A memory across sessions</b><span>With Korium connected, sessions remember what earlier ones learned.</span><br><span class="opt">only if you connect it</span></div>
-  <div class="card"><b>Clean git history</b><span>No AI co-author lines or session links in commits.</span><br><span class="opt">on, can be turned off</span></div>
-</div>
+<h2>A day with Masthead</h2>
+<p>It's Monday. You have a milestone with nine issues in it, the kind of list that used to mean a week of watching over someone's shoulder. You open Claude Code in the repository and type one thing:</p>
+<pre>/work-on milestone 4</pre>
+<p>A foreman wakes up. It doesn't build anything yet. It reads. The project's README first, because that's the brief: why this work exists, what shape it has, what rules it follows. Then every issue, with every comment, because your rulings tend to arrive as comments. Then the decision records the issues point at, the architecture notes, the mockups, and what earlier sessions wrote down in memory.</p>
+<p>Then it sends a small reader to every issue, all nine at once. Each reader comes back with the same report. Does this issue say what has to be true when it's done, or does it tell the builder how to do its job? Can I read scenarios out of it, "Given this, When that, Then this is true," and does each one rest on something real: a decision that was made, a rule in the README, something you actually said? Is it too big for one pull request? What would a builder have to guess? One more reader looks at the milestone as a whole: are two issues building the same thing, does one contradict the decision record, is there a decision nobody is building, is the order right.</p>
+<p>The foreman shows you the first issue rewritten, old body beside new, and you say go. The rest get rewritten the same way. The big ones get split into sub-issues. Every open question gets looked up in the sources, in order: the issue's own comments, the README, the decision record, the architecture doc, the mockups, the memory. Whatever a source settles is answered on the issue with the line quoted, so nobody has to ask twice. Whatever nothing settles comes to you, one question at a time, with a recommendation. You answer in a sentence. It goes on the issue in your words. An issue with a question still open stays out of the run until you've answered it.</p>
+<p>Now the foreman hands you one table: the issues in build order, which depend on which, which can run side by side without touching the same files, how much effort each one needs, and how many workers it would run at once. You pick a number. Say three.</p>
+<p>Three fresh sessions start, each with its own copy of the repository and a branch tied to its issue. Each worker reads its issue, the README and the decision record cover to cover, looks up what earlier sessions learned, and sends the foreman a plan in five lines or fewer: for each scenario, what it will change and the test that proves it. The foreman holds that plan against the scenarios and the README's rule that the simplest thing that meets the result wins, and says go, or sends it back naming the line.</p>
+<figure><div class="paper"><svg xmlns="http://www.w3.org/2000/svg" role="img" viewBox="0 0 960 620" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="14">
+    <text x="40" y="40" font-size="22" font-weight="600" fill="#1f2937">A run: the issues are checked, a foreman plans, workers build in parallel</text>
 
-<h2>How a session looks</h2>
-<p>You type one command with an issue number. Claude does the rest and asks you only when something is genuinely yours to decide.</p>
-<figure><div class="paper">
-<svg xmlns="http://www.w3.org/2000/svg" role="img" viewBox="0 0 960 460" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="14">
-  <text x="40" y="40" font-size="22" font-weight="600" fill="#1f2937">One issue, one session, one pull request</text>
-  <text x="40" y="66" fill="#4b5563">What happens after you type /work-on #123</text>
-  <rect x="40" y="100" width="130" height="64" rx="10" fill="#eef2ff" stroke="#6366f1"/>
-  <text x="105" y="126" text-anchor="middle" font-weight="600" fill="#312e81">read</text>
-  <text x="105" y="146" text-anchor="middle" font-size="12" fill="#4338ca">the issue, its project</text>
-  <line x1="170" y1="132" x2="196" y2="132" stroke="#6b7280" stroke-width="2" marker-end="url(#w-a)"/>
-  <rect x="198" y="100" width="130" height="64" rx="10" fill="#eef2ff" stroke="#6366f1"/>
-  <text x="263" y="126" text-anchor="middle" font-weight="600" fill="#312e81">branch</text>
-  <text x="263" y="146" text-anchor="middle" font-size="12" fill="#4338ca">a worktree of its own</text>
-  <line x1="328" y1="132" x2="354" y2="132" stroke="#6b7280" stroke-width="2" marker-end="url(#w-a)"/>
-  <rect x="356" y="100" width="130" height="64" rx="10" fill="#f5f3ff" stroke="#7c3aed" stroke-dasharray="5 3"/>
-  <text x="421" y="126" text-anchor="middle" font-weight="600" fill="#4c1d95">remember</text>
-  <text x="421" y="146" text-anchor="middle" font-size="12" fill="#5b21b6">search memory (optional)</text>
-  <line x1="486" y1="132" x2="512" y2="132" stroke="#6b7280" stroke-width="2" marker-end="url(#w-a)"/>
-  <rect x="514" y="100" width="130" height="64" rx="10" fill="#eef2ff" stroke="#6366f1"/>
-  <text x="579" y="126" text-anchor="middle" font-weight="600" fill="#312e81">build</text>
-  <text x="579" y="146" text-anchor="middle" font-size="12" fill="#4338ca">tests first, then code</text>
-  <line x1="644" y1="132" x2="670" y2="132" stroke="#6b7280" stroke-width="2" marker-end="url(#w-a)"/>
-  <rect x="672" y="100" width="130" height="64" rx="10" fill="#fef3c7" stroke="#d97706"/>
-  <text x="737" y="126" text-anchor="middle" font-weight="600" fill="#78350f">review wave</text>
-  <text x="737" y="146" text-anchor="middle" font-size="12" fill="#92400e">blind reviewers, a judge</text>
-  <line x1="802" y1="132" x2="828" y2="132" stroke="#6b7280" stroke-width="2" marker-end="url(#w-a)"/>
-  <rect x="830" y="100" width="100" height="64" rx="10" fill="#eef2ff" stroke="#6366f1"/>
-  <text x="880" y="126" text-anchor="middle" font-weight="600" fill="#312e81">fix</text>
-  <text x="880" y="146" text-anchor="middle" font-size="12" fill="#4338ca">the fix list</text>
-  <path d="M 880 164 C 880 200, 737 200, 737 166" fill="none" stroke="#d97706" stroke-width="2" marker-end="url(#w-o)"/>
-  <text x="808" y="206" text-anchor="middle" font-size="12" fill="#92400e">until the list is empty</text>
-  <rect x="514" y="240" width="130" height="64" rx="10" fill="#fef3c7" stroke="#d97706"/>
-  <text x="579" y="266" text-anchor="middle" font-weight="600" fill="#78350f">push check</text>
-  <text x="579" y="286" text-anchor="middle" font-size="12" fill="#92400e">tests pass on this commit</text>
-  <path d="M 880 164 C 900 240, 700 272, 646 272" fill="none" stroke="#6b7280" stroke-width="2" marker-end="url(#w-a)"/>
-  <line x1="514" y1="272" x2="488" y2="272" stroke="#6b7280" stroke-width="2" marker-end="url(#w-a)"/>
-  <rect x="356" y="240" width="130" height="64" rx="10" fill="#dcfce7" stroke="#16a34a"/>
-  <text x="421" y="266" text-anchor="middle" font-weight="600" fill="#14532d">one pull request</text>
-  <text x="421" y="286" text-anchor="middle" font-size="12" fill="#166534">Fixes #123</text>
-  <line x1="356" y1="272" x2="330" y2="272" stroke="#6b7280" stroke-width="2" marker-end="url(#w-a)"/>
-  <rect x="198" y="240" width="130" height="64" rx="10" fill="#f5f3ff" stroke="#7c3aed" stroke-dasharray="5 3"/>
-  <text x="263" y="266" text-anchor="middle" font-weight="600" fill="#4c1d95">save</text>
-  <text x="263" y="286" text-anchor="middle" font-size="12" fill="#5b21b6">what was learned (optional)</text>
-  <rect x="40" y="340" width="890" height="90" rx="10" fill="#f9fafb" stroke="#d1d5db"/>
-  <text x="60" y="366" font-weight="600" fill="#374151">Several issues at once: the foreman</text>
-  <text x="60" y="390" fill="#4b5563">/work-on foreman proposes a plan for a project or milestone, you say how many run at once,</text>
-  <text x="60" y="412" fill="#4b5563">and each issue gets a fresh session of its own that follows the row above. Questions come back to the foreman, then to you.</text>
+  <!-- Row 1: before anything runs -->
+  <rect x="40" y="70" width="270" height="92" rx="10" fill="#f3f4f6" stroke="#9ca3af"/>
+  <text x="175" y="96" text-anchor="middle" font-weight="600" fill="#374151">the work, written down</text>
+  <text x="175" y="116" text-anchor="middle" font-size="12" fill="#4b5563">project README: why, shape, rules</text>
+  <text x="175" y="132" text-anchor="middle" font-size="12" fill="#4b5563">issues: why, scenarios, out of scope, questions</text>
+  <text x="175" y="148" text-anchor="middle" font-size="12" fill="#4b5563">decision records, mockups</text>
+
+  <line x1="310" y1="116" x2="344" y2="116" stroke="#6b7280" stroke-width="2" marker-end="url(#w-a)"/>
+  <rect x="346" y="70" width="270" height="92" rx="10" fill="#fef3c7" stroke="#d97706"/>
+  <text x="481" y="96" text-anchor="middle" font-weight="600" fill="#78350f">/analyze-issues</text>
+  <text x="481" y="116" text-anchor="middle" font-size="12" fill="#92400e">a reader per issue: shape, scenarios, size, questions</text>
+  <text x="481" y="132" text-anchor="middle" font-size="12" fill="#92400e">a reader for the milestone: duplicates, gaps, order</text>
+  <text x="481" y="148" text-anchor="middle" font-size="12" fill="#92400e">rewrites, splits, asks you what nothing settles</text>
+
+  <line x1="616" y1="116" x2="650" y2="116" stroke="#6b7280" stroke-width="2" marker-end="url(#w-a)"/>
+  <rect x="652" y="70" width="270" height="92" rx="10" fill="#eef2ff" stroke="#6366f1"/>
+  <text x="787" y="96" text-anchor="middle" font-weight="600" fill="#312e81">/work-on foreman</text>
+  <text x="787" y="116" text-anchor="middle" font-size="12" fill="#4338ca">reads everything, proposes one plan:</text>
+  <text x="787" y="132" text-anchor="middle" font-size="12" fill="#4338ca">build order, dependencies, effort, parallelism</text>
+  <text x="787" y="148" text-anchor="middle" font-size="12" fill="#4338ca">you decide how many run at once</text>
+
+  <!-- Foreman dispatch fan-out -->
+  <line x1="787" y1="162" x2="787" y2="196" stroke="#6366f1" stroke-width="2"/>
+  <line x1="160" y1="196" x2="780" y2="196" stroke="#6366f1" stroke-width="2"/>
+  <line x1="160" y1="196" x2="160" y2="224" stroke="#6366f1" stroke-width="2" marker-end="url(#w-p)"/>
+  <line x1="490" y1="196" x2="490" y2="224" stroke="#6366f1" stroke-width="2" marker-end="url(#w-p)"/>
+  <line x1="780" y1="196" x2="780" y2="224" stroke="#6366f1" stroke-width="2" marker-end="url(#w-p)"/>
+  <text x="300" y="190" text-anchor="middle" font-size="12" fill="#4338ca">one fresh session per issue, a worktree each</text>
+
+  <!-- Three worker columns -->
+  <g font-size="12">
+    <rect x="40" y="226" width="240" height="250" rx="10" fill="#fafafa" stroke="#d1d5db"/>
+    <text x="160" y="248" text-anchor="middle" font-weight="600" fill="#374151">worker: issue #41</text>
+    <rect x="370" y="226" width="240" height="250" rx="10" fill="#fafafa" stroke="#d1d5db"/>
+    <text x="490" y="248" text-anchor="middle" font-weight="600" fill="#374151">worker: issue #42</text>
+    <rect x="660" y="226" width="240" height="250" rx="10" fill="#fafafa" stroke="#d1d5db"/>
+    <text x="780" y="248" text-anchor="middle" font-weight="600" fill="#374151">worker: issue #45</text>
+  </g>
+  <!-- Steps inside each worker (drawn once per column) -->
+  <g font-size="12" fill="#374151">
+    <g>
+      <text x="56" y="272">1. read the issue, README, decisions</text>
+      <text x="56" y="292">2. plan: a change and a test per scenario</text>
+      <text x="56" y="312" fill="#4338ca">   the foreman checks it, says go</text>
+      <text x="56" y="332">3. build, test first; search memory</text>
+      <text x="56" y="352">4. decision-record review</text>
+      <text x="56" y="372">5. blind reviewers, then the judge</text>
+      <text x="56" y="392">6. fix the list, test first; fix checks</text>
+      <text x="56" y="412">7. English pass on customer text</text>
+      <text x="56" y="432">8. push check: tests on this commit</text>
+      <text x="56" y="452">9. one pull request, Fixes #41</text>
+    </g>
+    <g>
+      <text x="386" y="272">1. read the issue, README, decisions</text>
+      <text x="386" y="292">2. plan: a change and a test per scenario</text>
+      <text x="386" y="312" fill="#4338ca">   the foreman checks it, says go</text>
+      <text x="386" y="332">3. build, test first; search memory</text>
+      <text x="386" y="352">4. decision-record review</text>
+      <text x="386" y="372">5. blind reviewers, then the judge</text>
+      <text x="386" y="392">6. fix the list, test first; fix checks</text>
+      <text x="386" y="412">7. English pass on customer text</text>
+      <text x="386" y="432">8. push check: tests on this commit</text>
+      <text x="386" y="452">9. one pull request, Fixes #42</text>
+    </g>
+    <g>
+      <text x="676" y="272">1. read the issue, README, decisions</text>
+      <text x="676" y="292">2. plan: a change and a test per scenario</text>
+      <text x="676" y="312" fill="#4338ca">   the foreman checks it, says go</text>
+      <text x="676" y="332">3. build, test first; search memory</text>
+      <text x="676" y="352">4. decision-record review</text>
+      <text x="676" y="372">5. blind reviewers, then the judge</text>
+      <text x="676" y="392">6. fix the list, test first; fix checks</text>
+      <text x="676" y="412">7. English pass on customer text</text>
+      <text x="676" y="432">8. push check: tests on this commit</text>
+      <text x="676" y="452">9. one pull request, Fixes #45</text>
+    </g>
+  </g>
+  <!-- questions back to the foreman -->
+  <text x="325" y="300" text-anchor="middle" font-size="11" fill="#6b7280">questions go</text>
+  <text x="325" y="314" text-anchor="middle" font-size="11" fill="#6b7280">to the foreman,</text>
+  <text x="325" y="328" text-anchor="middle" font-size="11" fill="#6b7280">then to you</text>
+
+  <!-- Merge row -->
+  <line x1="160" y1="476" x2="160" y2="506" stroke="#16a34a" stroke-width="2" marker-end="url(#w-g)"/>
+  <line x1="490" y1="476" x2="490" y2="506" stroke="#16a34a" stroke-width="2" marker-end="url(#w-g)"/>
+  <line x1="780" y1="476" x2="780" y2="506" stroke="#16a34a" stroke-width="2" marker-end="url(#w-g)"/>
+  <rect x="40" y="508" width="857" height="62" rx="10" fill="#dcfce7" stroke="#16a34a"/>
+  <text x="468" y="533" text-anchor="middle" font-weight="600" fill="#14532d">the foreman queues each green pull request for merge, closes the sub-issues that shipped,</text>
+  <text x="468" y="553" text-anchor="middle" font-size="12" fill="#166534">and gives the worker its next ready issue. The run ends when every issue is merged, parked or skipped.</text>
+
+  <text x="40" y="600" font-size="12" fill="#6b7280">A worker that stops on a failure gets one message; a second failure parks the issue with a comment. Memory steps run only when Korium is connected.</text>
+
   <defs>
     <marker id="w-a" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#6b7280"/></marker>
-    <marker id="w-o" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#d97706"/></marker>
+    <marker id="w-p" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#6366f1"/></marker>
+    <marker id="w-g" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#16a34a"/></marker>
   </defs>
 </svg>
 </div>
-<figcaption>The dashed steps are the optional memory. Everything else runs without it.</figcaption></figure>
+<figcaption>The whole run: the issues are checked, the foreman plans, you pick how many workers, each worker follows the same nine steps, and the foreman merges and hands out the next issue.</figcaption></figure>
+<p>Then they build. A bug is fixed test first: a failing test in its own commit, then the fix. When an issue builds a decision record, a fresh reviewer reads the whole record and checks the work against it, assuming it was done wrong.</p>
+<p>When a worker thinks it's done, it doesn't grade its own work. It sends the diff, and nothing else, to five reviewers at once, one angle each: bugs, edge cases, contracts, reuse, cleanup, and a security reviewer when the change touches sign-in, secrets or input from outside. None of them saw the worker's notes. None of them can edit anything. None of them can reach the network. Then a judge reads the code and their findings, throws out whatever it can't prove, and hands back a fix list with a file and a line for each item. The worker fixes those, test first again, and the fixes get a check of their own. A reader goes over any sentence a customer would read and says which is false against the scenarios and which isn't plain English. The tests run on the final commit and leave a receipt that names it, and nothing can be pushed until the receipt matches. Then one pull request goes up, with <code>Fixes #41</code>, the list of what wasn't proved, and the issue moves to In Review.</p>
+<figure><div class="paper"><svg xmlns="http://www.w3.org/2000/svg" role="img" viewBox="0 0 960 560" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="14">
+    <text x="40" y="40" font-size="22" font-weight="600" fill="#1f2937">The review: reviewers who read cold, a judge that keeps only what it can prove</text>
 
-<h2>The review, up close</h2>
-<p>When the change is finished, Claude does not grade its own work. It sends the diff, and nothing else, to reviewers who each take one angle. They cannot edit, cannot reach the network, and never see the author's explanation. A separate judge throws out what it cannot prove and hands back a fix list with a file and line for each item.</p>
-<figure><div class="paper">
-<svg xmlns="http://www.w3.org/2000/svg" role="img" viewBox="0 0 960 520" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="15">
-  <text x="40" y="40" font-size="22" font-weight="600" fill="#1f2937">The review wave: blind reviewers, one judge, one fix list</text>
-  <rect x="40" y="90" width="150" height="70" rx="10" fill="#eef2ff" stroke="#6366f1"/>
-  <text x="115" y="118" text-anchor="middle" font-weight="600" fill="#312e81">Claude, the author</text>
-  <text x="115" y="140" text-anchor="middle" font-size="13" fill="#4338ca">finishes the change</text>
-  <rect x="240" y="90" width="120" height="70" rx="10" fill="#f3f4f6" stroke="#9ca3af"/>
-  <text x="300" y="118" text-anchor="middle" font-weight="600" fill="#374151">the diff</text>
-  <text x="300" y="140" text-anchor="middle" font-size="13" fill="#6b7280">and nothing else</text>
-  <line x1="190" y1="125" x2="238" y2="125" stroke="#6b7280" stroke-width="2" marker-end="url(#r-a)"/>
+  <!-- Author -->
+  <rect x="40" y="100" width="160" height="76" rx="10" fill="#eef2ff" stroke="#6366f1"/>
+  <text x="120" y="128" text-anchor="middle" font-weight="600" fill="#312e81">the worker</text>
+  <text x="120" y="148" text-anchor="middle" font-size="12" fill="#4338ca">finishes the change</text>
+  <text x="120" y="164" text-anchor="middle" font-size="12" fill="#4338ca">and sends only the diff</text>
+
+  <line x1="200" y1="138" x2="248" y2="138" stroke="#6b7280" stroke-width="2" marker-end="url(#r-a)"/>
+
+  <!-- Reviewers -->
   <g font-size="13">
-    <rect x="420" y="60" width="150" height="40" rx="8" fill="#fef3c7" stroke="#d97706"/><text x="495" y="85" text-anchor="middle" fill="#78350f">reviewer: bugs</text>
-    <rect x="420" y="108" width="150" height="40" rx="8" fill="#fef3c7" stroke="#d97706"/><text x="495" y="133" text-anchor="middle" fill="#78350f">reviewer: edge cases</text>
-    <rect x="420" y="156" width="150" height="40" rx="8" fill="#fef3c7" stroke="#d97706"/><text x="495" y="181" text-anchor="middle" fill="#78350f">reviewer: contracts</text>
-    <rect x="420" y="204" width="150" height="40" rx="8" fill="#fef3c7" stroke="#d97706"/><text x="495" y="229" text-anchor="middle" fill="#78350f">reviewer: reuse</text>
-    <rect x="420" y="252" width="150" height="40" rx="8" fill="#fef3c7" stroke="#d97706"/><text x="495" y="277" text-anchor="middle" fill="#78350f">reviewer: cleanup</text>
-    <rect x="420" y="300" width="150" height="40" rx="8" fill="#fee2e2" stroke="#dc2626"/><text x="495" y="325" text-anchor="middle" fill="#7f1d1d">security reviewer</text>
+    <rect x="250" y="60" width="180" height="36" rx="8" fill="#fef3c7" stroke="#d97706"/><text x="340" y="83" text-anchor="middle" fill="#78350f">reviewer: bugs</text>
+    <rect x="250" y="104" width="180" height="36" rx="8" fill="#fef3c7" stroke="#d97706"/><text x="340" y="127" text-anchor="middle" fill="#78350f">reviewer: edge cases</text>
+    <rect x="250" y="148" width="180" height="36" rx="8" fill="#fef3c7" stroke="#d97706"/><text x="340" y="171" text-anchor="middle" fill="#78350f">reviewer: contracts</text>
+    <rect x="250" y="192" width="180" height="36" rx="8" fill="#fef3c7" stroke="#d97706"/><text x="340" y="215" text-anchor="middle" fill="#78350f">reviewer: reuse</text>
+    <rect x="250" y="236" width="180" height="36" rx="8" fill="#fef3c7" stroke="#d97706"/><text x="340" y="259" text-anchor="middle" fill="#78350f">reviewer: cleanup</text>
+    <rect x="250" y="280" width="180" height="36" rx="8" fill="#fee2e2" stroke="#dc2626"/><text x="340" y="303" text-anchor="middle" fill="#7f1d1d">security reviewer</text>
   </g>
-  <line x1="360" y1="125" x2="418" y2="125" stroke="#6b7280" stroke-width="2" marker-end="url(#r-a)"/>
-  <text x="495" y="360" text-anchor="middle" font-size="13" fill="#6b7280">each reads the code cold:</text>
-  <text x="495" y="378" text-anchor="middle" font-size="13" fill="#6b7280">no author's notes, no editing, no network</text>
-  <line x1="570" y1="200" x2="628" y2="200" stroke="#6b7280" stroke-width="2" marker-end="url(#r-a)"/>
-  <text x="599" y="190" text-anchor="middle" font-size="12" fill="#6b7280">findings</text>
-  <rect x="630" y="160" width="150" height="80" rx="10" fill="#ecfeff" stroke="#0891b2"/>
-  <text x="705" y="188" text-anchor="middle" font-weight="600" fill="#164e63">the judge</text>
-  <text x="705" y="208" text-anchor="middle" font-size="13" fill="#155e75">keeps only what</text>
-  <text x="705" y="226" text-anchor="middle" font-size="13" fill="#155e75">it can prove</text>
-  <line x1="705" y1="240" x2="705" y2="290" stroke="#9ca3af" stroke-width="2" stroke-dasharray="4 4" marker-end="url(#r-a)"/>
-  <rect x="640" y="292" width="130" height="36" rx="8" fill="#f3f4f6" stroke="#d1d5db"/>
-  <text x="705" y="315" text-anchor="middle" font-size="13" fill="#6b7280">thrown out</text>
-  <line x1="780" y1="200" x2="838" y2="200" stroke="#16a34a" stroke-width="2" marker-end="url(#r-g)"/>
-  <rect x="840" y="170" width="90" height="60" rx="10" fill="#dcfce7" stroke="#16a34a"/>
-  <text x="885" y="195" text-anchor="middle" font-weight="600" fill="#14532d">fix list</text>
-  <text x="885" y="215" text-anchor="middle" font-size="12" fill="#166534">file:line each</text>
-  <path d="M 885 230 C 885 470, 115 470, 115 160" fill="none" stroke="#6366f1" stroke-width="2" marker-end="url(#r-p)"/>
-  <text x="500" y="440" text-anchor="middle" fill="#4338ca">the author fixes each one, test first, then the wave runs again until the list is empty</text>
-  <text x="40" y="500" fill="#4b5563">Then: the push check, and one pull request.</text>
+  <rect x="250" y="328" width="180" height="58" rx="8" fill="#f9fafb" stroke="#d1d5db"/>
+  <text x="340" y="348" text-anchor="middle" font-size="12" fill="#4b5563">each one reads the code cold:</text>
+  <text x="340" y="364" text-anchor="middle" font-size="12" fill="#4b5563">no author's notes, no editing,</text>
+  <text x="340" y="380" text-anchor="middle" font-size="12" fill="#4b5563">no network</text>
+
+  <!-- Findings to the judge -->
+  <line x1="430" y1="188" x2="488" y2="188" stroke="#6b7280" stroke-width="2" marker-end="url(#r-a)"/>
+  <text x="459" y="178" text-anchor="middle" font-size="12" fill="#6b7280">findings</text>
+
+  <!-- Judge -->
+  <rect x="490" y="140" width="190" height="96" rx="10" fill="#ecfeff" stroke="#0891b2"/>
+  <text x="585" y="166" text-anchor="middle" font-weight="600" fill="#164e63">the judge</text>
+  <text x="585" y="186" text-anchor="middle" font-size="12" fill="#155e75">reads the code and the findings,</text>
+  <text x="585" y="202" text-anchor="middle" font-size="12" fill="#155e75">nothing from the worker,</text>
+  <text x="585" y="218" text-anchor="middle" font-size="12" fill="#155e75">and sorts them three ways</text>
+
+  <!-- Three outputs -->
+  <line x1="680" y1="160" x2="738" y2="128" stroke="#16a34a" stroke-width="2" marker-end="url(#r-g)"/>
+  <rect x="740" y="90" width="190" height="72" rx="10" fill="#dcfce7" stroke="#16a34a"/>
+  <text x="835" y="112" text-anchor="middle" font-weight="600" fill="#14532d">the fix list</text>
+  <text x="835" y="130" text-anchor="middle" font-size="12" fill="#166534">real, proven, worth fixing here;</text>
+  <text x="835" y="146" text-anchor="middle" font-size="12" fill="#166534">a file and line for each one</text>
+
+  <line x1="680" y1="188" x2="738" y2="226" stroke="#6b7280" stroke-width="2" marker-end="url(#r-a)"/>
+  <rect x="740" y="196" width="190" height="72" rx="10" fill="#f3f4f6" stroke="#9ca3af"/>
+  <text x="835" y="218" text-anchor="middle" font-weight="600" fill="#374151">new issues to file</text>
+  <text x="835" y="236" text-anchor="middle" font-size="12" fill="#4b5563">serious, but outside this change:</text>
+  <text x="835" y="252" text-anchor="middle" font-size="12" fill="#4b5563">filed, linked, not fixed here</text>
+
+  <line x1="680" y1="216" x2="738" y2="318" stroke="#9ca3af" stroke-width="2" stroke-dasharray="4 4" marker-end="url(#r-a)"/>
+  <rect x="740" y="302" width="190" height="72" rx="10" fill="#f9fafb" stroke="#d1d5db"/>
+  <text x="835" y="324" text-anchor="middle" font-weight="600" fill="#6b7280">thrown out</text>
+  <text x="835" y="342" text-anchor="middle" font-size="12" fill="#6b7280">not real, not proven, or not</text>
+  <text x="835" y="358" text-anchor="middle" font-size="12" fill="#6b7280">worth a change; gone for good</text>
+
+  <!-- Fix loop back to the worker -->
+  <path d="M 930 126 L 946 126 L 946 500 L 120 500 L 120 182" fill="none" stroke="#6366f1" stroke-width="2" stroke-linejoin="round" marker-end="url(#r-p)"/>
+  <rect x="300" y="420" width="400" height="60" rx="10" fill="#eef2ff" stroke="#6366f1"/>
+  <text x="500" y="443" text-anchor="middle" font-size="13" fill="#312e81">the worker fixes each item on the list, test first,</text>
+  <text x="500" y="462" text-anchor="middle" font-size="13" fill="#312e81">and the fixes get a check of their own, up to three rounds</text>
+
+  <text x="40" y="530" font-size="13" fill="#4b5563">Then: a reader checks the customer-facing text, the tests run on the final commit, and one pull request goes up.</text>
+
   <defs>
     <marker id="r-a" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#6b7280"/></marker>
     <marker id="r-g" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#16a34a"/></marker>
@@ -216,37 +285,74 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   </defs>
 </svg>
 </div>
-<figcaption>A reviewer who reads the author's explanation reviews the explanation. Masthead keeps the explanation away from them.</figcaption></figure>
+<figcaption>The judge sorts every finding three ways: onto the fix list with a file and line, onto a list of new issues when it's serious but outside this change, or out, when it isn't real, isn't proven, or isn't worth a change.</figcaption></figure>
+<p>Meanwhile you're having coffee. A worker's question lands at the foreman, which re-reads the issue's comments and the sources and answers with the line quoted. Only when nothing settles it does the question reach you, and your answer goes on the issue so the next session finds it. A worker that stops on a failure gets one message; a second failure parks the issue with a comment saying what happened, and the run goes on without it.</p>
+<p>When a pull request's checks are green, its review is clean and the worker has cleaned up after itself, the foreman queues it for merge, closes the sub-issues that shipped, and gives that worker the next ready issue. By the end of the day every issue is merged, parked or skipped, and you get one line per issue saying which.</p>
+<p>The whole time, a set of small checks runs underneath. Nobody, not a worker, not a reviewer, not Claude in a hurry, reads a secret, force-pushes, pushes untested code, or sends a helper a brief that hides what wasn't proved. You don't see those checks unless one says no, and when it does, it says why and what to do instead.</p>
 
-<h2>Each decision, and why</h2>
-<ol class="ledger">
-<li><div><h3>A rule is a gate, not a sentence</h3><p>The rules that matter are small programs that run just before Claude acts and refuse when the rule is broken. You notice nothing until one refuses, and then you see a short reason.</p><div class="why"><p>We wrote the rules in prose first. They held for about three hours. A gate cannot forget, and it never passes silently.</p></div></div></li>
-<li><div><h3>Secrets are never read</h3><p>Claude cannot open environment files, keys, tokens, password files or cloud credentials. If it needs a value, it asks you.</p><div class="why"><p>A secret that enters the conversation is in the transcript and in whatever Claude writes next. Refusing the read is the only place to stop that.</p></div></div></li>
-<li><div><h3>Nothing irreversible</h3><p>Force pushes, history rewrites, deleting unmerged branches and destructive data commands are refused.</p><div class="why"><p>Everything else can be reviewed and reverted. These cannot. A refusal costs a sentence; the alternative costs a weekend.</p></div></div></li>
-<li><div><h3>Tests pass before anything is pushed</h3><p>If you say yes at setup, a push is refused until the test command has passed on the exact commit being pushed. Claude runs the tests itself; the gate only checks the receipt.</p><div class="why"><p>"I ran the tests" is a claim. A receipt that names the commit is a fact.</p></div></div></li>
-<li><div><h3>Reviewers are blind, and a judge keeps only what is proven</h3><p>Several reviewers, one angle each, plus a security reviewer when the change touches secrets or untrusted input. None can edit or reach the network. The judge hands back a fix list.</p><div class="why"><p>A reviewer who can edit stops reviewing and starts fixing. A reviewer who can reach the network can be talked to. The judge exists because reviewers disagree and the author should not be the one deciding.</p></div></div></li>
-<li><div><h3>One issue per session</h3><p>One issue, one worktree, one branch, one pull request. A foreman mode runs several workers in parallel, one fresh session each.</p><div class="why"><p>A session that carries several pieces of work drifts. Many short sessions are cheap; one long one is not.</p></div></div></li>
-<li><div><h3>Honest handoffs</h3><p>A brief to a helper must say what the author claims, what is not proved, and how a fix will be proved.</p><div class="why"><p>A helper starts with only its brief. Whatever is left out, it never learns.</p></div></div></li>
-<li><div><h3>A memory across sessions, if you want one</h3><p>With Korium connected, each session searches what earlier sessions learned before its first change and saves what it learned at the end.</p><div class="why"><p>Korium is a product from Kyroco, the company behind Masthead. It has a free plan, but it is an account and a sign-in, and that is your decision, not ours.</p></div></div></li>
-<li><div><h3>Your repository states its facts</h3><p>A small settings file tells Masthead your test command and where it may keep working files. A repository that states nothing still gets every guard rail; the ones that need a fact stand aside.</p><div class="why"><p>Facts belong to the repository, so a teammate who clones it gets the same rails with nothing to configure.</p></div></div></li>
-<li><div><h3>Opinions are switches; safety is not</h3><p>Korium, clean git history and the model gate for helpers are options you set at install. The secrets, irreversible-action and web-traffic rails are not.</p><div class="why"><p>We hold opinions, and we made them switches. We also hold a few rules we would not want to be talked out of.</p></div></div></li>
-</ol>
+<h3>One issue on its own</h3>
+<p><code>/work-on #123</code> does the same for a single issue with you as the foreman. The worker reports its brief and waits for your go before building, and an issue with the <code>design-sheet</code> label gets a one-page sheet written into the issue for you to approve first.</p>
 
 <h2>Installing it</h2>
-<p>Two commands in a terminal, then one inside Claude Code that asks three questions. Nothing is written until you say yes.</p>
 <pre>claude plugin marketplace add kyroco/masthead
-claude plugin install masthead@masthead
-/masthead:setup</pre>
-<p>Setup asks: just you or the team; tests before a push, with the test command it found; and whether to connect a memory now, later, or not at all. Run it again any time to change an answer.</p>
+claude plugin install masthead@masthead</pre>
+<p>Then open Claude Code in a repository and run <code>/masthead:setup</code>. It asks three questions and writes nothing until you say yes: just you or the team (whether the settings are committed with the code), tests before a push (it finds your test command), and whether to connect a memory now, later or not at all. Run it again whenever you want to change an answer.</p>
+<p>The install options are under <code>/plugin configure masthead@masthead</code>:</p>
+<div class="tablewrap"><table>
+<tr><th>Option</th><th>Default</th><th>What it does</th></tr>
+<tr><td>Connect Korium memory</td><td>off</td><td>Each session looks up what earlier sessions learned before its first change, and saves what it learned at the end. Needs a Korium account; there's a free plan. Everything else works without it.</td></tr>
+<tr><td>Keep AI attribution out of commits</td><td>on</td><td>Refuses a commit message or pull request body with an AI co-author line, a session link or a generated-with footer.</td></tr>
+<tr><td>Ask for a reason before a helper runs on the biggest model</td><td>off</td><td>Helpers run on the small model unless the brief says why the big one is needed.</td></tr>
+</table></div>
+<p>To remove it: <code>claude plugin uninstall masthead@masthead</code>. The settings file setup wrote and the push check script are yours to delete.</p>
 
-<h2>Plain questions</h2>
-<dl class="qa">
-<dt>Do I need a Korium account?</dt><dd>No. Everything except the memory works without one.</dd>
-<dt>Does Masthead send anything anywhere?</dt><dd>No. There is no telemetry. The only network use is the memory, and only if you connect it.</dd>
-<dt>Can it change my code on its own?</dt><dd>No. Gates refuse actions; they never take them.</dd>
-<dt>What if a gate gets in my way?</dt><dd>Every refusal says what to do instead. The install options are switches, and the safety rails each have an off switch in the documentation for a real reason.</dd>
-<dt>How do I remove it?</dt><dd>One command: <code>claude plugin uninstall masthead@masthead</code>. The small settings file it wrote is yours to delete.</dd>
-</dl>
+<h2>What an issue has to say</h2>
+<p>An issue says what is true when the work is done, never how to get there, in four parts: <b>Why</b> (what a person can't do today), <b>Scenarios</b> (one to five lines of "Given, When, Then", each naming the decision, README rule or your own words it rests on), <b>Out of scope</b>, and <b>Questions</b> (what the sources don't settle). One issue is one pull request, built and proved by one worker in one session. The issue checks rewrite issues into this shape and split the ones that are too big, so you don't have to write them this way yourself.</p>
 
-<footer>Masthead is made by Kyroco and is the setup we run on our own repositories every day. Apache 2.0.</footer>
+<h2>Every check, what it refuses, and where it falls short</h2>
+<p>Each check is a short script, run by Claude Code at a fixed moment: before a tool call, after one, or when a session or helper stops. It reads what is about to happen and either lets it through or refuses it with a reason Claude can act on. The off switches are environment variables read from the check's own environment, so a session can't switch a check off for itself.</p>
+<h3>Always on</h3>
+<div class="tablewrap"><table>
+<tr><th>Check</th><th>Runs</th><th>Refuses</th><th>Where it falls short</th></tr>
+<tr><td><code>block-secret-reads.py</code></td><td>before a Read, Grep or shell command</td><td>reading a credential file: environment files, keys, tokens, password files, cloud and SSH credentials, even through the masked reader</td><td>matches file names and command text, so a secret in an oddly named file isn't recognized</td></tr>
+<tr><td><code>block-secret-fetches.py</code></td><td>before a shell command</td><td>pulling a secret out of a vault or secret store on the command line</td><td>matches command text</td></tr>
+<tr><td><code>scan-tool-output-for-secrets.py</code></td><td>after a shell command</td><td>nothing; warns when the output looks like a credential</td><td>a backstop after the fact</td></tr>
+<tr><td><code>irreversible-action-gate.sh</code></td><td>before a shell command</td><td>force pushes, history rewrites, deleting unmerged branches, destructive data and infrastructure commands, pushing without the push check</td><td>emits a refusal, not a question</td></tr>
+<tr><td><code>untrusted-domain-deny.py</code></td><td>before a web fetch or search</td><td>requests to paste sites and other hosts code shouldn't reach</td><td>the host list is in the script</td></tr>
+<tr><td><code>web-to-memory-gate.py</code></td><td>after a web fetch; before a write</td><td>copying text fetched from the web into files every session loads, or into memory, without a marker saying the web was read</td><td>files inside a git repository are left alone, since a pull request shows them</td></tr>
+<tr><td><code>agent-brief-gates.sh</code></td><td>before a helper is sent</td><td>a brief to a reviewer that leaves out the author's claims or the code outside the diff the change depends on; a brief asking for a fix without saying how it's proved; a brief that passes a conclusion off as a rule</td><td>checks the shape of the brief, not whether it's true</td></tr>
+<tr><td><code>dispatch-record-gate.sh</code></td><td>before a helper is sent</td><td>nothing; records which model each helper ran on</td><td></td></tr>
+<tr><td><code>review-write-fence.py</code></td><td>before a file write</td><td>a reviewer writing anything but its own findings file, or a scratch copy under the review folder</td><td>a shell write isn't seen</td></tr>
+<tr><td><code>bash-scope-reviewer.sh</code></td><td>before a shell command</td><td>a reviewer reaching the network</td><td>scoped by the agent's type</td></tr>
+<tr><td><code>bash-scope-diagnoser.sh</code></td><td>before a shell command</td><td>the diagnoser or reader doing anything but running tests, reading git history and inspecting files</td><td>scoped by the agent's type</td></tr>
+<tr><td><code>verdict-gate.sh</code></td><td>when a session or helper stops</td><td>a diagnosis case file whose verdict names no file and line, or has fewer than two numbered observations</td><td></td></tr>
+<tr><td><code>scope-gate.py</code></td><td>before and after a write</td><td>while a scope file exists in the checkout, writes outside its allowed paths; puts back a protected file a command changed</td><td>a background command's later writes aren't seen</td></tr>
+<tr><td><code>skill-review-gate.py</code></td><td>before a skill or helper runs</td><td>invoking a changed project skill or agent nobody in the session has read</td><td>project files only</td></tr>
+<tr><td><code>prime-context.py</code></td><td>at session start and on each prompt</td><td>nothing; injects the procedure that fits the prompt</td><td></td></tr>
+</table></div>
+<h3>On when the repository states the fact setup writes</h3>
+<div class="tablewrap"><table>
+<tr><th>Check</th><th>Runs</th><th>Refuses</th><th>Needs</th></tr>
+<tr><td><code>hard-gate.sh</code></td><td>before <code>git push</code> or <code>gh pr create</code></td><td>a push until the push check reports the tests passed on this exact commit; a push of any other commit</td><td>the test command from setup</td></tr>
+<tr><td><code>adr-sections-gate.py</code>, <code>adr-structure-gate.sh</code>, <code>wiki-refresh.sh</code></td><td>before a write; at stop; at session start</td><td>a decision record written without its sections; a finish that leaves one with an unchecked claims list; keeps the records folder fresh</td><td>a decision records folder</td></tr>
+<tr><td><code>elixir-toolchain-env.sh</code>, <code>elixir-format-after-edit.sh</code></td><td>at session start; after an edit</td><td>nothing; pins the Elixir toolchain and formats an edited file</td><td>an Elixir root</td></tr>
+</table></div>
+<h3>On or off with an install option</h3>
+<div class="tablewrap"><table>
+<tr><th>Check</th><th>Option</th><th>Refuses</th></tr>
+<tr><td><code>engram-protocol.sh</code></td><td>Connect Korium memory</td><td>the first edit before a memory search; a finish with nothing saved; a brief that hides what memory found; a capture filed under another agent's name; a grep for a name the code index already answered</td></tr>
+<tr><td><code>capture-finding-reminder.py</code>, <code>korium-index-on-stop.sh</code></td><td>Connect Korium memory</td><td>nothing; reminders and index refreshes</td></tr>
+<tr><td><code>commit-attribution-gate.py</code></td><td>Keep AI attribution out of commits</td><td>a commit message or pull request body with an AI co-author line, a session link or a generated-with footer</td></tr>
+<tr><td><code>model-choice-gate.sh</code></td><td>Ask for a reason before the biggest model</td><td>a helper sent to the big model with no reason on the first line of its brief</td></tr>
+</table></div>
+
+<h2>What Masthead never does</h2>
+<ul>
+<li>Send anything anywhere. There's no telemetry. The only network use is the Korium memory, and only if you connect it.</li>
+<li>Change your code on its own. The checks refuse actions; they don't take them.</li>
+<li>Read a secret file, not even to check it.</li>
+<li>Touch your git history. No co-author trailers, no footers.</li>
+</ul>
+
+<footer>Masthead is made by Kyroco. It's the setup we run on our own repositories every day. Apache 2.0.</footer>
 </main>

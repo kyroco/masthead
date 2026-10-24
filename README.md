@@ -4,7 +4,22 @@ Masthead is a plugin for [Claude Code](https://code.claude.com). You give it
 a list of things to build, as GitHub issues, and it builds them: each one in
 its own session, checked, reviewed by people who weren't in the room, tested
 on the exact commit that ships, and merged. You decide the things only you
-can decide. Here's what a day with it looks like.
+can decide.
+
+## Why we built it
+
+We'd had the rules written down for a long time. "Search memory before you
+change anything" sat in the file Claude reads at the start of every session.
+Then we took out the small script that was enforcing it, and within two days
+a whole piece of work shipped with nothing saved. Nobody noticed until later.
+A rule in prose is a suggestion. A rule in front of the action is a rule.
+That's the idea under all of it: write the spec into the issue before the
+session starts, let the session run on its own, and put the rules that
+matter where they can't be forgotten.
+
+![A rule in prose fades over a session; a check holds](docs/images/gates.svg)
+
+Here's what a day with it looks like.
 
 ## A day with Masthead
 
@@ -97,19 +112,6 @@ don't see those checks unless one says no, and when it does, it says why and
 what to do instead.
 
 ![The review wave: blind reviewers, one judge, one fix list](docs/images/review.svg)
-
-### Why we built it
-
-We'd had the rules written down for a long time. "Search memory before you
-change anything" sat in the file Claude reads at the start of every session.
-Then we took out the small script that was enforcing it, and within two days
-a whole piece of work shipped with nothing saved. Nobody noticed until later.
-A rule in prose is a suggestion. A rule in front of the action is a rule.
-That's the idea under all of it: write the spec into the issue before the
-session starts, let the session run on its own, and put the rules that
-matter where they can't be forgotten.
-
-![A rule in prose fades over a session; a check holds](docs/images/gates.svg)
 
 ### One issue on its own
 
