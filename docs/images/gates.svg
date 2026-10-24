@@ -10,8 +10,8 @@
   <text x="225" y="240" font-size="13" fill="#6b7280">hour 2</text>
   <text x="390" y="240" font-size="13" fill="#6b7280">hour 3</text>
   <path d="M 60 140 C 160 142, 240 170, 300 200 S 400 222, 420 222" fill="none" stroke="#dc2626" stroke-width="4" stroke-linecap="round"/>
-  <text x="40" y="282" fill="#4b5563">It fades as the session gets long, and nobody is told.</text>
-  <text x="40" y="306" fill="#4b5563">The rule fails the day it matters.</text>
+  <text x="40" y="282" fill="#4b5563">It fades as the session gets long, and nobody notices</text>
+  <text x="40" y="306" fill="#4b5563">until something has already slipped through.</text>
 
   <!-- Right: a gate -->
   <text x="520" y="44" font-size="22" font-weight="600" fill="#1f2937">The same rule as a gate</text>
@@ -39,7 +39,7 @@
   <text x="752" y="257" text-anchor="middle" font-size="14" fill="#7f1d1d" font-weight="600">refused, with the reason</text>
   <text x="752" y="280" text-anchor="middle" font-size="13" fill="#7f1d1d">"run the tests, then push again"</text>
   <text x="520" y="336" fill="#4b5563">Claude reads the reason and does the right thing instead.</text>
-  <text x="520" y="360" fill="#4b5563">A gate cannot forget, and it never passes silently.</text>
+  <text x="520" y="360" fill="#4b5563">The check runs the same way at hour one and at hour ten.</text>
 
   <defs>
     <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#6b7280"/></marker>
