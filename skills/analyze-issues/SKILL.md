@@ -26,7 +26,11 @@ One `reader` agent per issue (Haiku, its own model, at high effort), all
 sent in one message so they run at once. Each gets the brief in
 `issue-check.md` beside this file, with the issue number filled in. It reads
 the issue with every comment, the project README, and the ADR sections and
-mockups the issue names, and reports:
+mockups the issue names. Its whole report goes into its Korium capture, and
+it returns only the verdict, the scenario count, the split, the questions
+word for word and the thought id: nineteen full reports returned to one
+session have come to about 430,000 characters. The report
+holds:
 
 - which of the four parts are present, and the lines that say how instead
   of what;
@@ -36,8 +40,8 @@ mockups the issue names, and reports:
   order between them;
 - the questions the sources leave open, each as
   `[NEEDS CLARIFICATION: ...]`;
-- the rewritten body, in the four parts, with every line it kept from the
-  old body and nothing it invented.
+- the rewritten body, in the four parts, written out in full, with every
+  line it kept from the old body and nothing it invented.
 
 ## 3. Check the milestone as one
 
@@ -53,16 +57,19 @@ the per-issue reports, and names only these:
 
 ## 4. Apply the rewrites
 
-Show the user the first issue's rewrite, old body and new side by side, and
-wait for their go; that go covers the rest of the run. Then, for each issue,
-in this session: edit the body to the rewrite
+Read the first issue's report with `korium_reconstruct`, show the user its
+rewrite, old body and new side by side, and wait for their go; that go covers
+the rest of the run. Then send one `general-purpose` agent per issue, with
+`model: "sonnet"` and the brief in `apply-rewrite.md` beside this file, all in
+one message. Each writer edits the body to the rewrite
 (`gh issue edit <n> --body-file`), keeping any folded history block, the Screens paragraph and every tool-maintained
-block (between `:start` and `:end` comments) exactly as they were. Where the check split it, create the sub-issues as
+block (between `:start` and `:end` comments) exactly as they were. Where the check split it, it creates the sub-issues as
 the `github-issues` skill says (same milestone and project, the sub-issue
 link, blocked-by where one needs another), each with its own four parts, and
-leave the parent as the summary. Record each rewrite in one issue comment:
+leaves the parent as the summary. It records the rewrite in one issue comment:
 "Rewritten by /analyze-issues on <date>; the old body is in the edit
-history."
+history." The rewrites never pass through this session. A writer that could
+not read its report changes nothing; check that issue again.
 
 Never drop a line the user wrote; quote it under the scenario it rules on.
 

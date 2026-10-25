@@ -99,8 +99,8 @@ agree.
 
 ## 3. Search Korium
 
-Two focused `agent_search` queries: the issue's subject, and the subsystem it
-touches. Look for the user's decisions and preferences, past decisions, and
+Two focused `agent_search` queries, each with `limit` 5: the issue's subject,
+and the subsystem it touches. Look for the user's decisions and preferences, past decisions, and
 mistakes not to repeat, and hardest for work already landed nearby: often some
 of the issue is already built, and the new code belongs behind an interface
 that exists. Where a note disagrees with the issue, ADR, architecture doc or

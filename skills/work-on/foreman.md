@@ -14,15 +14,24 @@ or "PR #1422", never "#1418" alone.
 
 1. The issue.
 2. The project README: the project's rules and how each issue fits.
-3. The ADR the issue links, read in full, and only that ADR, plus any ADR it
-   names. Never point a worker at another ADR: an old one may be superseded.
+3. The ADR the issue links, and only that ADR, plus any ADR it names. Never
+   point a worker at another ADR: an old one may be superseded. Every worker
+   reads it in full, and so do the milestone check and each ADR review.
 4. The architecture doc and UX mockups that ADR or the project README names.
 5. Korium: the user's decisions and preferences, past decisions, and mistakes
    not to repeat. Where a note disagrees with 1 to 4, 1 to 4 win.
 6. The user.
 
-Every answer about what to build quotes the line it rests on. When the user
-disputes an answer, look the line up again and quote it; never just agree.
+Every answer about what to build quotes the line it rests on, looked up when
+you answer: read the whole section it sits in (the ADR decision, the
+architecture doc section, the mockup page), never the matching line alone,
+and never answer from memory. When the user disputes an answer, look the line
+up again and quote it; never just agree.
+
+You do not read the ADR, the architecture doc or the mockups in full at the
+start. A foreman that did ran out of room and compacted before it started a
+worker, and kept three ADR decisions in its summary; a foreman that looked
+each line up when it answered took its stage to merge.
 
 ## What invoking this as the foreman authorizes
 
@@ -41,16 +50,14 @@ one does not apply (no ADR is linked), mark it done and say why.
 2. Resolve the work and list its issues
 3. Read the project README, all of it
 4. Read every issue, body and every comment
-5. Read each linked ADR, every line
-6. Read the architecture doc, all of it
-7. Read the mockups the issues touch
-8. Order the issues and write the plan
-9. Wait for the user's decision
+5. Name the ADR, architecture doc and mockups the issues use
+6. Order the issues and write the plan
+7. Wait for the user's decision
 
 The steps:
 
 1. Korium: `agent_search` on the project, its subsystem, and past foreman runs
-   on it. Use what comes back.
+   on it, each with `limit` 5. Use what comes back.
 2. Find the project or milestone and its open issues. No exact match: list the
    close ones and ask.
 3. Leave out an issue with a parent (its parent's worker builds it) and any
@@ -58,9 +65,9 @@ The steps:
    adjudicator keeps a finding to fix in its PR or throws it out.
 4. Read the project README.
 5. Read every issue with every comment, never the body alone: the user's
-   rulings arrive as comments. Then read each linked ADR in full, the
-   architecture doc in full, and the mockups the issues touch. A keyword
-   search or a line range is not a read.
+   rulings arrive as comments. Then name the one ADR the issues link, the
+   architecture doc and the mockup pages they touch, by path, so every brief
+   and answer points at the same files.
 6. Run `/analyze-issues` on the issues (`${CLAUDE_PLUGIN_ROOT}/skills/analyze-issues/SKILL.md`),
    unless the user ran it on this work already and no issue changed since.
    It rewrites each issue into its four parts, splits the big ones, and
@@ -128,7 +135,8 @@ An issue whose blocker is still open waits until that blocker merges.
   message asking for status.
 - A worker's first message is its plan, five lines or fewer: for each
   scenario, what it will change and the test that shows it. Check each line
-  against the scenarios and the project README's rule that the simplest thing
+  against its scenario, the ADR section that scenario rests on (read that
+  whole section now), and the project README's rule that the simplest thing
   that meets the result wins. Reply "go", or send it back naming the line to
   change. A line the scenarios, the ADR and the README do not settle is a
   question for the user, not a guess for the worker.
@@ -139,6 +147,10 @@ An issue whose blocker is still open waits until that blocker merges.
   so the next session finds it.
 - Pass the user's words on unchanged. Never reword them, and never add a rule
   the sources do not state.
+- Never send a worker ADR text in place of the ADR. Quote the one line an
+  answer rests on and name its section; the worker still reads the whole ADR.
+  Workers given snippets have built the wrong thing and a whole run was
+  pulled back.
 - When you steer a worker away from something (an old comment, a dropped
   design), name what it should still read: the issue, the project README, the
   ADR, the architecture doc and the mockups. Never write "build what the issue
