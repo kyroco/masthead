@@ -80,10 +80,10 @@ each answer's write to one `general-purpose` agent with `model: "haiku"`,
 sending the issue number, the `[NEEDS CLARIFICATION]` line it answers word
 for word, your recommendation when the user's words refer to it, and the
 user's words verbatim. It reads the issue and, in this order, stopping at
-the first step that fails: posts a comment with the question, the
+the first step that fails: captures in Korium the question, the
 recommendation marked as the session's when it was sent, and the user's
-own words unchanged; takes only that line out of the body; removes the
-label when no such line is left; captures the same three in Korium; and
+own words unchanged; posts the same three as a comment; takes only that
+line out of the body; removes the label when no such line is left; and
 returns one short line saying what it did. Wait for
 that line before the next write: one write at a time. When it says a step
 failed, the label stays; tell the user which issue and step. Never read a
