@@ -1,35 +1,47 @@
-
 # The milestone brief
 
-Sent to one `reader` agent with `model: "opus"`, effort `high`, after every
-per-issue report is back. Fill in the names, the Korium ids and the Korium
-line, and send the rest as written.
+Sent to one `general-purpose` agent with `model: "opus"`, after every
+per-issue agent is back. Fill in the names and the Korium line, and send the
+rest as written.
 
 ```
-Model-choice: opus, this judges every issue of a milestone against the whole ADR at once, and no later step checks it.
-read_only: true
-This is a reading and judging job; you change no file and no issue.
+Model-choice: opus, this checks every rewrite of a milestone against the whole ADR and fixes copying mistakes, and no later step checks it.
+no code change
+This checks and corrects GitHub issues; it changes no file in the repo.
 
 Korium: <what this session's agent_search found, or that it found nothing>.
 
 Check <milestone or project> in <repo> as one body of work before any of it
 is built. Read, in full: the project README, the decision records and design
-documents it names, every open issue with its comments (`gh issue list --milestone "<title>"`,
-then `gh issue view <n> --comments` for each), and the per-issue reports in
-Korium: <ids>.
+documents it names, the mockup pages the issues name, and every open issue with its comments
+(`gh issue list --milestone "<title>"`, then `gh issue view <n> --comments`).
+For each issue rewritten today, read its body before the rewrite from the
+edit history:
+gh api graphql -f query='{repository(owner:"<owner>",name:"<name>"){issue(number:<n>){userContentEdits(first:10){nodes{editedAt diff}}}}}'
 
-Report only these, each with the issue numbers and the line it rests on:
+Fix these yourself, on GitHub:
 
-1. Two issues that build the same thing, or one that undoes another.
-2. An issue that contradicts the ADR: quote the issue line and the ADR line.
-3. A gap: a decision the ADR makes for this stage that no issue builds.
-4. Order: a blocked-by link that is missing, or one that is wrong.
+1. A copying mistake: a line the user wrote that is gone, a history
+   block, Screens paragraph or :start/:end block that changed, or a
+   placeholder ("as in section 2") where the text belongs. Put back the old
+   text exactly.
+2. A blocked-by link between these issues that is missing or wrong.
 
-Nothing else is a finding: not wording, not size (the per-issue checks hold
-size), not a design you would prefer. Finding nothing is a fine result.
+Each fix rests on a line you quote from the ADR, the architecture doc, the
+mockups or the old body. If no line settles it, do not change it: report
+it. Edit with `gh issue edit <n> --body-file - <<'BODY'` ... `BODY`.
 
-Capture your report in Korium with agent_capture, with every quote in full.
-Then return, in under 500 words, each finding in one or two lines with the
-issue numbers and where its lines are, what you could not read, and the
-thought_id.
+Report, and change nothing for, these:
+
+3. Two issues that build the same thing, or one that undoes another.
+4. An issue that contradicts the ADR: quote the issue line and the ADR line.
+5. A gap: a decision the ADR makes for this stage that no issue builds.
+
+Nothing else is a finding: not wording, not size, not a design you would
+prefer. Finding nothing is a fine result.
+
+Capture your report in Korium with agent_capture, every quote in full. Then
+return, in under 500 words: each fix (the issue, what you changed, the line
+it rests on), each finding in one or two lines with the issue numbers and
+where its lines are, what you could not read, and the thought_id.
 ```

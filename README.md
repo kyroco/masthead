@@ -45,30 +45,31 @@ everything up front runs out of room before the first builder starts.
 
 ![The foreman reads the brief and every issue first](docs/images/day-2-read.svg)
 
-Then it sends a small reader to every issue, all nine at once. Each reader
-writes the same report and keeps it in memory, rewrite and all, then hands
-the foreman only the verdict and the open questions. Does this issue say
-what has to be true when it's done, or does it tell the builder how to do
-its job? Can I read scenarios out of it, "Given this, When that, Then this
-is true," and does each one rest on something real: a decision that was
+Then it sends a small agent to every issue, all nine at once. Each one reads
+its issue and rewrites it on GitHub itself, then hands the foreman only the
+verdict and the open questions. Each asks the same things. Does this issue
+say what has to be true when it's done, or does it tell the builder how to
+do its job? Can I read scenarios out of it, "Given this, When that, Then
+this is true," and does each one rest on something real: a decision that was
 made, a rule in the README, something you actually said? Is it too big for
-one pull request? What would a builder have to guess? One more reader looks
-at the milestone as a whole: are two issues building the same thing, does
-one contradict the decision record, is there a decision nobody is building,
-is the order right.
+one pull request? What would a builder have to guess? When all nine are
+done, one more agent, on a stronger model, reads every rewritten issue
+against the decision record, the architecture notes, the mockups and the old
+body. It puts back anything a rewrite dropped and fixes the order, each fix
+resting on a line it can quote. It tells you, without changing anything,
+when two issues build the same thing, one contradicts the decision record,
+or a decision has nobody building it.
 
-![Nine readers, one per issue, and one for the milestone](docs/images/day-3-check.svg)
+![Nine agents, one per issue, and one check of them all](docs/images/day-3-check.svg)
 
-The foreman shows you the first issue rewritten, old body beside new, and
-you say go. A small writer per issue rewrites the rest the same way, from
-the reports in memory. The big ones get split into sub-issues. Every open
-question gets looked up in the sources, in order: the issue's own comments,
-the README, the decision record, the architecture doc, the mockups, the
-memory. Whatever a source settles is answered on the issue with the line
-quoted, so nobody has to ask twice. Whatever nothing settles comes to you,
-one question at a time, with a recommendation. You answer in a sentence. It
-goes on the issue in your words. An issue with a question still open stays
-out of the run until you've answered it.
+The big ones get split into sub-issues by the agent that rewrote them. Every
+open question gets looked up in the sources first, in order: the issue's own
+comments, the README, the decision record, the architecture doc, the
+mockups, the memory. Whatever a source settles is written into the issue
+with the line quoted, so nobody has to ask twice. Whatever nothing settles
+comes to you, one question at a time, with a recommendation. You answer in a
+sentence. It goes on the issue in your words. An issue with a question still
+open stays out of the run until you've answered it.
 
 Now the foreman hands you one table: the issues in build order, which depend
 on which, which can run side by side without touching the same files, how
