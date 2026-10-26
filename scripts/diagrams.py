@@ -144,8 +144,8 @@ def workflow():
     c.text(40, 40, "A run: the issues are checked, a foreman plans, workers build in parallel", size=20, color="#1f2937", bold=True)
     work = c.box(40, 70, [("the work, written down", "title"), ("project README: why, shape, rules", "body"),
                           ("issues: why, scenarios, out of scope, questions", "body"), ("decision records, mockups", "body")], INK)
-    check = c.box(right(work) + 40, 70, [("/analyze-issues", "title"), ("a reader per issue: shape, scenarios, size, questions", "body"),
-                                         ("a reader for the milestone: duplicates, gaps, order", "body"), ("rewrites, splits, asks you what nothing settles", "body")], CHECK)
+    check = c.box(right(work) + 40, 70, [("/analyze-issues", "title"), ("an agent per issue: rewrites it on GitHub, splits it, asks", "body"),
+                                         ("one check of every rewrite: puts back what was dropped", "body"), ("asks you only what nothing settles", "body")], CHECK)
     c.arrow(right(work), work[1] + 40, check[0] - 2, work[1] + 40)
     fy = bottom(check) + 60
     foreman = c.box(0, fy, [("/work-on foreman", "title"), ("reads the brief and every issue, proposes one plan: build order, dependencies, effort, parallelism", "body"),
@@ -272,18 +272,18 @@ def day2():
 
 def day3():
     c = Canvas(1000, 330)
-    c.text(40, 34, "Nine small readers, one per issue, all at once", size=16, color="#1f2937", bold=True)
+    c.text(40, 34, "Nine small agents, one per issue, all at once", size=16, color="#1f2937", bold=True)
     x = 40
     for n in range(41, 50):
-        b = c.box(x, 50, [(f"reader, #{n}", "body")], CHECK, pad=8)
+        b = c.box(x, 50, [(f"agent, #{n}", "body")], CHECK, pad=8)
         x = right(b) + 8
-    q = c.box(40, 110, [("each one asks the same four things", "title"), ("Does it say what must be true, or how to build it?", "body"),
+    q = c.box(40, 110, [("each asks four things, then rewrites its issue", "title"), ("Does it say what must be true, or how to build it?", "body"),
                         ("Can I read scenarios out of it, and what does each rest on?", "body"), ("Is it too big for one pull request?", "body"),
                         ("What would a builder have to guess?", "body")], CHECK, title_size=13)
-    m = c.box(right(q) + 30, 110, [("one more reader looks at the milestone as a whole", "title"), ("Are two issues building the same thing?", "body"),
-                                   ("Does one contradict the decision record?", "body"), ("Is there a decision nobody is building?", "body"), ("Is the order right?", "body")], CHECK, title_size=13)
+    m = c.box(right(q) + 30, 110, [("then one more agent checks every rewrite", "title"), ("Did a rewrite drop anything? It puts it back.", "body"), ("Are two issues building the same thing?", "body"),
+                                   ("Does one contradict the decision record?", "body"), ("Is there a decision nobody is building?", "body"), ("Is the order right? It fixes the links.", "body")], CHECK, title_size=13)
     c.w = int(max(c.w, right(m) + 40))
-    then = c.box(40, bottom(q) + 20, [("Then: issues rewritten (you approve the first), big ones split, questions looked up in the sources,", "body"),
+    then = c.box(40, bottom(q) + 20, [("Then: big ones split, questions looked up in the sources,", "body"),
                                       ("and only what nothing settles comes to you, one at a time, with a recommendation", "body")], INK, min_w=right(m) - 40)
     c.h = int(bottom(then) + 24)
     c.write("day-3-check.svg")

@@ -13,85 +13,78 @@ the issue before a worker sees it. It changes no code.
 An issue's shape, and the size rule, are in the `github-issues` skill. Read
 that section first; this skill applies it.
 
+The session that runs this skill starts the agents and stays out of the way.
+It writes no issue itself and holds no rewrite: each agent writes its issue
+on GitHub directly, and GitHub keeps every earlier body in the issue's edit
+history.
+
 ## 1. Resolve the work
 
 Find the open issues of the milestone, project or numbers given. An issue
 with a parent is checked with its parent, as one. No exact match: list the
 close ones and ask. Then `agent_search` Korium for the project, its
-subsystem and earlier runs of this skill on it, and use what comes back.
+subsystem and earlier runs of this skill on it, with `limit` 5, and use what
+comes back.
 
-## 2. Check each issue, in parallel
+## 2. Rewrite each issue, in parallel
 
-One `reader` agent per issue (Haiku, its own model, at high effort), all
-sent in one message so they run at once. Each gets the brief in
-`issue-check.md` beside this file, with the issue number filled in. It reads
-the issue with every comment, the project README, and the ADR sections and
-mockups the issue names. Its whole report goes into its Korium capture, and
-it returns only the verdict, the scenario count, the split, the questions
-word for word and the thought id: nineteen full reports returned to one
-session have come to about 430,000 characters. The report
-holds:
+One `general-purpose` agent per issue, with `model: "haiku"`, all sent in one
+message so they run at once. Each gets the brief in `issue-check.md` beside
+this file, with the issue number filled in. It reads the issue with every
+comment, the project README, and the ADR sections and mockups the issue
+names, then on GitHub:
 
-- which of the four parts are present, and the lines that say how instead
-  of what;
-- the scenarios it reads out of the issue as it stands, and how many;
-- the modules it expects the work to touch, from the code index;
-- a split, when the size rule says so: each sub-issue's four parts and the
-  order between them;
-- the questions the sources leave open, each as
-  `[NEEDS CLARIFICATION: ...]`;
-- the rewritten body, in the four parts, written out in full, with every
-  line it kept from the old body and nothing it invented.
+- rewrites the body into the four parts, keeping any folded history block, the Screens paragraph and every
+  tool-maintained block (between `:start` and `:end` comments) exactly as
+  they were, and every line the user wrote, quoted under the scenario it rules
+  on;
+- splits the issue when the size rule says so: each sub-issue with its own
+  four parts, the sub-issue link, and blocked-by where one waits on another,
+  leaving the parent as the summary;
+- puts every question the sources leave open in the Questions part and adds
+  the `needs-decision` label;
+- adds one comment: "Rewritten by /analyze-issues on <date>; the old body is
+  in the edit history."
 
-## 3. Check the milestone as one
+It returns only the verdict, the sub-issue numbers and the open questions
+word for word.
 
-One `reader` agent on Opus (`model: "opus"`, with the `Model-choice:` line
-the dispatch check wants), given the brief in `milestone-check.md`: it reads
-the whole ADR, the architecture doc, the project README and every issue, with
-the per-issue reports, and names only these:
+## 3. Check every rewrite, and the milestone as one
+
+Once every per-issue agent is back, one `general-purpose` agent on Opus
+(`model: "opus"`, with the `Model-choice:` line the dispatch check wants),
+given the brief in `milestone-check.md`. It reads the whole ADR, the
+architecture doc, the project README, every issue as it now stands with its
+comments, and each issue's body before the rewrite from GitHub's edit
+history.
+
+It fixes on GitHub, itself, a copying mistake (a line of the user's dropped, a
+kept part changed, a placeholder such as "the scenarios as in section 2"
+where the text belongs) and a blocked-by link that is missing or wrong. Each
+fix rests on a line it quotes from the ADR, the architecture doc, the
+mockups or the old body; nothing it assumes is a reason to change an issue.
+
+It reports, and changes nothing for, what would change what gets built:
 
 - two issues that build the same thing;
 - an issue that contradicts the ADR, with the ADR line;
-- a gap: an ADR decision for this stage that no issue builds;
-- an order problem: a blocked-by link that is missing or wrong.
+- a gap: an ADR decision for this stage that no issue builds.
 
-## 4. Apply the rewrites
+## 4. Questions
 
-Read the first issue's report with `korium_reconstruct`, show the user its
-rewrite, old body and new side by side, and wait for their go; that go covers
-the rest of the run. Then send one `general-purpose` agent per issue, with
-`model: "sonnet"` and the brief in `apply-rewrite.md` beside this file, all in
-one message. Each writer edits the body to the rewrite
-(`gh issue edit <n> --body-file`), keeping any folded history block, the Screens paragraph and every tool-maintained
-block (between `:start` and `:end` comments) exactly as they were. Where the check split it, it creates the sub-issues as
-the `github-issues` skill says (same milestone and project, the sub-issue
-link, blocked-by where one needs another), each with its own four parts, and
-leaves the parent as the summary. It records the rewrite in one issue comment:
-"Rewritten by /analyze-issues on <date>; the old body is in the edit
-history." The rewrites never pass through this session. A writer that could
-not read its report changes nothing; check that issue again.
+Every open question is already on its issue, with the `needs-decision`
+label: the per-issue agent looked in the sources before it asked. Put them
+to the user one at a time, in build order, each as one paragraph: what is
+blocked, your one recommendation with its reason, and the question. Write
+each answer on the issue as a comment in the user's own words, capture it
+in Korium, take the question out of the body and remove the label. An issue
+with the label is not dispatched.
 
-Never drop a line the user wrote; quote it under the scenario it rules on.
-
-## 5. Questions
-
-For every `[NEEDS CLARIFICATION]`, look in the sources in order: the issue's
-comments, the project README, the ADR, the architecture doc, the mockups,
-Korium. What a source settles, answer on the issue as a comment quoting the
-line, and take the question out. What nothing settles stays in the issue and
-gets the `needs-decision` label.
-
-Then put the open questions to the user one at a time, in build order, each
-as one paragraph: what is blocked, your one recommendation with its reason,
-and the question. Write each answer on the issue as a comment in the user's
-own words, capture it in Korium, take the question out of the body and
-remove the label. An issue with the label is not dispatched.
-
-## 6. Report, and capture
+## 5. Report, and capture
 
 One table, one row per issue: ready, split into which numbers, or waiting on
-which question. Then the milestone findings. Capture the run in Korium with
-`agent_capture` and give its id.
+which question. Then what the check in step 3 fixed and what it reported.
+Capture the run in Korium with `agent_capture` and give its id.
 
 ## What this skill never does
 
