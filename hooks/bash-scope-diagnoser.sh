@@ -18,7 +18,7 @@ TOOL_NAME="$(printf '%s' "$INPUT" | jq -r '.tool_name // empty')"
 
 # Apply the gate only to the diagnoser and reader agents when run with --project-wide; a main-session call passes.
 if [ "${1:-}" = "--project-wide" ]; then
-  IS_DIAGNOSER="$(printf '%s' "$INPUT" | jq -r '[.agent_type, .subagent_type, .agent_name] | map(select(. != null) | sub("^masthead:"; "")) | any(. == "diagnoser" or . == "reader")')"
+  IS_DIAGNOSER="$(printf '%s' "$INPUT" | jq -r '[.agent_type, .subagent_type, .agent_name] | map(select(type == "string") | sub("^.*:"; "")) | any(. == "diagnoser" or . == "reader")')"
   [ "$IS_DIAGNOSER" = "true" ] || exit 0
 fi
 
