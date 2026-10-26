@@ -271,6 +271,8 @@ scoped "the label may arrive in agent_name"     agent_name    reviewer-contract 
 scoped "or in subagent_type"                    subagent_type reviewer-round-2       2
 scoped "a lookalike name is NOT in scope"       agent_type    reviewerlookalike      0
 scoped "another agent passes straight through"  agent_type    general-purpose        0
+scoped "masthead's namespaced reviewer is in scope" agent_type masthead:reviewer   2
+scoped "another plugin's reviewer is not"     agent_type    otherplugin:reviewer   0
 
 printf '[bash-scope-reviewer-test] %d passed, %d failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]
