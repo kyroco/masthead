@@ -146,12 +146,15 @@ An issue whose blocker is still open waits until that blocker merges.
   sources above, in order, and answer with the line quoted. Only when none
   answers it, ask the user, and say which sources you checked. Hand the
   write to one `general-purpose` agent with `model: "haiku"`, sending the
-  issue number and the answer, in the user's words verbatim when it is
-  theirs. It reads the issue, posts the answer as a comment so the next
-  session finds it, takes the question out of the body, removes the
-  `needs-decision` label when no question is left, captures the answer in
-  Korium and returns one short line. Never read a whole issue body yourself
-  to make the write.
+  issue number, the worker's question word for word, and the answer, in
+  the user's words verbatim when it is theirs. It reads the issue, posts
+  the question and answer as a comment so the next session finds it, takes
+  that question out of the body only when it is there, removes the
+  `needs-decision` label only when no `[NEEDS CLARIFICATION]` line is left,
+  captures the answer in Korium and returns one short line saying what it
+  did. Wait for that line before the next write on the same issue. When it
+  says a step failed, tell the user which issue and step. Never read a
+  whole issue body yourself to make the write.
 - Pass the user's words on unchanged. Never reword them, and never add a rule
   the sources do not state.
 - Never send a worker ADR text in place of the ADR. Quote the one line an

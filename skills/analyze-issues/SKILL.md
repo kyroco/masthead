@@ -77,11 +77,16 @@ label: the per-issue agent looked in the sources before it asked. Put them
 to the user one at a time, in build order, each as one paragraph: what is
 blocked, your one recommendation with its reason, and the question. Hand
 each answer's write to one `general-purpose` agent with `model: "haiku"`,
-sending the issue number and the user's words verbatim. It reads the issue,
-posts the answer as a comment in the user's own words, takes the question
-out of the body, removes the label when no question is left, captures the
-answer in Korium and returns one short line. Never read a whole issue body
-yourself to make the write. An issue with the label is not dispatched.
+sending the issue number, the `[NEEDS CLARIFICATION]` line it answers word
+for word, your recommendation when the user's words refer to it, and the
+user's words verbatim. It reads the issue, posts the answer as a comment
+in the user's own words under the question it answers, takes only that line
+out of the body, removes the label when no such line is left, captures the
+answer in Korium and returns one short line saying what it did. Wait for
+that line before the next write: one write at a time. When it says a step
+failed, the label stays; tell the user which issue and step. Never read a
+whole issue body yourself to make the write. An issue with the label is
+not dispatched.
 
 ## 5. Report, and capture
 
