@@ -144,9 +144,14 @@ An issue whose blocker is still open waits until that blocker merges.
   question for the user, not a guess for the worker.
 - A worker's question: first re-read that issue's comments, then look in the
   sources above, in order, and answer with the line quoted. Only when none
-  answers it, ask the user, and say which sources you checked. Write the
-  answer on the issue as a comment, in the user's words when it is theirs,
-  so the next session finds it.
+  answers it, ask the user, and say which sources you checked. Hand the
+  write to one `general-purpose` agent with `model: "haiku"`, sending the
+  issue number and the answer, in the user's words verbatim when it is
+  theirs. It reads the issue, posts the answer as a comment so the next
+  session finds it, takes the question out of the body, removes the
+  `needs-decision` label when no question is left, captures the answer in
+  Korium and returns one short line. Never read a whole issue body yourself
+  to make the write.
 - Pass the user's words on unchanged. Never reword them, and never add a rule
   the sources do not state.
 - Never send a worker ADR text in place of the ADR. Quote the one line an

@@ -75,10 +75,13 @@ It reports, and changes nothing for, what would change what gets built:
 Every open question is already on its issue, with the `needs-decision`
 label: the per-issue agent looked in the sources before it asked. Put them
 to the user one at a time, in build order, each as one paragraph: what is
-blocked, your one recommendation with its reason, and the question. Write
-each answer on the issue as a comment in the user's own words, capture it
-in Korium, take the question out of the body and remove the label. An issue
-with the label is not dispatched.
+blocked, your one recommendation with its reason, and the question. Hand
+each answer's write to one `general-purpose` agent with `model: "haiku"`,
+sending the issue number and the user's words verbatim. It reads the issue,
+posts the answer as a comment in the user's own words, takes the question
+out of the body, removes the label when no question is left, captures the
+answer in Korium and returns one short line. Never read a whole issue body
+yourself to make the write. An issue with the label is not dispatched.
 
 ## 5. Report, and capture
 
