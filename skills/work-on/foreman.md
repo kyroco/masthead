@@ -148,11 +148,12 @@ An issue whose blocker is still open waits until that blocker merges.
   write to one `general-purpose` agent with `model: "haiku"`, sending the
   issue number, the worker's question word for word, and the answer, in
   the user's words verbatim when it is theirs. It reads the issue and, in
-  this order, stopping at the first step that fails: captures the question
-  and answer in Korium; posts them as a comment so the next session finds
-  it; takes that question out of the body only when it is there; removes
-  the `needs-decision` label only when no `[NEEDS CLARIFICATION]` line is
-  left; and returns one short line saying what it did. Wait for that line before the next write on the same issue. When it
+  this order: captures the question and answer in Korium, and when that
+  fails reports it and carries on; then, stopping at the first of these
+  that fails, posts them as a comment so the next session finds it, takes
+  that question out of the body only when it is there, and removes the
+  `needs-decision` label only when no `[NEEDS CLARIFICATION]` line is left;
+  and returns one short line saying what it did. Wait for that line before the next write on the same issue. When it
   says a step failed, tell the user which issue and step. Never read a
   whole issue body yourself to make the write.
 - Pass the user's words on unchanged. Never reword them, and never add a rule
