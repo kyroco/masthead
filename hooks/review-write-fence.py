@@ -17,6 +17,8 @@ WANT = {
 SCRATCH = "scratch"
 AGENT_LIST_SOURCE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bash-scope-reviewer.sh")
 IDENTITY_FIELDS = ("agent_type", "subagent_type", "agent_name")
+# Only this plugin's agents are fenced; another plugin's agent of the same name is not ours to police.
+PLUGIN_PREFIX = "masthead:"
 # Take the repo's state folder from project_fact.py, else the default.
 try:
     from project_fact import state_dir as _state_dir
@@ -55,9 +57,13 @@ def governing_agent(payload, pattern):
         value = payload.get(field)
         if not isinstance(value, str) or not value:
             continue
-        match = pattern.match(value.rsplit(":", 1)[-1])
-        if match:
-            return match.group(1)
+        # A masthead: name is ours when any of its parts names a reviewer, so a subfolder of agents/ cannot hide one;
+        # the last such part is the agent, since Claude Code puts the folders first.
+        parts = value[len(PLUGIN_PREFIX):].split(":") if value.startswith(PLUGIN_PREFIX) else [value]
+        for part in reversed(parts):
+            match = pattern.match(part)
+            if match:
+                return match.group(1)
     return None
 
 

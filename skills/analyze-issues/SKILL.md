@@ -85,9 +85,10 @@ was sent, and the user's own words unchanged, and when that fails reports
 it and carries on; then, stopping at the first of these that fails, posts
 the same three as a comment, takes only that line out of the body, and
 removes the label when no such line is left; and returns one short line
-saying what it did. Wait for
-that line before the next write: one write at a time. When it says a step
-failed, the label stays; tell the user which issue and step. Never read a
+saying what it did. Wait for that line before the next write: one write at
+a time. When it says a step failed, tell the user which issue and step;
+when that step was the comment, body edit or label, the label stays and
+the issue waits. Never read a
 whole issue body yourself to make the write. An issue with the label is
 not dispatched.
 
