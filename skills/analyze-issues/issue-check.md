@@ -42,8 +42,15 @@ Report, in this order:
    `<!-- ...:start -->` and `<!-- ...:end -->` comments, each exactly as it is. A scenario about a
    screen names its mockup page and the rubric rules it makes hold: the
    project README requires both of every screen issue. Add nothing the
-   sources do not support.
+   sources do not support. Write every line out in full, never "as in
+   section 2", and when you split, write each sub-issue's body out in full
+   too: a writer pastes this section without the rest of your report.
 
-Capture your report in Korium with agent_capture and return its thought_id.
-End with what you could not read.
+Capture the whole report, sections 1 to 5 and what you could not read, in
+Korium with agent_capture. Then return only this, in under 250 words: the
+verdict (ready, split into how many, or waiting on questions); the scenario
+count; if split, each sub-issue's title and which waits on which; every
+[NEEDS CLARIFICATION] line word for word; anything wrong you found outside
+this issue, one line each; and the thought_id. The rewrite stays in Korium,
+where the writer reads it; the session that sent you does not need it.
 ```

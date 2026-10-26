@@ -48,7 +48,9 @@ and list in the PR body each check the repo lacks. The `reviewer` and
 
 Search Korium before each step and before each change, not only at the start:
 `agent_search` for what the step is about, and `code_locate` (with the `repo`
-value from `CLAUDE.md`) for code you are about to read or change. Use what
+value from `CLAUDE.md`) for code you are about to read or change. Give
+`agent_search` a `limit` of 5: each hit comes back whole, and at the default
+of 10 one search has filled 40,000 characters. Use what
 comes back, and put this rule in every subagent brief except the
 adjudicator's, which judges from the code and findings alone. Error -32029 is the
 limit of 60 searches a minute, not an outage: wait the `retry_after_ms` it

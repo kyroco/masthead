@@ -28,6 +28,8 @@ Report only these, each with the issue numbers and the line it rests on:
 Nothing else is a finding: not wording, not size (the per-issue checks hold
 size), not a design you would prefer. Finding nothing is a fine result.
 
-Capture your report in Korium with agent_capture and return its thought_id.
-End with what you could not read.
+Capture your report in Korium with agent_capture, with every quote in full.
+Then return, in under 500 words, each finding in one or two lines with the
+issue numbers and where its lines are, what you could not read, and the
+thought_id.
 ```

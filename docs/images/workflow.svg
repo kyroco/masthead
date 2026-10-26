@@ -13,9 +13,9 @@
   <text x="651" y="128" text-anchor="middle" font-size="12" fill="#92400e">a reader for the milestone: duplicates, gaps, order</text>
   <text x="651" y="144" text-anchor="middle" font-size="12" fill="#92400e">rewrites, splits, asks you what nothing settles</text>
   <line x1="406" y1="110" x2="444" y2="110" stroke="#6b7280" stroke-width="2" marker-end="url(#m6b7280)"/>
-  <rect x="135" y="220" width="626" height="74" rx="10" fill="#eef2ff" stroke="#6366f1" stroke-width="1.5"/>
+  <rect x="81" y="220" width="734" height="74" rx="10" fill="#eef2ff" stroke="#6366f1" stroke-width="1.5"/>
   <text x="448" y="246" text-anchor="middle" font-size="14" font-weight="600" fill="#312e81">/work-on foreman</text>
-  <text x="448" y="262" text-anchor="middle" font-size="12" fill="#4338ca">reads everything, proposes one plan: build order, dependencies, effort, parallelism</text>
+  <text x="448" y="262" text-anchor="middle" font-size="12" fill="#4338ca">reads the brief and every issue, proposes one plan: build order, dependencies, effort, parallelism</text>
   <text x="448" y="278" text-anchor="middle" font-size="12" fill="#4338ca">you decide how many run at once</text>
   <path d="M 651 160 L 651 190 L 448 190 L 448 218" fill="none" stroke="#6b7280" stroke-width="2" stroke-linejoin="round" marker-end="url(#m6b7280)"/>
   <rect x="40" y="364" width="349" height="206" rx="10" fill="#f9fafb" stroke="#d1d5db" stroke-width="1.5"/>
@@ -58,8 +58,8 @@
   <path d="M 448 294 L 448 334 L 599 334 L 599 362" fill="none" stroke="#6366f1" stroke-width="2" stroke-linejoin="round" marker-end="url(#m6366f1)"/>
   <path d="M 448 294 L 448 334 L 984 334 L 984 362" fill="none" stroke="#6366f1" stroke-width="2" stroke-linejoin="round" marker-end="url(#m6366f1)"/>
   <text x="214" y="326" text-anchor="middle" font-size="12" fill="#4338ca">one fresh session per issue, each in its own worktree</text>
-  <path d="M 1128 364 L 1128 257 L 763 257" fill="none" stroke="#6b7280" stroke-width="2" stroke-linejoin="round" stroke-dasharray="5 4" marker-end="url(#m6b7280)"/>
-  <text x="773" y="249" text-anchor="start" font-size="11" fill="#6b7280">plans, questions and reports come back to the foreman</text>
+  <path d="M 1128 364 L 1128 257 L 817 257" fill="none" stroke="#6b7280" stroke-width="2" stroke-linejoin="round" stroke-dasharray="5 4" marker-end="url(#m6b7280)"/>
+  <text x="827" y="249" text-anchor="start" font-size="11" fill="#6b7280">plans, questions and reports come back to the foreman</text>
   <rect x="40" y="610" width="1161" height="57" rx="10" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5"/>
   <text x="620" y="635" text-anchor="middle" font-size="13" font-weight="600" fill="#14532d">the foreman queues each green pull request for merge, closes the sub-issues that shipped, and gives that worker its next ready issue</text>
   <text x="620" y="651" text-anchor="middle" font-size="12" fill="#166534">the run ends when every issue is merged, parked or skipped, with one line per issue saying which</text>

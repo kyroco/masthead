@@ -148,12 +148,12 @@ def workflow():
                                          ("a reader for the milestone: duplicates, gaps, order", "body"), ("rewrites, splits, asks you what nothing settles", "body")], CHECK)
     c.arrow(right(work), work[1] + 40, check[0] - 2, work[1] + 40)
     fy = bottom(check) + 60
-    foreman = c.box(0, fy, [("/work-on foreman", "title"), ("reads everything, proposes one plan: build order, dependencies, effort, parallelism", "body"),
+    foreman = c.box(0, fy, [("/work-on foreman", "title"), ("reads the brief and every issue, proposes one plan: build order, dependencies, effort, parallelism", "body"),
                             ("you decide how many run at once", "body")], FOREMAN)
     # centre the foreman under the two boxes above
     fx = (right(check) + 40) / 2 - foreman[2] / 2
     c.parts = c.parts[:-4]  # redraw at the centred x
-    foreman = c.box(fx, fy, [("/work-on foreman", "title"), ("reads everything, proposes one plan: build order, dependencies, effort, parallelism", "body"),
+    foreman = c.box(fx, fy, [("/work-on foreman", "title"), ("reads the brief and every issue, proposes one plan: build order, dependencies, effort, parallelism", "body"),
                              ("you decide how many run at once", "body")], FOREMAN)
     ey = (bottom(check) + foreman[1]) / 2
     c.path(f"M {mid(check):.0f} {bottom(check):.0f} L {mid(check):.0f} {ey:.0f} L {mid(foreman):.0f} {ey:.0f} L {mid(foreman):.0f} {foreman[1] - 2:.0f}")
@@ -254,7 +254,7 @@ def day2():
     c = Canvas(1000, 250)
     fore = c.box(40, 70, [("the foreman", "title"), ("builds nothing yet.", "body"), ("It reads.", "body")], FOREMAN, min_w=150)
     docs = [("the project README", "why, shape, rules: the brief"), ("every issue, every comment", "your rulings arrive as comments"),
-            ("the decision records", "what is built, decided earlier"), ("architecture notes and mockups", "how it fits, what it looks like")]
+            ("the decision records", "named now, read by builders in full"), ("architecture notes and mockups", "named now, looked up by section")]
     y = 24
     boxes = []
     for t, s in docs:
@@ -263,7 +263,7 @@ def day2():
     c.arrow(right(fore), fore[1] + 40, boxes[1][0] - 2, fore[1] + 40)
     mem = c.box(right(fore) + 50, y, [("memory", "title"), ("what earlier sessions learned (optional)", "body")], MEMORY, title_size=13, pad=8, dash=True)
     boxes.append(mem)
-    rule = c.box(max(right(b) for b in boxes) + 40, 60, [("the one rule of reading", "title"), ("all of it, every line.", "body"), ("A keyword search is not a read.", "body"),
+    rule = c.box(max(right(b) for b in boxes) + 40, 60, [("the one rule of reading", "title"), ("The brief and every issue: all of it.", "body"), ("An answer quotes the section it read.", "body"),
                                         ("An issue read alone builds the wrong thing.", "body")], CHECK, title_size=13, pad=10)
     c.w = int(max(c.w, right(rule) + 30))
     c.h = int(max(bottom(boxes[-1]), bottom(rule)) + 24)

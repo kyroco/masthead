@@ -11,19 +11,19 @@
   <rect x="255" y="77" width="239" height="45" rx="10" fill="#f3f4f6" stroke="#9ca3af" stroke-width="1.5"/>
   <text x="374" y="96" text-anchor="middle" font-size="13" font-weight="600" fill="#374151">every issue, every comment</text>
   <text x="374" y="112" text-anchor="middle" font-size="12" fill="#4b5563">your rulings arrive as comments</text>
-  <rect x="255" y="130" width="232" height="45" rx="10" fill="#f3f4f6" stroke="#9ca3af" stroke-width="1.5"/>
-  <text x="371" y="149" text-anchor="middle" font-size="13" font-weight="600" fill="#374151">the decision records</text>
-  <text x="371" y="165" text-anchor="middle" font-size="12" fill="#4b5563">what is built, decided earlier</text>
+  <rect x="255" y="130" width="268" height="45" rx="10" fill="#f3f4f6" stroke="#9ca3af" stroke-width="1.5"/>
+  <text x="389" y="149" text-anchor="middle" font-size="13" font-weight="600" fill="#374151">the decision records</text>
+  <text x="389" y="165" text-anchor="middle" font-size="12" fill="#4b5563">named now, read by builders in full</text>
   <rect x="255" y="183" width="273" height="45" rx="10" fill="#f3f4f6" stroke="#9ca3af" stroke-width="1.5"/>
   <text x="392" y="202" text-anchor="middle" font-size="13" font-weight="600" fill="#374151">architecture notes and mockups</text>
-  <text x="392" y="218" text-anchor="middle" font-size="12" fill="#4b5563">how it fits, what it looks like</text>
+  <text x="392" y="218" text-anchor="middle" font-size="12" fill="#4b5563">named now, looked up by section</text>
   <line x1="205" y1="110" x2="253" y2="110" stroke="#6b7280" stroke-width="2" marker-end="url(#m6b7280)"/>
   <rect x="255" y="236" width="304" height="45" rx="10" fill="#f5f3ff" stroke="#7c3aed" stroke-width="1.5" stroke-dasharray="6 3"/>
   <text x="407" y="255" text-anchor="middle" font-size="13" font-weight="600" fill="#4c1d95">memory</text>
   <text x="407" y="271" text-anchor="middle" font-size="12" fill="#5b21b6">what earlier sessions learned (optional)</text>
   <rect x="599" y="60" width="330" height="81" rx="10" fill="#fef3c7" stroke="#d97706" stroke-width="1.5"/>
   <text x="764" y="81" text-anchor="middle" font-size="13" font-weight="600" fill="#78350f">the one rule of reading</text>
-  <text x="764" y="97" text-anchor="middle" font-size="12" fill="#92400e">all of it, every line.</text>
-  <text x="764" y="113" text-anchor="middle" font-size="12" fill="#92400e">A keyword search is not a read.</text>
+  <text x="764" y="97" text-anchor="middle" font-size="12" fill="#92400e">The brief and every issue: all of it.</text>
+  <text x="764" y="113" text-anchor="middle" font-size="12" fill="#92400e">An answer quotes the section it read.</text>
   <text x="764" y="129" text-anchor="middle" font-size="12" fill="#92400e">An issue read alone builds the wrong thing.</text>
 </svg>
