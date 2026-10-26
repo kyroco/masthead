@@ -27,13 +27,14 @@ INPUT="$(cat 2>/dev/null || true)"
 [ "$(printf '%s' "$INPUT" | jq -r '.tool_name // empty')" = "Bash" ] || exit 0
 
 # Apply only to the reviewers: no identity means the main session and passes, and any identity field naming a reviewer puts the call in scope.
+# Claude Code sends this plugin's reviewer as masthead:reviewer; another plugin's agent of the same name is not ours to police.
 in_scope=0
 for field_value in \
   "$(printf '%s' "$INPUT" | jq -r '.agent_type // empty')" \
   "$(printf '%s' "$INPUT" | jq -r '.subagent_type // empty')" \
   "$(printf '%s' "$INPUT" | jq -r '.agent_name // empty')"; do
   [ -n "$field_value" ] || continue
-  candidate="${field_value##*:}"
+  candidate="${field_value#masthead:}"
   if printf '%s' "$candidate" | grep -qE "^($REVIEWER_AGENTS)([-_.:]|$)"; then
     in_scope=1
     break

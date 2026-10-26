@@ -20,6 +20,7 @@ payload="$(cat 2>/dev/null || echo '{}')"
 field() { printf '%s' "$payload" | jq -r "$1" 2>/dev/null || echo ""; }
 
 # The dispatched agent, without masthead's plugin prefix: Claude Code sends masthead:reviewer for this plugin's reviewer. Another plugin's agent keeps its prefix, so it is never taken for ours.
+# The masthead: namespace is trusted as this plugin's identity. A fork also named masthead would pass as ours, but reading the name from .claude-plugin/plugin.json would not tell it apart either, since a fork's plugin.json says masthead too.
 agent_type() { local t; t="$(field '.tool_input.subagent_type // ""')"; printf '%s' "${t#masthead:}"; }
 
 # The user's private state root: $CLAUDE_PLUGIN_DATA/state, else $TMPDIR/masthead-<uid>. Mode 0700; refused when a symlink or not ours.
