@@ -300,6 +300,14 @@ CASES = [
      BUILD_PLAIN, "deny"),
     ("REGRESSION plugin reviewer with no claims", "gate-wave-brief", "masthead:security-reviewer",
      REVIEW_NO_CLAIMS, "deny"),
+    ("REGRESSION plugin diagnoser, no declaration", "gate-fix-evidence", "masthead:diagnoser",
+     REVIEW_SAYING_PATCH, "allow"),
+    ("REGRESSION plugin reviewer told it is impossible", "gate-brief-inference", "masthead:reviewer",
+     "Review the diff. A retry is impossible here.", "allow"),
+    ("another plugin's reviewer is not masthead's", "gate-wave-brief", "otherplugin:reviewer",
+     REVIEW_NO_CLAIMS, "allow"),
+    ("another plugin's reviewer gets no exemption", "gate-agent", "otherplugin:reviewer",
+     REVIEW_CLAIMS_AND_PLURAL_SEAM, "deny"),
 ]
 
 
@@ -313,23 +321,23 @@ def decision_for(gate, subagent, prompt):
     # gate-agent only bites once the session's Korium search found something,
     # so its cases run against a private state folder holding one such search.
     env = dict(os.environ)
-    if gate == "gate-agent":
-        data = tempfile.mkdtemp()
-        session = os.path.join(data, "state", "claude-engram", "test-brief-gates")
-        os.makedirs(session)
-        with open(os.path.join(session, "searches.tsv"), "w") as f:
-            f.write("3\tthe change under review\n")
-        env["CLAUDE_PLUGIN_DATA"] = data
-        env.pop("MASTHEAD_BRIEF_GATE", None)
+    with tempfile.TemporaryDirectory() as data:
+        if gate == "gate-agent":
+            session = os.path.join(data, "state", "claude-engram", "test-brief-gates")
+            os.makedirs(session)
+            with open(os.path.join(session, "searches.tsv"), "w") as f:
+                f.write("3\tthe change under review\n")
+            env["CLAUDE_PLUGIN_DATA"] = data
+            env.pop("MASTHEAD_BRIEF_GATE", None)
 
-    result = subprocess.run(
-        ["bash", HOOK, gate],
-        input=payload,
-        capture_output=True,
-        text=True,
-        check=False,
-        env=env,
-    )
+        result = subprocess.run(
+            ["bash", HOOK, gate],
+            input=payload,
+            capture_output=True,
+            text=True,
+            check=False,
+            env=env,
+        )
 
     # The hook exits 0 either way. The decision is the stdout, or its absence.
     out = result.stdout.strip()
