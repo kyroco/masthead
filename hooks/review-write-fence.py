@@ -57,9 +57,12 @@ def governing_agent(payload, pattern):
         value = payload.get(field)
         if not isinstance(value, str) or not value:
             continue
-        match = pattern.match(value.rsplit(":", 1)[-1] if value.startswith(PLUGIN_PREFIX) else value)
-        if match:
-            return match.group(1)
+        # A masthead: name is ours when any of its parts names a reviewer, so a subfolder of agents/ cannot hide one.
+        parts = value[len(PLUGIN_PREFIX):].split(":") if value.startswith(PLUGIN_PREFIX) else [value]
+        for part in parts:
+            match = pattern.match(part)
+            if match:
+                return match.group(1)
     return None
 
 

@@ -13,7 +13,7 @@ REVIEWER_AGENTS="reviewer|security-reviewer"
 if ! command -v jq >/dev/null 2>&1; then
   RAW="$(cat 2>/dev/null || true)"
   # Cover the same reviewer list as the jq path.
-  if printf '%s' "$RAW" | grep -qE "\"($REVIEWER_AGENTS)\"" \
+  if printf '%s' "$RAW" | grep -qE "\"(masthead:([^\"]*:)?)?($REVIEWER_AGENTS)([-_.:][^\"]*)?\"" \
      && printf '%s' "$RAW" | grep -qE 'curl|wget|nc |netcat|ssh |scp |https?://|/dev/tcp'; then
     printf 'jq is not installed, so this gate cannot read the call. Refusing a reviewer network call rather than passing it unchecked. Install jq, or set %s=off to reopen this knowingly.\n' REVIEWER_NETWORK_GATE >&2
     exit 2
@@ -34,8 +34,9 @@ for field_value in \
   "$(printf '%s' "$INPUT" | jq -r '.subagent_type // empty')" \
   "$(printf '%s' "$INPUT" | jq -r '.agent_name // empty')"; do
   [ -n "$field_value" ] || continue
-  case "$field_value" in masthead:*) candidate="${field_value##*:}" ;; *) candidate="$field_value" ;; esac
-  if printf '%s' "$candidate" | grep -qE "^($REVIEWER_AGENTS)([-_.:]|$)"; then
+  # A masthead: name is ours when any of its parts names a reviewer, so a subfolder of agents/ cannot hide one.
+  case "$field_value" in masthead:*) candidates="$(printf '%s' "${field_value#masthead:}" | tr ':' '\n')" ;; *) candidates="$field_value" ;; esac
+  if printf '%s\n' "$candidates" | grep -qE "^($REVIEWER_AGENTS)([-_.:]|$)"; then
     in_scope=1
     break
   fi

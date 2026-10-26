@@ -19,7 +19,7 @@ TOOL_NAME="$(printf '%s' "$INPUT" | jq -r '.tool_name // empty')"
 # Apply the gate only to the diagnoser and reader agents when run with --project-wide; a main-session call passes.
 # Claude Code sends this plugin's agents as masthead:diagnoser; another plugin's agent of the same name is not ours to police.
 if [ "${1:-}" = "--project-wide" ]; then
-  IS_DIAGNOSER="$(printf '%s' "$INPUT" | jq -r '[.agent_type, .subagent_type, .agent_name] | map(select(type == "string") | if startswith("masthead:") then sub("^.*:"; "") else . end) | any(. == "diagnoser" or . == "reader")')"
+  IS_DIAGNOSER="$(printf '%s' "$INPUT" | jq -r '[.agent_type, .subagent_type, .agent_name] | map(select(type == "string") | if startswith("masthead:") then (ltrimstr("masthead:") | split(":") | .[]) else . end) | any(. == "diagnoser" or . == "reader")')"
   [ "$IS_DIAGNOSER" = "true" ] || exit 0
 fi
 
