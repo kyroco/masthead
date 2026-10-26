@@ -19,8 +19,8 @@ payload="$(cat 2>/dev/null || echo '{}')"
 
 field() { printf '%s' "$payload" | jq -r "$1" 2>/dev/null || echo ""; }
 
-# The dispatched agent, without a plugin prefix: Claude Code sends masthead:reviewer for the plugin's reviewer.
-agent_type() { local t; t="$(field '.tool_input.subagent_type // ""')"; printf '%s' "${t##*:}"; }
+# The dispatched agent, without masthead's plugin prefix: Claude Code sends masthead:reviewer for this plugin's reviewer. Another plugin's agent keeps its prefix, so it is never taken for ours.
+agent_type() { local t; t="$(field '.tool_input.subagent_type // ""')"; printf '%s' "${t#masthead:}"; }
 
 # The user's private state root: $CLAUDE_PLUGIN_DATA/state, else $TMPDIR/masthead-<uid>. Mode 0700; refused when a symlink or not ours.
 state_root() {
