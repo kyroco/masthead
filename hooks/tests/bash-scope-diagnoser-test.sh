@@ -211,6 +211,7 @@ scoped 2 "project-wide: a payload carrying only subagent_type reader is gated" "
 scoped 2 "project-wide: the plugin's diagnoser (masthead:diagnoser) is gated" "{$RM,\"agent_type\":\"masthead:diagnoser\"}" --project-wide
 scoped 2 "project-wide: the plugin's reader (masthead:reader) is gated" "{$RM,\"subagent_type\":\"masthead:reader\"}" --project-wide
 scoped 0 "project-wide: another plugin's reader passes through" "{$RM,\"agent_type\":\"otherplugin:reader\"}" --project-wide
+scoped 2 "project-wide: masthead's diagnoser in a subfolder is gated" "{$RM,\"agent_type\":\"masthead:debug:diagnoser\"}" --project-wide
 # Frontmatter (no argument): the host runs it only inside The diagnoser, so no name lets a call out.
 scoped 2 "frontmatter: The diagnoser under a task label is gated" "{$RM,\"agent_type\":\"diagnoser\",\"agent_name\":\"hunt-1\"}"
 scoped 2 "frontmatter: a payload with no identity is gated" "{$RM}"

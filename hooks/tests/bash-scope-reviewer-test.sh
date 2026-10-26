@@ -273,6 +273,7 @@ scoped "a lookalike name is NOT in scope"       agent_type    reviewerlookalike 
 scoped "another agent passes straight through"  agent_type    general-purpose        0
 scoped "masthead's namespaced reviewer is in scope" agent_type masthead:reviewer   2
 scoped "another plugin's reviewer is not"     agent_type    otherplugin:reviewer   0
+scoped "masthead's reviewer in a subfolder"   agent_type    masthead:review:reviewer 2
 
 printf '[bash-scope-reviewer-test] %d passed, %d failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

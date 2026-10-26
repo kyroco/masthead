@@ -308,6 +308,10 @@ CASES = [
      REVIEW_NO_CLAIMS, "allow"),
     ("another plugin's reviewer gets no exemption", "gate-agent", "otherplugin:reviewer",
      REVIEW_CLAIMS_AND_PLURAL_SEAM, "deny"),
+    # Claude Code adds each subfolder of agents/ to the name, so masthead's
+    # agents are matched on the part after the last colon.
+    ("masthead's reviewer in a subfolder, no Korium line", "gate-agent", "masthead:review:reviewer",
+     REVIEW_CLAIMS_AND_PLURAL_SEAM, "allow"),
 ]
 
 
