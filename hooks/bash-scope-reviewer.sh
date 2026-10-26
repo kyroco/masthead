@@ -34,7 +34,7 @@ for field_value in \
   "$(printf '%s' "$INPUT" | jq -r '.subagent_type // empty')" \
   "$(printf '%s' "$INPUT" | jq -r '.agent_name // empty')"; do
   [ -n "$field_value" ] || continue
-  candidate="${field_value#masthead:}"
+  case "$field_value" in masthead:*) candidate="${field_value##*:}" ;; *) candidate="$field_value" ;; esac
   if printf '%s' "$candidate" | grep -qE "^($REVIEWER_AGENTS)([-_.:]|$)"; then
     in_scope=1
     break
