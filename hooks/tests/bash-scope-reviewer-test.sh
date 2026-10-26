@@ -159,6 +159,13 @@ else
     if [ "$got" = "2" ]; then ok
     else bad "with no jq, $name reaches the network (got exit $got, wanted 2)" "the jq-present path refuses it"; fi
   done
+  # The main session may quote such a word in its own command; that is not an agent name.
+  got="$(nojq "$HOOK" '{"tool_name":"Bash","tool_input":{"command":"grep -l \"reviewer.md\" agents/ && curl -s https://x"}}')"
+  if [ "$got" = "0" ]; then ok
+  else bad "with no jq, a main-session command quoting reviewer.md is refused (got exit $got, wanted 0)" "only an identity field names an agent"; fi
+  got="$(nojq "$HOOK" '{"tool_name":"Bash","tool_input":{"command":"curl https://x","description":"reviewer-fence check"}}')"
+  if [ "$got" = "0" ]; then ok
+  else bad "with no jq, a main-session description naming the reviewer fence is refused (got exit $got, wanted 0)" "only an identity field names an agent"; fi
   got="$(nojq "$HOOK" '{"tool_name":"Bash","agent_type":"otherplugin:reviewer","tool_input":{"command":"curl https://x"}}')"
   if [ "$got" = "0" ]; then ok
   else bad "with no jq, another plugin's reviewer is held (got exit $got, wanted 0)" "it is not masthead's to police"; fi

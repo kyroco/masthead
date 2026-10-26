@@ -63,6 +63,8 @@ case_ deny  "masthead's namespaced reviewer"          "$(p Write agent_type mast
 case_ allow "another plugin's reviewer is not fenced"  "$(p Write agent_type otherplugin:reviewer "$W/repo/lib/a.ex")"
 case_ deny  "masthead's reviewer in a subfolder"      "$(p Write agent_type masthead:review:reviewer "$W/repo/lib/a.ex")"
 case_ deny  "a masthead subfolder named for the reviewer" "$(p Write agent_type masthead:reviewer:contract "$W/repo/lib/a.ex")"
+case_ deny  "a reviewer in a folder named for the other" "$(p Write agent_type masthead:security-reviewer:reviewer "$R/findings-security-reviewer.json")"
+case_ allow "a security reviewer in a reviewer folder"  "$(p Write agent_type masthead:reviewer:security-reviewer "$R/findings-security-reviewer.json")"
 case_ deny  "subagent_type names the reviewer"         "$(p Write subagent_type reviewer "$W/repo/lib/a.ex")"
 case_ deny  "a traversal out of the review folder"     "$(p Write agent_type reviewer "$R/../../lib/findings-reviewer-x.json")"
 case_ deny  "a findings name two folders into source"  "$(p Write agent_type reviewer "$W/repo/lib/sub/findings-reviewer-x.json")"

@@ -312,6 +312,8 @@ CASES = [
     # agents are matched on the part after the last colon.
     ("masthead's reviewer in a subfolder, no Korium line", "gate-agent", "masthead:review:reviewer",
      REVIEW_CLAIMS_AND_PLURAL_SEAM, "allow"),
+    ("a subfolder named for the reviewer is still screened", "gate-wave-brief", "masthead:reviewer:contract",
+     REVIEW_NO_CLAIMS, "deny"),
 ]
 
 
