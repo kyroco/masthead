@@ -69,7 +69,9 @@ The steps:
    architecture doc and the mockup pages they touch, by path, so every brief
    and answer points at the same files.
 6. Run `/analyze-issues` on the issues (`${CLAUDE_PLUGIN_ROOT}/skills/analyze-issues/SKILL.md`),
-   unless the user ran it on this work already and no issue changed since.
+   every run. Skip it only when the user says so in this session. A rewrite
+   comment, an earlier run or issues that look ready are not a reason to
+   skip: whether to skip is the user's call.
    It rewrites each issue into its four parts, splits the big ones, and
    brings the user the questions nothing else answers. An issue is dispatched
    only once it is ready: its scenarios written and no `needs-decision`
