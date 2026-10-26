@@ -13,7 +13,8 @@ REVIEWER_AGENTS="reviewer|security-reviewer"
 if ! command -v jq >/dev/null 2>&1; then
   RAW="$(cat 2>/dev/null || true)"
   # Cover the same reviewer list as the jq path.
-  if printf '%s' "$RAW" | grep -qE "\"(masthead:([^\"]*:)?)?($REVIEWER_AGENTS)([-_.:][^\"]*)?\"" \
+  # Read the name only from an identity field, so a command that quotes reviewer.md is not taken for a reviewer.
+  if printf '%s' "$RAW" | grep -qE "\"(agent_type|subagent_type|agent_name)\"[[:space:]]*:[[:space:]]*\"(masthead:([^\"\\\\]*:)?)?($REVIEWER_AGENTS)([-_.:][^\"\\\\]*)?\"" \
      && printf '%s' "$RAW" | grep -qE 'curl|wget|nc |netcat|ssh |scp |https?://|/dev/tcp'; then
     printf 'jq is not installed, so this gate cannot read the call. Refusing a reviewer network call rather than passing it unchecked. Install jq, or set %s=off to reopen this knowingly.\n' REVIEWER_NETWORK_GATE >&2
     exit 2

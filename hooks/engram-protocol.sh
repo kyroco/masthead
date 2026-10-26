@@ -21,7 +21,14 @@ field() { printf '%s' "$payload" | jq -r "$1" 2>/dev/null || echo ""; }
 
 # The dispatched agent: Claude Code sends this plugin's reviewer as masthead:reviewer, or masthead:<folder>:reviewer for one in a subfolder of agents/, so a masthead: name is matched on the part after the last colon. Another plugin's agent keeps its prefix, so it is never taken for ours.
 # The masthead: namespace is trusted as this plugin's identity. A fork also named masthead would pass as ours, but reading the name from .claude-plugin/plugin.json would not tell it apart either, since a fork's plugin.json says masthead too.
-agent_type() { local t; t="$(field '.tool_input.subagent_type // ""')"; case "$t" in masthead:*) t="${t##*:}" ;; esac; printf '%s' "$t"; }
+# Of a masthead: name's parts, the last one naming a masthead agent is the agent, as in the fences; else the last part.
+agent_type() {
+  local t; t="$(field '.tool_input.subagent_type // ""')"
+  case "$t" in
+    masthead:*) printf '%s' "${t#masthead:}" | awk -F: '{ for (i = NF; i >= 1; i--) if ($i ~ /^(reviewer|security-reviewer|adjudicator|diagnoser|reader)$/) { printf "%s", $i; exit } printf "%s", $NF }' ;;
+    *) printf '%s' "$t" ;;
+  esac
+}
 
 # The user's private state root: $CLAUDE_PLUGIN_DATA/state, else $TMPDIR/masthead-<uid>. Mode 0700; refused when a symlink or not ours.
 state_root() {

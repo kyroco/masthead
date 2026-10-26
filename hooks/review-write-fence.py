@@ -57,9 +57,10 @@ def governing_agent(payload, pattern):
         value = payload.get(field)
         if not isinstance(value, str) or not value:
             continue
-        # A masthead: name is ours when any of its parts names a reviewer, so a subfolder of agents/ cannot hide one.
+        # A masthead: name is ours when any of its parts names a reviewer, so a subfolder of agents/ cannot hide one;
+        # the last such part is the agent, since Claude Code puts the folders first.
         parts = value[len(PLUGIN_PREFIX):].split(":") if value.startswith(PLUGIN_PREFIX) else [value]
-        for part in parts:
+        for part in reversed(parts):
             match = pattern.match(part)
             if match:
                 return match.group(1)
