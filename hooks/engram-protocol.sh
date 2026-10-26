@@ -19,6 +19,9 @@ payload="$(cat 2>/dev/null || echo '{}')"
 
 field() { printf '%s' "$payload" | jq -r "$1" 2>/dev/null || echo ""; }
 
+# The dispatched agent, without masthead's plugin prefix: Claude Code sends masthead:reviewer for this plugin's reviewer. Another plugin's agent keeps its prefix, so it is never taken for ours.
+agent_type() { local t; t="$(field '.tool_input.subagent_type // ""')"; printf '%s' "${t#masthead:}"; }
+
 # The user's private state root: $CLAUDE_PLUGIN_DATA/state, else $TMPDIR/masthead-<uid>. Mode 0700; refused when a symlink or not ours.
 state_root() {
   local r
@@ -417,7 +420,7 @@ EOF
     case "${MASTHEAD_BRIEF_GATE:-}" in off|0|false|no) exit 0 ;; esac
 
     # The blind reviewers and the adjudicator are exempt unless the brief orders a source change.
-    case "$(field '.tool_input.subagent_type // ""')" in
+    case "$(agent_type)" in
       reviewer|security-reviewer|adjudicator)
         brief_instructs_a_source_change "$prompt" || exit 0
         ;;
@@ -476,7 +479,7 @@ Only a line BEGINNING with the token counts, so a brief that merely mentions Kor
     prompt="$(field '.tool_input.prompt // ""')"
 
     # The four read-only agents are exempt unless the brief orders a change.
-    case "$(field '.tool_input.subagent_type // ""')" in
+    case "$(agent_type)" in
       reviewer|security-reviewer|diagnoser|reader)
         brief_instructs_a_source_change "$prompt" || exit 0
         ;;
@@ -505,7 +508,7 @@ Only a line BEGINNING with the token counts, so a brief that merely mentions Kor
 
   # gate-wave-brief: refuse a brief to reviewer or security-reviewer that states no author claims, or no code outside the diff the change depends on.
   gate-wave-brief)
-    subagent="$(field '.tool_input.subagent_type // ""')"
+    subagent="$(agent_type)"
     prompt="$(field '.tool_input.prompt // ""')"
 
     # Only the two review agents are screened.
@@ -538,7 +541,7 @@ Only a line BEGINNING with the token counts, so a brief that merely mentions Kor
 
   # gate-brief-inference: refuse a build brief that passes the lead's conclusion off as a rule without saying whose judgment it is.
   gate-brief-inference)
-    subagent="$(field '.tool_input.subagent_type // ""')"
+    subagent="$(agent_type)"
 
     # Every dispatch except the reviewers.
     case "$subagent" in

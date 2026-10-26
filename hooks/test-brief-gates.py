@@ -37,6 +37,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 
 HOOK = os.path.join(os.path.dirname(os.path.abspath(__file__)), "engram-protocol.sh")
 
@@ -285,6 +286,28 @@ CASES = [
      REVIEW_SAYING_PATCH, "deny"),
     ("declared review brief passes", "gate-fix-evidence", "general-purpose",
      READ_ONLY_REVIEW_NO_CLAIMS, "allow"),
+
+    # PLUGIN AGENT NAMES. Claude Code sends a plugin's agent as
+    # "<plugin>:<agent>", so "masthead:reviewer" must be screened and exempted
+    # exactly as "reviewer" is. On 2026-10-26 gate-agent refused five
+    # masthead:reviewer briefs and one masthead:adjudicator brief for having no
+    # Korium line, though both are meant to get none.
+    ("REGRESSION plugin reviewer, no Korium line", "gate-agent", "masthead:reviewer",
+     REVIEW_CLAIMS_AND_PLURAL_SEAM, "allow"),
+    ("REGRESSION plugin adjudicator, no Korium line", "gate-agent", "masthead:adjudicator",
+     REVIEW_CLAIMS_AND_PLURAL_SEAM, "allow"),
+    ("a builder with no Korium line is refused", "gate-agent", "general-purpose",
+     BUILD_PLAIN, "deny"),
+    ("REGRESSION plugin reviewer with no claims", "gate-wave-brief", "masthead:security-reviewer",
+     REVIEW_NO_CLAIMS, "deny"),
+    ("REGRESSION plugin diagnoser, no declaration", "gate-fix-evidence", "masthead:diagnoser",
+     REVIEW_SAYING_PATCH, "allow"),
+    ("REGRESSION plugin reviewer told it is impossible", "gate-brief-inference", "masthead:reviewer",
+     "Review the diff. A retry is impossible here.", "allow"),
+    ("another plugin's reviewer is not masthead's", "gate-wave-brief", "otherplugin:reviewer",
+     REVIEW_NO_CLAIMS, "allow"),
+    ("another plugin's reviewer gets no exemption", "gate-agent", "otherplugin:reviewer",
+     REVIEW_CLAIMS_AND_PLURAL_SEAM, "deny"),
 ]
 
 
@@ -294,13 +317,27 @@ def decision_for(gate, subagent, prompt):
         "tool_name": "Agent",
         "tool_input": {"subagent_type": subagent, "prompt": prompt},
     })
-    result = subprocess.run(
-        ["bash", HOOK, gate],
-        input=payload,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+
+    # gate-agent only bites once the session's Korium search found something,
+    # so its cases run against a private state folder holding one such search.
+    env = dict(os.environ)
+    with tempfile.TemporaryDirectory() as data:
+        if gate == "gate-agent":
+            session = os.path.join(data, "state", "claude-engram", "test-brief-gates")
+            os.makedirs(session)
+            with open(os.path.join(session, "searches.tsv"), "w") as f:
+                f.write("3\tthe change under review\n")
+            env["CLAUDE_PLUGIN_DATA"] = data
+            env.pop("MASTHEAD_BRIEF_GATE", None)
+
+        result = subprocess.run(
+            ["bash", HOOK, gate],
+            input=payload,
+            capture_output=True,
+            text=True,
+            check=False,
+            env=env,
+        )
 
     # The hook exits 0 either way. The decision is the stdout, or its absence.
     out = result.stdout.strip()

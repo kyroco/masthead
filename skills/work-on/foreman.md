@@ -144,9 +144,18 @@ An issue whose blocker is still open waits until that blocker merges.
   question for the user, not a guess for the worker.
 - A worker's question: first re-read that issue's comments, then look in the
   sources above, in order, and answer with the line quoted. Only when none
-  answers it, ask the user, and say which sources you checked. Write the
-  answer on the issue as a comment, in the user's words when it is theirs,
-  so the next session finds it.
+  answers it, ask the user, and say which sources you checked. Hand the
+  write to one `general-purpose` agent with `model: "haiku"`, sending the
+  issue number, the worker's question word for word, and the answer, in
+  the user's words verbatim when it is theirs. It reads the issue and, in
+  this order: captures the question and answer in Korium, and when that
+  fails reports it and carries on; then, stopping at the first of these
+  that fails, posts them as a comment so the next session finds it, takes
+  that question out of the body only when it is there, and removes the
+  `needs-decision` label only when no `[NEEDS CLARIFICATION]` line is left;
+  and returns one short line saying what it did. Wait for that line before the next write on the same issue. When it
+  says a step failed, tell the user which issue and step. Never read a
+  whole issue body yourself to make the write.
 - Pass the user's words on unchanged. Never reword them, and never add a rule
   the sources do not state.
 - Never send a worker ADR text in place of the ADR. Quote the one line an
