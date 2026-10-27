@@ -162,7 +162,7 @@ def workflow():
     cols = []
     x = 40
     for n in ("41", "42", "45"):
-        lines = [(f"worker for issue #{n}", "title")] + [(s, "body") for s in WORKER_STEPS] + [(f"9. one pull request, Fixes #{n}", "body")]
+        lines = [(f"worker for issue #{n}", "title")] + [(s, "body") for s in WORKER_STEPS] + [(f"8. one pull request, Fixes #{n}", "body")]
         b = c.box(x, wy, lines, OUTBOX, pad=16)
         cols.append(b)
         x = right(b) + 36
@@ -206,7 +206,7 @@ def review():
     c.arrow(right(worker), worker[1] + 40, revs[1][0] - 2, worker[1] + 40)
 
     jx = right(revs[0]) + 70
-    judge = c.box(jx, 150, [("the judge", "title"), ("runs each false claim's reproduction,", "body"), ("nothing from the worker,", "body"), ("and places it; that is final", "body")], JUDGE)
+    judge = c.box(jx, 150, [("the judge", "title"), ("runs each false claim's reproduction,", "body"), ("nothing from the worker,", "body"), ("and places it; that is final;", "body"), ("an unsettled security finding", "body"), ("goes to the foreman", "body")], JUDGE)
     c.arrow(right(revs[2]), revs[2][1] + 18, judge[0] - 2, revs[2][1] + 18)
     c.text((right(revs[2]) + judge[0]) / 2, revs[2][1] + 8, "false claims", size=12, anchor="middle")
 

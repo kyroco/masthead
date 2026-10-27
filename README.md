@@ -33,11 +33,11 @@ Claude Code in the repository and type one thing:
 
 ![You type one command; the milestone has nine issues](docs/images/day-1-start.svg)
 
-A foreman wakes up. It doesn't build anything yet. It reads. The project's
-README first, because that's the brief: why this work exists, what shape it
-has, what rules it follows. Then every issue, with every comment, because
-your rulings tend to arrive as comments. Then what earlier sessions wrote
-down in memory. It notes which decision record, architecture notes and
+A foreman wakes up. It doesn't build anything yet. It reads. What earlier sessions
+wrote down in memory first. Then the project's README, because that's the
+brief: why this work exists, what shape it has, what rules it follows. Then
+every issue, with every comment, because your rulings tend to arrive as
+comments. It notes which decision record, architecture notes and
 mockups the issues point at, but it doesn't read those end to end yet. Every
 builder reads them in full, and when a builder asks a question, the foreman
 reads the section the answer sits in and quotes it. A foreman that reads
@@ -136,8 +136,9 @@ comment saying what happened, and the run goes on without it.
 
 When a pull request's checks pass, its review is clean and the worker has
 cleaned up after itself, the foreman queues it to be merged. It closes the
-issue, and any big issue whose pieces are now all done, then gives that worker
-its next issue, a follow-up that waited on this one first. By the end of the
+issue, and any big issue whose pieces are now all done, then starts the next
+issue, a follow-up that waited on this one first, in that worker in the
+desktop app or in a fresh session in the terminal. By the end of the
 day every issue is merged, parked or skipped, and you get one
 line per issue saying which.
 
@@ -155,8 +156,8 @@ what to do instead.
 
 `/work-on #123` does the same for a single issue with you as the foreman.
 The worker reports its brief and waits for your go before building, and an
-issue with the `design-sheet` label gets a one-page sheet written into the
-issue for you to approve first.
+issue with the `design-sheet` label that builds no decision record gets a
+one-page sheet written into the issue for you to approve first.
 
 ## Install
 
@@ -172,8 +173,9 @@ install options (a terminal install takes the defaults silently):
 It asks whether to connect Korium memory (off unless you say so), whether to
 keep a code index in Korium (off), whether to keep AI attribution out of commits (on), and whether a helper needs a reason
 before running on the biggest model (off). Then run `/masthead:setup`. It
-asks three questions about the repository and writes nothing until you say
-yes: just you or the team
+asks three questions about the repository, and one or two more when it finds
+a folder of decision records or no ignore line for its working files, and
+writes nothing until you say yes: just you or the team
 (whether the settings are committed with the code), tests before a push
 (it finds your test command), and whether to connect a memory now, later or
 not at all. Run it again whenever you want to change an answer.
@@ -185,7 +187,7 @@ To change an install option later, run `/plugin configure masthead@masthead`:
 | Connect Korium memory | off | Each session looks up what earlier sessions learned before its first change, and saves what it learned at the end. Needs a [Korium](https://kyroco.ai) account; there's a free plan. Everything else works without it. |
 | Keep a code index in Korium | off | Only with Korium memory on and korium-cli installed. The names and structure of the code in each repository you open, and the names you search for, go to your Korium account, so Claude can ask the index before it greps. Leave it off for a repository you may not send to Korium. |
 | Keep AI attribution out of commits | on | Refuses a commit message or pull request body with an AI co-author line, a session link or a generated-with footer. |
-| Ask for a reason before a helper runs on the biggest model | off | Helpers run on the small model unless the brief says why the big one is needed. |
+| Ask for a reason before a helper runs on the biggest model | off | A helper with no model in its own file runs on the small model unless the brief says why the big one is needed. The verifier, the security reviewer and the diagnoser name the big model in their files and are not asked. |
 
 To remove it: `claude plugin uninstall masthead@masthead`. The settings file
 setup wrote and the push check script (`.claude/push-check.sh`) are yours to
@@ -219,7 +221,7 @@ reason Claude can act on.
 | `block-secret-fetches.py` | before a shell command | pulling a secret out of a vault or secret store on the command line | matches command text |
 | `scan-tool-output-for-secrets.py` | after a shell command | nothing; warns when the output looks like a credential | a backstop after the fact |
 | `issue-edit-gate.py` | before a shell command | an issue edit whose new body drops a line quoted as yours (three or more words in quotes, with your name on the line or on a heading above it), or adds a `[NEEDS CLARIFICATION]` question with no `looked in:` part naming the decision record, the README rule and the Korium query searched | reads the body from `--body-file <path>` only, a real file inside the checkout, and refuses `--body`, standard input, a heredoc or a here-string with that form to use; knows you by the first name in git config, or "the user" when it is the one speaking; a document quote on the same line as your words is kept too; a question already on the issue is left alone; it guards against a line dropped by accident, like the other checks, and reads no other shell shape |
-| `irreversible-action-gate.sh` | before a shell command | force pushes, history rewrites, deleting unmerged branches, destructive data and infrastructure commands, pushing without the push check | emits a refusal, not a question |
+| `irreversible-action-gate.sh` | before a shell command | force pushes, hard resets, `git clean`, deleting a remote branch, skipping the checks with `--no-verify`, and destructive data and infrastructure commands | emits a refusal, not a question |
 | `untrusted-domain-deny.py` | before a web fetch or search | requests to paste sites and other hosts code shouldn't reach | the host list is in the script |
 | `web-to-memory-gate.py` | after a web fetch; before a write | copying text fetched from the web into files every session loads, or into memory, without a marker saying the web was read | files inside a git repository are left alone, since a pull request shows them |
 | `agent-brief-gates.sh` | before a helper is sent | a brief to a verifier or security reviewer that leaves out the claims it must check; a third re-verify round | checks the shape of the brief, not whether it's true |
@@ -232,12 +234,12 @@ reason Claude can act on.
 | `skill-review-gate.py` | before a skill or helper runs | invoking a changed project skill or agent nobody in the session has read | project files only |
 | `prime-context.py` | at session start and on each prompt | nothing; injects the procedure that fits the prompt (before a commit, before a push, before reading a test result) | |
 
-### On when the repository states the fact setup writes
+### Fully on once the repository states the fact setup writes
 
 | Check | Runs | Refuses | Needs |
 |---|---|---|---|
-| `hard-gate.sh` | before `git push` or `gh pr create` | a push until the push check reports the tests passed on this exact commit; a push of any other commit | the test command from setup (`PROJECT_PUSH_CHECK`) |
-| `adr-sections-gate.py`, `adr-structure-gate.sh`, `wiki-refresh.sh` | before a write; at stop; at session start | a decision record written without its sections; a finish that leaves one with an unchecked claims list; keeps the records folder fresh | a decision records folder (`ADR_DIR`) |
+| `hard-gate.sh` | before `git push` or `gh pr create` | a push that carries something shaped like a secret, or fails a changed stack's format, compile, lint or type check; with the test command, a push until the push check reports the tests passed on this exact commit, and a push of any other commit | nothing for the secret scan and the stack checks; the test command from setup (`PROJECT_PUSH_CHECK`) for the test receipt |
+| `adr-sections-gate.py`, `adr-structure-gate.sh`, `wiki-refresh.sh` | before a write; at stop; at session start | a decision record written without its sections; a finish that leaves one with an unchecked claims list; keeps the records folder fresh | a decision records folder: `ADR_DIR`, or `docs/adr` when none is named |
 | `elixir-toolchain-env.sh`, `elixir-format-after-edit.sh` | at session start; after an edit | nothing; pins the Elixir toolchain and formats an edited file | an Elixir root (`PROJECT_ELIXIR_ROOT`) |
 
 Where these three fall short, together: the fact names a file, and the copy
@@ -253,9 +255,9 @@ review is the guard against intent.
 |---|---|---|
 | `engram-protocol.sh` | Connect Korium memory | the first edit before a memory search; a finish with nothing saved; a capture filed under another agent's name |
 | `capture-finding-reminder.py` | Connect Korium memory | nothing; reminders only |
-| `korium-index-on-stop.sh` and the code index gates in `engram-protocol.sh` | Keep a code index in Korium | a grep for a name the code index already answered; otherwise nothing, the index refresh runs at the end of a session |
+| `korium-index-on-stop.sh` and the code index gates in `engram-protocol.sh` | Keep a code index in Korium | a grep for a name the code index holds until the index is asked, a search that repeats a name it just answered, and, once, a whole-file read of a file it just placed; the index refresh at the end of a session refuses nothing |
 | `commit-attribution-gate.py` | Keep AI attribution out of commits | a commit message or pull request body with an AI co-author line, a session link or a generated-with footer |
-| `model-choice-gate.sh` | Ask for a reason before the biggest model | a helper sent to the big model with no reason on the first line of its brief |
+| `model-choice-gate.sh` | Ask for a reason before the biggest model | a helper with no model in its own file sent to the big model with no reason on the first line of its brief |
 
 The off switches are environment variables read from the check's own
 environment, so a session can't switch a check off for itself:

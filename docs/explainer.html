@@ -111,7 +111,7 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   <text x="748" y="136" text-anchor="middle" font-size="12" fill="#4b5563">#45, #46, #47, #48, #49</text>
 </svg>
 </div></figure>
-<p>A foreman wakes up. It doesn't build anything yet. It reads. The project's README first, because that's the brief: why this work exists, what shape it has, what rules it follows. Then every issue, with every comment, because your rulings tend to arrive as comments. Then what earlier sessions wrote down in memory. It notes which decision record, architecture notes and mockups the issues point at, but it doesn't read those end to end yet. Every builder reads them in full, and when a builder asks a question, the foreman reads the section the answer sits in and quotes it. A foreman that reads everything up front runs out of room before the first builder starts.</p>
+<p>A foreman wakes up. It doesn't build anything yet. It reads. What earlier sessions wrote down in memory first. Then the project's README, because that's the brief: why this work exists, what shape it has, what rules it follows. Then every issue, with every comment, because your rulings tend to arrive as comments. It notes which decision record, architecture notes and mockups the issues point at, but it doesn't read those end to end yet. Every builder reads them in full, and when a builder asks a question, the foreman reads the section the answer sits in and quotes it. A foreman that reads everything up front runs out of room before the first builder starts.</p>
 <figure><div class="paper"><svg xmlns="http://www.w3.org/2000/svg" role="img" viewBox="0 0 1000 305" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="14">
     <defs><marker id="day2read-m16a34a" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#16a34a"/></marker><marker id="day2read-m6366f1" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#6366f1"/></marker><marker id="day2read-m6b7280" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#6b7280"/></marker><marker id="day2read-md97706" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#d97706"/></marker><marker id="day2read-mdb2777" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#db2777"/></marker><marker id="day2read-mdc2626" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#dc2626"/></marker></defs>
   <rect x="40" y="70" width="165" height="74" rx="10" fill="#eef2ff" stroke="#6366f1" stroke-width="1.5"/>
@@ -256,11 +256,13 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   <text x="528" y="292" text-anchor="middle" font-size="12" fill="#6b7280">each one tries to make every claim false:</text>
   <text x="528" y="308" text-anchor="middle" font-size="12" fill="#6b7280">no author's notes, no editing, no network</text>
   <line x1="320" y1="160" x2="368" y2="160" stroke="#6b7280" stroke-width="2" marker-end="url(#review-m6b7280)"/>
-  <rect x="610" y="150" width="294" height="90" rx="10" fill="#ecfeff" stroke="#0891b2" stroke-width="1.5"/>
+  <rect x="610" y="150" width="294" height="122" rx="10" fill="#ecfeff" stroke="#0891b2" stroke-width="1.5"/>
   <text x="757" y="176" text-anchor="middle" font-size="14" font-weight="600" fill="#164e63">the judge</text>
   <text x="757" y="192" text-anchor="middle" font-size="12" fill="#155e75">runs each false claim's reproduction,</text>
   <text x="757" y="208" text-anchor="middle" font-size="12" fill="#155e75">nothing from the worker,</text>
-  <text x="757" y="224" text-anchor="middle" font-size="12" fill="#155e75">and places it; that is final</text>
+  <text x="757" y="224" text-anchor="middle" font-size="12" fill="#155e75">and places it; that is final;</text>
+  <text x="757" y="240" text-anchor="middle" font-size="12" fill="#155e75">an unsettled security finding</text>
+  <text x="757" y="256" text-anchor="middle" font-size="12" fill="#155e75">goes to the foreman</text>
   <line x1="540" y1="168" x2="608" y2="168" stroke="#6b7280" stroke-width="2" marker-end="url(#review-m6b7280)"/>
   <text x="575" y="158" text-anchor="middle" font-size="12" fill="#6b7280">false claims</text>
   <rect x="964" y="90" width="302" height="74" rx="10" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5"/>
@@ -285,9 +287,9 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   <text x="40" y="516" text-anchor="start" font-size="13" fill="#4b5563">Then: the tests run on the final commit, and one pull request goes up.</text>
 </svg>
 </div>
-<figcaption>The judge runs each false claim's reproduction and sorts it three ways: onto the fix list with a file and line, onto a list of new issues when it's serious but outside this change, or out, when it isn't real, isn't confirmed, or isn't worth a change. Its placement is final.</figcaption></figure>
+<figcaption>The judge runs each false claim's reproduction and sorts it three ways: onto the fix list with a file and line, onto a list of new issues when it's serious but outside this change, or out, when it isn't real, isn't confirmed, or isn't worth a change. Its placement is final. A security finding it cannot settle goes to the foreman instead, and the pull request waits for that answer.</figcaption></figure>
 <p>Meanwhile you're having coffee. A worker's question lands at the foreman, which re-reads the issue's comments and the sources and answers with the line quoted. Only when nothing settles it does the question reach you, and your answer goes on the issue so the next session finds it. A worker that stops on a failure gets one message; a second failure parks the issue with a comment saying what happened, and the run goes on without it.</p>
-<p>When a pull request's checks pass, its review is clean and the worker has cleaned up after itself, the foreman queues it to be merged. It closes the issue, and any big issue whose pieces are now all done, then gives that worker its next issue, a follow-up that waited on this one first. By the end of the day every issue is merged, parked or skipped, and you get one line per issue saying which.</p>
+<p>When a pull request's checks pass, its review is clean and the worker has cleaned up after itself, the foreman queues it to be merged. It closes the issue, and any big issue whose pieces are now all done, then starts the next issue, a follow-up that waited on this one first, in that worker in the desktop app or in a fresh session in the terminal. By the end of the day every issue is merged, parked or skipped, and you get one line per issue saying which.</p>
 <figure><div class="paper"><svg xmlns="http://www.w3.org/2000/svg" role="img" viewBox="0 0 1076 282" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="14">
     <defs><marker id="day6coffee-m16a34a" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#16a34a"/></marker><marker id="day6coffee-m6366f1" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#6366f1"/></marker><marker id="day6coffee-m6b7280" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#6b7280"/></marker><marker id="day6coffee-md97706" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#d97706"/></marker><marker id="day6coffee-mdb2777" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#db2777"/></marker><marker id="day6coffee-mdc2626" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#dc2626"/></marker></defs>
   <circle cx="90" cy="64" r="26" fill="#fce7f3" stroke="#db2777" stroke-width="2"/>
@@ -344,7 +346,7 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   <text x="232" y="488" text-anchor="middle" font-size="12" fill="#6b7280">5. one verifier per scenario, then the judge</text>
   <text x="232" y="504" text-anchor="middle" font-size="12" fill="#6b7280">6. fix the list, test first; re-verify what broke</text>
   <text x="232" y="520" text-anchor="middle" font-size="12" fill="#6b7280">7. push check: tests on this commit</text>
-  <text x="232" y="536" text-anchor="middle" font-size="12" fill="#6b7280">9. one pull request, Fixes #41</text>
+  <text x="232" y="536" text-anchor="middle" font-size="12" fill="#6b7280">8. one pull request, Fixes #41</text>
   <rect x="461" y="364" width="385" height="190" rx="10" fill="#f9fafb" stroke="#d1d5db" stroke-width="1.5"/>
   <text x="653" y="392" text-anchor="middle" font-size="14" font-weight="600" fill="#6b7280">worker for issue #42</text>
   <text x="653" y="408" text-anchor="middle" font-size="12" fill="#6b7280">1. read the issue, the README, the decisions</text>
@@ -355,7 +357,7 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   <text x="653" y="488" text-anchor="middle" font-size="12" fill="#6b7280">5. one verifier per scenario, then the judge</text>
   <text x="653" y="504" text-anchor="middle" font-size="12" fill="#6b7280">6. fix the list, test first; re-verify what broke</text>
   <text x="653" y="520" text-anchor="middle" font-size="12" fill="#6b7280">7. push check: tests on this commit</text>
-  <text x="653" y="536" text-anchor="middle" font-size="12" fill="#6b7280">9. one pull request, Fixes #42</text>
+  <text x="653" y="536" text-anchor="middle" font-size="12" fill="#6b7280">8. one pull request, Fixes #42</text>
   <rect x="882" y="364" width="385" height="190" rx="10" fill="#f9fafb" stroke="#d1d5db" stroke-width="1.5"/>
   <text x="1074" y="392" text-anchor="middle" font-size="14" font-weight="600" fill="#6b7280">worker for issue #45</text>
   <text x="1074" y="408" text-anchor="middle" font-size="12" fill="#6b7280">1. read the issue, the README, the decisions</text>
@@ -366,7 +368,7 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   <text x="1074" y="488" text-anchor="middle" font-size="12" fill="#6b7280">5. one verifier per scenario, then the judge</text>
   <text x="1074" y="504" text-anchor="middle" font-size="12" fill="#6b7280">6. fix the list, test first; re-verify what broke</text>
   <text x="1074" y="520" text-anchor="middle" font-size="12" fill="#6b7280">7. push check: tests on this commit</text>
-  <text x="1074" y="536" text-anchor="middle" font-size="12" fill="#6b7280">9. one pull request, Fixes #45</text>
+  <text x="1074" y="536" text-anchor="middle" font-size="12" fill="#6b7280">8. one pull request, Fixes #45</text>
   <path d="M 470 294 L 470 334 L 232 334 L 232 362" fill="none" stroke="#6366f1" stroke-width="2" stroke-linejoin="round" marker-end="url(#workflow-m6366f1)"/>
   <path d="M 470 294 L 470 334 L 653 334 L 653 362" fill="none" stroke="#6366f1" stroke-width="2" stroke-linejoin="round" marker-end="url(#workflow-m6366f1)"/>
   <path d="M 470 294 L 470 334 L 1074 334 L 1074 362" fill="none" stroke="#6366f1" stroke-width="2" stroke-linejoin="round" marker-end="url(#workflow-m6366f1)"/>
@@ -382,24 +384,24 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   <text x="40" y="681" text-anchor="start" font-size="12" fill="#6b7280">A worker that stops on a failure gets one message; a second failure parks the issue with a comment. Memory steps run only when Korium is connected.</text>
 </svg>
 </div>
-<figcaption>The whole run on one page: the issues are checked, the foreman plans, you pick how many workers, each worker follows the same nine steps, and the foreman merges and hands out the next issue.</figcaption></figure>
+<figcaption>The whole run on one page: the issues are checked, the foreman plans, you pick how many workers, each worker follows the same eight steps, and the foreman merges and hands out the next issue.</figcaption></figure>
 <p>The whole time, a set of small checks runs underneath. Nobody, not a worker, not a verifier, not Claude in a hurry, reads a secret, force-pushes, pushes untested code, or sends a verifier a brief with no claims to check. You don't see those checks unless one says no, and when it does, it says why and what to do instead.</p>
 
 <h3>One issue on its own</h3>
-<p><code>/work-on #123</code> does the same for a single issue with you as the foreman. The worker reports its brief and waits for your go before building, and an issue with the <code>design-sheet</code> label gets a one-page sheet written into the issue for you to approve first.</p>
+<p><code>/work-on #123</code> does the same for a single issue with you as the foreman. The worker reports its brief and waits for your go before building, and an issue with the <code>design-sheet</code> label that builds no decision record gets a one-page sheet written into the issue for you to approve first.</p>
 
 <h2>Installing it</h2>
 <p>Open Claude Code in a repository and run these two inside the session, not in a terminal, because only the in-session install asks you the four install options (a terminal install takes the defaults silently):</p>
 <pre>/plugin marketplace add kyroco/masthead
 /plugin install masthead@masthead</pre>
-<p>It asks whether to connect Korium memory (off unless you say so), whether to keep a code index in Korium (off), whether to keep AI attribution out of commits (on), and whether a helper needs a reason before running on the biggest model (off). Then run <code>/masthead:setup</code>. It asks three questions about the repository and writes nothing until you say yes: just you or the team (whether the settings are committed with the code), tests before a push (it finds your test command), and whether to connect a memory now, later or not at all. Run it again whenever you want to change an answer.</p>
+<p>It asks whether to connect Korium memory (off unless you say so), whether to keep a code index in Korium (off), whether to keep AI attribution out of commits (on), and whether a helper needs a reason before running on the biggest model (off). Then run <code>/masthead:setup</code>. It asks three questions about the repository, and one or two more when it finds a folder of decision records or no ignore line for its working files, and writes nothing until you say yes: just you or the team (whether the settings are committed with the code), tests before a push (it finds your test command), and whether to connect a memory now, later or not at all. Run it again whenever you want to change an answer.</p>
 <p>To change an install option later, run <code>/plugin configure masthead@masthead</code>:</p>
 <div class="tablewrap"><table>
 <tr><th>Option</th><th>Default</th><th>What it does</th></tr>
 <tr><td>Connect Korium memory</td><td>off</td><td>Each session looks up what earlier sessions learned before its first change, and saves what it learned at the end. Needs a Korium account; there's a free plan. Everything else works without it.</td></tr>
 <tr><td>Keep a code index in Korium</td><td>off</td><td>Only with Korium memory on and korium-cli installed. The names and structure of the code in each repository you open, and the names you search for, go to your Korium account, so Claude can ask the index before it greps. Leave it off for a repository you may not send to Korium.</td></tr>
 <tr><td>Keep AI attribution out of commits</td><td>on</td><td>Refuses a commit message or pull request body with an AI co-author line, a session link or a generated-with footer.</td></tr>
-<tr><td>Ask for a reason before a helper runs on the biggest model</td><td>off</td><td>Helpers run on the small model unless the brief says why the big one is needed.</td></tr>
+<tr><td>Ask for a reason before a helper runs on the biggest model</td><td>off</td><td>A helper with no model in its own file runs on the small model unless the brief says why the big one is needed. The verifier, the security reviewer and the diagnoser name the big model in their files and are not asked.</td></tr>
 </table></div>
 <p>To remove it: <code>claude plugin uninstall masthead@masthead</code>. The settings file setup wrote and the push check script are yours to delete.</p>
 
@@ -415,7 +417,7 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 <tr><td><code>block-secret-fetches.py</code></td><td>before a shell command</td><td>pulling a secret out of a vault or secret store on the command line</td><td>matches command text</td></tr>
 <tr><td><code>scan-tool-output-for-secrets.py</code></td><td>after a shell command</td><td>nothing; warns when the output looks like a credential</td><td>a backstop after the fact</td></tr>
 <tr><td><code>issue-edit-gate.py</code></td><td>before a shell command</td><td>an issue edit whose new body drops a line quoted as yours (three or more words in quotes, with your name on the line or on a heading above it), or adds a <code>[NEEDS CLARIFICATION]</code> question with no <code>looked in:</code> part naming the decision record, the README rule and the Korium query searched</td><td>reads the body from <code>--body-file &lt;path&gt;</code> only, a real file inside the checkout, and refuses <code>--body</code>, standard input, a heredoc or a here-string with that form to use; knows you by the first name in git config, or "the user" when it is the one speaking; a document quote on the same line as your words is kept too; a question already on the issue is left alone; it guards against a line dropped by accident, like the other checks, and reads no other shell shape</td></tr>
-<tr><td><code>irreversible-action-gate.sh</code></td><td>before a shell command</td><td>force pushes, history rewrites, deleting unmerged branches, destructive data and infrastructure commands, pushing without the push check</td><td>emits a refusal, not a question</td></tr>
+<tr><td><code>irreversible-action-gate.sh</code></td><td>before a shell command</td><td>force pushes, hard resets, <code>git clean</code>, deleting a remote branch, skipping the checks with <code>--no-verify</code>, and destructive data and infrastructure commands</td><td>emits a refusal, not a question</td></tr>
 <tr><td><code>untrusted-domain-deny.py</code></td><td>before a web fetch or search</td><td>requests to paste sites and other hosts code shouldn't reach</td><td>the host list is in the script</td></tr>
 <tr><td><code>web-to-memory-gate.py</code></td><td>after a web fetch; before a write</td><td>copying text fetched from the web into files every session loads, or into memory, without a marker saying the web was read</td><td>files inside a git repository are left alone, since a pull request shows them</td></tr>
 <tr><td><code>agent-brief-gates.sh</code></td><td>before a helper is sent</td><td>a brief to a verifier or security reviewer that leaves out the claims it must check; a third re-verify round</td><td>checks the shape of the brief, not whether it's true</td></tr>
@@ -428,11 +430,11 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 <tr><td><code>skill-review-gate.py</code></td><td>before a skill or helper runs</td><td>invoking a changed project skill or agent nobody in the session has read</td><td>project files only</td></tr>
 <tr><td><code>prime-context.py</code></td><td>at session start and on each prompt</td><td>nothing; injects the procedure that fits the prompt</td><td></td></tr>
 </table></div>
-<h3>On when the repository states the fact setup writes</h3>
+<h3>Fully on once the repository states the fact setup writes</h3>
 <div class="tablewrap"><table>
 <tr><th>Check</th><th>Runs</th><th>Refuses</th><th>Needs</th></tr>
-<tr><td><code>hard-gate.sh</code></td><td>before <code>git push</code> or <code>gh pr create</code></td><td>a push until the push check reports the tests passed on this exact commit; a push of any other commit</td><td>the test command from setup</td></tr>
-<tr><td><code>adr-sections-gate.py</code>, <code>adr-structure-gate.sh</code>, <code>wiki-refresh.sh</code></td><td>before a write; at stop; at session start</td><td>a decision record written without its sections; a finish that leaves one with an unchecked claims list; keeps the records folder fresh</td><td>a decision records folder</td></tr>
+<tr><td><code>hard-gate.sh</code></td><td>before <code>git push</code> or <code>gh pr create</code></td><td>a push that carries something shaped like a secret, or fails a changed stack's format, compile, lint or type check; with the test command, a push until the push check reports the tests passed on this exact commit, and a push of any other commit</td><td>nothing for the secret scan and the stack checks; the test command from setup for the test receipt</td></tr>
+<tr><td><code>adr-sections-gate.py</code>, <code>adr-structure-gate.sh</code>, <code>wiki-refresh.sh</code></td><td>before a write; at stop; at session start</td><td>a decision record written without its sections; a finish that leaves one with an unchecked claims list; keeps the records folder fresh</td><td>a decision records folder: the one named, or <code>docs/adr</code> when none is named</td></tr>
 <tr><td><code>elixir-toolchain-env.sh</code>, <code>elixir-format-after-edit.sh</code></td><td>at session start; after an edit</td><td>nothing; pins the Elixir toolchain and formats an edited file</td><td>an Elixir root</td></tr>
 </table></div>
 <p>Where these three fall short, together: the fact names a file, and the copy that runs is the one in the checkout you are in. A branch can change the push check script or the toolchain file, the same way CI runs a pull request's own tests. The record of which commit passed is a file in the checkout too. So the push check is a guard against forgetting, not against intent; a pull request review is the guard against intent.</p>
@@ -441,9 +443,9 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 <tr><th>Check</th><th>Option</th><th>Refuses</th></tr>
 <tr><td><code>engram-protocol.sh</code></td><td>Connect Korium memory</td><td>the first edit before a memory search; a finish with nothing saved; a capture filed under another agent's name</td></tr>
 <tr><td><code>capture-finding-reminder.py</code></td><td>Connect Korium memory</td><td>nothing; reminders only</td></tr>
-<tr><td><code>korium-index-on-stop.sh</code> and the code index gates in <code>engram-protocol.sh</code></td><td>Keep a code index in Korium</td><td>a grep for a name the code index already answered; otherwise nothing, the index refresh runs at the end of a session</td></tr>
+<tr><td><code>korium-index-on-stop.sh</code> and the code index gates in <code>engram-protocol.sh</code></td><td>Keep a code index in Korium</td><td>a grep for a name the code index holds until the index is asked, a search that repeats a name it just answered, and, once, a whole-file read of a file it just placed; the index refresh at the end of a session refuses nothing</td></tr>
 <tr><td><code>commit-attribution-gate.py</code></td><td>Keep AI attribution out of commits</td><td>a commit message or pull request body with an AI co-author line, a session link or a generated-with footer</td></tr>
-<tr><td><code>model-choice-gate.sh</code></td><td>Ask for a reason before the biggest model</td><td>a helper sent to the big model with no reason on the first line of its brief</td></tr>
+<tr><td><code>model-choice-gate.sh</code></td><td>Ask for a reason before the biggest model</td><td>a helper with no model in its own file sent to the big model with no reason on the first line of its brief</td></tr>
 </table></div>
 
 <h2>What Masthead never does</h2>
