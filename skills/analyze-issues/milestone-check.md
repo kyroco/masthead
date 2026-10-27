@@ -5,7 +5,7 @@ per-issue agent is back. Fill in the names and the Korium line, and send the
 rest as written.
 
 ```
-Model-choice: opus, this checks every rewrite of a milestone against the whole ADR and fixes copying mistakes, and no later step checks it.
+Model-choice: opus, this checks every issue of a milestone against the whole ADR, fixes copying mistakes and verifies size, and no later step checks it.
 no code change
 This checks and corrects GitHub issues; it changes no file in the repo.
 
@@ -15,7 +15,7 @@ Check <milestone or project> in <repo> as one body of work before any of it
 is built. Read, in full: the project README, the decision records and design
 documents it names, the mockup pages the issues name, and every open issue with its comments
 (`gh issue list --milestone "<title>"`, then `gh issue view <n> --comments`).
-For each issue rewritten today, read its body before the rewrite from the
+For each issue edited today, read its body before the edit from the
 edit history:
 gh api graphql -f query='{repository(owner:"<owner>",name:"<name>"){issue(number:<n>){userContentEdits(first:10){nodes{editedAt diff}}}}}'
 
@@ -36,9 +36,13 @@ Report, and change nothing for, these:
 3. Two issues that build the same thing, or one that undoes another.
 4. An issue that contradicts the ADR: quote the issue line and the ADR line.
 5. A gap: a decision the ADR makes for this stage that no issue builds.
+6. Size: an issue or sub-issue that does not fit one worker session by the Size rule
+   in ${CLAUDE_PLUGIN_ROOT}/skills/github-issues/SKILL.md. Check every
+   issue and every sub-issue, and name each one that does not fit, with the
+   reason (what it touches).
 
-Nothing else is a finding: not wording, not size, not a design you would
-prefer. Finding nothing is a fine result.
+Nothing else is a finding: not wording, not a design you would prefer.
+Finding nothing is a fine result.
 
 Capture your report in Korium with agent_capture, every quote in full. Then
 return, in under 500 words: each fix (the issue, what you changed, the line

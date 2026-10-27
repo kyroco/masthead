@@ -141,8 +141,8 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   <text x="764" y="129" text-anchor="middle" font-size="12" fill="#92400e">An issue read alone builds the wrong thing.</text>
 </svg>
 </div></figure>
-<p>Then it sends a small agent to every issue, all nine at once. Each one reads its issue and rewrites it on GitHub itself, then hands the foreman only the verdict and the open questions. Each asks the same things. Does this issue say what has to be true when it's done, or does it tell the builder how to do its job? Can I read scenarios out of it, "Given this, When that, Then this is true," and does each one rest on something real: a decision that was made, a rule in the README, something you actually said? Is it too big for one pull request? What would a builder have to guess? When all nine are done, one more agent, on a stronger model, reads every rewritten issue against the decision record, the architecture notes, the mockups and the old body. It puts back anything a rewrite dropped and fixes the order, each fix resting on a line it can quote. It tells you, without changing anything, when two issues build the same thing, one contradicts the decision record, or a decision has nobody building it.</p>
-<figure><div class="paper"><svg xmlns="http://www.w3.org/2000/svg" role="img" viewBox="0 0 1000 315" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="14">
+<p>Then it sends a small agent to every issue, all nine at once. Each one reads its issue and checks it against its sources, on a fixed list. Are the four parts there, in order? Is every line you wrote still quoted under the scenario it rules on? Does each scenario cite a source line that exists, one the agent opens and quotes: a decision that was made, a rule in the README, something you actually said? Can a test show it, "Given this, When that, Then this is true"? Does it say what has to be true when it's done, or does it tell the builder how to do its job? Does it fit one worker session? An issue that passes is left alone: no edit, no comment. One that fails gets only the failing part fixed, on GitHub, and a check in front of the edit refuses a body that drops a line you wrote, or that asks you a question without saying where it looked first. Each agent hands the foreman only its verdicts and the open questions. When all nine are done, one more agent, on a stronger model, reads every issue against the decision record, the architecture notes, the mockups and the old body. It puts back anything an edit dropped and fixes the order, each fix resting on a line it can quote. It tells you, without changing anything, when two issues build the same thing, one contradicts the decision record, a decision has nobody building it, or an issue is still too big for one session.</p>
+<figure><div class="paper"><svg xmlns="http://www.w3.org/2000/svg" role="img" viewBox="0 0 1075 315" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="14">
     <defs><marker id="day3check-m16a34a" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#16a34a"/></marker><marker id="day3check-m6366f1" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#6366f1"/></marker><marker id="day3check-m6b7280" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#6b7280"/></marker><marker id="day3check-md97706" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#d97706"/></marker><marker id="day3check-mdb2777" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#db2777"/></marker><marker id="day3check-mdc2626" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#dc2626"/></marker></defs>
   <text x="40" y="34" text-anchor="start" font-size="16" font-weight="600" fill="#1f2937">Nine small agents, one per issue, all at once</text>
   <rect x="40" y="50" width="88" height="28" rx="10" fill="#fef3c7" stroke="#d97706" stroke-width="1.5"/>
@@ -163,25 +163,26 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   <text x="756" y="68" text-anchor="middle" font-size="12" fill="#92400e">agent, #48</text>
   <rect x="808" y="50" width="88" height="28" rx="10" fill="#fef3c7" stroke="#d97706" stroke-width="1.5"/>
   <text x="852" y="68" text-anchor="middle" font-size="12" fill="#92400e">agent, #49</text>
-  <rect x="40" y="110" width="453" height="105" rx="10" fill="#fef3c7" stroke="#d97706" stroke-width="1.5"/>
-  <text x="266" y="135" text-anchor="middle" font-size="13" font-weight="600" fill="#78350f">each asks four things, then rewrites its issue</text>
-  <text x="266" y="151" text-anchor="middle" font-size="12" fill="#92400e">Does it say what must be true, or how to build it?</text>
-  <text x="266" y="167" text-anchor="middle" font-size="12" fill="#92400e">Can I read scenarios out of it, and what does each rest on?</text>
-  <text x="266" y="183" text-anchor="middle" font-size="12" fill="#92400e">Is it too big for one pull request?</text>
-  <text x="266" y="199" text-anchor="middle" font-size="12" fill="#92400e">What would a builder have to guess?</text>
-  <rect x="523" y="110" width="371" height="121" rx="10" fill="#fef3c7" stroke="#d97706" stroke-width="1.5"/>
-  <text x="708" y="135" text-anchor="middle" font-size="13" font-weight="600" fill="#78350f">then one more agent checks every rewrite</text>
-  <text x="708" y="151" text-anchor="middle" font-size="12" fill="#92400e">Did a rewrite drop anything? It puts it back.</text>
-  <text x="708" y="167" text-anchor="middle" font-size="12" fill="#92400e">Are two issues building the same thing?</text>
-  <text x="708" y="183" text-anchor="middle" font-size="12" fill="#92400e">Does one contradict the decision record?</text>
-  <text x="708" y="199" text-anchor="middle" font-size="12" fill="#92400e">Is there a decision nobody is building?</text>
-  <text x="708" y="215" text-anchor="middle" font-size="12" fill="#92400e">Is the order right? It fixes the links.</text>
-  <rect x="40" y="235" width="854" height="56" rx="10" fill="#f3f4f6" stroke="#9ca3af" stroke-width="1.5"/>
-  <text x="467" y="259" text-anchor="middle" font-size="12" fill="#4b5563">Then: big ones split, questions looked up in the sources,</text>
-  <text x="467" y="275" text-anchor="middle" font-size="12" fill="#4b5563">and only what nothing settles comes to you, one at a time, with a recommendation</text>
+  <rect x="40" y="110" width="611" height="105" rx="10" fill="#fef3c7" stroke="#d97706" stroke-width="1.5"/>
+  <text x="346" y="135" text-anchor="middle" font-size="13" font-weight="600" fill="#78350f">each checks its issue against its sources, and fixes only what fails</text>
+  <text x="346" y="151" text-anchor="middle" font-size="12" fill="#92400e">Are the four parts there? Is every line you wrote still quoted?</text>
+  <text x="346" y="167" text-anchor="middle" font-size="12" fill="#92400e">Does each scenario cite a source line that exists, and can a test show it?</text>
+  <text x="346" y="183" text-anchor="middle" font-size="12" fill="#92400e">Does it say how? Does it fit one session?</text>
+  <text x="346" y="199" text-anchor="middle" font-size="12" fill="#92400e">What would a builder have to guess? An issue that passes is left alone.</text>
+  <rect x="681" y="110" width="354" height="137" rx="10" fill="#fef3c7" stroke="#d97706" stroke-width="1.5"/>
+  <text x="858" y="135" text-anchor="middle" font-size="13" font-weight="600" fill="#78350f">then one more agent checks every issue</text>
+  <text x="858" y="151" text-anchor="middle" font-size="12" fill="#92400e">Did an edit drop anything? It puts it back.</text>
+  <text x="858" y="167" text-anchor="middle" font-size="12" fill="#92400e">Are two issues building the same thing?</text>
+  <text x="858" y="183" text-anchor="middle" font-size="12" fill="#92400e">Does one contradict the decision record?</text>
+  <text x="858" y="199" text-anchor="middle" font-size="12" fill="#92400e">Is there a decision nobody is building?</text>
+  <text x="858" y="215" text-anchor="middle" font-size="12" fill="#92400e">Is the order right? It fixes the links.</text>
+  <text x="858" y="231" text-anchor="middle" font-size="12" fill="#92400e">Is one still too big for one session?</text>
+  <rect x="40" y="235" width="995" height="56" rx="10" fill="#f3f4f6" stroke="#9ca3af" stroke-width="1.5"/>
+  <text x="538" y="259" text-anchor="middle" font-size="12" fill="#4b5563">Then: big ones split, questions looked up in the sources,</text>
+  <text x="538" y="275" text-anchor="middle" font-size="12" fill="#4b5563">and only what nothing settles comes to you, one at a time, with a recommendation</text>
 </svg>
 </div></figure>
-<p>The big ones get split into sub-issues by the agent that rewrote them. Every open question gets looked up in the sources first, in order: the issue's own comments, the README, the decision record, the architecture doc, the mockups, the memory. Whatever a source settles is written into the issue with the line quoted, so nobody has to ask twice. Whatever nothing settles comes to you, one question at a time, with a recommendation. You answer in a sentence. It goes on the issue in your words. An issue with a question still open stays out of the run until you've answered it.</p>
+<p>The big ones get split into sub-issues by the agent that checked them. Every open question gets looked up in the sources first, in order: the issue's own comments, the README, the decision record, the architecture doc, the mockups, the memory. Whatever a source settles is written into the issue with the line quoted, so nobody has to ask twice. Whatever nothing settles comes to you, one question at a time, with a recommendation. You answer in a sentence. It goes on the issue in your words. An issue with a question still open stays out of the run until you've answered it.</p>
 <p>Now the foreman hands you one table: the issues in build order, which depend on which, which can run side by side without touching the same files, how much effort each one needs, and how many workers it would run at once. You pick a number. Say three.</p>
 <figure><div class="paper"><svg xmlns="http://www.w3.org/2000/svg" role="img" viewBox="0 0 1000 218" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="14">
     <defs><marker id="day4plan-m16a34a" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#16a34a"/></marker><marker id="day4plan-m6366f1" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#6366f1"/></marker><marker id="day4plan-m6b7280" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#6b7280"/></marker><marker id="day4plan-md97706" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#d97706"/></marker><marker id="day4plan-mdb2777" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#db2777"/></marker><marker id="day4plan-mdc2626" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#dc2626"/></marker></defs>
@@ -324,17 +325,17 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   <text x="223" y="112" text-anchor="middle" font-size="12" fill="#4b5563">project README: why, shape, rules</text>
   <text x="223" y="128" text-anchor="middle" font-size="12" fill="#4b5563">issues: why, scenarios, out of scope, questions</text>
   <text x="223" y="144" text-anchor="middle" font-size="12" fill="#4b5563">decision records, mockups</text>
-  <rect x="446" y="70" width="446" height="90" rx="10" fill="#fef3c7" stroke="#d97706" stroke-width="1.5"/>
-  <text x="669" y="96" text-anchor="middle" font-size="14" font-weight="600" fill="#78350f">/analyze-issues</text>
-  <text x="669" y="112" text-anchor="middle" font-size="12" fill="#92400e">an agent per issue: rewrites it on GitHub, splits it, asks</text>
-  <text x="669" y="128" text-anchor="middle" font-size="12" fill="#92400e">one check of every rewrite: puts back what was dropped</text>
-  <text x="669" y="144" text-anchor="middle" font-size="12" fill="#92400e">asks you only what nothing settles</text>
+  <rect x="446" y="70" width="453" height="90" rx="10" fill="#fef3c7" stroke="#d97706" stroke-width="1.5"/>
+  <text x="673" y="96" text-anchor="middle" font-size="14" font-weight="600" fill="#78350f">/analyze-issues</text>
+  <text x="673" y="112" text-anchor="middle" font-size="12" fill="#92400e">an agent per issue: checks it, fixes only what fails, asks</text>
+  <text x="673" y="128" text-anchor="middle" font-size="12" fill="#92400e">one check of every issue: what was dropped, what is too big</text>
+  <text x="673" y="144" text-anchor="middle" font-size="12" fill="#92400e">asks you only what nothing settles</text>
   <line x1="406" y1="110" x2="444" y2="110" stroke="#6b7280" stroke-width="2" marker-end="url(#workflow-m6b7280)"/>
-  <rect x="99" y="220" width="734" height="74" rx="10" fill="#eef2ff" stroke="#6366f1" stroke-width="1.5"/>
-  <text x="466" y="246" text-anchor="middle" font-size="14" font-weight="600" fill="#312e81">/work-on foreman</text>
-  <text x="466" y="262" text-anchor="middle" font-size="12" fill="#4338ca">reads the brief and every issue, proposes one plan: build order, dependencies, effort, parallelism</text>
-  <text x="466" y="278" text-anchor="middle" font-size="12" fill="#4338ca">you decide how many run at once</text>
-  <path d="M 669 160 L 669 190 L 466 190 L 466 218" fill="none" stroke="#6b7280" stroke-width="2" stroke-linejoin="round" marker-end="url(#workflow-m6b7280)"/>
+  <rect x="103" y="220" width="734" height="74" rx="10" fill="#eef2ff" stroke="#6366f1" stroke-width="1.5"/>
+  <text x="470" y="246" text-anchor="middle" font-size="14" font-weight="600" fill="#312e81">/work-on foreman</text>
+  <text x="470" y="262" text-anchor="middle" font-size="12" fill="#4338ca">reads the brief and every issue, proposes one plan: build order, dependencies, effort, parallelism</text>
+  <text x="470" y="278" text-anchor="middle" font-size="12" fill="#4338ca">you decide how many run at once</text>
+  <path d="M 673 160 L 673 190 L 470 190 L 470 218" fill="none" stroke="#6b7280" stroke-width="2" stroke-linejoin="round" marker-end="url(#workflow-m6b7280)"/>
   <rect x="40" y="364" width="349" height="190" rx="10" fill="#f9fafb" stroke="#d1d5db" stroke-width="1.5"/>
   <text x="214" y="392" text-anchor="middle" font-size="14" font-weight="600" fill="#6b7280">worker for issue #41</text>
   <text x="214" y="408" text-anchor="middle" font-size="12" fill="#6b7280">1. read the issue, the README, the decisions</text>
@@ -368,12 +369,12 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   <text x="984" y="504" text-anchor="middle" font-size="12" fill="#6b7280">6. fix the list, test first; fix checks</text>
   <text x="984" y="520" text-anchor="middle" font-size="12" fill="#6b7280">7. push check: tests on this commit</text>
   <text x="984" y="536" text-anchor="middle" font-size="12" fill="#6b7280">9. one pull request, Fixes #45</text>
-  <path d="M 466 294 L 466 334 L 214 334 L 214 362" fill="none" stroke="#6366f1" stroke-width="2" stroke-linejoin="round" marker-end="url(#workflow-m6366f1)"/>
-  <path d="M 466 294 L 466 334 L 599 334 L 599 362" fill="none" stroke="#6366f1" stroke-width="2" stroke-linejoin="round" marker-end="url(#workflow-m6366f1)"/>
-  <path d="M 466 294 L 466 334 L 984 334 L 984 362" fill="none" stroke="#6366f1" stroke-width="2" stroke-linejoin="round" marker-end="url(#workflow-m6366f1)"/>
+  <path d="M 470 294 L 470 334 L 214 334 L 214 362" fill="none" stroke="#6366f1" stroke-width="2" stroke-linejoin="round" marker-end="url(#workflow-m6366f1)"/>
+  <path d="M 470 294 L 470 334 L 599 334 L 599 362" fill="none" stroke="#6366f1" stroke-width="2" stroke-linejoin="round" marker-end="url(#workflow-m6366f1)"/>
+  <path d="M 470 294 L 470 334 L 984 334 L 984 362" fill="none" stroke="#6366f1" stroke-width="2" stroke-linejoin="round" marker-end="url(#workflow-m6366f1)"/>
   <text x="214" y="326" text-anchor="middle" font-size="12" fill="#4338ca">one fresh session per issue, each in its own worktree</text>
-  <path d="M 1128 364 L 1128 257 L 835 257" fill="none" stroke="#6b7280" stroke-width="2" stroke-linejoin="round" stroke-dasharray="5 4" marker-end="url(#workflow-m6b7280)"/>
-  <text x="845" y="249" text-anchor="start" font-size="11" fill="#6b7280">plans, questions and reports come back to the foreman</text>
+  <path d="M 1128 364 L 1128 257 L 838 257" fill="none" stroke="#6b7280" stroke-width="2" stroke-linejoin="round" stroke-dasharray="5 4" marker-end="url(#workflow-m6b7280)"/>
+  <text x="848" y="249" text-anchor="start" font-size="11" fill="#6b7280">plans, questions and reports come back to the foreman</text>
   <rect x="40" y="594" width="1118" height="57" rx="10" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5"/>
   <text x="599" y="619" text-anchor="middle" font-size="13" font-weight="600" fill="#14532d">the foreman queues each passing pull request, closes its issue and any big issue now done, and gives that worker its next issue</text>
   <text x="599" y="635" text-anchor="middle" font-size="12" fill="#166534">the run ends when every issue is merged, parked or skipped, with one line per issue saying which</text>
@@ -405,7 +406,7 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 <p>To remove it: <code>claude plugin uninstall masthead@masthead</code>. The settings file setup wrote and the push check script are yours to delete.</p>
 
 <h2>What an issue has to say</h2>
-<p>An issue says what is true when the work is done, never how to get there, in four parts: <b>Why</b> (what a person can't do today), <b>Scenarios</b> (at least one line of "Given, When, Then", each naming the decision, README rule or your own words it rests on), <b>Out of scope</b>, and <b>Questions</b> (what the sources don't settle). One issue is one pull request, built and proved by one worker in one session. The issue checks rewrite issues into this shape and split the ones that are too big, so you don't have to write them this way yourself.</p>
+<p>An issue says what is true when the work is done, never how to get there, in four parts: <b>Why</b> (what a person can't do today), <b>Scenarios</b> (at least one line of "Given, When, Then", each naming the decision, README rule or your own words it rests on), <b>Out of scope</b>, and <b>Questions</b> (what the sources don't settle). One issue is one pull request, built and proved by one worker in one session. The issue checks hold each issue to this shape and its sources, fix only the part that fails, and split the ones that are too big, so you don't have to write them this way yourself.</p>
 
 <h2>Every check, what it refuses, and where it falls short</h2>
 <p>Each check is a short script, run by Claude Code at a fixed moment: before a tool call, after one, or when a session or helper stops. It reads what is about to happen and either lets it through or refuses it with a reason Claude can act on. The off switches are environment variables read from the check's own environment, so a session can't switch a check off for itself.</p>
@@ -415,6 +416,7 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 <tr><td><code>block-secret-reads.py</code></td><td>before a Read, Grep or shell command</td><td>reading a credential file: environment files, keys, tokens, password files, cloud and SSH credentials, even through the masked reader</td><td>matches file names and command text, so a secret in an oddly named file isn't recognized</td></tr>
 <tr><td><code>block-secret-fetches.py</code></td><td>before a shell command</td><td>pulling a secret out of a vault or secret store on the command line</td><td>matches command text</td></tr>
 <tr><td><code>scan-tool-output-for-secrets.py</code></td><td>after a shell command</td><td>nothing; warns when the output looks like a credential</td><td>a backstop after the fact</td></tr>
+<tr><td><code>issue-edit-gate.py</code></td><td>before a shell command</td><td>an issue edit whose new body drops a line quoted as yours (three or more words in quotes, on a line that names you), or carries a <code>[NEEDS CLARIFICATION]</code> question with no <code>looked in:</code> part naming the decision record, the README rule and the Korium query searched</td><td>knows you by the first name in git config, or the words "the user"; a document quote on the same line as your words is kept too; it reads the body from <code>--body</code>, <code>--body-file</code> or a heredoc and refuses one it cannot read</td></tr>
 <tr><td><code>irreversible-action-gate.sh</code></td><td>before a shell command</td><td>force pushes, history rewrites, deleting unmerged branches, destructive data and infrastructure commands, pushing without the push check</td><td>emits a refusal, not a question</td></tr>
 <tr><td><code>untrusted-domain-deny.py</code></td><td>before a web fetch or search</td><td>requests to paste sites and other hosts code shouldn't reach</td><td>the host list is in the script</td></tr>
 <tr><td><code>web-to-memory-gate.py</code></td><td>after a web fetch; before a write</td><td>copying text fetched from the web into files every session loads, or into memory, without a marker saying the web was read</td><td>files inside a git repository are left alone, since a pull request shows them</td></tr>

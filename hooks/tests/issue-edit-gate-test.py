@@ -88,7 +88,7 @@ def main():
     drop_said = OLD.replace('Robert said "one thing should get me account statuses".', "Robert said nothing.")
     drop_bullet = OLD.replace('- "the code shouldn\'t know who to call to read and who to update"\n', "")
     drop_the_user = OLD.replace('; the user: "it\'s basic abstraction concepts"', "")
-    swap_adr = OLD.replace('"nothing else reads or writes those columns"', '"one module is the only way in and out"')
+    swap_adr = OLD.replace('"No code checks a plan\'s name"', '"a plan is its settings, never its name"')
     drop_foo = OLD.replace('named "Foo"', "named Foo")
     rewrapped = OLD.replace('Robert said "one thing should get me account statuses".',
                             'Robert said "one thing should get me\naccount statuses".')

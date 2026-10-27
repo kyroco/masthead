@@ -60,7 +60,8 @@ there. Four parts, in this order, under these headings:
 - **Out of scope:** what this issue leaves to another, by number when it
   exists.
 - **Questions:** what the decision records, the README and memory do not
-  settle, each as `[NEEDS CLARIFICATION: the question]`. Never guess an
+  settle, each as `[NEEDS CLARIFICATION: the question; looked in: <decision-record section>, <README rule>, Korium "<query>"]`,
+  naming where the answer was looked for first. Never guess an
   answer into a scenario. An issue with one open carries the
   `needs-decision` label and is not dispatched.
 
