@@ -386,5 +386,80 @@ says  references/gate-catalog.md "hooks/korium-index-on-stop.sh"
 says  skills/analyze-issues/SKILL.md "checked by a blind verifier before any code is written"
 never skills/analyze-issues/SKILL.md "checked by the foreman"
 
+# 9. Issue #25, verification round 1: seventeen sentences the adjudicator
+# placed on the fix list, each pinned with the wording it replaced.
+# The foreman reads memory first (foreman.md step 1).
+says  README.md "What earlier sessions wrote down in memory first"
+never README.md "Then what earlier sessions wrote down in memory"
+says  docs/explainer.template.html "What earlier sessions wrote down in memory first"
+never docs/explainer.template.html "Then what earlier sessions wrote down in memory"
+# After a merge, the terminal starts a fresh session (foreman.md section 4).
+says  README.md "in a fresh session in the terminal"
+never README.md "gives that worker its next issue"
+says  docs/explainer.template.html "in a fresh session in the terminal"
+never docs/explainer.template.html "gives that worker its next issue"
+# No sheet for an issue that builds a decision record (worker.md step 6).
+says  README.md "label that builds no decision record gets a"
+never README.md "label gets a one-page sheet"
+says  docs/explainer.template.html "label that builds no decision record gets a"
+never docs/explainer.template.html "label gets a one-page sheet"
+# Setup asks more than three questions in some repos (setup SKILL.md 6 and 7).
+says  README.md "one or two more when it finds a folder of decision records"
+never README.md "asks three questions about the repository and writes nothing"
+says  docs/explainer.template.html "one or two more when it finds a folder of decision records"
+never docs/explainer.template.html "asks three questions about the repository and writes nothing"
+# The model option skips a helper whose file names a model (model-choice-gate.sh).
+says  README.md "A helper with no model in its own file"
+never README.md "Helpers run on the small model unless"
+says  docs/explainer.template.html "A helper with no model in its own file"
+never docs/explainer.template.html "Helpers run on the small model unless"
+says  README.md "a helper with no model in its own file sent to the big model"
+says  docs/explainer.template.html "a helper with no model in its own file sent to the big model"
+# What the irreversible-action gate refuses (its header and lines 399 to 430).
+says  README.md "deleting a remote branch, skipping the checks with"
+never README.md "history rewrites, deleting unmerged branches"
+never README.md "pushing without the push check"
+says  docs/explainer.template.html "deleting a remote branch, skipping the checks with"
+never docs/explainer.template.html "history rewrites, deleting unmerged branches"
+never docs/explainer.template.html "pushing without the push check"
+never references/gate-catalog.md "and unproven pushes"
+# The push gate and the ADR gates run in part with no fact (hard-gate.sh 430, adr-sections-gate.py 45).
+says  README.md "Fully on once the repository states the fact setup writes"
+never README.md "On when the repository states the fact setup writes"
+says  docs/explainer.template.html "Fully on once the repository states the fact setup writes"
+never docs/explainer.template.html "On when the repository states the fact setup writes"
+says  README.md "nothing for the secret scan and the stack checks"
+never README.md "| the test command from setup (\`PROJECT_PUSH_CHECK\`) |"
+says  docs/explainer.template.html "nothing for the secret scan and the stack checks"
+never docs/explainer.template.html "<td>the test command from setup</td>"
+says  README.md "when none is named"
+never README.md "a decision records folder (\`ADR_DIR\`) |"
+says  docs/explainer.template.html "when none is named"
+never docs/explainer.template.html "<td>a decision records folder</td>"
+# The code index gates refuse before the first lookup and a whole-file read (engram-protocol.sh).
+says  README.md "until the index is asked"
+never README.md "already answered; otherwise nothing"
+says  docs/explainer.template.html "until the index is asked"
+never docs/explainer.template.html "already answered; otherwise nothing"
+# An unsettled security finding goes to the foreman (adjudicator.md step 5).
+says  docs/explainer.template.html "goes to the foreman instead"
+says  scripts/diagrams.py "goes to the foreman"
+says  docs/images/review.svg "goes to the foreman"
+# The worker box numbers eight steps with no gap.
+says  scripts/diagrams.py "8. one pull request"
+never scripts/diagrams.py "9. one pull request"
+never docs/images/workflow.svg "9. one pull request"
+says  docs/explainer.template.html "the same eight steps"
+never docs/explainer.template.html "the same nine steps"
+# The catalog says which install options switch its gates on (run.sh, agent-brief-gates.sh).
+says  references/gate-catalog.md "runs only with the Korium memory install option on"
+says  references/gate-catalog.md "since the previous Stop"
+never references/gate-catalog.md "since the user last spoke"
+says  references/gate-catalog.md "with the Korium memory option on, prints"
+says  references/gate-catalog.md "or a scratch copy under"
+for doc in docs/explainer.html docs/images/review.svg docs/images/workflow.svg; do
+  never "$doc" "the same nine steps"
+done
+
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
