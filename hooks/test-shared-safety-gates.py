@@ -210,6 +210,40 @@ def main():
           bool(rows) and "model" in rows[0].split("\t"), True)
     stated = by_name.get(marker + "-stated", [""] * 7)
     check("a stated dispatch records the call's model", stated[4], "haiku")
+    dispatch_decision({"prompt": "Re-verify: round 2, claims 1 and 3\nVerify the fix commits.\nClaims: x",
+                       "subagent_type": "verifier", "model": "opus"})
+    reverify = open(rec).read().splitlines()[-1].split("\t")
+    check("a re-verify brief is recorded with its round", reverify[5], "re-verify round 2")
+    dispatch_decision({"prompt": "Re-verify: claims 1 and 3\nVerify the fix commits.",
+                       "subagent_type": "verifier", "model": "opus"})
+    unnumbered = open(rec).read().splitlines()[-1].split("\t")
+    # The form is exact: only a line that begins "Re-verify: round N" at column
+    # zero is a re-verify. The gate refuses every other spelling, so the record
+    # never sees one that ran; recorded alone, it is a plain dispatch.
+    check("a re-verify line with no round number is not the form", unnumbered[5], "dispatched")
+    dispatch_decision({"prompt": "- Re-verify: round 3, claim 2\nVerify the fix commits.",
+                       "subagent_type": "verifier", "model": "opus"})
+    marked = open(rec).read().splitlines()[-1].split("\t")
+    check("a re-verify line as a list item is not the form", marked[5], "dispatched")
+    dispatch_decision({"prompt": "**Re-verify**: round 4, claim 2\nVerify the fix commits.",
+                       "subagent_type": "verifier", "model": "opus"})
+    bold = open(rec).read().splitlines()[-1].split("\t")
+    check("a bold Re-verify label is not the form", bold[5], "dispatched")
+    # The outcome cannot be preset from the environment: the wrapper passes a
+    # refusal as an argument, so an operator variable changes nothing (edge-5).
+    run(["bash", DISPATCH], json.dumps({
+        "session_id": "dispatch-suite", "cwd": DISPATCH_ROOT, "tool_name": "Agent",
+        "tool_input": {"prompt": "Re-verify: round 2\nVerify.", "subagent_type": "verifier", "model": "opus"}}),
+        env={"MASTHEAD_DISPATCH_OUTCOME": "dispatched"})
+    preset = open(rec).read().splitlines()[-1].split("\t")
+    check("an environment outcome is ignored", preset[5], "re-verify round 2")
+    run(["bash", DISPATCH, "--refused"], json.dumps({
+        "session_id": "dispatch-suite", "cwd": DISPATCH_ROOT, "tool_name": "Agent",
+        "tool_input": {"prompt": "Re-verify: round 2\nVerify.", "subagent_type": "verifier", "model": "opus"}}))
+    argued = open(rec).read().splitlines()[-1].split("\t")
+    check("the wrapper's refusal argument is recorded", argued[5], "refused")
+    check("every row carries the branch column",
+          all(len(r.split("\t")) == 8 for r in open(rec).read().splitlines()), True)
     check("and records the stated reason",
           stated[6], "haiku, mechanical sweep the suite verifies")
     fromfile = by_name.get(marker + "-fromfile", [""] * 7)
@@ -321,75 +355,6 @@ def main():
     check("the operator's search escape",
           edit_gate("k-off", {"MASTHEAD_SEARCH_GATE": "off"}), "allow")
 
-    print("\n--- a brief passes the answer down, not the errand ---")
-    # gate-agent matched the word "korium" anywhere, so a brief telling an agent
-    # to go and search satisfied it, and the agent re-derived what this session
-    # was already holding. When we have searched and found something, the brief
-    # has to carry it.
-    FINDING = ("Korium: the gate refuses by exit 2 rather than JSON, and the "
-               "review wave driver calls it on every brief.")
-
-    def agent_gate(sid, prompt, env=None):
-        return kgate("gate-agent", {"session_id": sid, "cwd": KCWD,
-                                    "tool_name": "Agent",
-                                    "tool_input": {"prompt": prompt}}, env)
-
-    kstate("k-brief", [("8", "heredoc gate bypass")])
-    check("searched, and the brief carries findings",
-          agent_gate("k-brief", FINDING + "\n\nFix the hook."), "allow")
-    check("searched, and the brief just says go looking",
-          agent_gate("k-brief", "Go and search korium, then fix the hook."), "deny")
-    check("a 'we found nothing' declaration counts",
-          agent_gate("k-brief", "Korium: nothing on the reconnect loop; the only "
-                     "hits were socket auth, a different subsystem.\n\nGo."), "allow")
-    check("merely mentioning korium is not a finding",
-          agent_gate("k-brief", "Please consult korium about this."), "deny")
-    # FOUND BY MUTATION. Loosening the parse from "the line starts with the
-    # token" to "the line contains it" broke nothing, because the only mention
-    # case here was short enough to fail the substance floor instead. This one is
-    # long, so only the PARSE can refuse it.
-    check("a long mention is still not a declaration",
-          agent_gate("k-brief", "Please consult korium about this, it probably "
-                     "already holds the answer and will save us the tokens."),
-          "deny")
-    check("too short to be carrying anything",
-          agent_gate("k-brief", "Korium: nothing.\n\nGo."), "deny")
-    # A REFUSAL MUST BE ONE DECISION. deny_tool prints, it does not exit, so the
-    # first version fell through and emitted TWO json objects, which no client
-    # can parse. Found by running real briefs through it, not by reading it.
-    two = run(["bash", PROTOCOL, "gate-agent"], json.dumps(
-        {"session_id": "k-brief", "cwd": KCWD, "tool_name": "Agent",
-         "tool_input": {"prompt": "go search korium"}}),
-        env={"TMPDIR": KTMP + "/"})
-    check("a refusal is exactly one decision", two, "deny")
-    kstate("k-nohit", [("0", "nothing found")])
-    check("nothing found, so the old rule stands",
-          agent_gate("k-nohit", "Search korium first, capture as you go."), "allow")
-    check("nothing found and no protocol at all",
-          agent_gate("k-nohit", "Just go and do it."), "deny")
-    check("the operator's brief escape",
-          agent_gate("k-brief", "no findings", {"MASTHEAD_BRIEF_GATE": "off"}), "allow")
-
-    # THE ADJUDICATOR GETS NO KORIUM LINE. It judges from the code and the
-    # findings alone and holds no memory search, so the session's findings
-    # must not be forced into its brief. A brief that orders it to change code
-    # is not a judging brief and stays under the rule.
-    def typed_gate(sid, kind, prompt):
-        return kgate("gate-agent", {"session_id": sid, "cwd": KCWD,
-                                    "tool_name": "Agent",
-                                    "tool_input": {"prompt": prompt,
-                                                   "subagent_type": kind}})
-
-    JUDGING_BRIEF = ("read_only: true\nThis is a judging job; you change no code.\n\n"
-                     "Judge the findings of this review round. The change is a..b.")
-    check("an adjudicator brief needs no Korium line",
-          typed_gate("k-brief", "adjudicator", JUDGING_BRIEF), "allow")
-    check("the same brief to a general-purpose agent is still refused",
-          typed_gate("k-brief", "general-purpose", JUDGING_BRIEF), "deny")
-    check("an adjudicator told to change code is under the rule",
-          typed_gate("k-brief", "adjudicator",
-                     "Fix the hook in engram-protocol.sh and commit it."), "deny")
-
     print("\n--- a capture is filed under the name that made it ---")
     # ADR-0120: source_agent is the one field that answers who decided this.
     # MEASURED on 1434 real captures from 2026-08-20: this refuses 0 of them when
@@ -421,10 +386,9 @@ def main():
                 {"MASTHEAD_CAPTURE_GATE": "off"}), "allow")
 
     print("\n--- the brief checks answer together, in one decision ---")
-    # agent-brief-gates.sh runs six checks on every dispatch and joins what
-    # they say, so a brief with three problems hears about all three at once.
-    # Each session here has searched nothing, so gate-agent asks only that the
-    # brief carries the memory protocol.
+    # agent-brief-gates.sh runs the one brief check, the model option and the
+    # dispatch record on every dispatch and joins what they say, so a brief with
+    # two problems hears about both at once.
     FAN_TMP = tempfile.mkdtemp()
     FAN_CWD = tempfile.mkdtemp()
     FAN_USER = tempfile.mkdtemp()
@@ -453,25 +417,33 @@ def main():
         except Exception:
             return "unparseable: " + out[:70]
 
-    THREE_PROBLEMS = "Fix the crash in the parser. This cannot be done any other way."
-    out = fan_out(THREE_PROBLEMS)
+    # A verifier brief with no claims list, sent with model opus on the call and
+    # no Model-choice line: the one brief check and the model option both refuse.
+    TWO_PROBLEMS = "Verify this diff and report what you find."
+    out = fan_out(TWO_PROBLEMS, subagent="verifier", model="opus")
     reason = reason_of(out)
-    check("a brief with three problems is refused once",
+    check("a brief with two problems is refused once",
           out.count('"hookSpecificOutput"'), 1)
     check("and the one decision parses", reason.startswith("unparseable"), False)
-    for name in ("gate-agent", "gate-fix-evidence", "gate-brief-inference"):
+    for name in ("model-choice-gate", "gate-verify-brief"):
         check("it names {}".format(name), "] " + name + "\n" in reason, True)
-    check("and counts them", "refused by 3 of the 6 brief checks" in reason, True)
-    unexplained = reason_of(fan_out(THREE_PROBLEMS, model=None))
-    check("an Opus helper with no Model-choice line is a fourth refusal",
-          "] model-choice-gate\n" in unexplained and "refused by 4 of the 6 brief checks" in unexplained, True)
+    check("and counts them", "refused by 2 of the 3 brief checks" in reason, True)
+    one = reason_of(fan_out(TWO_PROBLEMS, subagent="verifier"))
+    check("the same brief on haiku is one refusal",
+          "] gate-verify-brief\n" in one and "refused by 1 of the 3 brief checks" in one, True)
     check("the record-only check never appears as a refusal",
           "dispatch-record-gate" in reason, False)
-    check("the dispatch was still recorded",
-          os.path.exists(os.path.join(FAN_CWD, ".claude", "state", "dispatches.tsv")), True)
+    record = os.path.join(FAN_CWD, ".claude", "state", "dispatches.tsv")
+    check("the dispatch was still recorded", os.path.exists(record), True)
+    refused_rows = [r.split("\t") for r in open(record).read().splitlines()[1:]]
+    check("and a refused dispatch is recorded as refused, so it never counts as a round",
+          all(r[5] == "refused" for r in refused_rows) and len(refused_rows) == 2, True)
+    # The removed checks stay removed: a build brief with no Korium line, no
+    # evidence plan and an unowned impossibility goes through on haiku.
+    check("a build brief is not screened for a Korium line, evidence or an impossibility",
+          fan_out("Fix the crash in the parser. This cannot be done any other way."), "")
 
     CLEAN = ("read_only: true\n"
-             "Search korium first and capture what you find as you go.\n\n"
              "List every hook file that carries a shebang.")
     check("a brief with nothing wrong is allowed", fan_out(CLEAN), "")
     check("empty stdin allows", fan_out(None, raw=""), "")
@@ -484,7 +456,7 @@ def main():
     check("a missing check file is refused, not skipped",
           "could not be run at all" in lonely_reason, True)
     check("and every missing check is named",
-          "refused by 6 of the 6 brief checks" in lonely_reason, True)
+          "refused by 3 of the 3 brief checks" in lonely_reason, True)
     for tree in (lonely, FAN_TMP, FAN_CWD, FAN_USER, KTMP, KCWD, stop_tmp, stop_cwd):
         shutil.rmtree(tree, ignore_errors=True)
 

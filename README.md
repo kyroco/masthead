@@ -81,9 +81,15 @@ pick a number. Say three.
 Three fresh sessions start, each with its own copy of the repository and a
 branch tied to its issue. Each worker reads its issue, the README and the
 decision record cover to cover, looks up what earlier sessions learned, and
-sends the foreman a plan, one line per scenario: what it will change and the test that proves it. The foreman holds that plan against
-the scenarios and the README's rule that the simplest thing that meets the
-result wins, and says go, or sends it back naming the line.
+writes a plan, one line per scenario: what it will change and the test
+that proves it. Then it sends the plan to a verifier that saw none of its
+reasoning. The verifier reads only the plan, the issue and the decisions the
+issue names, and answers five questions: does it over build, does it cut
+corners, does it add things nobody asked for, does it find the holes in the
+design and fill them, and does it get to a correct result in the least time.
+It also says if any step undoes a recorded decision. A plan that fails is
+revised; one that fails twice stops and asks. When it passes, the worker
+tells the foreman and builds.
 
 ![Three workers, each with its own session, send their plans](docs/images/day-5-workers.svg)
 
@@ -91,19 +97,27 @@ Then they build. A bug is fixed test first: a failing test in its own commit,
 then the fix. When an issue builds a decision record, a fresh reviewer reads
 the whole record and checks the work against it, assuming it was done wrong.
 
-When a worker thinks it's done, it doesn't grade its own work. It sends the
-diff, and nothing else, to reviewers at once, one angle each: bugs, edge
-cases, contracts, reuse, cleanup, the words a customer reads (when the change
-adds or edits any), and a security reviewer when the change
-touches sign-in, secrets or input from outside. None of them saw the
-worker's notes. None of them can edit anything. None of them can reach the
-network. Then a judge reads the code and their findings, throws out whatever
-it can't prove, and hands back a fix list with a file and a line for each
-item. The worker fixes those, test first again, and the fixes get a check of
-their own. The tests run on the final commit and leave a receipt that names it, and nothing
-can be pushed until the receipt matches. Then one pull request goes up, with
-`Fixes #41`, the list of what wasn't proved, and the issue moves to In
-Review.
+When a worker thinks it's done, it doesn't grade its own work. For each
+scenario it sends one verifier the scenario, the decision lines it rests on,
+the diff, and two lists: what it claims works and what it could not prove.
+Nothing else: not its notes, not an earlier review. The verifier assumes the
+code is wrong and tries to prove it, with every way a change goes wrong as
+its methods: a write that fails halfway, an input nobody handled, a promise
+to a caller the code breaks, a shared module written again, a sentence a
+customer reads that is false in some state. For every claim it returns
+either "true in every state", with the run that shows it, or each state
+where it is false, with the run. A security reviewer joins when the change
+touches sign-in, secrets or input from outside, with the repository's
+security rules as its claims. None of them can edit anything. None of them
+can reach the network. Then a judge reads the code and the false claims,
+runs each reproduction it can, confirms it, and places each one: fixed in
+this pull request, or filed as a new issue. That placement is final. The
+worker fixes the list, test first again, and only the claims the fix broke
+go back to a verifier, at most twice. The tests run on the final commit and
+leave a receipt that names it, and nothing can be pushed until the receipt
+matches. Then one pull request goes up, with `Fixes #41`, the list of what
+wasn't proved, the number of agent dispatches it took, and the issue moves
+to In Review.
 
 Meanwhile you're having coffee. A worker's question lands at the foreman,
 which re-reads the issue's comments and the sources and answers with the
@@ -124,12 +138,12 @@ line per issue saying which.
 ![A run: issues checked, a foreman plan, workers in parallel, merges](docs/images/workflow.svg)
 
 The whole time, a set of small checks runs underneath. Nobody, not a worker,
-not a reviewer, not Claude in a hurry, reads a secret, force-pushes, pushes
-untested code, or sends a helper a brief that hides what wasn't proved. You
+not a verifier, not Claude in a hurry, reads a secret, force-pushes, pushes
+untested code, or sends a verifier a brief with no claims to check. You
 don't see those checks unless one says no, and when it does, it says why and
 what to do instead.
 
-![The review wave: blind reviewers, one judge, one fix list](docs/images/review.svg)
+![The verification: blind verifiers, one judge, one fix list](docs/images/review.svg)
 
 ### One issue on its own
 
@@ -200,10 +214,10 @@ reason Claude can act on.
 | `irreversible-action-gate.sh` | before a shell command | force pushes, history rewrites, deleting unmerged branches, destructive data and infrastructure commands, pushing without the push check | emits a refusal, not a question |
 | `untrusted-domain-deny.py` | before a web fetch or search | requests to paste sites and other hosts code shouldn't reach | the host list is in the script |
 | `web-to-memory-gate.py` | after a web fetch; before a write | copying text fetched from the web into files every session loads, or into memory, without a marker saying the web was read | files inside a git repository are left alone, since a pull request shows them |
-| `agent-brief-gates.sh` | before a helper is sent | a brief to a reviewer that leaves out the author's claims or the code outside the diff the change depends on; a brief asking for a fix without saying how it's proved; a brief that passes a conclusion off as a rule | checks the shape of the brief, not whether it's true |
-| `dispatch-record-gate.sh` | before a helper is sent | nothing; records which model each helper ran on | |
-| `review-write-fence.py` | before a file write | a reviewer writing anything but its own findings file, or a scratch copy under the review folder | a shell write isn't seen |
-| `bash-scope-reviewer.sh` | before a shell command | a reviewer reaching the network | scoped by the agent's type |
+| `agent-brief-gates.sh` | before a helper is sent | a brief to a verifier or security reviewer that leaves out the claims it must check; a third re-verify round | checks the shape of the brief, not whether it's true |
+| `dispatch-record-gate.sh` | before a helper is sent | nothing; records which model each helper ran on, and whether it was a re-verify round | |
+| `review-write-fence.py` | before a file write | a verifier writing anything but its own findings file, or a scratch copy under the review folder | a shell write isn't seen |
+| `bash-scope-reviewer.sh` | before a shell command | a verifier reaching the network | scoped by the agent's type |
 | `bash-scope-diagnoser.sh` | before a shell command | the diagnoser or reader doing anything but running tests, reading git history and inspecting files | scoped by the agent's type |
 | `verdict-gate.sh` | when a session or helper stops | a diagnosis case file whose verdict names no file and line, or has fewer than two numbered observations | |
 | `scope-gate.py` | before and after a write | while a scope file exists in the checkout, writes outside its allowed paths; puts back a protected file a command changed | a background command's later writes aren't seen |
@@ -229,7 +243,7 @@ review is the guard against intent.
 
 | Check | Option | Refuses |
 |---|---|---|
-| `engram-protocol.sh` | Connect Korium memory | the first edit before a memory search; a finish with nothing saved; a brief that hides what memory found; a capture filed under another agent's name |
+| `engram-protocol.sh` | Connect Korium memory | the first edit before a memory search; a finish with nothing saved; a capture filed under another agent's name |
 | `capture-finding-reminder.py` | Connect Korium memory | nothing; reminders only |
 | `korium-index-on-stop.sh` and the code index gates in `engram-protocol.sh` | Keep a code index in Korium | a grep for a name the code index already answered; otherwise nothing, the index refresh runs at the end of a session |
 | `commit-attribution-gate.py` | Keep AI attribution out of commits | a commit message or pull request body with an AI co-author line, a session link or a generated-with footer |
@@ -258,8 +272,8 @@ for the sessions that open it.
 The skills under `skills/` are the written procedures Claude follows:
 `work-on` (the foreman and the worker), `analyze-issues` (the checks before a
 build), `github-issues` (how the tracker is used), `setup`, and the two
-Korium skills. `agents/` holds the reviewers, the judge, the diagnoser and
-the reader. `references/` holds the pull request steps and the brief
+Korium skills. `agents/` holds the verifier, the security reviewer, the
+judge, the diagnoser and the reader. `references/` holds the pull request steps and the brief
 format. `bash hooks/run-tests.sh` runs every check's tests, and CI runs them
 on Linux and macOS.
 

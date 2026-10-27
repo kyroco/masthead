@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Flag any text that would leave its box at a wide font. Width estimate: chars * size * 0.6 (bold 0.66)."""
+"""Flag any text that would leave its box at a wide font, and any box that leaves the canvas. Width estimate: chars * size * 0.6 (bold 0.66)."""
 import re, sys
 def attrs(tag):
     return dict(re.findall(r'([a-zA-Z-]+)="([^"]*)"', tag))
@@ -11,6 +11,9 @@ def run(path):
     vb = attrs(re.search(r"<svg[^>]*>", s).group(0))["viewBox"].split()
     W, H = float(vb[2]), float(vb[3])
     bad = []
+    for r in rects:
+        if r[2] < W and (r[0] < 0 or r[1] < 0 or r[0] + r[2] > W or r[1] + r[3] > H):
+            bad.append(f"{path}: a box at x={r[0]:.0f} y={r[1]:.0f} ({r[2]:.0f} by {r[3]:.0f}) leaves the {W:.0f} by {H:.0f} canvas")
     # group-level font-size inheritance (one level)
     for m in re.finditer(r"<text([^>]*)>(.*?)</text>", s, re.S):
         a = attrs(m.group(1)); txt = re.sub(r"<[^>]+>", "", m.group(2))

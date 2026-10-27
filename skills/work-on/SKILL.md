@@ -40,7 +40,7 @@ command, a pre-push check, its changelog or a worktree
 standard, those bind. The PR steps themselves are **Opening a PR** in
 `${CLAUDE_PLUGIN_ROOT}/references/session-cliffs.md`. When a step names a
 file this repo does not have, do what the step is for with what the repo has,
-and list in the PR body each check the repo lacks. The `reviewer` and
+and list in the PR body each check the repo lacks. The `verifier` and
 `security-reviewer` agents live in `${CLAUDE_PLUGIN_ROOT}/agents` and review every repo;
 `/code-review` is not part of the flow.
 
@@ -51,8 +51,9 @@ Search Korium before each step and before each change, not only at the start:
 value from `CLAUDE.md`) for code you are about to read or change. Give
 `agent_search` a `limit` of 5: each hit comes back whole, and at the default
 of 10 one search has filled 40,000 characters. Use what
-comes back, and put this rule in every subagent brief except the
-adjudicator's, which judges from the code and findings alone. Error -32029 is the
+comes back, and put this rule in every subagent brief except the verifier's
+and the adjudicator's, which hold no memory search and judge from the code,
+the claims and the findings alone. Error -32029 is the
 limit of 60 searches a minute, not an outage: wait the `retry_after_ms` it
 gives and search again.
 
