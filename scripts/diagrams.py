@@ -227,7 +227,7 @@ def review():
     aw = max(width_of(t, 12) for t, _ in lines) + 28
     again = c.box(mid(judge) - aw / 2, ay, lines, FOREMAN)
     loop_y = bottom(again) + 30
-    c.path(f"M {right(fix):.0f} {fix[1] + 20:.0f} L {right(fix) + 24:.0f} {fix[1] + 20:.0f} L {right(fix) + 24:.0f} {loop_y} L {mid(worker):.0f} {loop_y} L {mid(worker):.0f} {bottom(worker) + 2:.0f}", color=FOREMAN["stroke"])
+    c.path(f"M {right(fix):.0f} {fix[1] + 20:.0f} L {widest + 24:.0f} {fix[1] + 20:.0f} L {widest + 24:.0f} {loop_y} L {mid(worker):.0f} {loop_y} L {mid(worker):.0f} {bottom(worker) + 2:.0f}", color=FOREMAN["stroke"])
     c.text(40, loop_y + 40, "Then: the tests run on the final commit, and one pull request goes up.", size=13, color="#4b5563")
     c.h = int(loop_y + 60)
     c.write("review.svg")

@@ -408,49 +408,72 @@ EOF
     prompt="$(field '.tool_input.prompt // ""')"
     reasons=""
 
-    # A claims list: a line that starts "Claims:" or "What the author claims:" whose first item, on that line or the next non-blank one, is a claim; "none", an empty item or a "Not proven:" line is no claim, and markdown markers around the words do not count.
-    has_claims="$(printf '%s' "$prompt" | awk '
-      function bare(t) { gsub(/^[[:space:]>*_#`-]+|[[:space:]*_`.]+$/, "", t); return t }
-      function verdict(t) { t = bare(t); low = tolower(t); print (t != "" && low != "none" && low !~ /^(not proven|unproven)[: ]/) ? "yes" : "no"; exit }
+    # The form is exact, on purpose: a line that is exactly "Claims:" at column zero, whose next non-blank line is a "- " bullet of at least four words; and, on a re-verify, a line that begins "Re-verify: round N" at column zero. Every other spelling of either label is refused with the form to use, so no variant is ever half-read.
+    CLAIMS_FORM="the form is a line that is exactly 'Claims:' at column zero (no marker before it, nothing after the colon), and the next non-blank line is a bullet starting '- ' with at least four words; put the claims under the first Claims: line, since only that one is read"
+    REVERIFY_FORM="the form is a line that begins 'Re-verify: round N' at column zero, N the number of this round, with no marker before it"
+
+    # The first "Claims:" line: exact, or a variant that must be refused.
+    claims_state="$(printf '%s' "$prompt" | awk '
       {
-        line = $0
-        sub(/^[[:space:]]*([>*_#`-]+[[:space:]]*)*([0-9]+\.[[:space:]]*)?/, "", line)
-        low = tolower(line)
-        if (!seen && (low ~ /^claims:/ || low ~ /^what the author claims:/)) {
-          seen = 1
-          rest = line
-          sub(/^[^:]*:/, "", rest)
-          if (bare(rest) != "") verdict(rest)
+        line = $0; sub(/\r$/, "", line)
+        if (!seen) {
+          bare = line; gsub(/^[[:space:]>*_#`-]+|^[0-9]+\.[[:space:]]*/, "", bare); gsub(/[*_`]+/, "", bare)
+          if (tolower(bare) ~ /^(what the author )?claims[[:space:]]*:/) {
+            seen = 1
+            if (line !~ /^Claims:[[:space:]]*$/) { print "variant"; exit }
+            next
+          }
           next
         }
-        if (seen && line ~ /[^[:space:]]/) verdict(line)
-      }')"
-    if [ "$has_claims" != "yes" ]; then
-      reasons="Verification brief rule: a verifier is told what it must prove or break, never just handed a diff. Add a line that starts with 'Claims:' and list under it the scenario's Then lines, what the author claims works, and every sentence a customer reads that the change adds or edits (for the security reviewer, the repository's security conventions; for a plan, the plan's lines). Then retry."
-    fi
+        if (line ~ /[^[:space:]]/) {
+          if (line ~ /^- ([^[:space:]]+[[:space:]]+){3}[^[:space:]]+/) print "yes"; else print "short"
+          exit
+        }
+      }
+      END { if (!seen) print "missing"; else if (seen) print "empty" }' | head -1)"
+    case "$claims_state" in
+      yes) ;;
+      *) reasons="Verification brief rule: a verifier is told what it must prove or break, never just handed a diff, and the check reads one exact form: $CLAIMS_FORM. List under it the scenario's Then lines, what the author claims works, and every sentence a customer reads that the change adds or edits (for the security reviewer, the repository's security conventions; for a plan, the plan's lines), one bullet each. Then retry." ;;
+    esac
 
-    # The round cap, on a verifier's brief only: it says so on a line that starts "Re-verify:" (under the same markdown prefixes as the Claims line), and the dispatch log decides how many rounds this session has had on this branch. A round is the verifier's dispatch: the security reviewer sent beside it is neither counted nor capped, and no other agent's row counts. The row is written before the agent runs, so a verifier that died or was declined has spent its round.
-    if [ "$(agent_type)" = verifier ] && printf '%s' "$prompt" | grep -qiE '^[[:space:]]*([>*_#`-]+[[:space:]]*)*([0-9]+\.[[:space:]]*)?re-verify:'; then
-      log_root="$(field '.cwd // ""')"
-      [ -n "$log_root" ] || log_root="${CLAUDE_PROJECT_DIR:-$PWD}"
-      log="$log_root/.claude/state/dispatches.tsv"
-      session8="$(field '.session_id // "nosession"' | cut -c1-8)"
-      branch="$(git -C "$log_root" branch --show-current 2>/dev/null || true)"
-      [ -n "$branch" ] || branch="-"
-      rounds=0
-      if [ -s "$log" ]; then
-        # Columns: when, session, agent, type, model, outcome, reason, branch; a row with no branch column is from before the column existed and counts. Only this plugin's verifier counts: "verifier", or a masthead: name whose last part is verifier.
-        rounds="$(awk -F'\t' -v s="$session8" -v b="$branch" '
-          $2 == s && $6 ~ /^re-verify/ && (NF < 8 || $8 == b) {
-            t = $4; n = split(t, parts, ":")
-            if (t == "verifier" || (parts[1] == "masthead" && parts[n] == "verifier")) print
-          }' "$log" 2>/dev/null | wc -l | tr -d ' ')"
-      fi
-      if [ "${rounds:-0}" -ge 2 ]; then
+    # The round cap, on a verifier's brief only. A round is the verifier's dispatch: the security reviewer sent beside it is neither counted nor capped, and no other agent's row counts. The row is written before the agent runs, so a verifier that died or was declined has spent its round. The dispatch log decides how many rounds this session has had on this branch; the number in the brief is for the log.
+    if [ "$(agent_type)" = verifier ]; then
+      reverify_state="$(printf '%s' "$prompt" | awk '
+        {
+          line = $0; sub(/\r$/, "", line)
+          bare = line; gsub(/^[[:space:]>*_#`-]+|^[0-9]+\.[[:space:]]*/, "", bare); gsub(/[*_`]+/, "", bare)
+          if (tolower(bare) ~ /^re-?verify[[:space:]]*:/) {
+            if (line ~ /^Re-verify: round [0-9]+/) print "yes"; else print "variant"
+            exit
+          }
+        }' | head -1)"
+      if [ "$reverify_state" = variant ]; then
         [ -n "$reasons" ] && reasons="$reasons
 
 "
-        reasons="${reasons}Re-verify cap: this session has already sent $rounds re-verify rounds on this branch, read from the dispatch log at $log, and a change gets at most two. The round number in the brief does not change that count, and a verifier that died or was declined still spent its round. What is still on the adjudicator's fix list after the second round goes to the foreman, or to the user when there is none; do not send a third verifier."
+        reasons="${reasons}Re-verify rule: this brief's re-verify line is not in the one form the check reads, so it would run uncounted; $REVERIFY_FORM. Then retry."
+      elif [ "$reverify_state" = yes ]; then
+        log_root="$(field '.cwd // ""')"
+        [ -n "$log_root" ] || log_root="${CLAUDE_PROJECT_DIR:-$PWD}"
+        log="$log_root/.claude/state/dispatches.tsv"
+        session8="$(field '.session_id // "nosession"' | cut -c1-8)"
+        branch="$(git -C "$log_root" branch --show-current 2>/dev/null || true)"
+        [ -n "$branch" ] || branch="-"
+        rounds=0
+        if [ -s "$log" ]; then
+          # Columns: when, session, agent, type, model, outcome, reason, branch; a row with no branch column is from before the column existed and counts. Only this plugin's verifier counts: "verifier", or a masthead: name whose last part is verifier.
+          rounds="$(awk -F'\t' -v s="$session8" -v b="$branch" '
+            $2 == s && $6 ~ /^re-verify/ && (NF < 8 || $8 == b) {
+              t = $4; n = split(t, parts, ":")
+              if (t == "verifier" || (parts[1] == "masthead" && parts[n] == "verifier")) print
+            }' "$log" 2>/dev/null | wc -l | tr -d ' ')"
+        fi
+        if [ "${rounds:-0}" -ge 2 ]; then
+          [ -n "$reasons" ] && reasons="$reasons
+
+"
+          reasons="${reasons}Re-verify cap: this session has already sent $rounds re-verify rounds on this branch, read from the dispatch log at $log, and a change gets at most two. The round number in the brief does not change that count, and a verifier that died or was declined still spent its round. What is still on the adjudicator's fix list after the second round goes to the foreman, or to the user when there is none; do not send a third verifier."
+        fi
       fi
     fi
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # dispatch-record-gate.sh: PreToolUse Agent hook that appends each dispatch's model, outcome, reason and branch to the repo's dispatches.tsv; it never refuses and always exits 0.
-# The outcome is dispatched, refused (agent-brief-gates.sh passes --refused when a check refused), or re-verify round N for a brief whose line starts "Re-verify:"; gate-verify-brief counts the verifier's re-verify rows on the checkout's branch. The row is written before the agent runs, so a dispatch that dies or is declined still has its row.
+# The outcome is dispatched, refused (agent-brief-gates.sh passes --refused when a check refused), or re-verify round N for a brief with a line that begins exactly "Re-verify: round N"; gate-verify-brief counts the verifier's re-verify rows on the checkout's branch. The row is written before the agent runs, so a dispatch that dies or is declined still has its row.
 
 set -uo pipefail
 
@@ -89,19 +89,14 @@ fi
 OUTCOME=""
 [ -n "$REFUSED" ] && OUTCOME="refused"
 if [ -z "$OUTCOME" ]; then
+  # One exact form, the same one gate-verify-brief reads: a line that begins "Re-verify: round N" at column zero. Any other spelling is not a re-verify (the gate refuses it before it runs).
   OUTCOME="$(printf '%s' "$PROMPT" | awk '
     {
       line = $0
-      sub(/^[[:space:]]*([>*_#`-]+[[:space:]]*)*([0-9]+\.[[:space:]]*)?/, "", line)
-      if (tolower(substr(line, 1, 10)) == "re-verify:") {
-        r = substr(line, 11)
-        if (match(tolower(r), /round[[:space:]]+[0-9]+/)) {
-          n = substr(r, RSTART, RLENGTH)
-          sub(/^[^0-9]*/, "", n)
-          print "re-verify round " n
-        } else {
-          print "re-verify"
-        }
+      sub(/\r$/, "", line)
+      if (match(line, /^Re-verify: round [0-9]+/)) {
+        n = substr(line, 18, RLENGTH - 17)
+        print "re-verify round " n
         exit
       }
     }')"

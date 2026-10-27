@@ -45,6 +45,6 @@
   <rect x="513" y="390" width="489" height="56" rx="10" fill="#eef2ff" stroke="#6366f1" stroke-width="1.5"/>
   <text x="757" y="414" text-anchor="middle" font-size="12" fill="#4338ca">the worker fixes each item on the list, test first,</text>
   <text x="757" y="430" text-anchor="middle" font-size="12" fill="#4338ca">and only the claims the fix broke are re-verified, at most twice</text>
-  <path d="M 1266 110 L 1290 110 L 1290 476 L 180 476 L 180 196" fill="none" stroke="#6366f1" stroke-width="2" stroke-linejoin="round" marker-end="url(#m6366f1)"/>
+  <path d="M 1266 110 L 1355 110 L 1355 476 L 180 476 L 180 196" fill="none" stroke="#6366f1" stroke-width="2" stroke-linejoin="round" marker-end="url(#m6366f1)"/>
   <text x="40" y="516" text-anchor="start" font-size="13" fill="#4b5563">Then: the tests run on the final commit, and one pull request goes up.</text>
 </svg>

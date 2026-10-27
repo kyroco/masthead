@@ -60,6 +60,13 @@ reading code. Capture your verification with agent_capture and return its
 thought_id with your findings.
 ```
 
+The form is exact, on purpose: the check reads a line that is exactly
+`Claims:` at column zero, with no marker before it and nothing after the
+colon, and the next non-blank line must be a `- ` bullet of at least four
+words. Only the first `Claims:` line is read. Any other spelling (`**Claims:**`,
+`1. Claims:`, `What the author claims:`, claims on the same line) is refused
+with the form to use, so no variant is ever half-read.
+
 A verifier's brief names no Korium memory search: verifiers hold only
 `code_locate` and `agent_capture`, so no author's note reaches them.
 
@@ -72,11 +79,13 @@ carries only the claims the fix broke:
 Re-verify: round 1, claims 2 and 3
 ```
 
-The round number is for the log. The check does not read it: it counts the
-verifier's re-verify rows already in the dispatch log for this session on
-this branch and refuses a third, whatever the brief says. The security
-reviewer sent in the same round does not spend one; a verifier that died or
-was declined did, since its row was written before it ran.
+That line is exact too: it begins `Re-verify: round N` at column zero, N
+the number of this round, with no marker before it; any other spelling is
+refused. The round number is for the log. The check does not read it: it
+counts the verifier's re-verify rows already in the dispatch log for this
+session on this branch and refuses a third, whatever the brief says. The
+security reviewer sent in the same round does not spend one; a verifier that
+died or was declined did, since its row was written before it ran.
 
 **The security reviewer's brief** has the same shape, with the repository's
 security conventions as its claims (its CLAUDE.md and `docs/conventions/`
@@ -95,7 +104,7 @@ Issue #<n>: <the issue, body and comments, as gh issue view prints it>.
 Decision record: <the sections the issue names, quoted in full>.
 
 Claims:
-<the plan, one line per scenario: what will change and the test that shows it>
+- <the plan, one bullet per scenario: what will change and the test that shows it>
 
 Answer each of Robert's five questions in your agent file about this plan,
 and say whether any step undoes a decision recorded above. Verdict: pass or
@@ -156,10 +165,12 @@ so a reader that must judge takes `model: "opus"` and the line), forks,
 Explore, claude-code-guide, statusline-setup and plugin agents.
 
 **`gate-verify-brief` checks briefs to `verifier` and `security-reviewer`
-only.** The brief carries a claims list: a line starting `Claims:` (or `What
-the author claims:`) with something under it. And a brief whose line starts
-`Re-verify:` is refused when the dispatch log already holds two of the
-verifier's re-verify rows for this session on this branch.
+only.** The brief carries a claims list in the one exact form above: a line
+that is exactly `Claims:` at column zero, then a `- ` bullet of at least four
+words; a variant is refused with the form. And a verifier's brief with a line
+that begins `Re-verify: round N` is refused when the dispatch log already
+holds two of the verifier's re-verify rows for this session on this branch;
+a re-verify line in any other spelling is refused outright.
 `MASTHEAD_BRIEF_GATE=off` in the operator's environment turns it off.
 
 **`skill-review-gate.py`** refuses a dispatch of an agent whose
