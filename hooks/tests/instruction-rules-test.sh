@@ -133,5 +133,26 @@ for doc in $count_files; do
   never_phrase "$doc" "never shortens a step"
 done
 
+# 6. Issue #18: the words angle, contract without customer text, no English pass.
+says  agents/reviewer.md "- **words** every sentence a customer reads that the change adds or edits"
+says  agents/reviewer.md "list every state that shows it"
+says  agents/reviewer.md "report each state where it is false"
+never agents/reviewer.md "plain English against"
+never agents/reviewer.md "customer-text convention"
+never agents/reviewer.md "every sentence a customer reads about that behavior"
+says  agents/reviewer.md "what the change promises its callers, and where the code breaks it"
+says  agents/reviewer.md "find any other copy of that rule"
+says  references/session-cliffs.md "a \`words\` reviewer"
+says  references/session-cliffs.md "adds or edits text a customer reads"
+says  references/session-cliffs.md "\`contract\`, \`words\`"
+for doc in README.md docs/explainer.template.html docs/explainer.html scripts/diagrams.py docs/images/workflow.svg references/session-cliffs.md agents/reviewer.md agents/adjudicator.md skills/work-on/worker.md skills/work-on/foreman.md; do
+  never "$doc" "English pass"
+done
+says  references/session-cliffs.md "Add the changelog entry when the repo keeps one"
+never references/session-cliffs.md "which is not plain English"
+says  README.md "words"
+says  docs/explainer.template.html "words"
+says  scripts/diagrams.py "7. push check"
+
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
