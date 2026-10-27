@@ -278,7 +278,7 @@ def day3():
         x = right(b) + 8
     q = c.box(40, 110, [("each checks its issue against its sources, and fixes only what fails", "title"), ("Are the four parts there? Is every line you wrote still quoted?", "body"),
                         ("Does each scenario cite a source line that exists, and can a test show it?", "body"), ("Does it say how? Does it fit one session?", "body"),
-                        ("What would a builder have to guess? An issue that passes is left alone.", "body")], CHECK, title_size=13)
+                        ("An issue that passes is left alone: no edit, no comment.", "body")], CHECK, title_size=13)
     m = c.box(right(q) + 30, 110, [("then one more agent checks every issue", "title"), ("Did an edit drop anything? It puts it back.", "body"), ("Are two issues building the same thing?", "body"),
                                    ("Does one contradict the decision record?", "body"), ("Is there a decision nobody is building?", "body"), ("Is the order right? It fixes the links.", "body"), ("Is one still too big for one session?", "body")], CHECK, title_size=13)
     c.w = int(max(c.w, right(m) + 40))

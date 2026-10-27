@@ -55,8 +55,9 @@ Then this is true"? Does it say what has to be true when it's done, or does
 it tell the builder how to do its job? Does it fit one worker session? An
 issue that passes is left alone: no edit, no comment. One that fails gets
 only the failing part fixed, on GitHub, and a check in front of the edit
-refuses a body that drops a line you wrote, or that asks you a question
-without saying where it looked first. Each agent hands the foreman only its
+refuses a body that drops a line quoted as yours (your name on the line, or
+a quote under a heading that names you), or that asks you a question without
+saying where it looked first. Each agent hands the foreman only its
 verdicts and the open questions. When all nine are done, one more agent, on
 a stronger model, reads every issue against the decision record, the
 architecture notes, the mockups and the old body. It puts back anything an

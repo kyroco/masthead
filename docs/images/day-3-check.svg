@@ -25,7 +25,7 @@
   <text x="346" y="151" text-anchor="middle" font-size="12" fill="#92400e">Are the four parts there? Is every line you wrote still quoted?</text>
   <text x="346" y="167" text-anchor="middle" font-size="12" fill="#92400e">Does each scenario cite a source line that exists, and can a test show it?</text>
   <text x="346" y="183" text-anchor="middle" font-size="12" fill="#92400e">Does it say how? Does it fit one session?</text>
-  <text x="346" y="199" text-anchor="middle" font-size="12" fill="#92400e">What would a builder have to guess? An issue that passes is left alone.</text>
+  <text x="346" y="199" text-anchor="middle" font-size="12" fill="#92400e">An issue that passes is left alone: no edit, no comment.</text>
   <rect x="681" y="110" width="354" height="137" rx="10" fill="#fef3c7" stroke="#d97706" stroke-width="1.5"/>
   <text x="858" y="135" text-anchor="middle" font-size="13" font-weight="600" fill="#78350f">then one more agent checks every issue</text>
   <text x="858" y="151" text-anchor="middle" font-size="12" fill="#92400e">Did an edit drop anything? It puts it back.</text>
