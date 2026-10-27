@@ -37,7 +37,7 @@ each line up when it answered took its stage to merge.
 
 For this run only: starting background workers in this repo, messaging them,
 setting each issue's Status, running `/analyze-issues` as step 6 says, closing a
-merged issue's sub-issues, adding a worker's PR to the merge queue when the
+merged issue and a parent whose sub-issues are all closed, adding a worker's PR to the merge queue when the
 check in step 4 holds, and stopping each worker once its PR merges. Not
 deploys, production applies, force-pushes or pushes to main.
 
@@ -60,8 +60,9 @@ The steps:
    on it, each with `limit` 5. Use what comes back.
 2. Find the project or milestone and its open issues. No exact match: list the
    close ones and ask.
-3. Leave out an issue with a parent (its parent's worker builds it) and any
-   old "LOWs and NITs" log issue. There is no Nit log any more: the
+3. Plan one worker per sub-issue, never the parent: the parent is a summary
+   that closes when its sub-issues close. Leave out any old "LOWs and NITs"
+   log issue. There is no Nit log any more: the
    adjudicator keeps a finding to fix in its PR or throws it out.
 4. Read the project README.
 5. Read every issue with every comment, never the body alone: the user's
@@ -128,7 +129,9 @@ For each ready issue, up to the number the user chose:
    its foreman, with `notify_when_idle`. Pass on any instruction the user gave
    for this run, in the user's own words.
 
-An issue whose blocker is still open waits until that blocker merges.
+An issue whose blocker is still open waits until that blocker merges. A
+worker's follow-up issue (a review finding filed blocked by its issue) starts
+as soon as its blocker merges, ahead of unrelated work.
 
 ## 3. Supervise
 
@@ -142,6 +145,8 @@ An issue whose blocker is still open waits until that blocker merges.
   that meets the result wins. Reply "go", or send it back naming the line to
   change. A line the scenarios, the ADR and the README do not settle is a
   question for the user, not a guess for the worker.
+- A worker that split its issue sends the sub-issue numbers and stops: start
+  one worker per sub-issue as step 2 says, in blocked-by order.
 - A worker's question: first re-read that issue's comments, then look in the
   sources above, in order, and answer with the line quoted. Only when none
   answers it, ask the user, and say which sources you checked. Hand the
@@ -196,8 +201,9 @@ and its worktree and branch stay. Otherwise park it with the reason. Auto
 merge is off, so queue it with the `enqueuePullRequest` GraphQL mutation,
 using the PR's node id.
 
-Once it merges: close each sub-issue whose row in the worker's table says yes
-(GitHub deletes the merged branch itself), then give that worker the next
+Once it merges: close its issue if the `Fixes` line did not, and its parent
+once every sub-issue is closed (GitHub deletes the merged branch itself), then
+give that worker the next
 ready issue as step 2 says. In the terminal, stop the worker's session and
 start the next issue in a new one.
 

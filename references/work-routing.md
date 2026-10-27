@@ -1,8 +1,6 @@
 # Work routing
 
 When a subagent is worth spawning. The main session writes the code (CLAUDE.md).
-The one exception is a `/work-on` worker that split its issue: each sub-issue
-gets its own `general-purpose` subagent, one at a time (work-on step 6).
 
 ## Three reasons to spawn a fresh helper
 

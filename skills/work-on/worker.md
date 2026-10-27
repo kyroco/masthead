@@ -158,8 +158,7 @@ started by the user, end your turn with the question. The answer lands on
 the issue as a comment, so read the issue again before you build on it.
 
 With a sheet, the sheet says whether you will split the issue, and you split
-it only as approved. Without one, split without asking and name the split in
-the step 7 brief or, dispatched, in your report. To split, create each
+it only as approved. Without one, split without asking. To split, create each
 sub-issue with `gh issue create` (same milestone and project), make it a
 sub-issue of this one, and add a blocked-by link where one needs another:
 
@@ -167,26 +166,10 @@ sub-issue of this one, and add a blocked-by link where one needs another:
     gh api -X POST repos/{owner}/{repo}/issues/1418/sub_issues -F sub_issue_id=$id
     gh api -X POST repos/{owner}/{repo}/issues/<blocked number>/dependencies/blocked_by -F issue_id=<blocker id>
 
-In step 7 each sub-issue gets its own `general-purpose` subagent, never a fork.
-This is the one exception to "the main session writes the code":
-
-- They work in this worktree, on this branch, one after another in blocked-by
-  order, never at once: they would share one git index, one `_build` and one
-  test stack. Everything ships in this issue's one PR.
-- Each brief follows `${CLAUDE_PLUGIN_ROOT}/references/dispatch-brief.md`, opens with
-  `Model-choice: opus, writes the code for sub-issue #<n>` (the model check
-  refuses an Opus dispatch without it), names the
-  sub-issue and its scenarios, and asks for the files changed and each
-  command run with its output. On an issue that builds an ADR, the brief
-  gives the ADR's path and says to read all of it. Commits end in this
-  issue's number, `(#1418)`, with `refs #1419` (the sub-issue) in the body.
-- Before starting the next, read the last one's diff, rerun the tests it cites
-  and confirm the output. A claim you cannot reproduce goes back to it, or you
-  finish it yourself.
-
-Each sub-issue gets its own row in the step 7 table. The PR body carries
-`Fixes #1418` and `refs #1419` for each sub-issue, and goes up only when every
-row says yes.
+Then stop: you build none of them. Each sub-issue gets its own worker, started
+in blocked-by order, and this issue becomes a summary that closes when its
+sub-issues close. Dispatched, send your foreman the sub-issue numbers; started
+by the user, end your turn with them.
 
 ## 7. Build it
 
@@ -201,8 +184,7 @@ from another session.
 
 1. **Write the code** in this session, with the file from
    `.claude/references/stacks/` loaded for each stack you touch. Helpers only
-   for the three reasons in `${CLAUDE_PLUGIN_ROOT}/references/work-routing.md`, plus the
-   step 6 subagents.
+   for the three reasons in `${CLAUDE_PLUGIN_ROOT}/references/work-routing.md`.
 2. **Test** while you build: the targeted tests the change needs. To show a
    flaky test is fixed, run that one test two or three times, never dozens;
    every other test and suite runs once. Fix every bug test first, whoever
@@ -263,7 +245,7 @@ user, from this repo's main checkout:
 
 1. Confirm the issue closed and its Status reads Done; if the `Fixes` line did
    not do it, `gh issue close 1418 --reason completed` and `set-status.sh`, and
-   say so. Started by the user: close each step 6 sub-issue whose row says yes
-   the same way (a foreman does this for a dispatched worker).
+   say so. When it was its parent's last open sub-issue, close the parent the
+   same way.
 2. Then step 10 of **Opening a PR**: your test stack and tunnels, the code
    index of `<user>/1418-<short-slug>`, the worktree and the branch.

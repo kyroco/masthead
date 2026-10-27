@@ -68,12 +68,10 @@ has a passing test, and the repository's pre-push check passes on the PR's
 head.
 
 **Size.** One issue is one PR, built and proved by one worker in one fresh
-session. Split it when a scenario cannot be proved in this PR (it waits on
-another environment, a person or another issue), when there are more than
-about five scenarios or the work touches more than about fifteen files, or
-when two scenarios rest on different decisions. Merge two when one cannot be
-tested until the other lands, when one would leave code nothing calls until
-the other lands, or when both change the same functions.
+session. Split it the way scrum splits user stories, into thin slices that
+each work on their own and fit one worker session. Then merge neighbouring
+slices that share a file until each fills one worker session with room to
+spare.
 
 ## Filing
 
