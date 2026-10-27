@@ -182,6 +182,19 @@
         "hooks": [
           {
             "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/run.sh\" issue-edit-gate.py",
+            "timeout": 30,
+            "statusMessage": "Checking the issue edit keeps the user's lines",
+            "onFailure": "block",
+            "if": "Bash(*gh*)"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/run.sh\" irreversible-action-gate.sh",
             "timeout": 10,
             "statusMessage": "Checking for an action nothing undoes",

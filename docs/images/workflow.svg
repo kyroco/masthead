@@ -7,17 +7,17 @@
   <text x="223" y="112" text-anchor="middle" font-size="12" fill="#4b5563">project README: why, shape, rules</text>
   <text x="223" y="128" text-anchor="middle" font-size="12" fill="#4b5563">issues: why, scenarios, out of scope, questions</text>
   <text x="223" y="144" text-anchor="middle" font-size="12" fill="#4b5563">decision records, mockups</text>
-  <rect x="446" y="70" width="446" height="90" rx="10" fill="#fef3c7" stroke="#d97706" stroke-width="1.5"/>
-  <text x="669" y="96" text-anchor="middle" font-size="14" font-weight="600" fill="#78350f">/analyze-issues</text>
-  <text x="669" y="112" text-anchor="middle" font-size="12" fill="#92400e">an agent per issue: rewrites it on GitHub, splits it, asks</text>
-  <text x="669" y="128" text-anchor="middle" font-size="12" fill="#92400e">one check of every rewrite: puts back what was dropped</text>
-  <text x="669" y="144" text-anchor="middle" font-size="12" fill="#92400e">asks you only what nothing settles</text>
+  <rect x="446" y="70" width="453" height="90" rx="10" fill="#fef3c7" stroke="#d97706" stroke-width="1.5"/>
+  <text x="673" y="96" text-anchor="middle" font-size="14" font-weight="600" fill="#78350f">/analyze-issues</text>
+  <text x="673" y="112" text-anchor="middle" font-size="12" fill="#92400e">an agent per issue: checks it, fixes only what fails, asks</text>
+  <text x="673" y="128" text-anchor="middle" font-size="12" fill="#92400e">one check of every issue: what was dropped, what is too big</text>
+  <text x="673" y="144" text-anchor="middle" font-size="12" fill="#92400e">asks you only what nothing settles</text>
   <line x1="406" y1="110" x2="444" y2="110" stroke="#6b7280" stroke-width="2" marker-end="url(#m6b7280)"/>
-  <rect x="99" y="220" width="734" height="74" rx="10" fill="#eef2ff" stroke="#6366f1" stroke-width="1.5"/>
-  <text x="466" y="246" text-anchor="middle" font-size="14" font-weight="600" fill="#312e81">/work-on foreman</text>
-  <text x="466" y="262" text-anchor="middle" font-size="12" fill="#4338ca">reads the brief and every issue, proposes one plan: build order, dependencies, effort, parallelism</text>
-  <text x="466" y="278" text-anchor="middle" font-size="12" fill="#4338ca">you decide how many run at once</text>
-  <path d="M 669 160 L 669 190 L 466 190 L 466 218" fill="none" stroke="#6b7280" stroke-width="2" stroke-linejoin="round" marker-end="url(#m6b7280)"/>
+  <rect x="103" y="220" width="734" height="74" rx="10" fill="#eef2ff" stroke="#6366f1" stroke-width="1.5"/>
+  <text x="470" y="246" text-anchor="middle" font-size="14" font-weight="600" fill="#312e81">/work-on foreman</text>
+  <text x="470" y="262" text-anchor="middle" font-size="12" fill="#4338ca">reads the brief and every issue, proposes one plan: build order, dependencies, effort, parallelism</text>
+  <text x="470" y="278" text-anchor="middle" font-size="12" fill="#4338ca">you decide how many run at once</text>
+  <path d="M 673 160 L 673 190 L 470 190 L 470 218" fill="none" stroke="#6b7280" stroke-width="2" stroke-linejoin="round" marker-end="url(#m6b7280)"/>
   <rect x="40" y="364" width="385" height="190" rx="10" fill="#f9fafb" stroke="#d1d5db" stroke-width="1.5"/>
   <text x="232" y="392" text-anchor="middle" font-size="14" font-weight="600" fill="#6b7280">worker for issue #41</text>
   <text x="232" y="408" text-anchor="middle" font-size="12" fill="#6b7280">1. read the issue, the README, the decisions</text>
@@ -51,12 +51,12 @@
   <text x="1074" y="504" text-anchor="middle" font-size="12" fill="#6b7280">6. fix the list, test first; re-verify what broke</text>
   <text x="1074" y="520" text-anchor="middle" font-size="12" fill="#6b7280">7. push check: tests on this commit</text>
   <text x="1074" y="536" text-anchor="middle" font-size="12" fill="#6b7280">9. one pull request, Fixes #45</text>
-  <path d="M 466 294 L 466 334 L 232 334 L 232 362" fill="none" stroke="#6366f1" stroke-width="2" stroke-linejoin="round" marker-end="url(#m6366f1)"/>
-  <path d="M 466 294 L 466 334 L 653 334 L 653 362" fill="none" stroke="#6366f1" stroke-width="2" stroke-linejoin="round" marker-end="url(#m6366f1)"/>
-  <path d="M 466 294 L 466 334 L 1074 334 L 1074 362" fill="none" stroke="#6366f1" stroke-width="2" stroke-linejoin="round" marker-end="url(#m6366f1)"/>
+  <path d="M 470 294 L 470 334 L 232 334 L 232 362" fill="none" stroke="#6366f1" stroke-width="2" stroke-linejoin="round" marker-end="url(#m6366f1)"/>
+  <path d="M 470 294 L 470 334 L 653 334 L 653 362" fill="none" stroke="#6366f1" stroke-width="2" stroke-linejoin="round" marker-end="url(#m6366f1)"/>
+  <path d="M 470 294 L 470 334 L 1074 334 L 1074 362" fill="none" stroke="#6366f1" stroke-width="2" stroke-linejoin="round" marker-end="url(#m6366f1)"/>
   <text x="232" y="326" text-anchor="middle" font-size="12" fill="#4338ca">one fresh session per issue, each in its own worktree</text>
-  <path d="M 1236 364 L 1236 257 L 835 257" fill="none" stroke="#6b7280" stroke-width="2" stroke-linejoin="round" stroke-dasharray="5 4" marker-end="url(#m6b7280)"/>
-  <text x="845" y="249" text-anchor="start" font-size="11" fill="#6b7280">plans, questions and reports come back to the foreman</text>
+  <path d="M 1236 364 L 1236 257 L 838 257" fill="none" stroke="#6b7280" stroke-width="2" stroke-linejoin="round" stroke-dasharray="5 4" marker-end="url(#m6b7280)"/>
+  <text x="848" y="249" text-anchor="start" font-size="11" fill="#6b7280">plans, questions and reports come back to the foreman</text>
   <rect x="40" y="594" width="1226" height="57" rx="10" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5"/>
   <text x="653" y="619" text-anchor="middle" font-size="13" font-weight="600" fill="#14532d">the foreman queues each passing pull request, closes its issue and any big issue now done, and gives that worker its next issue</text>
   <text x="653" y="635" text-anchor="middle" font-size="12" fill="#166534">the run ends when every issue is merged, parked or skipped, with one line per issue saying which</text>
