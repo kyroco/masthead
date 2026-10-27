@@ -1,6 +1,14 @@
 #!/usr/bin/env python3
 """Prove gate-verify-brief refuses and allows what it must.
 
+THE FORM IS EXACT ON PURPOSE (the foreman's ruling on fix check 2 of issue
+#20): the gate reads a line that is exactly "Claims:" at column zero, whose
+next non-blank line is a "- " bullet of at least four words, and a line that
+begins "Re-verify: round N" at column zero. Any other spelling of either label
+(a marker before it, a bold label, a numbered item, "What the author claims:",
+a round with no number) is refused with the exact form to use. A variant the
+gate does not read is not a bug; it is the design.
+
     python3 hooks/test-brief-gates.py
 
 WHY THIS FILE EXISTS. Until October 27, 2026 four brief checks read every
@@ -62,8 +70,54 @@ Claims:
 
 SECURITY = """Verify git diff abc123..def456 for the ways it can be attacked.
 
-Claims: the repository's security conventions in docs/conventions/security.md,
-and the six in your agent file.
+Claims:
+- the repository's security conventions in docs/conventions/security.md hold
+- the six conventions in your agent file hold
+"""
+
+INLINE_CLAIMS = """Verify git diff abc123..def456.
+
+Claims: the refusal sentence names the month the limit resets
+"""
+
+SHORT_BULLET = """Verify git diff abc123..def456.
+
+Claims:
+- limit sentence true
+"""
+
+FOUR_WORD_BULLET = """Verify git diff abc123..def456.
+
+Claims:
+- limit sentence is true
+"""
+
+BOLD_LABEL_COLON_OUTSIDE = """Verify git diff abc123..def456.
+
+**Claims**:
+- the refusal sentence names the month the limit resets
+"""
+
+SECOND_CLAIMS_LINE = """Verify git diff abc123..def456.
+
+Claims: none
+
+Claims:
+- the refusal sentence names the month the limit resets
+"""
+
+ROUND_WITHOUT_NUMBER = """Re-verify: claims 2 and 3
+Verify git diff def456..0a1b2c, the fix commits only.
+
+Claims:
+- nothing is written when the save is refused
+"""
+
+BOLD_REVERIFY = """**Re-verify**: round 1, claims 2 and 3
+Verify git diff def456..0a1b2c, the fix commits only.
+
+Claims:
+- nothing is written when the save is refused
 """
 
 
@@ -156,7 +210,7 @@ def re_verify_marked(n):
 # (label, subagent_type, prompt, log rows or None, expected decision)
 CASES = [
     ("a verifier brief with a claims list", "verifier", CLAIMS, None, "allow"),
-    ("the author's claims, in those words", "verifier", AUTHOR_CLAIMS, None, "allow"),
+    ("HELD the author's claims in other words is not the form", "verifier", AUTHOR_CLAIMS, None, "deny"),
     ("HELD thin brief to the verifier", "verifier", THIN, None, "deny"),
     ("HELD a Claims: line with nothing under it", "verifier", EMPTY_CLAIMS, None, "deny"),
     ("a security reviewer with its claims", "security-reviewer", SECURITY, None, "allow"),
@@ -212,14 +266,23 @@ CASES = [
     ("HELD a third round as a list item is still refused", "verifier", re_verify_marked(3),
      [(SESSION8, "re-verify round 1"), (SESSION8, "re-verify round 2")], "deny"),
     # The Claims line under an ordered-list prefix, and an empty list in words (edge-3).
-    ("a Claims: line as a numbered item", "verifier", LISTED_CLAIMS, None, "allow"),
+    ("HELD a Claims: line as a numbered item is not the form", "verifier", LISTED_CLAIMS, None, "deny"),
     ("HELD Claims: none is no list", "verifier", NONE_CLAIMS, None, "deny"),
     ("HELD none under Claims: is no list", "verifier", NONE_UNDER_CLAIMS, None, "deny"),
     ("HELD a bold Claims: none is no list", "verifier", BOLD_NONE, None, "deny"),
     ("HELD Claims: none followed by more text is no list", "verifier", NONE_THEN_MORE, None, "deny"),
     ("HELD none under Claims: followed by more text is no list", "verifier", NONE_UNDER_THEN_MORE, None, "deny"),
     ("HELD Not proven under an empty Claims: is no list", "verifier", NOT_PROVEN_ONLY, None, "deny"),
-    ("a bold Claims: with a list under it", "verifier", BOLD_LIST, None, "allow"),
+    ("HELD a bold Claims: label is not the form", "verifier", BOLD_LIST, None, "deny"),
+    ("HELD a bold label with the colon outside is not the form", "verifier", BOLD_LABEL_COLON_OUTSIDE, None, "deny"),
+    ("HELD claims on the Claims: line itself is not the form", "verifier", INLINE_CLAIMS, None, "deny"),
+    ("HELD a first bullet of three words is no claim", "verifier", SHORT_BULLET, None, "deny"),
+    ("a first bullet of four words is a claim", "verifier", FOUR_WORD_BULLET, None, "allow"),
+    ("HELD the first Claims: line decides; a second one is not read", "verifier", SECOND_CLAIMS_LINE, None, "deny"),
+    # A re-verify variant is refused whatever the log holds: no marker, no missing number.
+    ("HELD a re-verify line with no round number is not the form", "verifier", ROUND_WITHOUT_NUMBER, [], "deny"),
+    ("HELD a bold Re-verify label is not the form", "verifier", BOLD_REVERIFY, [], "deny"),
+    ("HELD a re-verify line as a list item is not the form, even in round 1", "verifier", re_verify_marked(1), [], "deny"),
     # Two markdown prefixes at once (a quoted list item).
     ("HELD a third round as a quoted list item is still refused", "verifier", re_verify_quoted(3),
      [(SESSION8, "re-verify round 1"), (SESSION8, "re-verify round 2")], "deny"),

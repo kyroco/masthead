@@ -217,15 +217,18 @@ def main():
     dispatch_decision({"prompt": "Re-verify: claims 1 and 3\nVerify the fix commits.",
                        "subagent_type": "verifier", "model": "opus"})
     unnumbered = open(rec).read().splitlines()[-1].split("\t")
-    check("a re-verify brief with no round is still a re-verify", unnumbered[5], "re-verify")
+    # The form is exact: only a line that begins "Re-verify: round N" at column
+    # zero is a re-verify. The gate refuses every other spelling, so the record
+    # never sees one that ran; recorded alone, it is a plain dispatch.
+    check("a re-verify line with no round number is not the form", unnumbered[5], "dispatched")
     dispatch_decision({"prompt": "- Re-verify: round 3, claim 2\nVerify the fix commits.",
                        "subagent_type": "verifier", "model": "opus"})
     marked = open(rec).read().splitlines()[-1].split("\t")
-    check("a re-verify line as a list item is still recorded as one", marked[5], "re-verify round 3")
-    dispatch_decision({"prompt": "> - Re-verify: round 4, claim 2\nVerify the fix commits.",
+    check("a re-verify line as a list item is not the form", marked[5], "dispatched")
+    dispatch_decision({"prompt": "**Re-verify**: round 4, claim 2\nVerify the fix commits.",
                        "subagent_type": "verifier", "model": "opus"})
-    quoted = open(rec).read().splitlines()[-1].split("\t")
-    check("a re-verify line under two prefixes is still recorded as one", quoted[5], "re-verify round 4")
+    bold = open(rec).read().splitlines()[-1].split("\t")
+    check("a bold Re-verify label is not the form", bold[5], "dispatched")
     # The outcome cannot be preset from the environment: the wrapper passes a
     # refusal as an argument, so an operator variable changes nothing (edge-5).
     run(["bash", DISPATCH], json.dumps({

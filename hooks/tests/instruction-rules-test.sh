@@ -275,8 +275,14 @@ says  skills/work-on/worker.md "A dead or declined verifier still spends its rou
 # Fix check 1 of issue #20: the count is of agents sent, and a declined one is in it.
 for doc in README.md docs/explainer.template.html docs/explainer.html; do
   never "$doc" "the count of agent runs it took"
-  says  "$doc" "the count of agents it sent"
+  never "$doc" "the count of agents it sent"
+  says  "$doc" "the number of agent dispatches it took"
 done
+# Fix check 2 of issue #20: the form is exact, and the refusal names it.
+says  references/dispatch-brief.md "at least four words"
+says  references/dispatch-brief.md "exactly \`Claims:\`"
+says  hooks/engram-protocol.sh "under the first Claims: line"
+says  references/gate-catalog.md "at least four words"
 says  skills/work-on/worker.md "declined at a permission prompt"
 says  references/dispatch-brief.md "declined at a permission prompt"
 says  references/gate-catalog.md "A dead or declined verifier still spends its round"
