@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# dispatch-record-gate.sh: PreToolUse Agent hook that appends each dispatch's model and reason to the repo's dispatches.tsv; it never refuses and always exits 0.
+# dispatch-record-gate.sh: PreToolUse Agent hook that appends each dispatch's model, outcome and reason to the repo's dispatches.tsv; it never refuses and always exits 0.
+# The outcome is dispatched, refused (agent-brief-gates.sh sets MASTHEAD_DISPATCH_OUTCOME when a check refused), or re-verify round N for a brief whose line starts "Re-verify:"; gate-verify-brief counts the re-verify rows.
 
 set -uo pipefail
 
@@ -76,5 +77,25 @@ elif [ "$MODEL" = "(inherited)" ]; then
   [ -n "$FROM_FILE" ] && MODEL="$FROM_FILE (agent file)"
 fi
 
-record "dispatched" "${REASON:-(no Model-choice line)}"
+# The outcome: what the wrapper says, else a re-verify round read from the brief, else dispatched.
+OUTCOME="${MASTHEAD_DISPATCH_OUTCOME:-}"
+if [ -z "$OUTCOME" ]; then
+  OUTCOME="$(printf '%s' "$PROMPT" | awk '
+    {
+      line = $0
+      sub(/^[[:space:]]*(\*\*)?/, "", line)
+      if (tolower(substr(line, 1, 10)) == "re-verify:") {
+        r = substr(line, 11)
+        if (match(tolower(r), /round[[:space:]]+[0-9]+/)) {
+          n = substr(r, RSTART, RLENGTH)
+          sub(/^[^0-9]*/, "", n)
+          print "re-verify round " n
+        } else {
+          print "re-verify"
+        }
+        exit
+      }
+    }')"
+fi
+record "${OUTCOME:-dispatched}" "${REASON:-(no Model-choice line)}"
 exit 0

@@ -81,7 +81,7 @@ check "fed to bash -c, gate-edit still answers rather than falling silent" \
 echo "engram-protocol selftest: gate-verify-brief screens the verifier and the security reviewer only"
 
 THIN="Verify this diff and report what you find."
-WITH_CLAIMS="Verify this diff. Claims: the pass never raises; the ambiguous-commit case is not proven."
+WITH_CLAIMS=$'Verify this diff.\nClaims: the pass never raises; the ambiguous-commit case is not proven.'
 
 check "a thin brief to the verifier" \
   "deny" "$(verdict gate-verify-brief "$(agent_payload verifier "$THIN")")"

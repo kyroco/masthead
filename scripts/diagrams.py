@@ -129,11 +129,11 @@ def gates():
 WORKER_STEPS = [
     "1. read the issue, the README, the decisions",
     "2. plan: a change and a test per scenario",
-    "   (the foreman checks it and says go)",
+    "   (a blind verifier passes it first)",
     "3. build, test first; search memory",
     "4. decision-record review",
-    "5. blind reviewers, then the judge",
-    "6. fix the list, test first; fix checks",
+    "5. one verifier per scenario, then the judge",
+    "6. fix the list, test first; re-verify what broke",
     "7. push check: tests on this commit",
 ]
 
@@ -191,10 +191,10 @@ def workflow():
 # --------------------------------------------------------------- review.svg
 def review():
     c = Canvas(1100, 620)
-    c.text(40, 40, "The review: reviewers who read cold, and a judge that keeps only what it can prove", size=20, color="#1f2937", bold=True)
-    worker = c.box(40, 120, [("the worker", "title"), ("finishes the change", "body"), ("and sends only the diff", "body")], FOREMAN)
+    c.text(40, 40, "The verification: verifiers who read cold, and a judge that confirms and places", size=20, color="#1f2937", bold=True)
+    worker = c.box(40, 120, [("the worker", "title"), ("finishes the change and sends", "body"), ("each scenario, the diff, its claims", "body")], FOREMAN)
     rx = right(worker) + 50
-    names = ["reviewer: bugs", "reviewer: edge cases", "reviewer: contracts", "reviewer: reuse", "reviewer: cleanup"]
+    names = ["verifier: scenario 1", "verifier: scenario 2", "verifier: scenario 3", "verifier: scenario 4"]
     revs = []
     y = 70
     for n in names:
@@ -202,18 +202,18 @@ def review():
         revs.append(b); y = bottom(b) + 8
     sec = c.box(rx, y, [("security reviewer", "body")], RED, min_w=170, pad=10)
     revs.append(sec); y = bottom(sec) + 10
-    note = c.box(rx, y, [("each one reads the code cold:", "body"), ("no author's notes, no editing, no network", "body")], OUTBOX, pad=10)
+    note = c.box(rx, y, [("each one tries to make every claim false:", "body"), ("no author's notes, no editing, no network", "body")], OUTBOX, pad=10)
     c.arrow(right(worker), worker[1] + 40, revs[1][0] - 2, worker[1] + 40)
 
     jx = right(revs[0]) + 70
-    judge = c.box(jx, 150, [("the judge", "title"), ("reads the code and the findings,", "body"), ("nothing from the worker,", "body"), ("and sorts them three ways", "body")], JUDGE)
+    judge = c.box(jx, 150, [("the judge", "title"), ("runs each false claim's reproduction,", "body"), ("nothing from the worker,", "body"), ("and places it; that is final", "body")], JUDGE)
     c.arrow(right(revs[2]), revs[2][1] + 18, judge[0] - 2, revs[2][1] + 18)
-    c.text((right(revs[2]) + judge[0]) / 2, revs[2][1] + 8, "findings", size=12, anchor="middle")
+    c.text((right(revs[2]) + judge[0]) / 2, revs[2][1] + 8, "false claims", size=12, anchor="middle")
 
     ox = right(judge) + 60
-    fix = c.box(ox, 90, [("the fix list", "title"), ("real, proven, worth fixing here;", "body"), ("a file and a line for each one", "body")], GOOD)
-    new = c.box(ox, bottom(fix) + 24, [("new issues to file", "title"), ("serious, but outside this change:", "body"), ("filed and linked, not fixed here", "body")], INK)
-    out = c.box(ox, bottom(new) + 24, [("thrown out", "title"), ("not real, not proven, or not worth", "body"), ("a change; gone for good", "body")], OUTBOX)
+    fix = c.box(ox, 90, [("the fix list", "title"), ("confirmed, and belongs to this change;", "body"), ("a file and a line for each one", "body")], GOOD)
+    new = c.box(ox, bottom(fix) + 24, [("new issues to file", "title"), ("confirmed, but outside this change:", "body"), ("filed and linked, never fixed here", "body")], INK)
+    out = c.box(ox, bottom(new) + 24, [("thrown out", "title"), ("could not be confirmed by running it;", "body"), ("gone for good", "body")], OUTBOX)
     c.arrow(right(judge), judge[1] + 30, fix[0] - 2, fix[1] + fix[3] / 2, color=GOOD["stroke"])
     c.arrow(right(judge), judge[1] + 50, new[0] - 2, new[1] + new[3] / 2)
     c.arrow(right(judge), judge[1] + 70, out[0] - 2, out[1] + out[3] / 2, dash=True)
@@ -222,7 +222,7 @@ def review():
 
     # back to the worker, around the outside
     ay = max(bottom(out), bottom(note)) + 30
-    lines = [("the worker fixes each item on the list, test first,", "body"), ("and the fixes get a check of their own, up to three rounds", "body")]
+    lines = [("the worker fixes each item on the list, test first,", "body"), ("and only the claims the fix broke are re-verified, at most twice", "body")]
     aw = max(width_of(t, 12) for t, _ in lines) + 28
     again = c.box(mid(judge) - aw / 2, ay, lines, FOREMAN)
     loop_y = bottom(again) + 30
@@ -319,14 +319,14 @@ def day5():
         ws.append(b); y = bottom(b) + 12
     for b in ws:
         c.arrow(right(fore), fore[1] + fore[3] / 2, b[0] - 2, b[1] + b[3] / 2, color=FOREMAN["stroke"])
-    plan = c.box(right(ws[0]) + 50, 40, [("a worker's first message: its plan, one line per scenario", "title"),
+    plan = c.box(right(ws[0]) + 50, 40, [("a worker's first message: its plan, one line per scenario, passed", "title"),
                                         ("scenario 1: change sign_in/form.ex,", "mono"), ("  test: remembers the email on reload", "mono"),
                                         ("scenario 2: change sign_in/cookie.ex,", "mono"), ("  test: the cookie expires after 30 days", "mono"),
-                                        ('the foreman checks each line against the scenarios and says "go"', "body")], INK, title_size=13)
+                                        ("a blind verifier read the plan, the issue and the decisions, and passed it", "body")], INK, title_size=13)
     c.arrow(right(ws[1]), ws[1][1] + ws[1][3] / 2, plan[0] - 2, ws[1][1] + ws[1][3] / 2)
     c.w = int(max(c.w, right(plan) + 40))
     low = max(bottom(plan), bottom(ws[-1]))
-    c.text(40, low + 34, "The simplest thing that meets the result wins. A line the sources don't settle is a question for you, not a guess.", size=12)
+    c.text(40, low + 34, "A plan that fails its verifier twice stops and asks. A line the sources don't settle is a question for you, not a guess.", size=12)
     c.h = int(low + 54)
     c.write("day-5-workers.svg")
 

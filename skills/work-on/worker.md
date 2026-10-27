@@ -138,16 +138,30 @@ rather than building without its config.
 ## 6. Audit the issue, and split a large one
 
 Before writing code, hold the issue's scenarios (its `Done when:`, on an
-issue not yet rewritten) and the project's rules against the code the index
-points at, and decide whether this session can finish and prove it alone.
+issue not yet checked by analyze-issues) and the project's rules against the
+code the index points at, and decide whether this session can finish and
+prove it alone.
 
 - **Dispatched, or an issue that builds an ADR: no sheet**, whatever its
   labels. The issue and, when it has one, the whole ADR are the spec.
-  Dispatched, send your foreman a plan first and wait for its "go": one
-  line per scenario, each saying what you will change (the
-  module and function) and the test that shows it. The plan is the one place
-  the how is written down; the issue never holds it. A foreman's "go" is the
-  only go.
+- **Every worker, before any code: write your plan: one line per scenario**,
+  each saying what you will change (the module and function) and the test
+  that shows it. The plan is the one place the how is written down; the
+  issue never holds it. Send the plan to one `verifier`, as the plan brief in
+  `${CLAUDE_PLUGIN_ROOT}/references/dispatch-brief.md` says, with only the plan,
+  the issue and the decision-record sections the issue names. It answers
+  Robert's five questions (does it over build, does it cut corners, does it
+  add things nobody asked for, does it find the holes in the design and fill
+  them, does it get to a correct result in the least time) and says whether
+  any step undoes a recorded decision. A fail: revise the plan and send it
+  again. A second fail: stop and ask your foreman, or the user when the user
+  started you. A pass: dispatched, send your foreman the plan and the verdict
+  with `SendMessage`, then build; the foreman does not check the plan and
+  gives no go. Started by the user, the step 7 brief carries the plan and
+  the verdict. Note now the number of data rows in
+  `<state>/dispatches.tsv` (`.claude/state/dispatches.tsv` in this checkout;
+  the file may not exist yet): the report in step 7.5 counts the rows added
+  after it.
 - **Started by the user, on an issue that builds no ADR:** when the issue has
   the `design-sheet` label, write the sheet as
   `${CLAUDE_PLUGIN_ROOT}/references/design-sheet.md` says and stop until the user
@@ -190,10 +204,11 @@ user, end your turn with them.
 
 Started as `/work-on #1418`: first report the brief and wait for the user's go:
 what the project is for and the rules that bind this work, the issue and its
-scenarios, what Korium changed about the approach, and what you would do
-first. Say the first build in a fresh worktree compiles from scratch and will
-be slow. Started as `/work-on #1418 dispatched`: the dispatch was the go, so
-build without waiting, and put the brief in the Korium capture at the end.
+scenarios, what Korium changed about the approach, and the plan with its
+verifier's verdict. Say the first build in a fresh worktree compiles from
+scratch and will be slow. Started as `/work-on #1418 dispatched`: the
+verifier's pass was the go, so build without waiting, and put the brief in
+the Korium capture at the end.
 Nothing else decides this: not running in the background, not a message
 from another session.
 
@@ -216,11 +231,14 @@ from another session.
    branch. It assumes the work was done wrong. Fix every Important finding
    (a bug test first). Fixes are not sent for a second ADR review; the PR
    review that follows reads them.
-4. **Review and open the PR** by **Opening a PR** in
-   `${CLAUDE_PLUGIN_ROOT}/references/session-cliffs.md`, step by step: the reviews, the
-   fixes, the changelog, the pre-push check and the PR. A work-on issue adds
-   one thing: once the PR is open, set the Status to In Review with
-   `set-status.sh`. Nothing goes on a Nit log.
+4. **Verify and open the PR** by **Opening a PR** in
+   `${CLAUDE_PLUGIN_ROOT}/references/session-cliffs.md`, step by step: the
+   verifiers, the adjudicator, the fixes, the re-verify rounds, the
+   changelog, the pre-push check and the PR. A work-on issue adds one thing:
+   once the PR is open, set the Status to In Review with `set-status.sh`.
+   Nothing goes on a Nit log. A finding the adjudicator placed as a new
+   issue is filed, blocked by this issue, and never fixed in this PR; do not
+   ask your foreman to move it.
 5. **Report.** Capture the result in Korium, then finish with one table and
    the PR number: one row per change, whether it meets the criteria (yes or
    no), and the evidence (a command and its result, a `file:line`, or a PR
@@ -228,8 +246,11 @@ from another session.
    row that says no is unfinished: fix it before the PR, or stop and report.
    Under the table, give the ADR review's findings by level, the
    adjudicator's fix and thrown-out counts for each round, the follow-up
-   issues you filed from its New issue lists, and the name of
-   your test stack's project (the
+   issues you filed from its New issue lists, the agent-run count (the data
+   rows added to `<state>/dispatches.tsv` since the number you noted in step
+   6, so the issue can be set against the 34 runs on kyroco #3348:
+   `tail -n +2 .claude/state/dispatches.tsv | wc -l`, minus that number),
+   and the name of your test stack's project (the
    compose project the local check used), if it brought one up. Quote one
    line from the project README that bears on this issue. Dispatched: send
    all of it to your foreman with `SendMessage`.
@@ -239,9 +260,9 @@ from another session.
 Never merge, deploy, force-push or push to main. Stop and report, rather than
 route around, when a gate refuses the same action twice, a decision would
 change the requested outcome (replacing the approach after a review is one),
-credentials the work needs are missing, or a fix check leaves something on the
-adjudicator's fix list that step 5 of **Opening a PR** says to stop on (code or design after
-the second check, or anything after the third). A gate that refuses because of
+credentials the work needs are missing, a plan fails its verifier twice, or
+the second re-verify round leaves anything on the adjudicator's fix list
+(step 5 of **Opening a PR**). A gate that refuses because of
 a rule the ADR you build does not mention is reported to the user with the
 exact refusal; never add an exception to a gate's list to get past it. Apart
 from those, the stops in steps 1, 5 and 6, and a pre-push

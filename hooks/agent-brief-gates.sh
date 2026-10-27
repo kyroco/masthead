@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# agent-brief-gates.sh: PreToolUse Agent hook that runs every brief check on the same input and joins all their refusals (or any check that cannot run) into one deny decision; always exits 0.
+# agent-brief-gates.sh: PreToolUse Agent hook that runs the brief check, the model option and the dispatch record on the same input and joins all their refusals (or any check that cannot run) into one deny decision; always exits 0.
 
 set -uo pipefail
 
@@ -63,22 +63,23 @@ collect() {
 }
 
 # Run every check in a fixed reporting order.
-collect "dispatch-record-gate"  bash "$DISPATCH"
 # The model gate is an install option; unset means on, so a copy outside a plugin keeps it.
 case "$(printf '%s' "${CLAUDE_PLUGIN_OPTION_HAIKU_DEFAULT:-on}" | tr '[:upper:]' '[:lower:]')" in
   false|0|no|off) ;;
   *) collect "model-choice-gate"     bash "$HERE/model-choice-gate.sh" ;;
 esac
-collect "gate-agent"            bash "$PROTOCOL" gate-agent
-collect "gate-fix-evidence"     bash "$PROTOCOL" gate-fix-evidence
-collect "gate-wave-brief"       bash "$PROTOCOL" gate-wave-brief
-collect "gate-brief-inference"  bash "$PROTOCOL" gate-brief-inference
+collect "gate-verify-brief"     bash "$PROTOCOL" gate-verify-brief
+# The record runs last so it can say whether the dispatch went through: a refused dispatch is recorded as refused and never counts as a re-verify round.
+if [ "$(printf '%s' "$REFUSALS" | jq -r 'length' 2>/dev/null || echo 0)" != "0" ]; then
+  export MASTHEAD_DISPATCH_OUTCOME=refused
+fi
+collect "dispatch-record-gate"  bash "$DISPATCH"
 
 [ "$(printf '%s' "$REFUSALS" | jq -r 'length' 2>/dev/null || echo 0)" != "0" ] || exit 0
 
 printf '%s' "$REFUSALS" | jq --arg total "$TOTAL" '
   length as $n
-  | (if $n == 1 then "check" else "checks" end) as $plural
+  | (if $total == "1" then "check" else "checks" end) as $plural
   | (to_entries
      | map("[" + ((.key + 1) | tostring) + " of " + ($n | tostring) + "] "
            + .value.id + "\n" + .value.reason)
