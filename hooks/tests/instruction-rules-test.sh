@@ -127,5 +127,11 @@ for doc in $count_files; do
   never_phrase "$doc" "more than about five scenarios"
 done
 
+# 5. No never-shortens sentence. Robert asked for it removed on October 27,
+# 2026. The phrase must be gone from every file the scenario-count check reads.
+for doc in $count_files; do
+  never_phrase "$doc" "never shortens a step"
+done
+
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
