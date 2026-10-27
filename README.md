@@ -173,9 +173,9 @@ install options (a terminal install takes the defaults silently):
 It asks whether to connect Korium memory (off unless you say so), whether to
 keep a code index in Korium (off), whether to keep AI attribution out of commits (on), and whether a helper needs a reason
 before running on the biggest model (off). Then run `/masthead:setup`. It
-asks three questions about the repository, and one or two more when it finds
-a folder of decision records or no ignore line for its working files, and
-writes nothing until you say yes: just you or the team
+asks three questions about the repository, or two when a memory is already
+connected, and one or two more when it finds a folder of decision records or
+no ignore line for its working files, and writes nothing until you say yes: just you or the team
 (whether the settings are committed with the code), tests before a push
 (it finds your test command), and whether to connect a memory now, later or
 not at all. Run it again whenever you want to change an answer.
@@ -187,7 +187,7 @@ To change an install option later, run `/plugin configure masthead@masthead`:
 | Connect Korium memory | off | Each session looks up what earlier sessions learned before its first change, and saves what it learned at the end. Needs a [Korium](https://kyroco.ai) account; there's a free plan. Everything else works without it. |
 | Keep a code index in Korium | off | Only with Korium memory on and korium-cli installed. The names and structure of the code in each repository you open, and the names you search for, go to your Korium account, so Claude can ask the index before it greps. Leave it off for a repository you may not send to Korium. |
 | Keep AI attribution out of commits | on | Refuses a commit message or pull request body with an AI co-author line, a session link or a generated-with footer. |
-| Ask for a reason before a helper runs on the biggest model | off | A helper with no model in its own file runs on the small model unless the brief says why the big one is needed. The verifier, the security reviewer and the diagnoser name the big model in their files and are not asked. |
+| Ask for a reason before a helper runs on the biggest model | off | A helper sent to the big model, by the call or by inheriting this session's, runs there only when the brief says why; a call that names no model for a helper whose own file names one is not asked. |
 
 To remove it: `claude plugin uninstall masthead@masthead`. The settings file
 setup wrote and the push check script (`.claude/push-check.sh`) are yours to
@@ -239,7 +239,7 @@ reason Claude can act on.
 | Check | Runs | Refuses | Needs |
 |---|---|---|---|
 | `hard-gate.sh` | before `git push` or `gh pr create` | a push that carries something shaped like a secret, or fails a changed stack's format, compile, lint or type check; with the test command, a push until the push check reports the tests passed on this exact commit, and a push of any other commit | nothing for the secret scan and the stack checks; the test command from setup (`PROJECT_PUSH_CHECK`) for the test receipt |
-| `adr-sections-gate.py`, `adr-structure-gate.sh`, `wiki-refresh.sh` | before a write; at stop; at session start | a decision record written without its sections; a finish that leaves one with an unchecked claims list; keeps the records folder fresh | a decision records folder: `ADR_DIR`, or `docs/adr` when none is named |
+| `adr-sections-gate.py`, `adr-structure-gate.sh`, `wiki-refresh.sh` | before a write; at stop; at session start | a decision record written without its sections; a finish that leaves one with an unchecked claims list; keeps the records folder fresh | a decision records folder: `ADR_DIR`, or `docs/adr` when none is named, for the two gates; the refresh only with `ADR_DIR` set to an absolute path |
 | `elixir-toolchain-env.sh`, `elixir-format-after-edit.sh` | at session start; after an edit | nothing; pins the Elixir toolchain and formats an edited file | an Elixir root (`PROJECT_ELIXIR_ROOT`) |
 
 Where these three fall short, together: the fact names a file, and the copy
@@ -255,9 +255,9 @@ review is the guard against intent.
 |---|---|---|
 | `engram-protocol.sh` | Connect Korium memory | the first edit before a memory search; a finish with nothing saved; a capture filed under another agent's name |
 | `capture-finding-reminder.py` | Connect Korium memory | nothing; reminders only |
-| `korium-index-on-stop.sh` and the code index gates in `engram-protocol.sh` | Keep a code index in Korium | a grep for a name the code index holds until the index is asked, a search that repeats a name it just answered, and, once, a whole-file read of a file it just placed; the index refresh at the end of a session refuses nothing |
+| `korium-index-on-stop.sh` and the code index gates in `engram-protocol.sh` | Keep a code index in Korium | a grep for a name the code index holds until the index is asked (and every grep while korium-cli is signed out or Korium does not answer), a search that repeats a name it just answered, and, once, a whole-file read of a file it just placed; the index refresh at the end of a session refuses nothing |
 | `commit-attribution-gate.py` | Keep AI attribution out of commits | a commit message or pull request body with an AI co-author line, a session link or a generated-with footer |
-| `model-choice-gate.sh` | Ask for a reason before the biggest model | a helper with no model in its own file sent to the big model with no reason on the first line of its brief |
+| `model-choice-gate.sh` | Ask for a reason before the biggest model | a helper sent to the big model, by the call or by inheriting this session's, with no reason on the first line of its brief; a call that names no model for a helper whose own file names one is not asked |
 
 The off switches are environment variables read from the check's own
 environment, so a session can't switch a check off for itself:

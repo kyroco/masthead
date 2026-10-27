@@ -38,18 +38,20 @@ gate twice.
 
 ## Korium and dispatch gates
 
-Every `engram-protocol.sh` gate below runs only with the Korium memory install
-option on, the three code index gates (`gate-discovery`, `gate-redundant-grep`
-and `gate-span-read`) also need the code index option, and
-`model-choice-gate.sh` runs only with the reason-before-Opus option on
-(`hooks/run.sh` and `hooks/agent-brief-gates.sh`). All three options are off
-by default, so on a default install none of these refuses anything.
+Every `engram-protocol.sh` gate below except `gate-verify-brief` runs only with
+the Korium memory install option on (`hooks/run.sh`), the three code index
+gates (`gate-discovery`, `gate-redundant-grep` and `gate-span-read`) also need
+the code index option, and `model-choice-gate.sh` runs only with the
+reason-before-Opus option on (`hooks/agent-brief-gates.sh`). All three options
+are off by default. `agent-brief-gates.sh` calls `gate-verify-brief` and the
+dispatch record directly, not through `run.sh`, so they run on a default
+install too; the brief check's own off switch is `MASTHEAD_BRIEF_GATE`.
 
 | Gate | Current job | Known limit |
 |---|---|---|
 | `hooks/engram-protocol.sh gate-edit` | Requires a Korium search before the first edit, and a second wording when the first found nothing | Cannot judge whether the search was about the task; no model judge |
 | `hooks/engram-protocol.sh gate-discovery` | Refuses a Grep, Glob or shell `rg`/`grep` for a name the code index holds until a fresh `code_locate` lookup of it; a stale answer means reindex and search again. A plain-word Grep or shell search it lets through is told where the index holds any of its words as a name | `korium-index-judge.py` asks the index itself with `korium-cli` (status first, so a signed-out Mac never gets a browser sign-in), only for code-shaped words, and refuses on an exact match. A name the index lacks, a non-indexed file and a folder outside a repo go through. korium-cli signed out or Korium not answering refuses until the lookup. Off switch `MASTHEAD_CODE_GATE=off`. Proven by `tests/korium-index-judge-test.sh`. The plain-word hint is `korium-index-hint.py`: up to three words of four or more letters, each asked once per session, any letter case, and it never refuses; signed out or slow means no hint. Off switch `MASTHEAD_INDEX_HINT=off`. Proven by `tests/korium-index-hint-test.sh` |
-| `hooks/model-choice-gate.sh` (run by `agent-brief-gates.sh`) | Refuses an Agent dispatch that would run on Opus (model opus on the call, or none set and no agent file naming one) unless the brief opens `Model-choice: opus, <why>`; Haiku is the default | Cannot judge whether the stated reason is true. Agents whose file names a model, forks, Explore, claude-code-guide, statusline-setup and plugin agents are not covered. Off switch `MASTHEAD_MODEL_GATE=off` |
+| `hooks/model-choice-gate.sh` (run by `agent-brief-gates.sh`) | Refuses an Agent dispatch that would run on Opus (model opus on the call, or none set and no agent file naming one) unless the brief opens `Model-choice: opus, <why>`; Haiku is the default | Cannot judge whether the stated reason is true. Agents whose file names a model, forks, Explore, claude-code-guide, statusline-setup and plugin agents are not covered when the call names no model; a model named on the call is checked whatever the agent. Off switch `MASTHEAD_MODEL_GATE=off` |
 | `hooks/engram-protocol.sh gate-redundant-grep` | Refuses, once, a search that repeats a name `code_locate` just answered | Reads the pattern or command text |
 | `hooks/engram-protocol.sh gate-span-read` | Refuses, once, a whole-file read after `code_locate` returned a span | A read with an offset passes |
 | `hooks/agent-brief-gates.sh` | Runs the one brief check, the model option and the dispatch record, and joins their refusals | A wrapper timeout can lose all of them at once. Proven by `test-shared-safety-gates.py` |

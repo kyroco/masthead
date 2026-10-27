@@ -159,11 +159,12 @@ that would run on Opus is refused unless its first non-empty line is
 or sets no model and the agent has no file naming one (general-purpose, Plan),
 so it inherits this session's. Set `model: "haiku"` (or sonnet) on the call and
 no line is needed. Opus is for work that decides something no later step
-checks: writing code, judging a design. Not covered: agents whose file names a
-model (verifier, security-reviewer and diagnoser name opus; the adjudicator
-and reader name haiku, so a reader that must judge takes `model: "opus"` and
-the line), forks,
-Explore, claude-code-guide, statusline-setup and plugin agents.
+checks: writing code, judging a design. Not covered when the call names no
+model: agents whose file names a model (verifier, security-reviewer and
+diagnoser name opus; the adjudicator and reader name haiku, so a reader that
+must judge takes `model: "opus"` and the line), forks, Explore,
+claude-code-guide, statusline-setup and plugin agents. A model named on the
+call is checked whatever the agent.
 
 **`gate-verify-brief` checks briefs to `verifier` and `security-reviewer`
 only.** The brief carries a claims list in the one exact form above: a line
