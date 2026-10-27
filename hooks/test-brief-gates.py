@@ -83,11 +83,40 @@ Verify the fix commits.
 
 
 def log_rows(rows):
-    """Rows of a dispatches.tsv: (session8, outcome) pairs."""
-    lines = ["when\tsession\tagent\ttype\tmodel\toutcome\treason"]
-    for session, outcome in rows:
-        lines.append("2026-10-27T14:00:00Z\t{}\tverify\tverifier\topus (agent file)\t{}\t(no Model-choice line)".format(session, outcome))
+    """Rows of a dispatches.tsv: (session8, outcome[, type[, branch]]) tuples.
+
+    The temp cwd the cases run in is not a git checkout, so its branch is "-";
+    a row on another branch belongs to another issue in a reused session.
+    """
+    lines = ["when\tsession\tagent\ttype\tmodel\toutcome\treason\tbranch"]
+    for row in rows:
+        session, outcome = row[0], row[1]
+        kind = row[2] if len(row) > 2 else "verifier"
+        branch = row[3] if len(row) > 3 else "-"
+        lines.append("2026-10-27T14:00:00Z\t{}\tverify\t{}\topus (agent file)\t{}\t(no Model-choice line)\t{}".format(session, kind, outcome, branch))
     return "\n".join(lines) + "\n"
+
+
+LISTED_CLAIMS = """Verify git diff abc123..def456.
+
+1. Claims:
+- the refusal sentence names the month the limit resets
+"""
+
+NONE_CLAIMS = """Verify git diff abc123..def456.
+
+Claims: none
+"""
+
+NONE_UNDER_CLAIMS = """Verify git diff abc123..def456.
+
+Claims:
+none
+"""
+
+
+def re_verify_marked(n):
+    return "- " + re_verify(n)
 
 
 # (label, subagent_type, prompt, log rows or None, expected decision)
@@ -128,6 +157,27 @@ CASES = [
      [(SESSION8, "re-verify round 1"), (SESSION8, "re-verify round 2")], "deny"),
     ("HELD no claims and a third round, refused once", "verifier", NO_CLAIMS_THIRD_ROUND,
      [(SESSION8, "re-verify round 1"), (SESSION8, "re-verify round 2")], "deny"),
+
+    # A round is one verifier, plus the security reviewer when a security
+    # finding was fixed. Only the verifier's rows spend a round (bugs-1, edge-4).
+    ("a security reviewer in round 1 does not spend round 2", "verifier", re_verify(2),
+     [(SESSION8, "re-verify round 1", "verifier"), (SESSION8, "re-verify round 1", "security-reviewer")], "allow"),
+    ("an adjudicator brief with a Re-verify line does not count", "verifier", re_verify(2),
+     [(SESSION8, "re-verify round 1", "adjudicator"), (SESSION8, "re-verify round 1", "verifier")], "allow"),
+    ("the verifier's rows count under the name Claude Code sends", "verifier", re_verify(3),
+     [(SESSION8, "re-verify round 1", "masthead:verifier"), (SESSION8, "re-verify round 2", "masthead:verifier")], "deny"),
+    # A reused session's next issue is on another branch and starts at zero (words-4).
+    ("another branch's rounds do not count", "verifier", re_verify(1),
+     [(SESSION8, "re-verify round 1", "verifier", "robert/9-last-issue"), (SESSION8, "re-verify round 2", "verifier", "robert/9-last-issue")], "allow"),
+    ("this branch's rounds count", "verifier", re_verify(3),
+     [(SESSION8, "re-verify round 1", "verifier", "-"), (SESSION8, "re-verify round 2", "verifier", "-")], "deny"),
+    # The Re-verify line is read under the same markdown prefixes as the Claims line (bugs-3).
+    ("HELD a third round as a list item is still refused", "verifier", re_verify_marked(3),
+     [(SESSION8, "re-verify round 1"), (SESSION8, "re-verify round 2")], "deny"),
+    # The Claims line under an ordered-list prefix, and an empty list in words (edge-3).
+    ("a Claims: line as a numbered item", "verifier", LISTED_CLAIMS, None, "allow"),
+    ("HELD Claims: none is no list", "verifier", NONE_CLAIMS, None, "deny"),
+    ("HELD none under Claims: is no list", "verifier", NONE_UNDER_CLAIMS, None, "deny"),
 ]
 
 

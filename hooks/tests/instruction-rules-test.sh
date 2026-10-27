@@ -253,10 +253,26 @@ never skills/work-on/foreman.md "It rewrites each issue into its four parts"
 says  skills/work-on/foreman.md "It checks each issue against its four parts"
 never skills/work-on/worker.md "not yet rewritten"
 says  skills/work-on/worker.md "not yet checked"
-# Scenario 8: the report counts agent runs.
+# Scenario 8: the report counts agent runs, and a refused dispatch is not a run.
 says  skills/work-on/worker.md "the agent-run count"
 says  skills/work-on/worker.md "dispatches.tsv"
+says  skills/work-on/worker.md "\$6 != \"refused\""
+says  references/session-cliffs.md "not refused"
+says  references/dispatch-brief.md "not refused"
 says  skills/work-on/foreman.md "agent-run count"
+# Review round 1 of issue #20: the docs say what the hooks do.
+for doc in README.md docs/explainer.template.html docs/explainer.html; do
+  never "$doc" "a brief that hides what memory found"
+done
+says  docs/explainer.template.html "isn't real, isn't confirmed, or isn't worth a change"
+says  docs/explainer.html "isn't real, isn't confirmed, or isn't worth a change"
+for doc in scripts/diagrams.py docs/images/review.svg docs/explainer.html; do
+  never "$doc" "could not be confirmed by running it"
+  says  "$doc" "not real, not confirmed, or not worth"
+done
+says  references/session-cliffs.md "the security reviewer's dispatch does not spend a round"
+says  skills/work-on/worker.md "A dead or declined verifier still spends its round"
+says  references/gate-catalog.md "A dead or declined verifier still spends its round"
 
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]

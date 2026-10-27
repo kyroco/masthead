@@ -218,6 +218,25 @@ def main():
                        "subagent_type": "verifier", "model": "opus"})
     unnumbered = open(rec).read().splitlines()[-1].split("\t")
     check("a re-verify brief with no round is still a re-verify", unnumbered[5], "re-verify")
+    dispatch_decision({"prompt": "- Re-verify: round 3, claim 2\nVerify the fix commits.",
+                       "subagent_type": "verifier", "model": "opus"})
+    marked = open(rec).read().splitlines()[-1].split("\t")
+    check("a re-verify line as a list item is still recorded as one", marked[5], "re-verify round 3")
+    # The outcome cannot be preset from the environment: the wrapper passes a
+    # refusal as an argument, so an operator variable changes nothing (edge-5).
+    run(["bash", DISPATCH], json.dumps({
+        "session_id": "dispatch-suite", "cwd": DISPATCH_ROOT, "tool_name": "Agent",
+        "tool_input": {"prompt": "Re-verify: round 2\nVerify.", "subagent_type": "verifier", "model": "opus"}}),
+        env={"MASTHEAD_DISPATCH_OUTCOME": "dispatched"})
+    preset = open(rec).read().splitlines()[-1].split("\t")
+    check("an environment outcome is ignored", preset[5], "re-verify round 2")
+    run(["bash", DISPATCH, "--refused"], json.dumps({
+        "session_id": "dispatch-suite", "cwd": DISPATCH_ROOT, "tool_name": "Agent",
+        "tool_input": {"prompt": "Re-verify: round 2\nVerify.", "subagent_type": "verifier", "model": "opus"}}))
+    argued = open(rec).read().splitlines()[-1].split("\t")
+    check("the wrapper's refusal argument is recorded", argued[5], "refused")
+    check("every row carries the branch column",
+          all(len(r.split("\t")) == 8 for r in open(rec).read().splitlines()), True)
     check("and records the stated reason",
           stated[6], "haiku, mechanical sweep the suite verifies")
     fromfile = by_name.get(marker + "-fromfile", [""] * 7)
