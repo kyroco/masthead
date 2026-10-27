@@ -112,10 +112,12 @@ order. The steps live here and nowhere else; a repo supplies only its own facts
    `Re-verify: round N, claims ...`, and the `security-reviewer` again when a
    security finding was fixed, then the `adjudicator` on that round's
    findings files as in step 3. At most two re-verify rounds per change;
-   the brief check counts them in the dispatch log and refuses a third. If
-   the second round still leaves anything on the fix list, stop and report
-   it to the foreman, or to the user when there is none. That is
-   fix-break-fix churn, and it needs a person.
+   the brief check counts the verifier's re-verify dispatches in the
+   dispatch log, on this branch, and refuses a third (the security
+   reviewer's dispatch does not spend a round; a verifier that died or was
+   declined did). If the second round still leaves anything on the fix
+   list, stop and report it to the foreman, or to the user when there is
+   none. That is fix-break-fix churn, and it needs a person.
 6. Log nothing. There is no Nit log: a finding is either on the fix list and
    fixed, or thrown out.
 7. Add the changelog entry when the repo keeps one, or its label for internal
@@ -128,7 +130,7 @@ order. The steps live here and nowhere else; a repo supplies only its own facts
    refuses the push and the PR until the check's receipt matches the commit.
 9. Push and open one PR to main. Its body gives the unproven list, the
    agent-run count (the rows added to `<state>/dispatches.tsv` for this
-   issue), and `Fixes #<issue>`. Never
+   issue whose outcome is not refused), and `Fixes #<issue>`. Never
    commit or push to main: main changes only by merging the reviewed PR once
    its checks are green.
 10. Once it merges, clean up what your own work created, from the main

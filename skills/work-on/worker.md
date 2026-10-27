@@ -158,9 +158,9 @@ prove it alone.
   started you. A pass: dispatched, send your foreman the plan and the verdict
   with `SendMessage`, then build; the foreman does not check the plan and
   gives no go. Started by the user, the step 7 brief carries the plan and
-  the verdict. Note now the number of data rows in
-  `<state>/dispatches.tsv` (`.claude/state/dispatches.tsv` in this checkout;
-  the file may not exist yet): the report in step 7.5 counts the rows added
+  the verdict. Note now the number of rows in `<state>/dispatches.tsv` that
+  were not refused (`.claude/state/dispatches.tsv` in this checkout; the
+  file may not exist yet): the report in step 7.5 counts the rows added
   after it.
 - **Started by the user, on an issue that builds no ADR:** when the issue has
   the `design-sheet` label, write the sheet as
@@ -234,7 +234,10 @@ from another session.
 4. **Verify and open the PR** by **Opening a PR** in
    `${CLAUDE_PLUGIN_ROOT}/references/session-cliffs.md`, step by step: the
    verifiers, the adjudicator, the fixes, the re-verify rounds, the
-   changelog, the pre-push check and the PR. A work-on issue adds one thing:
+   changelog, the pre-push check and the PR. A dead or declined verifier
+   still spends its round, since its row is written before it runs; when
+   that leaves you out of rounds, report to the foreman one round early
+   rather than send a third. A work-on issue adds one thing:
    once the PR is open, set the Status to In Review with `set-status.sh`.
    Nothing goes on a Nit log. A finding the adjudicator placed as a new
    issue is filed, blocked by this issue, and never fixed in this PR; do not
@@ -246,10 +249,12 @@ from another session.
    row that says no is unfinished: fix it before the PR, or stop and report.
    Under the table, give the ADR review's findings by level, the
    adjudicator's fix and thrown-out counts for each round, the follow-up
-   issues you filed from its New issue lists, the agent-run count (the data
-   rows added to `<state>/dispatches.tsv` since the number you noted in step
-   6, so the issue can be set against the 34 runs on kyroco #3348:
-   `tail -n +2 .claude/state/dispatches.tsv | wc -l`, minus that number),
+   issues you filed from its New issue lists, the agent-run count (the rows
+   added to `<state>/dispatches.tsv` since the number you noted in step 6
+   that were not refused, so the issue can be set against the 34 runs on
+   kyroco #3348:
+   `awk -F'\t' 'NR > 1 && $6 != "refused"' .claude/state/dispatches.tsv | wc -l`,
+   minus that number),
    and the name of your test stack's project (the
    compose project the local check used), if it brought one up. Quote one
    line from the project README that bears on this issue. Dispatched: send

@@ -69,13 +69,15 @@ case "$(printf '%s' "${CLAUDE_PLUGIN_OPTION_HAIKU_DEFAULT:-on}" | tr '[:upper:]'
   *) collect "model-choice-gate"     bash "$HERE/model-choice-gate.sh" ;;
 esac
 collect "gate-verify-brief"     bash "$PROTOCOL" gate-verify-brief
-# The record runs last so it can say whether the dispatch went through: a refused dispatch is recorded as refused and never counts as a re-verify round.
-if [ "$(printf '%s' "$REFUSALS" | jq -r 'length' 2>/dev/null || echo 0)" != "0" ]; then
-  export MASTHEAD_DISPATCH_OUTCOME=refused
+# The record runs last so it can say whether the dispatch went through: a refused dispatch is recorded as refused and never counts as a re-verify round or an agent run.
+REFUSED_COUNT="$(printf '%s' "$REFUSALS" | jq -r 'length' 2>/dev/null || echo 0)"
+if [ "$REFUSED_COUNT" != "0" ]; then
+  collect "dispatch-record-gate"  bash "$DISPATCH" --refused
+else
+  collect "dispatch-record-gate"  bash "$DISPATCH"
 fi
-collect "dispatch-record-gate"  bash "$DISPATCH"
 
-[ "$(printf '%s' "$REFUSALS" | jq -r 'length' 2>/dev/null || echo 0)" != "0" ] || exit 0
+[ "$REFUSED_COUNT" != "0" ] || exit 0
 
 printf '%s' "$REFUSALS" | jq --arg total "$TOTAL" '
   length as $n

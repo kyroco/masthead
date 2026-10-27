@@ -408,40 +408,52 @@ EOF
     prompt="$(field '.tool_input.prompt // ""')"
     reasons=""
 
-    # A claims list: a line that starts "Claims:" or "What the author claims:" with something after it, on that line or a later one.
+    # A claims list: a line that starts "Claims:" or "What the author claims:" with a claim after it, on that line or a later one; "none" is not a claim.
     has_claims="$(printf '%s' "$prompt" | awk '
+      function is_claim(t) { sub(/^[[:space:]]+/, "", t); sub(/[[:space:].]+$/, "", t); return (t != "" && tolower(t) != "none") }
       {
         line = $0
-        sub(/^[[:space:]]*[>*_#`-]*[[:space:]]*/, "", line)
+        sub(/^[[:space:]]*[>*_#`-]*[[:space:]]*([0-9]+\.[[:space:]]*)?/, "", line)
         low = tolower(line)
         if (!seen && (low ~ /^claims:/ || low ~ /^what the author claims:/)) {
           seen = 1
           rest = line
-          sub(/^[^:]*:[[:space:]]*/, "", rest)
-          if (rest ~ /[^[:space:]]/) { print "yes"; exit }
+          sub(/^[^:]*:/, "", rest)
+          if (is_claim(rest)) { print "yes"; exit }
           next
         }
-        if (seen && line ~ /[^[:space:]]/) { print "yes"; exit }
+        if (seen) {
+          item = line
+          sub(/^[>*_#`-]*[[:space:]]*([0-9]+\.[[:space:]]*)?/, "", item)
+          if (is_claim(item)) { print "yes"; exit }
+        }
       }')"
     if [ "$has_claims" != "yes" ]; then
       reasons="Verification brief rule: a verifier is told what it must prove or break, never just handed a diff. Add a line that starts with 'Claims:' and list under it the scenario's Then lines, what the author claims works, and every sentence a customer reads that the change adds or edits (for the security reviewer, the repository's security conventions; for a plan, the plan's lines). Then retry."
     fi
 
-    # The round cap: a re-verify brief says so on a line that starts "Re-verify:", and the dispatch log decides how many rounds this session has had.
-    if printf '%s' "$prompt" | grep -qiE '^[[:space:]]*(\*\*)?re-verify:'; then
-      root="$(field '.cwd // ""')"
-      [ -n "$root" ] || root="${CLAUDE_PROJECT_DIR:-$PWD}"
-      log="$root/.claude/state/dispatches.tsv"
+    # The round cap: a re-verify brief says so on a line that starts "Re-verify:" (under the same markdown prefixes as the Claims line), and the dispatch log decides how many rounds this session has had on this branch. A round is the verifier's dispatch: the security reviewer sent with it, or any other agent, does not spend one. The row is written before the agent runs, so a verifier that died or was declined has spent its round.
+    if printf '%s' "$prompt" | grep -qiE '^[[:space:]]*[>*_#`-]*[[:space:]]*([0-9]+\.[[:space:]]*)?re-verify:'; then
+      log_root="$(field '.cwd // ""')"
+      [ -n "$log_root" ] || log_root="${CLAUDE_PROJECT_DIR:-$PWD}"
+      log="$log_root/.claude/state/dispatches.tsv"
       session8="$(field '.session_id // "nosession"' | cut -c1-8)"
+      branch="$(git -C "$log_root" branch --show-current 2>/dev/null || true)"
+      [ -n "$branch" ] || branch="-"
       rounds=0
       if [ -s "$log" ]; then
-        rounds="$(awk -F'\t' -v s="$session8" '$2 == s && $6 ~ /^re-verify/' "$log" 2>/dev/null | wc -l | tr -d ' ')"
+        # Columns: when, session, agent, type, model, outcome, reason, branch; a row with no branch column is from before the column existed and counts.
+        rounds="$(awk -F'\t' -v s="$session8" -v b="$branch" '
+          $2 == s && $6 ~ /^re-verify/ && (NF < 8 || $8 == b) {
+            t = $4; n = split(t, parts, ":"); last = parts[n]
+            if (last == "verifier") print
+          }' "$log" 2>/dev/null | wc -l | tr -d ' ')"
       fi
       if [ "${rounds:-0}" -ge 2 ]; then
         [ -n "$reasons" ] && reasons="$reasons
 
 "
-        reasons="${reasons}Re-verify cap: this session has already sent $rounds re-verify rounds, read from the dispatch log at $log, and a change gets at most two. The round number in the brief does not change that count. What is still on the adjudicator's fix list after the second round goes to the foreman, or to the user when there is none; do not send a third verifier."
+        reasons="${reasons}Re-verify cap: this session has already sent $rounds re-verify rounds on this branch, read from the dispatch log at $log, and a change gets at most two. The round number in the brief does not change that count, and a verifier that died or was declined still spent its round. What is still on the adjudicator's fix list after the second round goes to the foreman, or to the user when there is none; do not send a third verifier."
       fi
     fi
 

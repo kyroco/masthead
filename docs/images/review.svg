@@ -31,14 +31,14 @@
   <text x="1115" y="116" text-anchor="middle" font-size="14" font-weight="600" fill="#14532d">the fix list</text>
   <text x="1115" y="132" text-anchor="middle" font-size="12" fill="#166534">confirmed, and belongs to this change;</text>
   <text x="1115" y="148" text-anchor="middle" font-size="12" fill="#166534">a file and a line for each one</text>
-  <rect x="964" y="188" width="280" height="74" rx="10" fill="#f3f4f6" stroke="#9ca3af" stroke-width="1.5"/>
-  <text x="1104" y="214" text-anchor="middle" font-size="14" font-weight="600" fill="#374151">new issues to file</text>
-  <text x="1104" y="230" text-anchor="middle" font-size="12" fill="#4b5563">confirmed, but outside this change:</text>
-  <text x="1104" y="246" text-anchor="middle" font-size="12" fill="#4b5563">filed and linked, never fixed here</text>
+  <rect x="964" y="188" width="366" height="74" rx="10" fill="#f3f4f6" stroke="#9ca3af" stroke-width="1.5"/>
+  <text x="1148" y="214" text-anchor="middle" font-size="14" font-weight="600" fill="#374151">new issues to file</text>
+  <text x="1148" y="230" text-anchor="middle" font-size="12" fill="#4b5563">confirmed and serious, but outside this change:</text>
+  <text x="1148" y="246" text-anchor="middle" font-size="12" fill="#4b5563">filed and linked, never fixed here</text>
   <rect x="964" y="286" width="294" height="74" rx="10" fill="#f9fafb" stroke="#d1d5db" stroke-width="1.5"/>
   <text x="1112" y="312" text-anchor="middle" font-size="14" font-weight="600" fill="#6b7280">thrown out</text>
-  <text x="1112" y="328" text-anchor="middle" font-size="12" fill="#6b7280">could not be confirmed by running it;</text>
-  <text x="1112" y="344" text-anchor="middle" font-size="12" fill="#6b7280">gone for good</text>
+  <text x="1112" y="328" text-anchor="middle" font-size="12" fill="#6b7280">not real, not confirmed, or not worth</text>
+  <text x="1112" y="344" text-anchor="middle" font-size="12" fill="#6b7280">a change; gone for good</text>
   <line x1="904" y1="180" x2="962" y2="127" stroke="#16a34a" stroke-width="2" marker-end="url(#m16a34a)"/>
   <line x1="904" y1="200" x2="962" y2="225" stroke="#6b7280" stroke-width="2" marker-end="url(#m6b7280)"/>
   <line x1="904" y1="220" x2="962" y2="323" stroke="#6b7280" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#m6b7280)"/>

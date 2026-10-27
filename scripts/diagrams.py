@@ -212,8 +212,8 @@ def review():
 
     ox = right(judge) + 60
     fix = c.box(ox, 90, [("the fix list", "title"), ("confirmed, and belongs to this change;", "body"), ("a file and a line for each one", "body")], GOOD)
-    new = c.box(ox, bottom(fix) + 24, [("new issues to file", "title"), ("confirmed, but outside this change:", "body"), ("filed and linked, never fixed here", "body")], INK)
-    out = c.box(ox, bottom(new) + 24, [("thrown out", "title"), ("could not be confirmed by running it;", "body"), ("gone for good", "body")], OUTBOX)
+    new = c.box(ox, bottom(fix) + 24, [("new issues to file", "title"), ("confirmed and serious, but outside this change:", "body"), ("filed and linked, never fixed here", "body")], INK)
+    out = c.box(ox, bottom(new) + 24, [("thrown out", "title"), ("not real, not confirmed, or not worth", "body"), ("a change; gone for good", "body")], OUTBOX)
     c.arrow(right(judge), judge[1] + 30, fix[0] - 2, fix[1] + fix[3] / 2, color=GOOD["stroke"])
     c.arrow(right(judge), judge[1] + 50, new[0] - 2, new[1] + new[3] / 2)
     c.arrow(right(judge), judge[1] + 70, out[0] - 2, out[1] + out[3] / 2, dash=True)

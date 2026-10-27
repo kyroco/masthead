@@ -266,14 +266,14 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   <text x="1115" y="116" text-anchor="middle" font-size="14" font-weight="600" fill="#14532d">the fix list</text>
   <text x="1115" y="132" text-anchor="middle" font-size="12" fill="#166534">confirmed, and belongs to this change;</text>
   <text x="1115" y="148" text-anchor="middle" font-size="12" fill="#166534">a file and a line for each one</text>
-  <rect x="964" y="188" width="280" height="74" rx="10" fill="#f3f4f6" stroke="#9ca3af" stroke-width="1.5"/>
-  <text x="1104" y="214" text-anchor="middle" font-size="14" font-weight="600" fill="#374151">new issues to file</text>
-  <text x="1104" y="230" text-anchor="middle" font-size="12" fill="#4b5563">confirmed, but outside this change:</text>
-  <text x="1104" y="246" text-anchor="middle" font-size="12" fill="#4b5563">filed and linked, never fixed here</text>
+  <rect x="964" y="188" width="366" height="74" rx="10" fill="#f3f4f6" stroke="#9ca3af" stroke-width="1.5"/>
+  <text x="1148" y="214" text-anchor="middle" font-size="14" font-weight="600" fill="#374151">new issues to file</text>
+  <text x="1148" y="230" text-anchor="middle" font-size="12" fill="#4b5563">confirmed and serious, but outside this change:</text>
+  <text x="1148" y="246" text-anchor="middle" font-size="12" fill="#4b5563">filed and linked, never fixed here</text>
   <rect x="964" y="286" width="294" height="74" rx="10" fill="#f9fafb" stroke="#d1d5db" stroke-width="1.5"/>
   <text x="1112" y="312" text-anchor="middle" font-size="14" font-weight="600" fill="#6b7280">thrown out</text>
-  <text x="1112" y="328" text-anchor="middle" font-size="12" fill="#6b7280">could not be confirmed by running it;</text>
-  <text x="1112" y="344" text-anchor="middle" font-size="12" fill="#6b7280">gone for good</text>
+  <text x="1112" y="328" text-anchor="middle" font-size="12" fill="#6b7280">not real, not confirmed, or not worth</text>
+  <text x="1112" y="344" text-anchor="middle" font-size="12" fill="#6b7280">a change; gone for good</text>
   <line x1="904" y1="180" x2="962" y2="127" stroke="#16a34a" stroke-width="2" marker-end="url(#review-m16a34a)"/>
   <line x1="904" y1="200" x2="962" y2="225" stroke="#6b7280" stroke-width="2" marker-end="url(#review-m6b7280)"/>
   <line x1="904" y1="220" x2="962" y2="323" stroke="#6b7280" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#review-m6b7280)"/>
@@ -284,7 +284,7 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   <text x="40" y="516" text-anchor="start" font-size="13" fill="#4b5563">Then: the tests run on the final commit, and one pull request goes up.</text>
 </svg>
 </div>
-<figcaption>The judge runs each false claim's reproduction and sorts it three ways: onto the fix list with a file and line, onto a list of new issues when it's serious but outside this change, or out, when it could not be confirmed. Its placement is final.</figcaption></figure>
+<figcaption>The judge runs each false claim's reproduction and sorts it three ways: onto the fix list with a file and line, onto a list of new issues when it's serious but outside this change, or out, when it isn't real, isn't confirmed, or isn't worth a change. Its placement is final.</figcaption></figure>
 <p>Meanwhile you're having coffee. A worker's question lands at the foreman, which re-reads the issue's comments and the sources and answers with the line quoted. Only when nothing settles it does the question reach you, and your answer goes on the issue so the next session finds it. A worker that stops on a failure gets one message; a second failure parks the issue with a comment saying what happened, and the run goes on without it.</p>
 <p>When a pull request's checks pass, its review is clean and the worker has cleaned up after itself, the foreman queues it to be merged. It closes the issue, and any big issue whose pieces are now all done, then gives that worker its next issue, a follow-up that waited on this one first. By the end of the day every issue is merged, parked or skipped, and you get one line per issue saying which.</p>
 <figure><div class="paper"><svg xmlns="http://www.w3.org/2000/svg" role="img" viewBox="0 0 1076 282" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="14">
@@ -437,7 +437,7 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 <h3>On or off with an install option</h3>
 <div class="tablewrap"><table>
 <tr><th>Check</th><th>Option</th><th>Refuses</th></tr>
-<tr><td><code>engram-protocol.sh</code></td><td>Connect Korium memory</td><td>the first edit before a memory search; a finish with nothing saved; a brief that hides what memory found; a capture filed under another agent's name</td></tr>
+<tr><td><code>engram-protocol.sh</code></td><td>Connect Korium memory</td><td>the first edit before a memory search; a finish with nothing saved; a capture filed under another agent's name</td></tr>
 <tr><td><code>capture-finding-reminder.py</code></td><td>Connect Korium memory</td><td>nothing; reminders only</td></tr>
 <tr><td><code>korium-index-on-stop.sh</code> and the code index gates in <code>engram-protocol.sh</code></td><td>Keep a code index in Korium</td><td>a grep for a name the code index already answered; otherwise nothing, the index refresh runs at the end of a session</td></tr>
 <tr><td><code>commit-attribution-gate.py</code></td><td>Keep AI attribution out of commits</td><td>a commit message or pull request body with an AI co-author line, a session link or a generated-with footer</td></tr>

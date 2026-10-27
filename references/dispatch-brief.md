@@ -73,8 +73,10 @@ Re-verify: round 1, claims 2 and 3
 ```
 
 The round number is for the log. The check does not read it: it counts the
-re-verify rows already in the dispatch log for this session and refuses a
-third, whatever the brief says.
+verifier's re-verify rows already in the dispatch log for this session on
+this branch and refuses a third, whatever the brief says. The security
+reviewer sent in the same round does not spend one; a verifier that died or
+was declined did, since its row was written before it ran.
 
 **The security reviewer's brief** has the same shape, with the repository's
 security conventions as its claims (its CLAUDE.md and `docs/conventions/`
@@ -135,8 +137,9 @@ the brief. Nothing checks this.
 to the repo's `.claude/state/dispatches.tsv`, with the model from the call's `model` field
 or the agent file's `model:` line, and its outcome: `dispatched`, `refused`
 when a check refused it, or `re-verify round N` for a brief whose line starts
-`Re-verify:`. An optional first non-empty line, `Model-choice: <tier>, <why>`,
-is recorded as the reason. The rows for an issue are its agent-run count.
+`Re-verify:`, and the checkout's branch. An optional first non-empty line,
+`Model-choice: <tier>, <why>`, is recorded as the reason. The rows for an
+issue whose outcome is not refused are its agent-run count.
 
 **`model-choice-gate.sh`. Haiku is the default for helper work.** An install
 option, off by default. When on, a dispatch
@@ -153,9 +156,9 @@ Explore, claude-code-guide, statusline-setup and plugin agents.
 **`gate-verify-brief` checks briefs to `verifier` and `security-reviewer`
 only.** The brief carries a claims list: a line starting `Claims:` (or `What
 the author claims:`) with something under it. And a brief whose line starts
-`Re-verify:` is refused when the dispatch log already holds two re-verify
-rows for this session. `MASTHEAD_BRIEF_GATE=off` in the operator's
-environment turns it off.
+`Re-verify:` is refused when the dispatch log already holds two of the
+verifier's re-verify rows for this session on this branch.
+`MASTHEAD_BRIEF_GATE=off` in the operator's environment turns it off.
 
 **`skill-review-gate.py`** refuses a dispatch of an agent whose
 `.claude/agents` file changed and that this session has not read. Read it first.
