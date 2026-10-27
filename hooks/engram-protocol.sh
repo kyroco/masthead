@@ -426,7 +426,7 @@ EOF
           next
         }
         if (line ~ /[^[:space:]]/) {
-          if (line ~ /^- ([^[:space:]]+[[:space:]]+){3}[^[:space:]]+/) print "yes"; else print "short"
+          if (line ~ /^- [^[:space:]]/ && split(substr(line, 3), words, /[[:space:]]+/) >= 4) print "yes"; else print "short"
           exit
         }
       }
