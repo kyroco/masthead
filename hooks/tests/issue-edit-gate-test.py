@@ -257,6 +257,79 @@ def main():
         print("{} {:<62} expected {:<5} got {}".format("ok  " if ok else "FAIL", label, "deny+", got if needle in reason else "no " + repr(needle[:30])))
     cases.extend(reasons)
 
+    # Fix check 1: the command is read as the shell reads it, and the user's
+    # lines are seen in every shape the issues use.
+    inch = (OLD.replace("None open.", "- The sign-in page shows a 27\" banner today.\n"
+                        "- Robert said \"keep the banner under the title\".\n"
+                        "- Robert said \"show the plan name in bold\"."))
+    inch_reworded = inch.replace('"keep the banner under the title"', '"move the banner"')
+    inch_first_bullet = inch.replace('27" banner today', 'the banner on every page')
+    heading_plain = OLD.replace("None open.", "**Robert, October 20:**\n\"Ship CSV export before PDF\"")
+    heading_plain_dropped = heading_plain.replace("\n\"Ship CSV export before PDF\"", "")
+    not_speaking = OLD.replace("None open.", 'The user wants "CSV export before PDF".')
+    not_speaking_dropped = not_speaking.replace('The user wants "CSV export before PDF".', "Nothing.")
+    short_ruling = OLD.replace("None open.", 'Robert: "Drop it".')
+    old_with_question = OLD.replace("None open.", "- [NEEDS CLARIFICATION: which plans?]")
+    cout_body = OLD.replace("None open.", "In C++ write cout << value to print.")
+    heredoc_text_body = OLD.replace("None open.", "Write it with --body-file - <<'BODY' and close with BODY.")
+    with open(os.path.join(tmp, "sub", "question.md"), "w") as fh:
+        fh.write(old_with_question)
+    with open(os.path.join(tmp, "x.md"), "w") as fh:
+        fh.write(drop_said)
+    with open(os.path.join(tmp, "sub", "x.md"), "w") as fh:
+        fh.write(OLD)
+    with open(os.path.join(tmp, "q.md"), "w") as fh:
+        fh.write(old_with_question)
+    half = OLD.split("## Scenarios")
+    fixes = [
+        ("rewords the user's quote below a stray inch mark", edit_cmd(inch_reworded), "deny", {"old": inch}),
+        ("edits only the inch-mark line above the user's quote", edit_cmd(inch_first_bullet), "allow", {"old": inch}),
+        ("here-string on the line before the edit", "cat <<<\"x\" >/dev/null\ngh issue edit 21 --body-file body.md", "deny"),
+        ("quoted heredoc opener on the line before the edit", "echo 'a <<EOF b'\ngh issue edit 21 --body-file body.md", "deny"),
+        ("here-string body drops the quote", "gh issue edit 21 --body-file - <<< 'Nothing.'", "deny"),
+        ("here-string body keeps the quote", "gh issue edit 21 --body-file - <<< " + shell_quote(OLD), "allow"),
+        ("here-string body from a variable", "gh issue edit 21 --body-file - <<< \"$BODY\"", "deny"),
+        ("second heredoc write to the body file wins",
+         "cat > b.md <<'A'\n" + OLD + "A\ncat > b.md <<'C'\n" + drop_said + "C\ngh issue edit 21 --body-file b.md", "deny"),
+        ("body file built with > then >>",
+         "cat > b.md <<'A'\n" + half[0] + "A\ncat >> b.md <<'B'\n## Scenarios" + half[1] + "B\ngh issue edit 21 --body-file b.md", "allow"),
+        ("heredoc writes the root file, cd, edit reads the sub file",
+         "cat > question.md <<'EOF'\n" + OLD + "EOF\ncd sub && gh issue edit 21 --body-file question.md", "deny"),
+        ("cd inside a subshell does not move the edit", "(cd sub); gh issue edit 21 --body-file x.md", "deny"),
+        ("comment with an apostrophe before the edit", "# don't forget\ngh issue edit 21 --body-file body.md", "deny"),
+        ("bash -c with two commands", "bash -c 'cd . ; gh issue edit 21 --body-file body.md'", "deny"),
+        ("question already on the first issue, new on the second", "gh issue edit 21 22 --body-file q.md", "deny", {"old": old_with_question}),
+        ("bare marker used as a question", edit_cmd(OLD.replace("None open.", "- [NEEDS CLARIFICATION] which format?")), "deny"),
+        ("piped heredoc keeps the quote", "cat <<'BODY' | gh issue edit 21 --body-file -\n" + OLD + "BODY", "allow"),
+        ("piped heredoc drops the quote", "cat <<'BODY' | gh issue edit 21 --body-file -\n" + drop_said + "BODY", "deny"),
+        ("redirect after the opener", "gh issue edit 21 --body-file - 2>&1 <<'BODY'\n" + OLD + "BODY", "allow"),
+        ("--body text mentioning << keeps the quote", "gh issue edit 21 --body " + shell_quote(cout_body), "allow"),
+        ("--body text naming a heredoc keeps the quote", "gh issue edit 21 --body " + shell_quote(heredoc_text_body), "allow"),
+        ("--body from a command substitution", 'gh issue edit 21 --body "$(cat clean.md)"', "deny"),
+        ("--body from a variable", 'gh issue edit 21 --body "$BODY"', "deny"),
+        ("plain quote line under the user's heading, dropped", edit_cmd(heading_plain_dropped), "deny", {"old": heading_plain}),
+        ("a line where the user is not the speaker, dropped", edit_cmd(not_speaking_dropped), "allow", {"old": not_speaking}),
+        ("a two-word ruling, dropped", edit_cmd(OLD), "allow", {"old": short_ruling}),
+    ]
+    for label, command, expected, *rest in fixes:
+        extra = rest[0] if rest else {}
+        got = decide(command, tmp, **extra)
+        mark = "ok  " if got == expected else "FAIL"
+        if got != expected:
+            failures.append(label)
+        print("{} {:<62} expected {:<5} got {}".format(mark, label, expected, got))
+    cases.extend(fixes)
+    for label, command, needle in [
+        ("command substitution refusal says it cannot be checked", 'gh issue edit 21 --body "$(cat clean.md)"', "cannot be checked"),
+        ("variable refusal says it cannot be checked", "gh issue edit 21 --body-file - <<< \"$BODY\"", "cannot be checked"),
+    ]:
+        got, reason = run(command, tmp)
+        ok = got == "deny" and needle in reason
+        if not ok:
+            failures.append(label)
+        print("{} {:<62} expected {:<5} got {}".format("ok  " if ok else "FAIL", label, "deny+", got if needle in reason else "no " + repr(needle)))
+        cases.append((label,))
+
     # The old body comes from the repo a GH_REPO prefix names.
     log = os.path.join(tmp, "gh.log")
     if os.path.exists(log):
