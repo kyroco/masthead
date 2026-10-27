@@ -152,7 +152,8 @@ it carries a question, the question goes to the user first.
   question for the user, not a guess for the worker.
 - A worker that split its issue sends the sub-issue numbers and stops, and
   that worker is free: start one worker per sub-issue as step 2 says, in
-  blocked-by order.
+  blocked-by order. In the terminal, stop that session as after a merge. Pass
+  the branch it left on GitHub to the user to delete.
 - A worker's question: first re-read that issue's comments, then look in the
   sources above, in order, and answer with the line quoted. Only when none
   answers it, ask the user, and say which sources you checked. Hand the
@@ -209,8 +210,9 @@ merge is off, so queue it with the `enqueuePullRequest` GraphQL mutation,
 using the PR's node id.
 
 Once it merges: close its issue if the `Fixes` line did not, then each parent
-up the chain that has no open sub-issue left, and set each to Done with
-`set-status.sh` (GitHub deletes the merged branch itself). List the issues it
+up the chain that has no open sub-issue left, and set the merged issue and
+each parent to Done with `set-status.sh` (GitHub deletes the merged branch
+itself). List the issues it
 blocked, its follow-ups among them:
 
     gh api repos/{owner}/{repo}/issues/<n>/dependencies/blocking --jq '.[] | "#\(.number) \(.state) \(.title)"'

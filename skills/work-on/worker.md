@@ -175,15 +175,17 @@ one needs another:
 
 Then stop: you build none of them. Each sub-issue gets its own worker, started
 in blocked-by order, and this issue becomes a summary that closes when its
-sub-issues close. Delete the branch step 4 made, on GitHub and here, and set
-this issue's Status back to Todo:
+sub-issues close. Delete the branch step 4 made here and its code index, and
+set this issue's Status back to Todo:
 
-    gh api -X DELETE repos/{owner}/{repo}/git/refs/heads/<user>/1418-<short-slug>
-    git switch --detach && git branch -D <user>/1418-<short-slug>
+    korium-cli delete <user>/1418-<short-slug>
+    git switch --detach
+    git branch -D <user>/1418-<short-slug>
     ${CLAUDE_PLUGIN_ROOT}/skills/work-on/set-status.sh 1418 "Todo"
 
-Dispatched, send your foreman the sub-issue numbers; started by the user, end
-your turn with them.
+Deleting it on GitHub is the user's call: name the branch left on GitHub with
+the sub-issue numbers. Dispatched, send them to your foreman; started by the
+user, end your turn with them.
 
 ## 7. Build it
 

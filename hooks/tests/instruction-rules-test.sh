@@ -63,7 +63,6 @@ says  skills/work-on/foreman.md "set the merged issue and each parent to Done"
 says  skills/work-on/foreman.md "A worker that split its issue sends the sub-issue numbers"
 says  skills/work-on/foreman.md "Close now any parent whose sub-issues are all closed"
 says  skills/work-on/foreman.md "each parent up the chain"
-says  skills/work-on/foreman.md "set each to Done"
 for doc in README.md docs/explainer.template.html docs/explainer.html scripts/diagrams.py docs/images/workflow.svg; do
   never "$doc" "closes the sub-issues that shipped"
 done
