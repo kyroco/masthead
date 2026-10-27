@@ -92,7 +92,7 @@ if [ -z "$OUTCOME" ]; then
   OUTCOME="$(printf '%s' "$PROMPT" | awk '
     {
       line = $0
-      sub(/^[[:space:]]*[>*_#`-]*[[:space:]]*([0-9]+\.[[:space:]]*)?/, "", line)
+      sub(/^[[:space:]]*([>*_#`-]+[[:space:]]*)*([0-9]+\.[[:space:]]*)?/, "", line)
       if (tolower(substr(line, 1, 10)) == "re-verify:") {
         r = substr(line, 11)
         if (match(tolower(r), /round[[:space:]]+[0-9]+/)) {

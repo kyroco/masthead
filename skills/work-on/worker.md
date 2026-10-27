@@ -249,10 +249,11 @@ from another session.
    row that says no is unfinished: fix it before the PR, or stop and report.
    Under the table, give the ADR review's findings by level, the
    adjudicator's fix and thrown-out counts for each round, the follow-up
-   issues you filed from its New issue lists, the agent-run count (the rows
-   added to `<state>/dispatches.tsv` since the number you noted in step 6
-   that were not refused, so the issue can be set against the 34 runs on
-   kyroco #3348:
+   issues you filed from its New issue lists, the agent-run count (the
+   agents you sent: the rows added to `<state>/dispatches.tsv` since the
+   number you noted in step 6 that were not refused, so the issue can be set
+   against the 34 runs on kyroco #3348; a dispatch declined at a permission
+   prompt is in it, since its row is written first:
    `awk -F'\t' 'NR > 1 && $6 != "refused"' .claude/state/dispatches.tsv | wc -l`,
    minus that number),
    and the name of your test stack's project (the

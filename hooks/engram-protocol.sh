@@ -408,32 +408,29 @@ EOF
     prompt="$(field '.tool_input.prompt // ""')"
     reasons=""
 
-    # A claims list: a line that starts "Claims:" or "What the author claims:" with a claim after it, on that line or a later one; "none" is not a claim.
+    # A claims list: a line that starts "Claims:" or "What the author claims:" whose first item, on that line or the next non-blank one, is a claim; "none", an empty item or a "Not proven:" line is no claim, and markdown markers around the words do not count.
     has_claims="$(printf '%s' "$prompt" | awk '
-      function is_claim(t) { sub(/^[[:space:]]+/, "", t); sub(/[[:space:].]+$/, "", t); return (t != "" && tolower(t) != "none") }
+      function bare(t) { gsub(/^[[:space:]>*_#`-]+|[[:space:]*_`.]+$/, "", t); return t }
+      function verdict(t) { t = bare(t); low = tolower(t); print (t != "" && low != "none" && low !~ /^(not proven|unproven)[: ]/) ? "yes" : "no"; exit }
       {
         line = $0
-        sub(/^[[:space:]]*[>*_#`-]*[[:space:]]*([0-9]+\.[[:space:]]*)?/, "", line)
+        sub(/^[[:space:]]*([>*_#`-]+[[:space:]]*)*([0-9]+\.[[:space:]]*)?/, "", line)
         low = tolower(line)
         if (!seen && (low ~ /^claims:/ || low ~ /^what the author claims:/)) {
           seen = 1
           rest = line
           sub(/^[^:]*:/, "", rest)
-          if (is_claim(rest)) { print "yes"; exit }
+          if (bare(rest) != "") verdict(rest)
           next
         }
-        if (seen) {
-          item = line
-          sub(/^[>*_#`-]*[[:space:]]*([0-9]+\.[[:space:]]*)?/, "", item)
-          if (is_claim(item)) { print "yes"; exit }
-        }
+        if (seen && line ~ /[^[:space:]]/) verdict(line)
       }')"
     if [ "$has_claims" != "yes" ]; then
       reasons="Verification brief rule: a verifier is told what it must prove or break, never just handed a diff. Add a line that starts with 'Claims:' and list under it the scenario's Then lines, what the author claims works, and every sentence a customer reads that the change adds or edits (for the security reviewer, the repository's security conventions; for a plan, the plan's lines). Then retry."
     fi
 
-    # The round cap: a re-verify brief says so on a line that starts "Re-verify:" (under the same markdown prefixes as the Claims line), and the dispatch log decides how many rounds this session has had on this branch. A round is the verifier's dispatch: the security reviewer sent with it, or any other agent, does not spend one. The row is written before the agent runs, so a verifier that died or was declined has spent its round.
-    if printf '%s' "$prompt" | grep -qiE '^[[:space:]]*[>*_#`-]*[[:space:]]*([0-9]+\.[[:space:]]*)?re-verify:'; then
+    # The round cap, on a verifier's brief only: it says so on a line that starts "Re-verify:" (under the same markdown prefixes as the Claims line), and the dispatch log decides how many rounds this session has had on this branch. A round is the verifier's dispatch: the security reviewer sent beside it is neither counted nor capped, and no other agent's row counts. The row is written before the agent runs, so a verifier that died or was declined has spent its round.
+    if [ "$(agent_type)" = verifier ] && printf '%s' "$prompt" | grep -qiE '^[[:space:]]*([>*_#`-]+[[:space:]]*)*([0-9]+\.[[:space:]]*)?re-verify:'; then
       log_root="$(field '.cwd // ""')"
       [ -n "$log_root" ] || log_root="${CLAUDE_PROJECT_DIR:-$PWD}"
       log="$log_root/.claude/state/dispatches.tsv"
@@ -442,11 +439,11 @@ EOF
       [ -n "$branch" ] || branch="-"
       rounds=0
       if [ -s "$log" ]; then
-        # Columns: when, session, agent, type, model, outcome, reason, branch; a row with no branch column is from before the column existed and counts.
+        # Columns: when, session, agent, type, model, outcome, reason, branch; a row with no branch column is from before the column existed and counts. Only this plugin's verifier counts: "verifier", or a masthead: name whose last part is verifier.
         rounds="$(awk -F'\t' -v s="$session8" -v b="$branch" '
           $2 == s && $6 ~ /^re-verify/ && (NF < 8 || $8 == b) {
-            t = $4; n = split(t, parts, ":"); last = parts[n]
-            if (last == "verifier") print
+            t = $4; n = split(t, parts, ":")
+            if (t == "verifier" || (parts[1] == "masthead" && parts[n] == "verifier")) print
           }' "$log" 2>/dev/null | wc -l | tr -d ' ')"
       fi
       if [ "${rounds:-0}" -ge 2 ]; then

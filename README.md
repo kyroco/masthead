@@ -116,7 +116,7 @@ worker fixes the list, test first again, and only the claims the fix broke
 go back to a verifier, at most twice. The tests run on the final commit and
 leave a receipt that names it, and nothing can be pushed until the receipt
 matches. Then one pull request goes up, with `Fixes #41`, the list of what
-wasn't proved, the count of agent runs it took, and the issue moves to In
+wasn't proved, the count of agents it sent, and the issue moves to In
 Review.
 
 Meanwhile you're having coffee. A worker's question lands at the foreman,

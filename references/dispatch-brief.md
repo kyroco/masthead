@@ -139,7 +139,9 @@ or the agent file's `model:` line, and its outcome: `dispatched`, `refused`
 when a check refused it, or `re-verify round N` for a brief whose line starts
 `Re-verify:`, and the checkout's branch. An optional first non-empty line,
 `Model-choice: <tier>, <why>`, is recorded as the reason. The rows for an
-issue whose outcome is not refused are its agent-run count.
+issue whose outcome is not refused are its agent-run count: the agents it
+sent, a dispatch declined at a permission prompt among them, since the row
+is written before the prompt.
 
 **`model-choice-gate.sh`. Haiku is the default for helper work.** An install
 option, off by default. When on, a dispatch

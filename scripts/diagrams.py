@@ -217,8 +217,9 @@ def review():
     c.arrow(right(judge), judge[1] + 30, fix[0] - 2, fix[1] + fix[3] / 2, color=GOOD["stroke"])
     c.arrow(right(judge), judge[1] + 50, new[0] - 2, new[1] + new[3] / 2)
     c.arrow(right(judge), judge[1] + 70, out[0] - 2, out[1] + out[3] / 2, dash=True)
-    if right(fix) + 60 > c.w:
-        c.w = int(right(fix) + 60)
+    widest = max(right(fix), right(new), right(out))
+    if widest + 60 > c.w:
+        c.w = int(widest + 60)
 
     # back to the worker, around the outside
     ay = max(bottom(out), bottom(note)) + 30
