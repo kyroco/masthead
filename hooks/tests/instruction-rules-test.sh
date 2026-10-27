@@ -46,9 +46,28 @@ never skills/work-on/worker.md "gets its own \`general-purpose\` subagent"
 never skills/work-on/worker.md "plus the step 6 subagents"
 never references/work-routing.md "each sub-issue gets its own"
 
+says  skills/work-on/worker.md "Then stop: you build none of them"
+says  skills/work-on/worker.md "each sub-issue in its own four parts"
+says  skills/work-on/worker.md "set this issue's Status back to Todo"
+says  skills/work-on/worker.md "When the issue has a parent, read the parent the same way"
+says  skills/work-on/worker.md "An issue with open sub-issues is a summary"
+says  skills/work-on/worker.md "each parent up the chain"
+says  skills/work-on/foreman.md "A worker that split its issue sends the sub-issue numbers"
+says  skills/work-on/foreman.md "Close now any parent whose sub-issues are all closed"
+says  skills/work-on/foreman.md "each parent up the chain"
+says  skills/work-on/foreman.md "set each to Done"
+for doc in README.md docs/explainer.template.html docs/explainer.html scripts/diagrams.py docs/images/workflow.svg; do
+  never "$doc" "closes the sub-issues that shipped"
+done
+
 # 3. Follow-up timing.
 says  references/session-cliffs.md "blocked by this one"
+says  skills/github-issues/SKILL.md "a follow-up filed from a PR's review is blocked by the issue whose review found it"
+says  skills/work-on/worker.md "the follow-up issues you filed"
 says  skills/work-on/foreman.md "as soon as its blocker merges, ahead of unrelated work"
+says  skills/work-on/foreman.md "dependencies/blocking"
+says  skills/work-on/foreman.md "its follow-ups wait with it"
+says  skills/work-on/foreman.md "a follow-up first once its blocker merges"
 
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
