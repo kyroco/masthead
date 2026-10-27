@@ -90,7 +90,8 @@ order. The steps live here and nowhere else; a repo supplies only its own facts
    fixing in this PR, and throws out the rest. Its fix list is the round's
    result. What it throws out is gone: it is not logged or filed. File each
    finding on its New issue list as its own issue, as the repo's tracker
-   skill says, and link it in the PR body; fix none of them here. Its For the
+   skill says, in the same milestone and blocked by this one, and link it in
+   the PR body; fix none of them here. Its For the
    foreman section goes to the foreman unedited (to the user when there is
    none), who decides; the PR waits for that answer.
 4. Fix each finding on the adjudicator's fix list in this PR, test first,

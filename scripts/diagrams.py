@@ -180,7 +180,7 @@ def workflow():
 
     # merge bar
     my = bottom(cols[0]) + 40
-    bar = c.box(40, my, [("the foreman queues each green pull request for merge, closes the sub-issues that shipped, and gives that worker its next ready issue", "title"),
+    bar = c.box(40, my, [("the foreman queues each passing pull request, closes its issue and any big issue now done, and gives that worker its next issue", "title"),
                          ("the run ends when every issue is merged, parked or skipped, with one line per issue saying which", "body")], GOOD, min_w=total - 40, title_size=13)
     for b in cols:
         c.arrow(mid(b), bottom(b), mid(b), my - 2, color=GOOD["stroke"])

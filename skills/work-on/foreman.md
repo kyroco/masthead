@@ -36,10 +36,11 @@ each line up when it answered took its stage to merge.
 ## What invoking this as the foreman authorizes
 
 For this run only: starting background workers in this repo, messaging them,
-setting each issue's Status, running `/analyze-issues` as step 6 says, closing a
-merged issue's sub-issues, adding a worker's PR to the merge queue when the
-check in step 4 holds, and stopping each worker once its PR merges. Not
-deploys, production applies, force-pushes or pushes to main.
+setting each issue's Status, running `/analyze-issues` as step 6 says,
+closing a merged issue and a parent whose sub-issues are all closed, adding a
+worker's PR to the merge queue when the check in step 4 holds, and stopping
+each worker once its PR merges. Not deploys, production applies, force-pushes
+or pushes to main.
 
 ## 1. Read and plan
 
@@ -60,9 +61,11 @@ The steps:
    on it, each with `limit` 5. Use what comes back.
 2. Find the project or milestone and its open issues. No exact match: list the
    close ones and ask.
-3. Leave out an issue with a parent (its parent's worker builds it) and any
-   old "LOWs and NITs" log issue. There is no Nit log any more: the
-   adjudicator keeps a finding to fix in its PR or throws it out.
+3. Plan one worker per sub-issue, never the parent: the parent is a summary
+   that closes when its sub-issues close. Close now any parent whose
+   sub-issues are all closed, as step 4 does after a merge. Leave out any old
+   "LOWs and NITs" log issue. There is no Nit log any more: the adjudicator
+   keeps a finding to fix in its PR or throws it out.
 4. Read the project README.
 5. Read every issue with every comment, never the body alone: the user's
    rulings arrive as comments. Then name the one ADR the issues link, the
@@ -75,7 +78,8 @@ The steps:
    It rewrites each issue into its four parts, splits the big ones, and
    brings the user the questions nothing else answers. An issue is dispatched
    only once it is ready: its scenarios written and no `needs-decision`
-   label. Order the ready ones by blocked-by links, then by number.
+   label. Order the ready ones by blocked-by links, a follow-up first once its
+   blocker merges, then by number.
 7. `git fetch` and confirm main is current.
 
 Then give the user one plan, as a table, and wait for the decision:
@@ -128,7 +132,11 @@ For each ready issue, up to the number the user chose:
    its foreman, with `notify_when_idle`. Pass on any instruction the user gave
    for this run, in the user's own words.
 
-An issue whose blocker is still open waits until that blocker merges.
+An issue whose blocker is still open waits until that blocker merges. A
+worker's follow-up issue (a review finding filed blocked by its issue) is part
+of the run the user already approved: once ready, it starts as soon as its
+blocker merges, ahead of unrelated work, within the user's worker limit. When
+it carries a question, the question goes to the user first.
 
 ## 3. Supervise
 
@@ -142,6 +150,10 @@ An issue whose blocker is still open waits until that blocker merges.
   that meets the result wins. Reply "go", or send it back naming the line to
   change. A line the scenarios, the ADR and the README do not settle is a
   question for the user, not a guess for the worker.
+- A worker that split its issue sends the sub-issue numbers and stops, and
+  that worker is free: start one worker per sub-issue as step 2 says, in
+  blocked-by order. In the terminal, stop that session as after a merge. Pass
+  the branch it left on GitHub to the user to delete.
 - A worker's question: first re-read that issue's comments, then look in the
   sources above, in order, and answer with the line quoted. Only when none
   answers it, ask the user, and say which sources you checked. Hand the
@@ -180,7 +192,8 @@ An issue whose blocker is still open waits until that blocker merges.
   action yourself.
 - A worker that stops on a failure gets one message naming it. A second
   failure parks the issue: `gh issue edit <n> --add-label parked` and one
-  comment saying what happened.
+  comment saying what happened. Its follow-ups wait with it: name them when
+  you report the park.
 - Tell a worker main moved only when it has a reason to bring main in: a
   conflict, a dependency, or changes that interact. Say which.
 - Never read a worker's transcript into this session.
@@ -196,10 +209,16 @@ and its worktree and branch stay. Otherwise park it with the reason. Auto
 merge is off, so queue it with the `enqueuePullRequest` GraphQL mutation,
 using the PR's node id.
 
-Once it merges: close each sub-issue whose row in the worker's table says yes
-(GitHub deletes the merged branch itself), then give that worker the next
-ready issue as step 2 says. In the terminal, stop the worker's session and
-start the next issue in a new one.
+Once it merges: close its issue if the `Fixes` line did not, then each parent
+up the chain that has no open sub-issue left, and set the merged issue and
+each parent to Done with `set-status.sh` (GitHub deletes the merged branch
+itself). List the issues it
+blocked, its follow-ups among them:
+
+    gh api repos/{owner}/{repo}/issues/<n>/dependencies/blocking --jq '.[] | "#\(.number) \(.state) \(.title)"'
+
+Then give that worker the next ready issue as step 2 says, those first. In the
+terminal, stop the worker's session and start the next issue in a new one.
 
 ## 5. End the run
 

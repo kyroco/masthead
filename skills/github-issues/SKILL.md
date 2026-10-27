@@ -68,12 +68,10 @@ has a passing test, and the repository's pre-push check passes on the PR's
 head.
 
 **Size.** One issue is one PR, built and proved by one worker in one fresh
-session. Split it when a scenario cannot be proved in this PR (it waits on
-another environment, a person or another issue), when there are more than
-about five scenarios or the work touches more than about fifteen files, or
-when two scenarios rest on different decisions. Merge two when one cannot be
-tested until the other lands, when one would leave code nothing calls until
-the other lands, or when both change the same functions.
+session. Split it the way scrum splits user stories, into thin slices that
+each work on their own and fit one worker session. Then merge neighbouring
+slices that share a file until each fills one worker session with room to
+spare.
 
 ## Filing
 
@@ -90,7 +88,8 @@ connector's tools for the same calls. `<org>` is the repository's owner.
 - Labels: `Bug`, `Feature` or `Improvement` for the kind of work (an existing
   `bug` label serves as Bug), plus any topic label already in the repository.
 - A blocked-by link for a real sequence dependency, never for "this would be
-  tidier after that":
+  tidier after that". The one exception marks shared work: a follow-up filed
+  from a PR's review is blocked by the issue whose review found it.
   `gh api -X POST repos/<repo>/issues/<blocked>/dependencies/blocked_by -F issue_id=<blocker's id>`
   (the id is `gh api repos/<repo>/issues/<n> --jq .id`, not the number).
 - A sub-issue: `gh api -X POST repos/<repo>/issues/<parent>/sub_issues -F sub_issue_id=<child's id>`.
