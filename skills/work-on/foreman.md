@@ -65,7 +65,8 @@ The steps:
    that closes when its sub-issues close. Close now any parent whose
    sub-issues are all closed, as step 4 does after a merge. Leave out any old
    "LOWs and NITs" log issue. There is no Nit log any more: the adjudicator
-   keeps a finding to fix in its PR or throws it out.
+   places a confirmed finding, fixed in its PR or filed as a new issue, or
+   throws it out.
 4. Read the project README.
 5. Read every issue with every comment, never the body alone: the user's
    rulings arrive as comments. Then name the one ADR the issues link, the
@@ -75,8 +76,9 @@ The steps:
    every run. Skip it only when the user says so in this session. A rewrite
    comment, an earlier run or issues that look ready are not a reason to
    skip: whether to skip is the user's call.
-   It rewrites each issue into its four parts, splits the big ones, and
-   brings the user the questions nothing else answers. An issue is dispatched
+   It checks each issue against its four parts and edits only what fails,
+   splits the big ones, and brings the user the questions nothing else
+   answers. An issue is dispatched
    only once it is ready: its scenarios written and no `needs-decision`
    label. Order the ready ones by blocked-by links, a follow-up first once its
    blocker merges, then by number.
@@ -143,13 +145,15 @@ it carries a question, the question goes to the user first.
 - Rely on `notify_when_idle` notices, or in the desktop app on the notes the
   app sends when a worker ends a turn. A worker silent past reason gets one
   message asking for status.
-- A worker's first message is its plan, one line per scenario:
-  what it will change and the test that shows it. Check each line
-  against its scenario, the ADR section that scenario rests on (read that
-  whole section now), and the project README's rule that the simplest thing
-  that meets the result wins. Reply "go", or send it back naming the line to
-  change. A line the scenarios, the ADR and the README do not settle is a
-  question for the user, not a guess for the worker.
+- A worker's first message is its plan, one line per scenario, with its
+  verifier's pass: what it will change and the test that shows it, and the
+  verdict of the blind verifier that read only the plan, the issue and the
+  decision-record sections. You do not check the plan and you send no go:
+  the worker builds once the verifier passes it. A plan that fails its
+  verifier twice comes to you as a question: answer it from the sources
+  above, in order, with the line quoted, or ask the user. A line the
+  scenarios, the ADR and the README do not settle is a question for the
+  user, not a guess for the worker.
 - A worker that split its issue sends the sub-issue numbers and stops, and
   that worker is free: start one worker per sub-issue as step 2 says, in
   blocked-by order. In the terminal, stop that session as after a merge. Pass
@@ -178,14 +182,17 @@ it carries a question, the question goes to the user first.
   design), name what it should still read: the issue, the project README, the
   ADR, the architecture doc and the mockups. Never write "build what the issue
   says", which reads as "the issue is the whole spec".
-- A worker's report must quote a line from the project README. One that does
-  not skipped the README: send it back to read it before you queue its PR.
+- A worker's report must quote a line from the project README and give its
+  agent-run count. One that does not skipped the README: send it back to
+  read it before you queue its PR.
 - An adjudicator's For the foreman section (a security finding it could not
-  settle, or a finding it could not place) is yours to decide: check the code
-  it names, then tell the worker to fix it, file it or leave it, with the
-  `file:line` that settles it. When the code does not settle it, give the user
-  the adjudicator's 300-word note as it stands and ask. A PR with one
-  unanswered is not queued.
+  settle) is yours to decide: check the code it names, then tell the worker
+  to fix it, file it or leave it, with the `file:line` that settles it. When
+  the code does not settle it, give the user the adjudicator's 300-word note
+  as it stands and ask. A PR with one unanswered is not queued. Everything
+  else the adjudicator placed itself, and that placement is final: a finding
+  it placed as a new issue is filed, never fixed in this PR, and you do not
+  ask the worker to fix it there.
 - Permission prompts belong to the user: tell them which session and what it
   asks (`claude attach <id>` in the terminal; in the desktop app, a link to
   the worker's session, `[its title](#<its id>)`). Never perform the blocked
@@ -201,8 +208,8 @@ it carries a question, the question goes to the user first.
 ## 4. Merge and clean up
 
 Queue a worker's PR when all hold: CI is green, the worker reports its ADR
-review with no Important finding left and nothing left on the adjudicator's
-fix list, the PR body's unproven
+review with no Important finding left, nothing left on the adjudicator's
+fix list and its agent-run count, the PR body's unproven
 list holds nothing a customer would see, and the worker, told you are ready
 to queue, has answered "cleaned up": its test stack and code index are gone,
 and its worktree and branch stay. Otherwise park it with the reason. Auto

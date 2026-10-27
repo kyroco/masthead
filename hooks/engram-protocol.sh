@@ -7,7 +7,7 @@
 #   gate-edit         refuses the first edit until a Korium search ran
 #   gate-discovery    refuses a Grep, Glob or shell search for a name the code index holds until a fresh code_locate lookup
 #   gate-redundant-grep, gate-span-read  refuse repeating what code_locate just answered
-#   gate-agent, gate-fix-evidence, gate-wave-brief, gate-brief-inference  check a dispatch brief before the agent starts
+#   gate-verify-brief  refuses a verifier or security-reviewer brief with no claims list, and a third re-verify round
 #   gate-capture      refuses a subagent capture filed under another agent's name
 #   gate-stop, gate-substop  refuse one finish with no capture
 # Every refusal happens once per session, then stands down. MASTHEAD_<NAME>_GATE=off in the operator's environment switches a gate off.
@@ -19,13 +19,13 @@ payload="$(cat 2>/dev/null || echo '{}')"
 
 field() { printf '%s' "$payload" | jq -r "$1" 2>/dev/null || echo ""; }
 
-# The dispatched agent: Claude Code sends this plugin's reviewer as masthead:reviewer, or masthead:<folder>:reviewer for one in a subfolder of agents/, so a masthead: name is matched on the part after the last colon. Another plugin's agent keeps its prefix, so it is never taken for ours.
+# The dispatched agent: Claude Code sends this plugin's verifier as masthead:verifier, or masthead:<folder>:verifier for one in a subfolder of agents/, so a masthead: name is matched on the part after the last colon. Another plugin's agent keeps its prefix, so it is never taken for ours.
 # The masthead: namespace is trusted as this plugin's identity. A fork also named masthead would pass as ours, but reading the name from .claude-plugin/plugin.json would not tell it apart either, since a fork's plugin.json says masthead too.
 # Of a masthead: name's parts, the last one naming a masthead agent is the agent, as in the fences; else the last part.
 agent_type() {
   local t; t="$(field '.tool_input.subagent_type // ""')"
   case "$t" in
-    masthead:*) printf '%s' "${t#masthead:}" | awk -F: '{ for (i = NF; i >= 1; i--) if ($i ~ /^(reviewer|security-reviewer|adjudicator|diagnoser|reader)$/) { printf "%s", $i; exit } printf "%s", $NF }' ;;
+    masthead:*) printf '%s' "${t#masthead:}" | awk -F: '{ for (i = NF; i >= 1; i--) if ($i ~ /^(verifier|security-reviewer|adjudicator|diagnoser|reader)$/) { printf "%s", $i; exit } printf "%s", $NF }' ;;
     *) printf '%s' "$t" ;;
   esac
 }
@@ -92,48 +92,6 @@ capture_outcome() {
     # An outage, an error frame, or a shape nobody here recognises.
     *) echo unknown ;;
   esac
-}
-
-# Flatten a brief to one line so a phrase split by wrapping still matches.
-flatten() {
-  printf '%s' "$1" | tr -s '[:space:]' ' '
-}
-
-# Does this brief ask somebody to write something? Its changes_code declaration decides, else its first instruction line.
-brief_instructs_a_source_change() {
-  local brief="$1"
-
-  printf '%s' "$brief" | grep -qE '^[[:space:]]*(\*\*)?changes_code:[[:space:]]*true' && return 0
-  declares_read_only "$brief" && return 1
-
-  local first
-  first="$(printf '%s' "$brief" | awk '
-    { line = $0
-      sub(/^[[:space:]]+/, "", line)
-      if (line == "") next
-      if (tolower(line) ~ /^(model-choice|korium|read_only|changes_code)[: ]/) next
-      sub(/^#+[[:space:]]*/, "", line)
-      sub(/^[-*][[:space:]]*/, "", line)
-      sub(/^\*\*/, "", line)
-      sub(/^<task>[[:space:]]*/, "", line)
-      print line
-      exit }')"
-  printf '%s' "$first" \
-    | grep -qiE '^(fix|implement|repair|harden|refactor|rewrite|migrate|port|delete|remove|add|update|change|adjust|wire|build|write|patch)\b'
-}
-
-brief_asks_for_a_write() {
-  flatten "$1" \
-    | grep -qiE 'fix|repair|patch|implement|harden|commit|sha\b|do not push|mix (format|credo|compile|test)|mutation-prove'
-}
-
-# Does this brief declare that it changes nothing (read_only: true, docs only, no code change)?
-declares_read_only() {
-  printf '%s' "$1" \
-    | sed -e 's/^[[:space:]]*[>*_#`-]*[[:space:]]*//' -e 's/[[:space:]*_`]*$//' \
-    | grep -v '^[[:space:]]*$' \
-    | head -12 \
-    | grep -qiE '^(read[_-]?only|readonly)[[:space:]]*:[[:space:]]*(true|yes)$|^(changes[_-]code|code[_-]change|writes[_-]code)[[:space:]]*:[[:space:]]*(false|no)$|^(no code change|read only|read-only|docs only|documentation only|diagnose only|diagnose-only|audit only|changes nothing)[.:!]?$'
 }
 
 case "$mode" in
@@ -421,51 +379,6 @@ EOF
     exit 0
     ;;
 
-  # gate-agent: refuse a brief that carries no Korium line when this session found results.
-  gate-agent)
-    prompt="$(field '.tool_input.prompt // ""')"
-
-    case "${MASTHEAD_BRIEF_GATE:-}" in off|0|false|no) exit 0 ;; esac
-
-    # The blind reviewers and the adjudicator are exempt unless the brief orders a source change.
-    case "$(agent_type)" in
-      reviewer|security-reviewer|adjudicator)
-        brief_instructs_a_source_change "$prompt" || exit 0
-        ;;
-    esac
-
-    hits=0
-    [ -s "$dir/searches.tsv" ] && \
-      hits="$(awk -F'\t' '$1 ~ /^[0-9]+$/ && $1 > 0' "$dir/searches.tsv" 2>/dev/null | wc -l | tr -d ' ')"
-
-    if [ "${hits:-0}" -gt 0 ]; then
-      # A line that starts with the token and says something after it.
-      found="$(printf '%s' "$prompt" | awk '
-        { line = $0; sub(/^[[:space:]]+/, "", line)
-          if (tolower(substr(line, 1, 7)) == "korium:") {
-            r = substr(line, 8); sub(/^[[:space:]]+/, "", r)
-            if (length(r) >= 40) { print "yes"; exit }
-          } }')"
-      [ "$found" = "yes" ] && exit 0
-      deny_tool "This session has already searched Korium and got results, and this brief does not pass them on. Sending an agent to re-derive what we are holding pays twice for one answer.
-
-Add a line to the brief that STARTS with 'Korium:' and carries what we know, in at least a sentence:
-
-    Korium: the gate refuses by exit 2 rather than JSON, and its self-test is proof/brief-gates-selftest.sh.
-
-If we searched and Korium had nothing on what this agent needs, say that instead, so it does not go looking for something we have already established is not there:
-
-    Korium: nothing on the reconnect loop; the only hits were about socket auth, which is a different subsystem.
-
-Only a line BEGINNING with the token counts, so a brief that merely mentions Korium does not satisfy this. MASTHEAD_BRIEF_GATE=off in the operator's environment turns it off."
-      # deny_tool prints, it does not exit.
-      exit 0
-    fi
-
-    # A word counts only outside a path.
-    printf '%s' "$prompt" | tr -s '[:space:]' '\n' | grep -v '/' | grep -qiE 'engram|korium' && exit 0
-    deny_tool "Korium memory protocol: a subagent prompt must carry the memory protocol. Add explicit instructions to (1) run the korium MCP server's agent_search tool before substantive work, (2) capture non-obvious decisions, gotchas, and reversals via its agent_capture tool as they happen, and (3) capture one summary thought before finishing. The tool is mcp__korium__agent_search / mcp__korium__agent_capture on a direct registration, or mcp__claude_ai_korium__* through the hosted connector. Then retry."    ;;
-
   # gate-capture: refuse a subagent capture filed under another agent's name.
   gate-capture)
     case "${MASTHEAD_CAPTURE_GATE:-}" in off|0|false|no) exit 0 ;; esac
@@ -482,94 +395,90 @@ Only a line BEGINNING with the token counts, so a brief that merely mentions Kor
     deny_tool "This capture is filed under '$claimed' but the agent making it is '$acting'. ADR-0120: source_agent is the one field that answers who decided this, and filing under another name falsifies exactly that. Use your own name. If you are genuinely re-filing for an agent whose own capture failed, keep their source_agent and set captured_by to your name, which this gate allows. MASTHEAD_CAPTURE_GATE=off in the operator's environment turns it off."
     ;;
 
-  # gate-fix-evidence: refuse a brief that asks for a fix without saying how the fix is proven.
-  gate-fix-evidence)
-    prompt="$(field '.tool_input.prompt // ""')"
+  # gate-verify-brief: refuse a brief to verifier or security-reviewer that carries no claims list, and a third re-verify round.
+  gate-verify-brief)
+    case "${MASTHEAD_BRIEF_GATE:-}" in off|0|false|no) exit 0 ;; esac
 
-    # The four read-only agents are exempt unless the brief orders a change.
+    # Only the two agents that verify claims are screened.
     case "$(agent_type)" in
-      reviewer|security-reviewer|diagnoser|reader)
-        brief_instructs_a_source_change "$prompt" || exit 0
-        ;;
-    esac
-
-    # A read-only brief is exempt.
-    declares_read_only "$prompt" && exit 0
-
-    # The same declaration in other words.
-    flatten "$prompt" \
-      | grep -qiE 'read[ -]?only|diagnose[ -]?only|report findings|never edit|do(es)? not edit|do not change any file|chang(e|es) nothing|no files? (are|is|will be) (changed|modified|edited|written)|makes? no (code )?changes|writes? no code|no code is (written|changed)|without changing any (code|file)|nothing (is|will be) (changed|edited|written)|audit[ -]only|no edits' && exit 0
-
-    # Only briefs that ask somebody to WRITE something.
-    brief_asks_for_a_write "$prompt" || exit 0
-
-    # A brief with no failure path to drive opts out.
-    flatten "$prompt" \
-      | grep -qiE 'docs only|comment only|comments only|no code change|documentation only|no behaviou?r change|behaviou?r-preserving|rename only|pure rename|infrastructure declaration|infra only|no application code|not executable in tests' && exit 0
-
-    # The brief says how the fix is proven.
-    flatten "$prompt" \
-      | grep -qiE 'test-evidence|test evidence|real failure|really fails|genuinely (absent|fails|failing)|not a stub|rather than a stub|baseline' && exit 0
-
-    deny_tool "Test-evidence rule: a brief that asks for a fix must also say how the fix will be PROVEN, and the proof must drive the REAL failure rather than a stub of it. A stub returning an error tuple does not exit like a dead process and does not poison a transaction like a real failed statement, so a fix proven against one can still be broken in production - this has cost us three review rounds. Add to the brief: what real failure the test must cause (terminate the process, cause a genuine SQL error, revoke the grant, stop the container), and where a real failure is genuinely out of reach, that the test says so in one line instead of implying coverage it does not have. Do NOT ask for the break-it-and-restore ritual; it was dropped on 2026-09-10 because editing working code to watch a test go red and editing it back costs a full loop per fix and proves only that the test reads the line you broke. See docs/conventions/test-evidence-conventions.md. If this brief changes no code at all, declare it and retry: put 'read_only: true' on a line of its own near the top of the brief, or say 'docs only' or 'no code change'. Declare it because it is true, not to get past this gate."
-    ;;
-
-  # gate-wave-brief: refuse a brief to reviewer or security-reviewer that states no author claims, or no code outside the diff the change depends on.
-  gate-wave-brief)
-    subagent="$(agent_type)"
-    prompt="$(field '.tool_input.prompt // ""')"
-
-    # Only the two review agents are screened.
-    case "$subagent" in
-      reviewer|security-reviewer) : ;;
+      verifier|security-reviewer) : ;;
       *) exit 0 ;;
     esac
 
-    # The brief says what the author claims, or where those claims are written.
+    prompt="$(field '.tool_input.prompt // ""')"
     reasons=""
 
-    if ! flatten "$prompt" \
-      | grep -qiE 'claim|unproven|(could|did|does) not (prove|verify|test)|stays unproven|not tested|untested|(have|has|had) not (proven|verified|tested)|unverified|not verified|builder-claims|author asserts|asserts that'; then
-      reasons="Review brief rule: a reviewer must be told what the AUTHOR claims and what the author could not prove, not just handed a diff. On 2026-08-17 the build's own moduledoc said an unrecognised throw 'costs precision and never costs correctness'; it was false, it was the third finding of the day, and it reached no reviewer because the brief carried the patch alone. Add to this brief: the claims the change makes about its own behaviour, and the list of things the author did not test or could not prove. If the author wrote one, name the file. Then retry."
-    fi
+    # The form is exact, on purpose: a line that is exactly "Claims:" at column zero, whose next non-blank line is a "- " bullet of at least four words; and, on a re-verify, a line that begins "Re-verify: round N" at column zero. Every other spelling of either label is refused with the form to use, so no variant is ever half-read.
+    CLAIMS_FORM="the form is a line that is exactly 'Claims:' at column zero (no marker before it, nothing after the colon), and the next non-blank line is a bullet starting '- ' with at least four words; put the claims under the first Claims: line, since only that one is read"
+    REVERIFY_FORM="the form is a line that begins 'Re-verify: round N' at column zero, N the number of this round, with no marker before it"
 
-    # The brief names the unchanged code the change depends on, or says the change is self-contained.
-    if ! flatten "$prompt" \
-      | grep -qiE 'unchanged|unmodified|untouched|outside (the|this) (diff|patch|change)|not in the diff|beyond the patch|depend(s|ed|ing)? on|lean(s|ed|ing)? on|rel(y|ies|ied|ying) on|call(s|ed|ing)? into|callers? of|call sites?|seams?\b|self-contained|no external dependenc|touches nothing outside'; then
-      [ -n "$reasons" ] && reasons="$reasons
-
-"
-      reasons="${reasons}Review brief rule: name the code OUTSIDE this diff that the change depends on, so the reviewer reads the seam rather than grading the patch as text. On 2026-08-17 all three findings that changed the code lived in unchanged files and a vendored library. List the modules the change calls into or is called by, or say plainly that it is self-contained if it truly is. Then retry."
-    fi
-
-    # One decision carrying every complaint.
-    [ -n "$reasons" ] && deny_tool "$reasons"
-    exit 0
-    ;;
-
-  # gate-brief-inference: refuse a build brief that passes the lead's conclusion off as a rule without saying whose judgment it is.
-  gate-brief-inference)
-    subagent="$(agent_type)"
-
-    # Every dispatch except the reviewers.
-    case "$subagent" in
-      reviewer|security-reviewer) exit 0 ;;
-      *) : ;;
+    # The first "Claims:" line: exact, or a variant that must be refused.
+    claims_state="$(printf '%s' "$prompt" | awk '
+      {
+        line = $0; sub(/\r$/, "", line)
+        if (!seen) {
+          bare = line; gsub(/^[[:space:]>*_#`-]+|^[0-9]+\.[[:space:]]*/, "", bare); gsub(/[*_`]+/, "", bare)
+          if (tolower(bare) ~ /^(what the author )?claims[[:space:]]*:/) {
+            seen = 1
+            if (line !~ /^Claims:[[:space:]]*$/) { print "variant"; exit }
+            next
+          }
+          next
+        }
+        if (line ~ /[^[:space:]]/) {
+          if (line ~ /^- [^[:space:]]/ && split(substr(line, 3), words, /[[:space:]]+/) >= 4) print "yes"; else print "short"
+          exit
+        }
+      }
+      END { if (!seen) print "missing"; else if (seen) print "empty" }' | head -1)"
+    case "$claims_state" in
+      yes) ;;
+      *) reasons="Verification brief rule: a verifier is told what it must prove or break, never just handed a diff, and the check reads one exact form: $CLAIMS_FORM. List under it the scenario's Then lines, what the author claims works, and every sentence a customer reads that the change adds or edits (for the security reviewer, the repository's security conventions; for a plan, the plan's lines), one bullet each. Then retry." ;;
     esac
 
-    prompt="$(field '.tool_input.prompt // ""')"
+    # The round cap, on a verifier's brief only. A round is the verifier's dispatch: the security reviewer sent beside it is neither counted nor capped, and no other agent's row counts. The row is written before the agent runs, so a verifier that died or was declined has spent its round. The dispatch log decides how many rounds this session has had on this branch; the number in the brief is for the log.
+    if [ "$(agent_type)" = verifier ]; then
+      reverify_state="$(printf '%s' "$prompt" | awk '
+        {
+          line = $0; sub(/\r$/, "", line)
+          bare = line; gsub(/^[[:space:]>*_#`-]+|^[0-9]+\.[[:space:]]*/, "", bare); gsub(/[*_`]+/, "", bare)
+          if (tolower(bare) ~ /^re-?verify[[:space:]]*:/) {
+            if (line ~ /^Re-verify: round [0-9]+/) print "yes"; else print "variant"
+            exit
+          }
+        }' | head -1)"
+      if [ "$reverify_state" = variant ]; then
+        [ -n "$reasons" ] && reasons="$reasons
 
-    # No impossibility claim, nothing to label.
-    printf '%s' "$prompt" \
-      | grep -qiE 'cannot be done|can not be done|impossible|no way to|there is no way|is not possible|cannot be made|so we cannot|therefore we cannot|rules? (it|that) out' \
-      || exit 0
+"
+        reasons="${reasons}Re-verify rule: this brief's re-verify line is not in the one form the check reads, so it would run uncounted; $REVERIFY_FORM. Then retry."
+      elif [ "$reverify_state" = yes ]; then
+        log_root="$(field '.cwd // ""')"
+        [ -n "$log_root" ] || log_root="${CLAUDE_PROJECT_DIR:-$PWD}"
+        log="$log_root/.claude/state/dispatches.tsv"
+        session8="$(field '.session_id // "nosession"' | cut -c1-8)"
+        branch="$(git -C "$log_root" branch --show-current 2>/dev/null || true)"
+        [ -n "$branch" ] || branch="-"
+        rounds=0
+        if [ -s "$log" ]; then
+          # Columns: when, session, agent, type, model, outcome, reason, branch; a row with no branch column is from before the column existed and counts. Only this plugin's verifier counts: "verifier", or a masthead: name whose last part is verifier.
+          rounds="$(awk -F'\t' -v s="$session8" -v b="$branch" '
+            $2 == s && $6 ~ /^re-verify/ && (NF < 8 || $8 == b) {
+              t = $4; n = split(t, parts, ":")
+              if (t == "verifier" || (parts[1] == "masthead" && parts[n] == "verifier")) print
+            }' "$log" 2>/dev/null | wc -l | tr -d ' ')"
+        fi
+        if [ "${rounds:-0}" -ge 2 ]; then
+          [ -n "$reasons" ] && reasons="$reasons
 
-    # It carries one, and it says whose it is and how to overturn it.
-    printf '%s' "$prompt" \
-      | grep -qiE 'my (inference|conclusion|reading|assumption)|i (may be|might be|could be) wrong|unverified|not a rule|treat (this|that) as a proposal|disprove|if you (can|think you can) (show|prove|disprove)|say so and do the better thing|verify this yourself|do not take (this|my word)' \
-      && exit 0
+"
+          reasons="${reasons}Re-verify cap: this session has already sent $rounds re-verify rounds on this branch, read from the dispatch log at $log, and a change gets at most two. The round number in the brief does not change that count, and a verifier that died or was declined still spent its round. What is still on the adjudicator's fix list after the second round goes to the foreman, or to the user when there is none; do not send a third verifier."
+        fi
+      fi
+    fi
 
-    deny_tool "Build brief rule: this brief says something cannot be done, and does not say whose judgement that is. A rule the specialist must obey and a conclusion you drew from a rule are different things, and handing over the second as the first is how a false sentence ends up in a moduledoc. On 2026-08-17 a brief said attributing a crash needed either a rescue inside the transaction or the process dictionary and that both were closed. The rule was real, the conclusion was false, a per-call :atomics reference answers it, and the specialist built a whole design inside the mistake because it came from the lead. Rewrite it: state the rule and its source, mark the inference as yours, and tell the specialist to disprove it if they can."
+    [ -n "$reasons" ] && deny_tool "$reasons"
+    exit 0
     ;;
 
   gate-stop)

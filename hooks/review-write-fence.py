@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""PreToolUse hook that lets reviewer and security-reviewer agents write only their own review file or the review scratch folder, and denies every other write; fails closed."""
+"""PreToolUse hook that lets verifier and security-reviewer agents write only their own review file or the review scratch folder, and denies every other write; fails closed."""
 
 import json
 import os
@@ -7,11 +7,11 @@ import re
 import sys
 
 FILES = {
-    "reviewer": re.compile(r"findings-reviewer-[a-z0-9][a-z0-9-]*\.json"),
+    "verifier": re.compile(r"findings-verifier-[a-z0-9][a-z0-9-]*\.json"),
     "security-reviewer": re.compile(r"findings-security-reviewer(-[a-z0-9][a-z0-9-]*)?\.json"),
 }
 WANT = {
-    "reviewer": "findings-reviewer-<angle>-<name>.json",
+    "verifier": "findings-verifier-<claim>-<name>.json",
     "security-reviewer": "findings-security-reviewer-<name>.json",
 }
 SCRATCH = "scratch"
@@ -57,7 +57,7 @@ def governing_agent(payload, pattern):
         value = payload.get(field)
         if not isinstance(value, str) or not value:
             continue
-        # A masthead: name is ours when any of its parts names a reviewer, so a subfolder of agents/ cannot hide one;
+        # A masthead: name is ours when any of its parts names a verifier, so a subfolder of agents/ cannot hide one;
         # the last such part is the agent, since Claude Code puts the folders first.
         parts = value[len(PLUGIN_PREFIX):].split(":") if value.startswith(PLUGIN_PREFIX) else [value]
         for part in reversed(parts):
@@ -123,7 +123,7 @@ def check(payload, agent):
     if folder is None:
         deny(f"{agent} may write only {REVIEW_REL}/{WANT[agent]}, or anything under "
              f"{REVIEW_REL}/{SCRATCH}/, in the checkout under review, and this call writes "
-             f"{path or '(no path)'}. A reviewer never edits the code it judges or another reviewer's "
+             f"{path or '(no path)'}. A verifier never edits the code it judges or another verifier's "
              f"file; to run a test against changed code, make a throwaway worktree under "
              f"{REVIEW_REL}/{SCRATCH}/ and change that. If this is the file your dispatch names and it "
              "was still refused, put the findings in your final reply and say the write was refused.")
@@ -133,7 +133,7 @@ def main():
     try:
         payload = json.loads(sys.stdin.read())
     except ValueError:
-        deny("the tool call did not parse, so it cannot be shown to come from anyone but a reviewer.")
+        deny("the tool call did not parse, so it cannot be shown to come from anyone but a verifier.")
     if not isinstance(payload, dict) or payload.get("tool_name") not in TOOLS:
         return
     try:

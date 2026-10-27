@@ -7,9 +7,9 @@ When a subagent is worth spawning. The main session writes the code (CLAUDE.md).
 A fresh helper starts blank. Spawn one only for one of these three reasons. A
 fork, the only other kind, is covered below.
 
-**A blind context.** A reviewer must not see the author's reasoning, and a
+**A blind context.** A verifier must not see the author's reasoning, and a
 diagnoser must not see anyone's theory of the bug. That cannot be arranged inside
-the window that already holds them. Use `reviewer`, `security-reviewer` or
+the window that already holds them. Use `verifier`, `security-reviewer` or
 `diagnoser`.
 
 **A narrower tool grant.** Work that should run without Write, Edit or the
@@ -33,8 +33,8 @@ A fork (`subagent_type: "fork"`) inherits this conversation, so it needs no
 brief, but every step re-reads this session's context from cache. It exists in
 interactive and background sessions, not under `-p` or the SDK. Use one only for
 a short side fix that needs this session's background, while this session is
-under about 150,000 tokens. One code-writing fork at a time. Never fork a review:
-a reviewer must not know the author's reasoning.
+under about 150,000 tokens. One code-writing fork at a time. Never fork a verification:
+a verifier must not know the author's reasoning.
 
 Do not spawn agent-team teammates to write code: the Claude Code cost guide
 ("Manage costs effectively") puts a team at roughly seven times the tokens of one
@@ -42,10 +42,11 @@ session.
 
 ## Writing a brief
 
-`references/dispatch-brief.md` holds the brief fields and the checks that
-read them. Give each reviewer one angle from `agents/reviewer.md`.
+`references/dispatch-brief.md` holds the brief fields and the check that
+reads them. Give each verifier one scenario and its claims, as
+`agents/verifier.md` says.
 
-## Reviews
+## Verification
 
 Send `security-reviewer` when the change touches authorization, secrets,
 untrusted input or privilege, or when the repo's own security conventions say

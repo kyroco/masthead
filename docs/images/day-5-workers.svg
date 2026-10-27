@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1172" height="265" viewBox="0 0 1172 265" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="14">
-  <rect width="1172" height="265" fill="#ffffff"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="265" viewBox="0 0 1240 265" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="14">
+  <rect width="1240" height="265" fill="#ffffff"/>
   <defs><marker id="m16a34a" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#16a34a"/></marker><marker id="m6366f1" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#6366f1"/></marker><marker id="m6b7280" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#6b7280"/></marker><marker id="md97706" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#d97706"/></marker><marker id="mdb2777" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#db2777"/></marker><marker id="mdc2626" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#dc2626"/></marker></defs>
   <rect x="40" y="110" width="140" height="58" rx="10" fill="#eef2ff" stroke="#6366f1" stroke-width="1.5"/>
   <text x="110" y="136" text-anchor="middle" font-size="14" font-weight="600" fill="#312e81">the foreman</text>
@@ -16,13 +16,13 @@
   <line x1="180" y1="139" x2="248" y2="64" stroke="#6366f1" stroke-width="2" marker-end="url(#m6366f1)"/>
   <line x1="180" y1="139" x2="248" y2="126" stroke="#6366f1" stroke-width="2" marker-end="url(#m6366f1)"/>
   <line x1="180" y1="139" x2="248" y2="186" stroke="#6366f1" stroke-width="2" marker-end="url(#m6366f1)"/>
-  <rect x="615" y="40" width="517" height="121" rx="10" fill="#f3f4f6" stroke="#9ca3af" stroke-width="1.5"/>
-  <text x="874" y="65" text-anchor="middle" font-size="13" font-weight="600" fill="#374151">a worker's first message: its plan, one line per scenario</text>
-  <text x="874" y="81" text-anchor="middle" font-size="12" font-family="Menlo, Consolas, monospace" fill="#4b5563">scenario 1: change sign_in/form.ex,</text>
-  <text x="874" y="97" text-anchor="middle" font-size="12" font-family="Menlo, Consolas, monospace" fill="#4b5563">  test: remembers the email on reload</text>
-  <text x="874" y="113" text-anchor="middle" font-size="12" font-family="Menlo, Consolas, monospace" fill="#4b5563">scenario 2: change sign_in/cookie.ex,</text>
-  <text x="874" y="129" text-anchor="middle" font-size="12" font-family="Menlo, Consolas, monospace" fill="#4b5563">  test: the cookie expires after 30 days</text>
-  <text x="874" y="145" text-anchor="middle" font-size="12" fill="#4b5563">the foreman checks each line against the scenarios and says "go"</text>
+  <rect x="615" y="40" width="586" height="121" rx="10" fill="#f3f4f6" stroke="#9ca3af" stroke-width="1.5"/>
+  <text x="908" y="65" text-anchor="middle" font-size="13" font-weight="600" fill="#374151">a worker's first message: its plan, one line per scenario, passed</text>
+  <text x="908" y="81" text-anchor="middle" font-size="12" font-family="Menlo, Consolas, monospace" fill="#4b5563">scenario 1: change sign_in/form.ex,</text>
+  <text x="908" y="97" text-anchor="middle" font-size="12" font-family="Menlo, Consolas, monospace" fill="#4b5563">  test: remembers the email on reload</text>
+  <text x="908" y="113" text-anchor="middle" font-size="12" font-family="Menlo, Consolas, monospace" fill="#4b5563">scenario 2: change sign_in/cookie.ex,</text>
+  <text x="908" y="129" text-anchor="middle" font-size="12" font-family="Menlo, Consolas, monospace" fill="#4b5563">  test: the cookie expires after 30 days</text>
+  <text x="908" y="145" text-anchor="middle" font-size="12" fill="#4b5563">a blind verifier read the plan, the issue and the decisions, and passed it</text>
   <line x1="565" y1="126" x2="613" y2="126" stroke="#6b7280" stroke-width="2" marker-end="url(#m6b7280)"/>
-  <text x="40" y="245" text-anchor="start" font-size="12" fill="#6b7280">The simplest thing that meets the result wins. A line the sources don't settle is a question for you, not a guess.</text>
+  <text x="40" y="245" text-anchor="start" font-size="12" fill="#6b7280">A plan that fails its verifier twice stops and asks. A line the sources don't settle is a question for you, not a guess.</text>
 </svg>

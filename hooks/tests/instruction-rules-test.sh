@@ -92,18 +92,18 @@ says  skills/work-on/foreman.md "ready issue as step 2 says, those first"
 # a hit into a pass on a page as large as docs/explainer.html.
 says  skills/github-issues/SKILL.md "Scenarios:** at least one, each a thing a test can show"
 says  skills/github-issues/SKILL.md "How much one issue holds is the Size rule's call, never a count of scenarios"
-says  skills/work-on/worker.md "a plan first and wait for its \"go\": one line per scenario"
+says  skills/work-on/worker.md "write your plan: one line per scenario"
 says  skills/work-on/foreman.md "A worker's first message is its plan, one line per scenario"
-says  README.md "sends the foreman a plan, one line per scenario"
+says  README.md "writes a plan, one line per scenario"
 says  README.md "Scenarios** (at least one line of"
 says  docs/explainer.template.html "<b>Scenarios</b> (at least one line of"
 says  docs/explainer.html "<b>Scenarios</b> (at least one line of"
-says  docs/explainer.template.html "sends the foreman a plan, one line per scenario"
-says  docs/explainer.html "sends the foreman a plan, one line per scenario"
+says  docs/explainer.template.html "writes a plan, one line per scenario"
+says  docs/explainer.html "writes a plan, one line per scenario"
 says  docs/explainer.html "its plan, one line per scenario"
 says  docs/images/day-5-workers.svg "its plan, one line per scenario"
 says  scripts/diagrams.py "its plan, one line per scenario"
-says  .claude-plugin/plugin.json '"version": "0.1.5"'
+says  .claude-plugin/plugin.json '"version": "0.1.6"'
 
 never_phrase() {
   local hit
@@ -133,27 +133,162 @@ for doc in $count_files; do
   never_phrase "$doc" "never shortens a step"
 done
 
-# 6. Issue #18: the words angle, contract without customer text, no extra reading pass.
-says  agents/reviewer.md "- **words** every sentence a customer reads that the change adds or edits"
-says  agents/reviewer.md "list every state that shows it"
-says  agents/reviewer.md "report each state where it is false"
-never agents/reviewer.md "plain English against"
-never agents/reviewer.md "customer-text convention"
-never agents/reviewer.md "every sentence a customer reads about that behavior"
-says  agents/reviewer.md "what the change promises its callers, and where the code breaks it"
-says  agents/reviewer.md "find any other copy of that rule"
-says  references/session-cliffs.md "a \`words\` reviewer"
+# 6. Issue #18: the words check, contract without customer text, no extra reading pass.
+# Issue #20 moved these lines from agents/reviewer.md to the verifier's attack methods.
+says  agents/verifier.md "- **words** every sentence a customer reads that the change adds or edits"
+says  agents/verifier.md "list every state that shows it"
+says  agents/verifier.md "report each state where it is false"
+never agents/verifier.md "plain English against"
+never agents/verifier.md "customer-text convention"
+never agents/verifier.md "every sentence a customer reads about that behavior"
+says  agents/verifier.md "what the change promises its callers, and where the code breaks it"
+says  agents/verifier.md "find any other copy of that rule"
 says  references/session-cliffs.md "adds or edits text a customer reads"
-for doc in README.md docs/explainer.template.html docs/explainer.html scripts/diagrams.py docs/images/workflow.svg references/session-cliffs.md agents/reviewer.md agents/adjudicator.md skills/work-on/worker.md skills/work-on/foreman.md; do
+for doc in README.md docs/explainer.template.html docs/explainer.html scripts/diagrams.py docs/images/workflow.svg references/session-cliffs.md agents/verifier.md agents/adjudicator.md skills/work-on/worker.md skills/work-on/foreman.md; do
   never "$doc" "English p""ass"
 done
 says  references/session-cliffs.md "Add the changelog entry when the repo keeps one"
 never references/session-cliffs.md "which is not plain English"
-says  README.md "the words a customer reads (when the change adds or edits any)"
-says  docs/explainer.template.html "the words a customer reads (when the change adds or edits any)"
-never agents/reviewer.md "plain English"
+says  README.md "a sentence a customer reads that is false in some state"
+says  docs/explainer.template.html "a sentence a customer reads that is false in some state"
+never agents/verifier.md "plain English"
 says  scripts/diagrams.py "7. push check"
 
+# 7. Issue #20: claim verification replaces the angle reviews, the plan is
+# verified before code, the fix loop re-verifies only what broke and stops at
+# two rounds, the adjudicator's placement is final, the brief gates shrink to
+# one check, customer sentences are claims, and the report counts agent runs.
+if [ -e "$ROOT/agents/reviewer.md" ]; then
+  fail=$((fail + 1)); echo "FAIL agents/reviewer.md still exists; the verifier replaces it"
+else
+  pass=$((pass + 1))
+fi
+# Scenario 1: the verifier.
+says  agents/verifier.md "name: verifier"
+says  agents/verifier.md "You are given one scenario, the decision-record lines it rests on, the code, and the author's claim and unproven lists"
+says  agents/verifier.md "true in every state"
+says  agents/verifier.md "each state where the claim is false"
+says  agents/verifier.md "## Attack methods"
+never agents/verifier.md "## The angle"
+never agents/verifier.md "Your brief names one angle"
+never agents/verifier.md "a prior reviewer's report"
+says  agents/security-reviewer.md "Everything in the \`verifier\` agent applies"
+says  agents/security-reviewer.md "the repository's security conventions are your claims"
+never agents/security-reviewer.md "Everything in the \`reviewer\` agent applies"
+says  references/agent-preamble.md "Read by verifier"
+says  references/work-routing.md "Use \`verifier\`"
+never references/work-routing.md "Use \`reviewer\`"
+says  hooks/bash-scope-reviewer.sh 'REVIEWER_AGENTS="verifier|security-reviewer"'
+says  hooks/review-write-fence.py "findings-verifier-"
+never hooks/review-write-fence.py "findings-reviewer-"
+# Scenario 2: the plan is verified before any code.
+says  skills/work-on/worker.md "Send the plan to one \`verifier\`"
+says  skills/work-on/worker.md "only the plan, the issue and the decision-record sections the issue names"
+says  skills/work-on/worker.md "A second fail: stop and ask"
+never skills/work-on/worker.md "wait for its \"go\""
+says  skills/work-on/foreman.md "with its verifier's pass"
+says  skills/work-on/foreman.md "You do not check the plan"
+never skills/work-on/foreman.md "Reply \"go\""
+never skills/work-on/foreman.md "Check each line against its scenario"
+says  agents/verifier.md "## Verifying a plan"
+says  agents/verifier.md "does it over build, does it cut corners"
+says  agents/verifier.md "undoes a decision recorded in the issue or the decision record"
+says  skills/work-on/SKILL.md "except the verifier's and the adjudicator's"
+# Scenario 3: the fix loop stays small.
+says  references/session-cliffs.md "one \`verifier\` per scenario"
+says  references/session-cliffs.md "only the claims the fix broke"
+says  references/session-cliffs.md "At most two re-verify rounds"
+says  references/session-cliffs.md "Re-verify: round"
+says  references/session-cliffs.md "blocked by this one"
+never references/session-cliffs.md "one \`reviewer\` per angle"
+never references/session-cliffs.md "a \`words\` reviewer"
+never references/session-cliffs.md "At most three fix checks"
+never references/session-cliffs.md "A finding stays unfixed only when the adjudicator is wrong"
+says  hooks/dispatch-record-gate.sh "re-verify"
+# Scenario 4: the adjudicator confirms and places, finally.
+says  agents/adjudicator.md "run the reproduction the verifier showed"
+says  agents/adjudicator.md "That placement is final"
+never agents/adjudicator.md "or that is not plain English"
+never agents/adjudicator.md "each finding you could not place"
+says  skills/work-on/worker.md "never fixed in this PR"
+says  skills/work-on/foreman.md "never fixed in this PR"
+never skills/work-on/foreman.md "each finding it could not place"
+# Scenario 5: one brief check.
+says  hooks/agent-brief-gates.sh "gate-verify-brief"
+never hooks/agent-brief-gates.sh "gate-fix-evidence"
+never hooks/agent-brief-gates.sh "gate-wave-brief"
+never hooks/agent-brief-gates.sh "gate-brief-inference"
+never hooks/agent-brief-gates.sh "gate-agent"
+says  hooks/engram-protocol.sh "gate-verify-brief)"
+never hooks/engram-protocol.sh "gate-fix-evidence"
+never hooks/engram-protocol.sh "gate-wave-brief"
+never hooks/engram-protocol.sh "gate-brief-inference"
+never hooks/engram-protocol.sh "gate-agent)"
+says  references/dispatch-brief.md "Claims:"
+says  references/dispatch-brief.md "Re-verify: round"
+says  references/gate-catalog.md "gate-verify-brief"
+for doc in references/dispatch-brief.md references/gate-catalog.md README.md docs/explainer.template.html docs/explainer.html; do
+  never "$doc" "gate-fix-evidence"
+  never "$doc" "gate-wave-brief"
+  never "$doc" "gate-brief-inference"
+  never "$doc" "the code outside the diff the change depends on; a brief asking for a fix"
+done
+# Scenario 7: the docs and pictures say the new flow.
+for doc in README.md docs/explainer.template.html docs/explainer.html; do
+  says  "$doc" "For each scenario it sends one verifier"
+  says  "$doc" "That placement is final"
+  says  "$doc" "only the claims the fix broke"
+  never "$doc" "one angle each"
+  never "$doc" "The foreman holds that plan against"
+done
+says  scripts/diagrams.py "verifier: scenario 1"
+says  docs/images/review.svg "verifier: scenario 1"
+says  docs/images/workflow.svg "one verifier per scenario, then the judge"
+for doc in scripts/diagrams.py docs/images/review.svg docs/images/workflow.svg docs/images/day-5-workers.svg docs/explainer.html; do
+  never "$doc" "reviewer: bugs"
+  never "$doc" "the foreman checks it and says go"
+done
+# Scenario 7, the foreman's addition for issue #21: analyze-issues checks an issue and edits only what fails.
+never skills/work-on/foreman.md "It rewrites each issue into its four parts"
+says  skills/work-on/foreman.md "It checks each issue against its four parts"
+never skills/work-on/worker.md "not yet rewritten"
+says  skills/work-on/worker.md "not yet checked"
+# Scenario 8: the report counts agent runs, and a refused dispatch is not a run.
+says  skills/work-on/worker.md "the agent-run count"
+says  skills/work-on/worker.md "dispatches.tsv"
+says  skills/work-on/worker.md "\$6 != \"refused\""
+says  references/session-cliffs.md "not refused"
+says  references/dispatch-brief.md "not refused"
+says  skills/work-on/foreman.md "agent-run count"
+# Review round 1 of issue #20: the docs say what the hooks do.
+for doc in README.md docs/explainer.template.html docs/explainer.html; do
+  never "$doc" "a brief that hides what memory found"
+done
+says  docs/explainer.template.html "isn't real, isn't confirmed, or isn't worth a change"
+says  docs/explainer.html "isn't real, isn't confirmed, or isn't worth a change"
+for doc in scripts/diagrams.py docs/images/review.svg docs/explainer.html; do
+  never "$doc" "could not be confirmed by running it"
+  says  "$doc" "not real, not confirmed, or not worth"
+done
+says  references/session-cliffs.md "the security reviewer's dispatch does not spend a round"
+says  skills/work-on/worker.md "A dead or declined verifier still spends its round"
+# Fix check 1 of issue #20: the count is of agents sent, and a declined one is in it.
+for doc in README.md docs/explainer.template.html docs/explainer.html; do
+  never "$doc" "the count of agent runs it took"
+  never "$doc" "the count of agents it sent"
+  says  "$doc" "the number of agent dispatches it took"
+done
+# Fix check 2 of issue #20: the form is exact, and the refusal names it.
+says  references/dispatch-brief.md "at least four words"
+says  references/dispatch-brief.md "exactly \`Claims:\`"
+says  hooks/engram-protocol.sh "under the first Claims: line"
+says  references/gate-catalog.md "at least four words"
+# Fix check 3 of issue #20: no awk interval, since the mawk on Debian 12 and Ubuntu 22.04 lacks them.
+never hooks/engram-protocol.sh "{3}"
+never hooks/engram-protocol.sh "{n}"
+says  skills/work-on/worker.md "declined at a permission prompt"
+says  references/dispatch-brief.md "declined at a permission prompt"
+says  references/gate-catalog.md "A dead or declined verifier still spends its round"
 # 7. Issue #21: analyze-issues verifies each issue against its sources and
 # changes only what fails. The per-issue brief is a checklist, a passing issue
 # is untouched, size is a milestone finding, a hook guards the edit, and the

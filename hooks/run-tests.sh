@@ -49,6 +49,7 @@ run "index on stop"          bash "$here/tests/korium-index-on-stop-test.sh"
 run "tool output scan"       python3 "$here/tests/run-scan-tool-output-cases.py"
 run "tool output incident"   python3 "$here/tests/incident-shape-probe.py"
 run "instruction rules"      bash "$here/tests/instruction-rules-test.sh"
+run "pictures fit"           python3 "$here/../scripts/svgcheck.py" "$here"/../docs/images/*.svg
 run "issue edit gate"        python3 "$here/tests/issue-edit-gate-test.py"
 run "proof: brief gates"     bash "$here/proof/brief-gates-selftest.sh"
 run "proof: discovery"       bash "$here/proof/gate-discovery-bash-selftest.sh"

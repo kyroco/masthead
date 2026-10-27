@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
 #
-# Proof for the brief gates in engram-protocol.sh, the file beside this folder.
+# Proof for the brief check in engram-protocol.sh, the file beside this folder.
 #
-# WHY THIS FILE EXISTS. gate-wave-brief and gate-brief-inference each screened
-# a fixed list of agent names, so every dispatch under `general-purpose` or
-# `fork` was exempt. The nine-reviewer wave of 2026-08-19 ran entirely under
-# names neither gate had heard of, and neither gate read one of those briefs.
-# Both were found by feeding the real hook synthetic payloads, which is what
-# this script does, so the finding and the guard are the same mechanism.
+# WHY THIS FILE EXISTS. The brief checks once screened a fixed list of agent
+# names, so every dispatch under `general-purpose` or `fork` was exempt. The
+# nine-reviewer wave of 2026-08-19 ran entirely under names neither gate had
+# heard of, and neither gate read one of those briefs. Both were found by
+# feeding the real hook synthetic payloads, which is what this script does, so
+# the finding and the guard are the same mechanism.
 #
-# A gate keyed on one spelling of a thing teaches you the other spelling. So
-# every case below is a way of expressing the SAME intention, and the gate has
-# to answer them the same.
+# Since masthead issue #20 there is one brief check, gate-verify-brief: a brief
+# to the verifier or the security reviewer carries a claims list. It screens the
+# two agents by name, and the names Claude Code sends for a plugin's agents.
 #
-# Run it: bash ~/.claude/hooks/proof/brief-gates-selftest.sh
+# Run it: bash hooks/proof/brief-gates-selftest.sh
 # It needs bash and jq. It runs the hook only and changes nothing.
 
 set -uo pipefail
@@ -78,54 +78,32 @@ hookless_verdict() {
 check "fed to bash -c, gate-edit still answers rather than falling silent" \
   "deny" "$(hookless_verdict "$(jq -n '{session_id:"selftest", tool_input:{file_path:"/repo/docs/x.md"}}')" gate-edit)"
 
-echo "engram-protocol selftest: gate-wave-brief screens the two review agents only"
+echo "engram-protocol selftest: gate-verify-brief screens the verifier and the security reviewer only"
 
-THIN_REVIEW="Review this diff and report what you find."
+THIN="Verify this diff and report what you find."
+WITH_CLAIMS=$'Verify this diff.\nClaims:\n- the pass never raises in any state\nNot proven: the ambiguous-commit case.'
 
-check "a thin review brief to reviewer" \
-  "deny" "$(verdict gate-wave-brief "$(agent_payload reviewer "$THIN_REVIEW")")"
+check "a thin brief to the verifier" \
+  "deny" "$(verdict gate-verify-brief "$(agent_payload verifier "$THIN")")"
 
-check "a thin review brief to security-reviewer" \
-  "deny" "$(verdict gate-wave-brief "$(agent_payload security-reviewer "$THIN_REVIEW")")"
+check "a thin brief to security-reviewer" \
+  "deny" "$(verdict gate-verify-brief "$(agent_payload security-reviewer "$THIN")")"
+
+check "a thin brief to masthead's verifier, as Claude Code names it" \
+  "deny" "$(verdict gate-verify-brief "$(agent_payload masthead:verifier "$THIN")")"
 
 check "the same words to general-purpose are not screened" \
-  "allow" "$(verdict gate-wave-brief "$(agent_payload general-purpose "$THIN_REVIEW")")"
+  "allow" "$(verdict gate-verify-brief "$(agent_payload general-purpose "$THIN")")"
 
 check "the same words to a fork are not screened" \
-  "allow" "$(verdict gate-wave-brief "$(agent_payload fork "$THIN_REVIEW")")"
+  "allow" "$(verdict gate-verify-brief "$(agent_payload fork "$THIN")")"
 
 # The escape hatch has to stay truthful and usable, or the gate becomes theatre.
-check "a brief carrying the author's claims and the seam is allowed" \
-  "allow" \
-  "$(verdict gate-wave-brief "$(agent_payload general-purpose \
-      'Review this. The author claims the pass never raises, and could not prove the ambiguous-commit case. It is self-contained and depends on nothing outside the diff.')")"
+check "a verifier brief carrying a claims list is allowed" \
+  "allow" "$(verdict gate-verify-brief "$(agent_payload verifier "$WITH_CLAIMS")")"
 
-check "a brief that is not asking for a review at all is allowed" \
-  "allow" "$(verdict gate-wave-brief "$(agent_payload general-purpose 'Add a column to the tenants table.')")"
-
-echo "engram-protocol selftest: gate-brief-inference, whoever is being asked"
-
-CANNOT="This cannot be done any other way, so use the atomics cell."
-
-check "an unattributed impossibility under general-purpose" \
-  "deny" "$(verdict gate-brief-inference "$(agent_payload general-purpose "$CANNOT")")"
-
-check "an unattributed impossibility under fork" \
-  "deny" "$(verdict gate-brief-inference "$(agent_payload fork "$CANNOT")")"
-
-check "an unattributed impossibility under a named specialist, which always worked" \
-  "deny" "$(verdict gate-brief-inference "$(agent_payload thiago "$CANNOT")")"
-
-check "the same sentence, marked as the lead's own inference, is allowed" \
-  "allow" \
-  "$(verdict gate-brief-inference "$(agent_payload general-purpose \
-      'This cannot be done any other way. That is my inference, not a rule: disprove it if you can.')")"
-
-check "a reviewer is exempt, because its brief is screened by gate-wave-brief" \
-  "allow" "$(verdict gate-brief-inference "$(agent_payload reviewer "$CANNOT")")"
-
-check "a brief claiming no impossibility is allowed" \
-  "allow" "$(verdict gate-brief-inference "$(agent_payload general-purpose 'Make the report print the skipped count.')")"
+check "a brief that is not asking for a verification at all is allowed" \
+  "allow" "$(verdict gate-verify-brief "$(agent_payload general-purpose 'Add a column to the tenants table.')")"
 
 echo
 if [ "$FAILURES" -eq 0 ]; then

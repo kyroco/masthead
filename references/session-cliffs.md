@@ -74,27 +74,29 @@ order. The steps live here and nowhere else; a repo supplies only its own facts
 `CLAUDE.md` and `docs/conventions/`.
 
 1. Build on a branch and commit. Keep two lists: what you claim works, and what
-   you did not prove. Every reviewer gets both.
-2. Send the first reviews of the finished diff in one message, so they run
-   blind and at the same time: one `reviewer` per angle (`bugs`, `edge`,
-   `contract`, `reuse`, `cleanup`), a `words` reviewer whenever the diff
-   adds or edits text a customer reads (screen text, a refusal sentence,
-   the site's docs, the changelog), plus the `security-reviewer` when the
-   change touches authorization, secrets, untrusted input or privilege, or the
-   repo's security conventions call for it. Brief each as
-   `references/dispatch-brief.md` says. You do not read, merge,
-   level or drop their findings. `/code-review` is not used.
+   you did not prove. Every verifier gets both.
+2. Send the first verification of the finished diff in one message, so they
+   run blind and at the same time: one `verifier` per scenario, given the
+   scenario, the decision-record lines it rests on, the diff and both lists;
+   every sentence a customer reads that the diff adds or edits text a customer
+   reads in (screen text, a refusal sentence, the site's docs, the changelog)
+   is a claim of the scenario it belongs to. Add the `security-reviewer` when
+   the change touches authorization, secrets, untrusted input or privilege,
+   or the repo's security conventions call for it, with those conventions as
+   its claims. Brief each as `references/dispatch-brief.md` says. You do not
+   read, merge or drop their results. `/code-review` is not used.
 3. Send the `adjudicator` the commit range, the reviewed files (the files the
-   change touched before its first review, the same list on every round) and
-   the path of every findings file the round wrote, Nits included, and nothing
+   change touched before its first verification, the same list on every
+   round) and the path of every findings file the round wrote, and nothing
    else: not your claims, not your did-not-prove list, not your view of any
-   finding. It merges duplicates, keeps only what it proves and judges worth
-   fixing in this PR, and throws out the rest. Its fix list is the round's
-   result. What it throws out is gone: it is not logged or filed. File each
-   finding on its New issue list as its own issue, as the repo's tracker
-   skill says, in the same milestone and blocked by this one, and link it in
-   the PR body; fix none of them here. Its For the
-   foreman section goes to the foreman unedited (to the user when there is
+   finding. It runs each reproduction a verifier showed where it can,
+   confirms the claim is false, and places it: fix in this PR, or new issue.
+   That placement is final. What it throws out is gone: it is not logged or
+   filed. File each finding on its New issue list as its own issue, as the
+   repo's tracker skill says, in the same milestone and blocked by this one,
+   and link it in the PR body; fix none of them here, and never ask for one
+   to be fixed here. Its For the foreman section (a security finding it
+   could not settle) goes to the foreman unedited (to the user when there is
    none), who decides; the PR waits for that answer.
 4. Fix each finding on the adjudicator's fix list in this PR, test first,
    in two commits of its own: a test that reproduces it and fails, then the
@@ -103,24 +105,19 @@ order. The steps live here and nowhere else; a repo supplies only its own facts
    did-not-prove list.
    First name in one sentence why
    the code goes wrong, and fix that cause, so the other wrong results it
-   causes go too. A finding stays unfixed only when the adjudicator is wrong
-   (prove it with a command and its output, or a `file:line`); name it and its
-   proof in the PR body, and fix it if the foreman, or the user when there is
-   none, disagrees. When only a new approach would fix it, stop and ask before
+   causes go too. When only a new approach would fix it, stop and ask before
    rewriting.
-5. Check the fixes, over the fix commits only: one
-   `reviewer` on the `fixes` angle for each angle whose findings were fixed,
-   security included, given that angle's findings, and the `security-reviewer`
-   again when a security finding was fixed, then the `adjudicator` on that
-   check's findings files as in step 3. At most three fix checks per
-   change. After the second, sort what is still on the fix list:
-   - only wording (changelog, docs, comments) or missing tests: fix it and
-     run a third check without asking;
-   - anything in code or design, or a finding in the lines the last fix
-     changed: stop and report it to the foreman, or to the user when there is
-     none. That is fix-break-fix churn, and it needs a person.
-   If the third check still leaves anything on the fix list, stop and report
-   it.
+5. Re-verify, over the fix commits only, and only the claims the fix broke:
+   one `verifier` given those claims and the fix diff, its brief opening
+   `Re-verify: round N, claims ...`, and the `security-reviewer` again when a
+   security finding was fixed, then the `adjudicator` on that round's
+   findings files as in step 3. At most two re-verify rounds per change;
+   the brief check counts the verifier's re-verify dispatches in the
+   dispatch log, on this branch, and refuses a third (the security
+   reviewer's dispatch does not spend a round; a verifier that died or was
+   declined did). If the second round still leaves anything on the fix
+   list, stop and report it to the foreman, or to the user when there is
+   none. That is fix-break-fix churn, and it needs a person.
 6. Log nothing. There is no Nit log: a finding is either on the fix list and
    fixed, or thrown out.
 7. Add the changelog entry when the repo keeps one, or its label for internal
@@ -131,8 +128,9 @@ order. The steps live here and nowhere else; a repo supplies only its own facts
    the output, not the exit code. When it cannot reach its test stack, do what
    it prints, and stop and report only when that fails too. `hard-gate.sh`
    refuses the push and the PR until the check's receipt matches the commit.
-9. Push and open one PR to main. Its body gives the unproven list, any
-   Important finding left unfixed with its proof, and `Fixes #<issue>`. Never
+9. Push and open one PR to main. Its body gives the unproven list, the
+   agent-run count (the rows added to `<state>/dispatches.tsv` for this
+   issue whose outcome is not refused), and `Fixes #<issue>`. Never
    commit or push to main: main changes only by merging the reviewed PR once
    its checks are green.
 10. Once it merges, clean up what your own work created, from the main

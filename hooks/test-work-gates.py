@@ -1570,7 +1570,7 @@ def main():
     check("a stranger repo's procedure does not replace the general one",
           "REPO-PR-CLIFF" not in stranger_out and "The steps live here and nowhere else" in stranger_out, True)
     shutil.rmtree(own_pr, ignore_errors=True)
-    steps = ["Build on a branch", "reviews of the finished diff", "Fix each finding on the adjudicator's fix list",
+    steps = ["Build on a branch", "verification of the finished diff", "Fix each finding on the adjudicator's fix list",
              "changelog entry", "pre-push check on that last commit", "open one PR"]
     positions = [proof_cliff.find(step) for step in steps]
     check("the injected PR procedure keeps review, fixes, changelog and the push check before the PR",
