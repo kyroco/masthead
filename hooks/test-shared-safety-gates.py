@@ -222,6 +222,10 @@ def main():
                        "subagent_type": "verifier", "model": "opus"})
     marked = open(rec).read().splitlines()[-1].split("\t")
     check("a re-verify line as a list item is still recorded as one", marked[5], "re-verify round 3")
+    dispatch_decision({"prompt": "> - Re-verify: round 4, claim 2\nVerify the fix commits.",
+                       "subagent_type": "verifier", "model": "opus"})
+    quoted = open(rec).read().splitlines()[-1].split("\t")
+    check("a re-verify line under two prefixes is still recorded as one", quoted[5], "re-verify round 4")
     # The outcome cannot be preset from the environment: the wrapper passes a
     # refusal as an argument, so an operator variable changes nothing (edge-5).
     run(["bash", DISPATCH], json.dumps({

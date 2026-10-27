@@ -114,6 +114,40 @@ Claims:
 none
 """
 
+BOLD_NONE = """Verify git diff abc123..def456.
+
+**Claims:** none
+"""
+
+NONE_THEN_MORE = """Verify git diff abc123..def456.
+
+Claims: none
+Not proven: everything.
+"""
+
+NONE_UNDER_THEN_MORE = """Verify git diff abc123..def456.
+
+Claims:
+none
+The diff is small.
+"""
+
+NOT_PROVEN_ONLY = """Verify git diff abc123..def456.
+
+Claims:
+Not proven: everything.
+"""
+
+BOLD_LIST = """Verify git diff abc123..def456.
+
+**Claims:**
+- the refusal sentence names the month the limit resets
+"""
+
+
+def re_verify_quoted(n):
+    return "> - " + re_verify(n)
+
 
 def re_verify_marked(n):
     return "- " + re_verify(n)
@@ -153,8 +187,11 @@ CASES = [
      [(SESSION8, "dispatched"), (SESSION8, "dispatched"), (SESSION8, "dispatched")], "allow"),
     ("a refused dispatch does not count", "verifier", re_verify(1),
      [(SESSION8, "refused"), (SESSION8, "refused")], "allow"),
-    ("the security reviewer is capped the same way", "security-reviewer", re_verify(3),
-     [(SESSION8, "re-verify round 1"), (SESSION8, "re-verify round 2")], "deny"),
+    # The security reviewer never spends a round and is never capped: it is
+    # sent only beside a verifier, after that verifier's row is written.
+    ("a security reviewer in round 2, after the round-2 verifier", "security-reviewer", re_verify(2),
+     [(SESSION8, "re-verify round 1", "verifier"), (SESSION8, "re-verify round 1", "security-reviewer"),
+      (SESSION8, "re-verify round 2", "verifier")], "allow"),
     ("HELD no claims and a third round, refused once", "verifier", NO_CLAIMS_THIRD_ROUND,
      [(SESSION8, "re-verify round 1"), (SESSION8, "re-verify round 2")], "deny"),
 
@@ -178,6 +215,17 @@ CASES = [
     ("a Claims: line as a numbered item", "verifier", LISTED_CLAIMS, None, "allow"),
     ("HELD Claims: none is no list", "verifier", NONE_CLAIMS, None, "deny"),
     ("HELD none under Claims: is no list", "verifier", NONE_UNDER_CLAIMS, None, "deny"),
+    ("HELD a bold Claims: none is no list", "verifier", BOLD_NONE, None, "deny"),
+    ("HELD Claims: none followed by more text is no list", "verifier", NONE_THEN_MORE, None, "deny"),
+    ("HELD none under Claims: followed by more text is no list", "verifier", NONE_UNDER_THEN_MORE, None, "deny"),
+    ("HELD Not proven under an empty Claims: is no list", "verifier", NOT_PROVEN_ONLY, None, "deny"),
+    ("a bold Claims: with a list under it", "verifier", BOLD_LIST, None, "allow"),
+    # Two markdown prefixes at once (a quoted list item).
+    ("HELD a third round as a quoted list item is still refused", "verifier", re_verify_quoted(3),
+     [(SESSION8, "re-verify round 1"), (SESSION8, "re-verify round 2")], "deny"),
+    # Another plugin's verifier is not masthead's; its rows do not count.
+    ("another plugin's verifier rows do not count", "verifier", re_verify(1),
+     [(SESSION8, "re-verify round 1", "otherplugin:verifier"), (SESSION8, "re-verify round 2", "otherplugin:verifier")], "allow"),
 ]
 
 

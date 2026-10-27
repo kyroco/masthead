@@ -272,6 +272,13 @@ for doc in scripts/diagrams.py docs/images/review.svg docs/explainer.html; do
 done
 says  references/session-cliffs.md "the security reviewer's dispatch does not spend a round"
 says  skills/work-on/worker.md "A dead or declined verifier still spends its round"
+# Fix check 1 of issue #20: the count is of agents sent, and a declined one is in it.
+for doc in README.md docs/explainer.template.html docs/explainer.html; do
+  never "$doc" "the count of agent runs it took"
+  says  "$doc" "the count of agents it sent"
+done
+says  skills/work-on/worker.md "declined at a permission prompt"
+says  references/dispatch-brief.md "declined at a permission prompt"
 says  references/gate-catalog.md "A dead or declined verifier still spends its round"
 
 echo "$pass passed, $fail failed"
