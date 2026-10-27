@@ -103,7 +103,7 @@ says  docs/explainer.html "sends the foreman a plan, one line per scenario"
 says  docs/explainer.html "its plan, one line per scenario"
 says  docs/images/day-5-workers.svg "its plan, one line per scenario"
 says  scripts/diagrams.py "its plan, one line per scenario"
-says  .claude-plugin/plugin.json '"version": "0.1.2"'
+says  .claude-plugin/plugin.json '"version": "0.1.3"'
 
 never_phrase() {
   local hit
@@ -125,6 +125,12 @@ for doc in $count_files; do
   never_phrase "$doc" "one to five lines"
   never_phrase "$doc" "five lines or fewer"
   never_phrase "$doc" "more than about five scenarios"
+done
+
+# 5. No never-shortens sentence. Robert asked for it removed on October 27,
+# 2026. The phrase must be gone from every file the scenario-count check reads.
+for doc in $count_files; do
+  never_phrase "$doc" "never shortens a step"
 done
 
 echo "$pass passed, $fail failed"
