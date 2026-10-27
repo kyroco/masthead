@@ -98,6 +98,10 @@ says  README.md "sends the foreman a plan, one line per scenario"
 says  README.md "Scenarios** (at least one line of"
 says  docs/explainer.template.html "<b>Scenarios</b> (at least one line of"
 says  docs/explainer.html "<b>Scenarios</b> (at least one line of"
+says  docs/explainer.template.html "sends the foreman a plan, one line per scenario"
+says  docs/explainer.html "sends the foreman a plan, one line per scenario"
+says  docs/explainer.html "its plan, one line per scenario"
+says  docs/images/day-5-workers.svg "its plan, one line per scenario"
 says  scripts/diagrams.py "its plan, one line per scenario"
 says  .claude-plugin/plugin.json '"version": "0.1.2"'
 
