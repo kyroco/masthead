@@ -409,12 +409,8 @@ never README.md "asks three questions about the repository and writes nothing"
 says  docs/explainer.template.html "one or two more when it finds a folder of decision records"
 never docs/explainer.template.html "asks three questions about the repository and writes nothing"
 # The model option skips a helper whose file names a model (model-choice-gate.sh).
-says  README.md "A helper with no model in its own file"
 never README.md "Helpers run on the small model unless"
-says  docs/explainer.template.html "A helper with no model in its own file"
 never docs/explainer.template.html "Helpers run on the small model unless"
-says  README.md "a helper with no model in its own file sent to the big model"
-says  docs/explainer.template.html "a helper with no model in its own file sent to the big model"
 # What the irreversible-action gate refuses (its header and lines 399 to 430).
 says  README.md "deleting a remote branch, skipping the checks with"
 never README.md "history rewrites, deleting unmerged branches"
@@ -460,6 +456,27 @@ says  references/gate-catalog.md "or a scratch copy under"
 for doc in docs/explainer.html docs/images/review.svg docs/images/workflow.svg; do
   never "$doc" "the same nine steps"
 done
+
+# 10. Issue #25, re-verify round 1: five sentences the adjudicator placed.
+# The brief check runs outside run.sh, so the Korium option does not switch it off.
+says  references/gate-catalog.md "except \`gate-verify-brief\`"
+never references/gate-catalog.md "none of these refuses anything"
+# A model named on the call is checked whatever the agent's file says.
+says  README.md "a call that names no model for a helper whose own file names one is not asked"
+never README.md "A helper with no model in its own file"
+says  docs/explainer.template.html "a call that names no model for a helper whose own file names one is not asked"
+never docs/explainer.template.html "A helper with no model in its own file"
+says  references/gate-catalog.md "are not covered when the call names no model"
+says  references/dispatch-brief.md "Not covered when the call names no model"
+# A signed-out korium-cli refuses every grep until the index is asked.
+says  README.md "every grep while korium-cli is signed out"
+says  docs/explainer.template.html "every grep while korium-cli is signed out"
+# The wiki refresh has no docs/adr fallback.
+says  README.md "the refresh only with"
+says  docs/explainer.template.html "the refresh only with"
+# Setup asks two questions when a memory is already connected.
+says  README.md "or two when a memory is already connected"
+says  docs/explainer.template.html "or two when a memory is already connected"
 
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
