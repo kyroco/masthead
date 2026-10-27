@@ -103,7 +103,7 @@ says  docs/explainer.html "writes a plan, one line per scenario"
 says  docs/explainer.html "its plan, one line per scenario"
 says  docs/images/day-5-workers.svg "its plan, one line per scenario"
 says  scripts/diagrams.py "its plan, one line per scenario"
-says  .claude-plugin/plugin.json '"version": "0.1.6"'
+says  .claude-plugin/plugin.json '"version": "0.1.7"'
 
 never_phrase() {
   local hit
@@ -360,6 +360,31 @@ never skills/analyze-issues/issue-check.md "--body-file - <<"
 never skills/analyze-issues/milestone-check.md "--body-file - <<"
 never README.md "skill rewrites issues into this shape"
 never docs/explainer.template.html "skill rewrites issues into this shape"
+
+# 8. Issue #25: the README, the explainer, the reference pages and the
+# pictures say what the 0.1.6 skills, agents and hooks do. Each sentence that
+# was wrong is pinned with the wording it replaced; the pictures already
+# matched scripts/diagrams.py and are pinned by sections 6 and 7 above. The
+# foreman widened the issue by one line: the analyze-issues skill's sentence
+# on who checks a worker's plan.
+says  docs/explainer.template.html "whether to keep a code index in Korium (off)"
+says  docs/explainer.html "whether to keep a code index in Korium (off)"
+says  README.md "the judge (the \`adjudicator\` agent)"
+says  references/agent-preamble.md "Read by verifier, security-reviewer, adjudicator, diagnoser and reader"
+never references/agent-preamble.md "security-reviewer, diagnoser and reader, in every repo"
+says  references/work-routing.md "differs from all five"
+never references/work-routing.md "differs from all four"
+says  references/dispatch-brief.md "Two hooks read every"
+never references/dispatch-brief.md "Three hooks read every"
+says  references/dispatch-brief.md "the adjudicator and reader name haiku"
+never references/dispatch-brief.md "diagnoser name opus; reader names haiku"
+says  references/session-cliffs.md "every sentence of it is a claim of the scenario it belongs to"
+never references/session-cliffs.md "that the diff adds or edits text a customer reads in"
+says  references/gate-catalog.md "hooks/prime-context.py"
+says  references/gate-catalog.md "hooks/capture-finding-reminder.py"
+says  references/gate-catalog.md "hooks/korium-index-on-stop.sh"
+says  skills/analyze-issues/SKILL.md "checked by a blind verifier before any code is written"
+never skills/analyze-issues/SKILL.md "checked by the foreman"
 
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
