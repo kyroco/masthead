@@ -163,6 +163,7 @@ says  skills/analyze-issues/issue-check.md "a verdict for each with its evidence
 says  skills/analyze-issues/issue-check.md "Every check passes: change nothing on GitHub. No edit, no comment."
 says  skills/analyze-issues/issue-check.md "looked in:"
 says  skills/analyze-issues/issue-check.md "fits one worker session by the Size rule"
+says  skills/analyze-issues/issue-check.md "without its \"looked in:\" part fails check 3"
 never skills/analyze-issues/issue-check.md "Rewrite issue #<n>"
 never skills/analyze-issues/issue-check.md "Rewritten by /analyze-issues"
 says  skills/analyze-issues/SKILL.md "## 2. Verify each issue, in parallel"
