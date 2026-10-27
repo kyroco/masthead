@@ -38,8 +38,7 @@ review), mark it completed and say why in its description.
 9. PR review, PR and report (steps 7.4 and 7.5)
 
 Time matters here: do not spend time that can be avoided, and the earlier a
-correct result is obtained, the better. This never shortens a step on your
-checklist: every read and every review still happens in full.
+correct result is obtained, the better.
 
 ## 1. Make the worktree
 
