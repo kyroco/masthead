@@ -116,10 +116,11 @@ comment saying what happened, and the run goes on without it.
 
 ![You have coffee; questions reach you only when nothing settles them](docs/images/day-6-coffee.svg)
 
-When a pull request's checks are green, its review is clean and the worker
-has cleaned up after itself, the foreman queues it for merge, closes the
-issue and any parent it finished, and gives that worker the next ready issue.
-By the end of the day every issue is merged, parked or skipped, and you get one
+When a pull request's checks pass, its review is clean and the worker has
+cleaned up after itself, the foreman queues it to be merged. It closes the
+issue, and any big issue whose pieces are now all done, then gives that worker
+its next issue, a follow-up that waited on this one first. By the end of the
+day every issue is merged, parked or skipped, and you get one
 line per issue saying which.
 
 ![A run: issues checked, a foreman plan, workers in parallel, merges](docs/images/workflow.svg)
