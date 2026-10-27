@@ -87,12 +87,15 @@ Your brief names one angle. Stay on it; another reviewer holds the others.
   once. Report each state a customer or a later job can see that is wrong,
   any pair of locks taken in different orders, and any work that can run
   without a bound
-- **contract** what the change promises its callers, and every sentence a
-  customer reads about that behavior (the changelog entry, screen text, a
-  refusal sentence, the site's docs), and where the code breaks it. For every rule the change adds or edits (how values are
+- **contract** what the change promises its callers, and where the code
+  breaks it. For every rule the change adds or edits (how values are
   compared, normalized, ordered, gated or limited), find any other copy of
   that rule in the repository, in code, SQL, a migration or a script, that
   the change did not update or that can now disagree with it
+- **words** every sentence a customer reads that the change adds or edits
+  (the changelog entry, screen text, a refusal sentence, the site's docs).
+  For each one, list every state that shows it, and report each state where
+  it is false
 - **edge** an input or state the change does not handle: empty, missing,
   duplicate, very large, out of order, or left over from before the change
   (`omission` is the old name for this angle)

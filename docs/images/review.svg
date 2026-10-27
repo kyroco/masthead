@@ -48,5 +48,5 @@
   <text x="653" y="414" text-anchor="middle" font-size="12" fill="#4338ca">the worker fixes each item on the list, test first,</text>
   <text x="653" y="430" text-anchor="middle" font-size="12" fill="#4338ca">and the fixes get a check of their own, up to three rounds</text>
   <path d="M 1100 110 L 1124 110 L 1124 476 L 137 476 L 137 196" fill="none" stroke="#6366f1" stroke-width="2" stroke-linejoin="round" marker-end="url(#m6366f1)"/>
-  <text x="40" y="516" text-anchor="start" font-size="13" fill="#4b5563">Then: a reader checks the text a customer would read, the tests run on the final commit, and one pull request goes up.</text>
+  <text x="40" y="516" text-anchor="start" font-size="13" fill="#4b5563">Then: the tests run on the final commit, and one pull request goes up.</text>
 </svg>
