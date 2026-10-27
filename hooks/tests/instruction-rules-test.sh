@@ -2,6 +2,8 @@
 # Checks that the skills state the three rules of issue #8 and no longer state
 # the ones they replaced: issues sliced like scrum stories, one worker per
 # sub-issue, and a review follow-up started as soon as its blocker merges.
+# Also checks issue #13: nothing caps how many scenarios an issue or a plan
+# holds, so the Size rule alone decides how much one issue holds.
 # Lines wrap anywhere, so each file is read as one line before matching.
 #
 # Run from anywhere: bash hooks/tests/instruction-rules-test.sh
@@ -36,7 +38,6 @@ never() {
 says  skills/github-issues/SKILL.md "the way scrum splits user stories"
 says  skills/github-issues/SKILL.md "room to spare"
 never skills/github-issues/SKILL.md "about fifteen files"
-never skills/github-issues/SKILL.md "more than about five scenarios"
 
 # 2. One worker per sub-issue.
 says  skills/work-on/foreman.md "one worker per sub-issue"
@@ -83,6 +84,44 @@ says  skills/work-on/foreman.md "already approved: once ready, it starts"
 says  skills/work-on/foreman.md "within the user's worker limit"
 says  skills/work-on/foreman.md "the question goes to the user first"
 says  skills/work-on/foreman.md "ready issue as step 2 says, those first"
+
+# 4. No scenario count. The check is exact on purpose, not a prose scanner: it
+# holds the lines where the rule now lives, and refuses the three phrases this
+# issue removed wherever a person or agent reads them. It reads each file
+# whole (grep -o, never -q), since a pipe that stops early on a match can turn
+# a hit into a pass on a page as large as docs/explainer.html.
+says  skills/github-issues/SKILL.md "Scenarios:** at least one, each a thing a test can show"
+says  skills/github-issues/SKILL.md "How much one issue holds is the Size rule's call, never a count of scenarios"
+says  skills/work-on/worker.md "a plan first and wait for its \"go\": one line per scenario"
+says  skills/work-on/foreman.md "A worker's first message is its plan, one line per scenario"
+says  README.md "sends the foreman a plan, one line per scenario"
+says  README.md "Scenarios** (at least one line of"
+says  docs/explainer.template.html "<b>Scenarios</b> (at least one line of"
+says  docs/explainer.html "<b>Scenarios</b> (at least one line of"
+says  scripts/diagrams.py "its plan, one line per scenario"
+says  .claude-plugin/plugin.json '"version": "0.1.2"'
+
+never_phrase() {
+  local hit
+  hit="$(flat "$1" | grep -oiF -- "$2")"
+  if [ -n "$hit" ]; then
+    fail=$((fail + 1))
+    printf 'FAIL %s still says: %s\n' "$1" "$2"
+  else
+    pass=$((pass + 1))
+  fi
+}
+
+count_files="$(cd "$ROOT" && find README.md skills references agents docs scripts -type f \( -name '*.md' -o -name '*.html' -o -name '*.py' -o -name '*.svg' \) 2>/dev/null | sort)"
+if [ -z "$count_files" ]; then
+  fail=$((fail + 1))
+  echo "FAIL found no files to search for a removed scenario count"
+fi
+for doc in $count_files; do
+  never_phrase "$doc" "one to five lines"
+  never_phrase "$doc" "five lines or fewer"
+  never_phrase "$doc" "more than about five scenarios"
+done
 
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
