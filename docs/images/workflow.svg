@@ -28,7 +28,7 @@
   <text x="232" y="488" text-anchor="middle" font-size="12" fill="#6b7280">5. one verifier per scenario, then the judge</text>
   <text x="232" y="504" text-anchor="middle" font-size="12" fill="#6b7280">6. fix the list, test first; re-verify what broke</text>
   <text x="232" y="520" text-anchor="middle" font-size="12" fill="#6b7280">7. push check: tests on this commit</text>
-  <text x="232" y="536" text-anchor="middle" font-size="12" fill="#6b7280">9. one pull request, Fixes #41</text>
+  <text x="232" y="536" text-anchor="middle" font-size="12" fill="#6b7280">8. one pull request, Fixes #41</text>
   <rect x="461" y="364" width="385" height="190" rx="10" fill="#f9fafb" stroke="#d1d5db" stroke-width="1.5"/>
   <text x="653" y="392" text-anchor="middle" font-size="14" font-weight="600" fill="#6b7280">worker for issue #42</text>
   <text x="653" y="408" text-anchor="middle" font-size="12" fill="#6b7280">1. read the issue, the README, the decisions</text>
@@ -39,7 +39,7 @@
   <text x="653" y="488" text-anchor="middle" font-size="12" fill="#6b7280">5. one verifier per scenario, then the judge</text>
   <text x="653" y="504" text-anchor="middle" font-size="12" fill="#6b7280">6. fix the list, test first; re-verify what broke</text>
   <text x="653" y="520" text-anchor="middle" font-size="12" fill="#6b7280">7. push check: tests on this commit</text>
-  <text x="653" y="536" text-anchor="middle" font-size="12" fill="#6b7280">9. one pull request, Fixes #42</text>
+  <text x="653" y="536" text-anchor="middle" font-size="12" fill="#6b7280">8. one pull request, Fixes #42</text>
   <rect x="882" y="364" width="385" height="190" rx="10" fill="#f9fafb" stroke="#d1d5db" stroke-width="1.5"/>
   <text x="1074" y="392" text-anchor="middle" font-size="14" font-weight="600" fill="#6b7280">worker for issue #45</text>
   <text x="1074" y="408" text-anchor="middle" font-size="12" fill="#6b7280">1. read the issue, the README, the decisions</text>
@@ -50,7 +50,7 @@
   <text x="1074" y="488" text-anchor="middle" font-size="12" fill="#6b7280">5. one verifier per scenario, then the judge</text>
   <text x="1074" y="504" text-anchor="middle" font-size="12" fill="#6b7280">6. fix the list, test first; re-verify what broke</text>
   <text x="1074" y="520" text-anchor="middle" font-size="12" fill="#6b7280">7. push check: tests on this commit</text>
-  <text x="1074" y="536" text-anchor="middle" font-size="12" fill="#6b7280">9. one pull request, Fixes #45</text>
+  <text x="1074" y="536" text-anchor="middle" font-size="12" fill="#6b7280">8. one pull request, Fixes #45</text>
   <path d="M 470 294 L 470 334 L 232 334 L 232 362" fill="none" stroke="#6366f1" stroke-width="2" stroke-linejoin="round" marker-end="url(#m6366f1)"/>
   <path d="M 470 294 L 470 334 L 653 334 L 653 362" fill="none" stroke="#6366f1" stroke-width="2" stroke-linejoin="round" marker-end="url(#m6366f1)"/>
   <path d="M 470 294 L 470 334 L 1074 334 L 1074 362" fill="none" stroke="#6366f1" stroke-width="2" stroke-linejoin="round" marker-end="url(#m6366f1)"/>

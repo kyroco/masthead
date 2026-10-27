@@ -78,9 +78,9 @@ order. The steps live here and nowhere else; a repo supplies only its own facts
 2. Send the first verification of the finished diff in one message, so they
    run blind and at the same time: one `verifier` per scenario, given the
    scenario, the decision-record lines it rests on, the diff and both lists;
-   every sentence a customer reads that the diff adds or edits text a customer
-   reads in (screen text, a refusal sentence, the site's docs, the changelog)
-   is a claim of the scenario it belongs to. Add the `security-reviewer` when
+   where the diff adds or edits text a customer reads (screen text, a refusal
+   sentence, the site's docs, the changelog), every sentence of it is a claim
+   of the scenario it belongs to. Add the `security-reviewer` when
    the change touches authorization, secrets, untrusted input or privilege,
    or the repo's security conventions call for it, with those conventions as
    its claims. Brief each as `references/dispatch-brief.md` says. You do not

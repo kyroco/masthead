@@ -117,5 +117,6 @@ Capture the run in Korium with `agent_capture` and give its id.
 ## What this skill never does
 
 It writes no code, no plan and no design. How a scenario is built is the
-worker's plan, checked by the foreman. It never adds a scenario the sources
-do not support: a gap is a question, not a guess.
+worker's plan, checked by a blind verifier before any code is written. It
+never adds a scenario the sources do not support: a gap is a question, not a
+guess.
