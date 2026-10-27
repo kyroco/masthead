@@ -198,6 +198,13 @@ for doc in README.md docs/explainer.template.html docs/explainer.html scripts/di
   never "$doc" "rewrote them"
   never "$doc" "Rewritten by /analyze-issues"
 done
+says  README.md "drops a line quoted as yours"
+never README.md "drops a line you wrote"
+never docs/explainer.template.html "drops a line you wrote"
+never scripts/diagrams.py "What would a builder have to guess?"
+never docs/images/day-3-check.svg "What would a builder have to guess?"
+says  references/gate-catalog.md "\`issue-edit-gate.py\`"
+says  references/gate-catalog.md "trusts whoever can comment on the issue"
 never README.md "skill rewrites issues into this shape"
 never docs/explainer.template.html "skill rewrites issues into this shape"
 

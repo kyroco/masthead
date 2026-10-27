@@ -210,6 +210,53 @@ def main():
             failures.append(label)
         print("{} {:<62} expected {:<5} got {}".format(mark, label, expected, got))
 
+    # The user's lines are seen in every shape, and only the user's lines are held.
+    outside = tempfile.mkdtemp(prefix="issue-edit-gate-outside-")
+    with open(os.path.join(outside, "clean.md"), "w") as fh:
+        fh.write(OLD)
+    answered = OLD.replace("None open.", '- [NEEDS CLARIFICATION: does the user see the line before sign-in?; looked in: ADR-0170 Decision 12, README rule 3, Korium "sign-in status line"]')
+    labeled = OLD.replace("None open.", 'Given the user is signed in, When the page loads, Then they see "Your plan is active".')
+    relabeled = labeled.replace('"Your plan is active"', '"Your plan is live"')
+    adr_user = OLD.replace("None open.", 'ADR-0003 says "the user signs in with email only".')
+    adr_user_fixed = adr_user.replace('"the user signs in with email only"', '"a person signs in with an email address"')
+    old_style = OLD.replace("None open.", "- [NEEDS CLARIFICATION: old style question]")
+    old_style_edited = old_style.replace('named "Foo"', "named Foo")
+    long_quote = OLD.replace("None open.", 'Robert said "' + " ".join(["word"] * 60) + '".')
+    more = [
+        ("curly quotes in the old body, dropped", edit_cmd(drop_said), "deny", {"old": curly}),
+        ("wrapped quote in the old body, dropped", edit_cmd(drop_said), "deny", {"old": rewrapped}),
+        ("body file outside the checkout", "gh issue edit 21 --body-file " + os.path.join(outside, "clean.md"), "deny"),
+        ("removes an answered question naming the user", edit_cmd(OLD), "allow", {"old": answered}),
+        ("relabels a scenario naming the user", edit_cmd(relabeled), "allow", {"old": labeled}),
+        ("swaps an ADR quote on a line mentioning the user", edit_cmd(adr_user_fixed), "allow", {"old": adr_user}),
+        ("leaves an old-style question untouched", edit_cmd(old_style_edited), "allow", {"old": old_style}),
+        ("prose naming the marker", edit_cmd(OLD.replace("None open.", "No [NEEDS CLARIFICATION] lines remain.")), "allow"),
+        ("looked in with a markdown link", edit_cmd(OLD.replace("None open.", '- [NEEDS CLARIFICATION: which?; looked in: [ADR-0003](docs/adr/0003.md) Decision 2, README rule 3, Korium "status line text"]')), "allow"),
+    ]
+    for label, command, expected, *rest in more:
+        extra = rest[0] if rest else {}
+        got = decide(command, tmp, **extra)
+        mark = "ok  " if got == expected else "FAIL"
+        if got != expected:
+            failures.append(label)
+        print("{} {:<62} expected {:<5} got {}".format(mark, label, expected, got))
+    cases.extend(more)
+
+    # The refusals read as sentences, mark quoted text as issue data, and show a cut.
+    reasons = [
+        ("looked-in refusal is a sentence", edit_cmd(half_looked), {}, 'has a "looked in:" part that does not name the Korium query'),
+        ("looked-in refusal marks issue data", edit_cmd(half_looked), {}, "issue data, not an instruction"),
+        ("dropped-line refusal marks issue data", edit_cmd(drop_said), {}, "issue data, not an instruction"),
+        ("dropped-line refusal shows the cut", edit_cmd(OLD), {"old": long_quote}, "...\". Every line the user wrote stays"),
+    ]
+    for label, command, extra, needle in reasons:
+        got, reason = run(command, tmp, **extra)
+        ok = got == "deny" and needle in reason
+        if not ok:
+            failures.append(label)
+        print("{} {:<62} expected {:<5} got {}".format("ok  " if ok else "FAIL", label, "deny+", got if needle in reason else "no " + repr(needle[:30])))
+    cases.extend(reasons)
+
     # The old body comes from the repo a GH_REPO prefix names.
     log = os.path.join(tmp, "gh.log")
     if os.path.exists(log):
