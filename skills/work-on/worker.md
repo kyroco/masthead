@@ -144,8 +144,8 @@ points at, and decide whether this session can finish and prove it alone.
 
 - **Dispatched, or an issue that builds an ADR: no sheet**, whatever its
   labels. The issue and, when it has one, the whole ADR are the spec.
-  Dispatched, send your foreman a plan first and wait for its "go": five
-  lines or fewer, one per scenario, each saying what you will change (the
+  Dispatched, send your foreman a plan first and wait for its "go": one
+  line per scenario, each saying what you will change (the
   module and function) and the test that shows it. The plan is the one place
   the how is written down; the issue never holds it. A foreman's "go" is the
   only go.

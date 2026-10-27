@@ -51,11 +51,12 @@ there. Four parts, in this order, under these headings:
 
 - **Why:** one or two sentences: what a person cannot do today, or what goes
   wrong, with the file and line when known.
-- **Scenarios:** one to five lines, each a thing a test can show, written
+- **Scenarios:** at least one, each a thing a test can show, written
   "Given <starting state>, When <what happens>, Then <what is true>", and
   each naming what it rests on: a decision record, a project README rule, or
-  the user's words quoted. Nothing about modules, calls or where a check runs:
-  that is the worker's plan, written before code and checked by the foreman.
+  the user's words quoted. How much one issue holds is the Size rule's call, never a count of
+  scenarios. Nothing about modules, calls or where a check runs: that is the
+  worker's plan, written before code and checked by the foreman.
 - **Out of scope:** what this issue leaves to another, by number when it
   exists.
 - **Questions:** what the decision records, the README and memory do not
