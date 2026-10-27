@@ -103,7 +103,7 @@ says  docs/explainer.html "sends the foreman a plan, one line per scenario"
 says  docs/explainer.html "its plan, one line per scenario"
 says  docs/images/day-5-workers.svg "its plan, one line per scenario"
 says  scripts/diagrams.py "its plan, one line per scenario"
-says  .claude-plugin/plugin.json '"version": "0.1.2"'
+says  .claude-plugin/plugin.json '"version": "0.1.3"'
 
 never_phrase() {
   local hit
