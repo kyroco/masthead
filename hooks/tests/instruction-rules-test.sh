@@ -103,7 +103,7 @@ says  docs/explainer.html "sends the foreman a plan, one line per scenario"
 says  docs/explainer.html "its plan, one line per scenario"
 says  docs/images/day-5-workers.svg "its plan, one line per scenario"
 says  scripts/diagrams.py "its plan, one line per scenario"
-says  .claude-plugin/plugin.json '"version": "0.1.4"'
+says  .claude-plugin/plugin.json '"version": "0.1.5"'
 
 never_phrase() {
   local hit
@@ -153,6 +153,53 @@ says  README.md "the words a customer reads (when the change adds or edits any)"
 says  docs/explainer.template.html "the words a customer reads (when the change adds or edits any)"
 never agents/reviewer.md "plain English"
 says  scripts/diagrams.py "7. push check"
+
+# 7. Issue #21: analyze-issues verifies each issue against its sources and
+# changes only what fails. The per-issue brief is a checklist, a passing issue
+# is untouched, size is a milestone finding, a hook guards the edit, and the
+# rewrite wording is gone from every page a person or agent reads.
+says  skills/analyze-issues/issue-check.md "edit only the part that fails"
+says  skills/analyze-issues/issue-check.md "a verdict for each with its evidence"
+says  skills/analyze-issues/issue-check.md "Every check passes: change nothing on GitHub. No edit, no comment."
+says  skills/analyze-issues/issue-check.md "looked in:"
+says  skills/analyze-issues/issue-check.md "fits one worker session by the Size rule"
+never skills/analyze-issues/issue-check.md "Rewrite issue #<n>"
+never skills/analyze-issues/issue-check.md "Rewritten by /analyze-issues"
+says  skills/analyze-issues/SKILL.md "## 2. Verify each issue, in parallel"
+says  skills/analyze-issues/SKILL.md "An issue that passes every check is untouched: no edit and no comment."
+says  skills/analyze-issues/SKILL.md "edits only the part that fails"
+says  skills/analyze-issues/SKILL.md "a verdict per check with its evidence"
+says  skills/analyze-issues/SKILL.md "does not fit one worker session by the Size rule"
+never skills/analyze-issues/SKILL.md "Rewritten by /analyze-issues"
+never skills/analyze-issues/SKILL.md "## 2. Rewrite each issue"
+never skills/analyze-issues/SKILL.md "Check every rewrite"
+says  skills/analyze-issues/milestone-check.md "6. Size:"
+says  skills/analyze-issues/milestone-check.md "does not fit one worker session by the Size rule"
+says  skills/analyze-issues/milestone-check.md "Nothing else is a finding: not wording, not a design you would prefer."
+never skills/analyze-issues/milestone-check.md "not size"
+never skills/analyze-issues/milestone-check.md "rewritten today"
+says  skills/github-issues/SKILL.md "looked in:"
+says  README.md "checks it against its sources"
+says  README.md "fixes only the part that fails"
+says  README.md "\`issue-edit-gate.py\`"
+says  docs/explainer.template.html "checks it against its sources"
+says  docs/explainer.template.html "fixes only the part that fails"
+says  docs/explainer.template.html "<code>issue-edit-gate.py</code>"
+says  docs/explainer.html "<code>issue-edit-gate.py</code>"
+says  scripts/diagrams.py "fixes only what fails"
+says  docs/images/day-3-check.svg "fixes only what fails"
+says  docs/images/workflow.svg "fixes only what fails"
+says  hooks/run-tests.sh "issue-edit-gate-test.py"
+for doc in README.md docs/explainer.template.html docs/explainer.html scripts/diagrams.py docs/images/workflow.svg docs/images/day-3-check.svg skills/analyze-issues/SKILL.md skills/analyze-issues/issue-check.md skills/analyze-issues/milestone-check.md; do
+  never "$doc" "rewrites it on GitHub"
+  never "$doc" "rewrites its issue"
+  never "$doc" "checks every rewrite"
+  never "$doc" "every rewritten issue"
+  never "$doc" "rewrote them"
+  never "$doc" "Rewritten by /analyze-issues"
+done
+never README.md "skill rewrites issues into this shape"
+never docs/explainer.template.html "skill rewrites issues into this shape"
 
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
