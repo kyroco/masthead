@@ -118,8 +118,8 @@ comment saying what happened, and the run goes on without it.
 
 When a pull request's checks are green, its review is clean and the worker
 has cleaned up after itself, the foreman queues it for merge, closes the
-sub-issues that shipped, and gives that worker the next ready issue. By the
-end of the day every issue is merged, parked or skipped, and you get one
+issue and any parent it finished, and gives that worker the next ready issue.
+By the end of the day every issue is merged, parked or skipped, and you get one
 line per issue saying which.
 
 ![A run: issues checked, a foreman plan, workers in parallel, merges](docs/images/workflow.svg)

@@ -64,6 +64,12 @@ comments.
     gh issue view 1418 --json state,labels,milestone,projectItems
     gh api repos/{owner}/{repo}/issues/1418/sub_issues --jq '.[] | "#\(.number) \(.state) \(.title)"'
     gh api repos/{owner}/{repo}/issues/1418/dependencies/blocked_by --jq '.[] | "#\(.number) \(.state) \(.title)"'
+    gh api repos/{owner}/{repo}/issues/1418/parent --jq .number
+
+When the issue has a parent, read the parent the same way, body and every
+comment: a ruling there binds this issue. An issue with open sub-issues is a
+summary: build none of it. Name its open sub-issues in blocked-by order and
+stop.
 
 **The brief is the README of the issue's GitHub project.** Read it, and the
 milestone's description, with exactly these lines:
@@ -158,9 +164,10 @@ started by the user, end your turn with the question. The answer lands on
 the issue as a comment, so read the issue again before you build on it.
 
 With a sheet, the sheet says whether you will split the issue, and you split
-it only as approved. Without one, split without asking. To split, create each
-sub-issue with `gh issue create` (same milestone and project), make it a
-sub-issue of this one, and add a blocked-by link where one needs another:
+it only as approved. Without one, split without asking. To split, create
+each sub-issue in its own four parts with `gh issue create` (same milestone
+and project), make it a sub-issue of this one, and add a blocked-by link where
+one needs another:
 
     id=$(gh api repos/{owner}/{repo}/issues/<sub number> --jq .id)
     gh api -X POST repos/{owner}/{repo}/issues/1418/sub_issues -F sub_issue_id=$id
@@ -168,8 +175,15 @@ sub-issue of this one, and add a blocked-by link where one needs another:
 
 Then stop: you build none of them. Each sub-issue gets its own worker, started
 in blocked-by order, and this issue becomes a summary that closes when its
-sub-issues close. Dispatched, send your foreman the sub-issue numbers; started
-by the user, end your turn with them.
+sub-issues close. Delete the branch step 4 made, on GitHub and here, and set
+this issue's Status back to Todo:
+
+    gh api -X DELETE repos/{owner}/{repo}/git/refs/heads/<user>/1418-<short-slug>
+    git switch --detach && git branch -D <user>/1418-<short-slug>
+    ${CLAUDE_PLUGIN_ROOT}/skills/work-on/set-status.sh 1418 "Todo"
+
+Dispatched, send your foreman the sub-issue numbers; started by the user, end
+your turn with them.
 
 ## 7. Build it
 
@@ -212,7 +226,8 @@ from another session.
    check). The criteria are the issue's scenarios and the brief's rules. A
    row that says no is unfinished: fix it before the PR, or stop and report.
    Under the table, give the ADR review's findings by level, the
-   adjudicator's fix and thrown-out counts for each round, and the name of
+   adjudicator's fix and thrown-out counts for each round, the follow-up
+   issues you filed from its New issue lists, and the name of
    your test stack's project (the
    compose project the local check used), if it brought one up. Quote one
    line from the project README that bears on this issue. Dispatched: send
@@ -245,7 +260,7 @@ user, from this repo's main checkout:
 
 1. Confirm the issue closed and its Status reads Done; if the `Fixes` line did
    not do it, `gh issue close 1418 --reason completed` and `set-status.sh`, and
-   say so. When it was its parent's last open sub-issue, close the parent the
-   same way.
+   say so. Then close each parent up the chain the same way, stopping at the
+   first that still has an open sub-issue.
 2. Then step 10 of **Opening a PR**: your test stack and tunnels, the code
    index of `<user>/1418-<short-slug>`, the worktree and the branch.
