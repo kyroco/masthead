@@ -53,9 +53,10 @@ Otherwise, on GitHub, it:
   with its "looked in:" part naming the decision-record section, README rule
   and Korium query it searched, and adds the `needs-decision` label.
 
-A check in front of the edit (`issue-edit-gate.py`) refuses a body that
-drops a line quoted as the user's, or a question without its "looked in:"
-part.
+A check in front of the edit (`issue-edit-gate.py`) reads one form, the
+body in a file inside the checkout sent with `gh issue edit <n> --body-file <path>`,
+and refuses a body that drops a line quoted as the user's, or a question
+without its "looked in:" part.
 
 It returns only a verdict per check with its evidence, what it edited, the
 sub-issue numbers and the open questions word for word.
@@ -96,7 +97,9 @@ user's words verbatim. It reads the issue and, in this order: captures in
 Korium the question, the recommendation marked as the session's when it
 was sent, and the user's own words unchanged, and when that fails reports
 it and carries on; then, stopping at the first of these that fails, posts
-the same three as a comment, takes only that line out of the body, and
+the same three as a comment, takes only that line out of the body (the new
+body written to a file inside the checkout and sent with
+`gh issue edit <n> --body-file <path>`, the one form the edit check reads), and
 removes the label when no such line is left; and returns one short line
 saying what it did. Wait for that line before the next write: one write at
 a time. When it says a step failed, tell the user which issue and step;

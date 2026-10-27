@@ -60,11 +60,12 @@ in full; never "as in section 2". Add nothing the sources do not support.
   a question a source settles is written into the issue with the line
   quoted, not asked. A design choice is not a question. Add the
   needs-decision label when a question is open.
-- Edit the body, passing it on standard input:
-  `gh issue edit <n> --body-file - <<'BODY'` ... `BODY`. A check in front of
-  the edit refuses a body that drops a line quoted as the user's, or a
-  question without its "looked in:" part. Fix the body; never work around
-  the check.
+- Write the whole new body to a file inside the checkout with the Write
+  tool, then edit with `gh issue edit <n> --body-file <path>`. A check in
+  front of the edit reads that one form, refuses `--body`, standard input, a
+  heredoc or a here-string, and refuses a body that drops a line quoted as
+  the user's or a question without its "looked in:" part. Fix the body;
+  never work around the check.
 
 Change no other issue. Capture what you did in Korium with agent_capture.
 Return only this, in under 150 words: one line per check (pass or fail,

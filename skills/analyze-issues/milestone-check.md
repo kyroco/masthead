@@ -29,7 +29,8 @@ Fix these yourself, on GitHub:
 
 Each fix rests on a line you quote from the ADR, the architecture doc, the
 mockups or the old body. If no line settles it, do not change it: report
-it. Edit with `gh issue edit <n> --body-file - <<'BODY'` ... `BODY`.
+it. Write the new body to a file inside the checkout, then edit with
+`gh issue edit <n> --body-file <path>`, the one form the edit check reads.
 
 Report, and change nothing for, these:
 

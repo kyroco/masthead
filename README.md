@@ -55,9 +55,9 @@ Then this is true"? Does it say what has to be true when it's done, or does
 it tell the builder how to do its job? Does it fit one worker session? An
 issue that passes is left alone: no edit, no comment. One that fails gets
 only the failing part fixed, on GitHub, and a check in front of the edit
-refuses a body that drops a line quoted as yours (your name on the line, or
-a quote under a heading that names you), or that asks you a question without
-saying where it looked first. Each agent hands the foreman only its
+refuses a body that drops a line quoted as yours (three or more words in
+quotes, with your name on the line or on a heading above it), or that adds a
+question for you without saying where it looked first. Each agent hands the foreman only its
 verdicts and the open questions. When all nine are done, one more agent, on
 a stronger model, reads every issue against the decision record, the
 architecture notes, the mockups and the old body. It puts back anything an
@@ -204,7 +204,7 @@ reason Claude can act on.
 | `block-secret-reads.py` | before a Read, Grep or shell command | reading a credential file: `.env`, keys, tokens, password files, cloud and SSH credentials, even through the masked reader | matches file names and command text, so a secret in an oddly named file isn't recognized |
 | `block-secret-fetches.py` | before a shell command | pulling a secret out of a vault or secret store on the command line | matches command text |
 | `scan-tool-output-for-secrets.py` | after a shell command | nothing; warns when the output looks like a credential | a backstop after the fact |
-| `issue-edit-gate.py` | before a shell command | an issue edit whose new body drops a line quoted as yours (three or more words in quotes, on a line that names you), or carries a `[NEEDS CLARIFICATION]` question with no `looked in:` part naming the decision record, the README rule and the Korium query searched | knows you by the first name in git config, or the words "the user"; a document quote on the same line as your words is kept too; it reads the body from `--body`, `--body-file` or a heredoc and refuses one it cannot read |
+| `issue-edit-gate.py` | before a shell command | an issue edit whose new body drops a line quoted as yours (three or more words in quotes, with your name on the line or on a heading above it), or adds a `[NEEDS CLARIFICATION]` question with no `looked in:` part naming the decision record, the README rule and the Korium query searched | reads the body from `--body-file <path>` only, a real file inside the checkout, and refuses `--body`, standard input, a heredoc or a here-string with that form to use; knows you by the first name in git config, or "the user" when it is the one speaking; a document quote on the same line as your words is kept too; a question already on the issue is left alone; it guards against a line dropped by accident, like the other checks, and reads no other shell shape |
 | `irreversible-action-gate.sh` | before a shell command | force pushes, history rewrites, deleting unmerged branches, destructive data and infrastructure commands, pushing without the push check | emits a refusal, not a question |
 | `untrusted-domain-deny.py` | before a web fetch or search | requests to paste sites and other hosts code shouldn't reach | the host list is in the script |
 | `web-to-memory-gate.py` | after a web fetch; before a write | copying text fetched from the web into files every session loads, or into memory, without a marker saying the web was read | files inside a git repository are left alone, since a pull request shows them |
