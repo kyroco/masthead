@@ -77,7 +77,9 @@ order. The steps live here and nowhere else; a repo supplies only its own facts
    you did not prove. Every reviewer gets both.
 2. Send the first reviews of the finished diff in one message, so they run
    blind and at the same time: one `reviewer` per angle (`bugs`, `edge`,
-   `contract`, `reuse`, `cleanup`), plus the `security-reviewer` when the
+   `contract`, `reuse`, `cleanup`), a `words` reviewer whenever the diff
+   adds or edits text a customer reads (screen text, a refusal sentence,
+   the site's docs, the changelog), plus the `security-reviewer` when the
    change touches authorization, secrets, untrusted input or privilege, or the
    repo's security conventions call for it. Brief each as
    `references/dispatch-brief.md` says. You do not read, merge,
@@ -122,14 +124,7 @@ order. The steps live here and nowhere else; a repo supplies only its own facts
 6. Log nothing. There is no Nit log: a finding is either on the fix list and
    fixed, or thrown out.
 7. Add the changelog entry when the repo keeps one, or its label for internal
-   work. Then one English pass, once the fix list is empty: send one `reader`
-   the text a customer reads that this change adds or edits (the changelog
-   entry, screen text, refusal sentences, the site's docs), the issue's
-   scenarios, and the repo's customer-text convention when it has one
-   (a file under `docs/conventions/`, for example), asking only two
-   things: which sentence is false against the scenarios, and which is not
-   plain English. Apply what it returns. No review round follows it, and
-   comments and module docs are not part of it.
+   work.
 8. Commit, then run the repo's pre-push check on that last commit: the script
    its `.claude/settings.json` env names as `PROJECT_PUSH_CHECK`, or its own
    test command when it names none, in one command with nothing sourced. Read

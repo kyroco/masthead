@@ -1,7 +1,7 @@
 {
   "name": "masthead",
   "displayName": "Masthead",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Working rules that hold: memory-first work, blind review, one issue per session, and the safety gates that make them real.",
   "author": {
     "name": "Kyroco, LLC",

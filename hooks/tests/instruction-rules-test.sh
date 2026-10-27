@@ -103,7 +103,7 @@ says  docs/explainer.html "sends the foreman a plan, one line per scenario"
 says  docs/explainer.html "its plan, one line per scenario"
 says  docs/images/day-5-workers.svg "its plan, one line per scenario"
 says  scripts/diagrams.py "its plan, one line per scenario"
-says  .claude-plugin/plugin.json '"version": "0.1.3"'
+says  .claude-plugin/plugin.json '"version": "0.1.4"'
 
 never_phrase() {
   local hit
@@ -132,6 +132,27 @@ done
 for doc in $count_files; do
   never_phrase "$doc" "never shortens a step"
 done
+
+# 6. Issue #18: the words angle, contract without customer text, no extra reading pass.
+says  agents/reviewer.md "- **words** every sentence a customer reads that the change adds or edits"
+says  agents/reviewer.md "list every state that shows it"
+says  agents/reviewer.md "report each state where it is false"
+never agents/reviewer.md "plain English against"
+never agents/reviewer.md "customer-text convention"
+never agents/reviewer.md "every sentence a customer reads about that behavior"
+says  agents/reviewer.md "what the change promises its callers, and where the code breaks it"
+says  agents/reviewer.md "find any other copy of that rule"
+says  references/session-cliffs.md "a \`words\` reviewer"
+says  references/session-cliffs.md "adds or edits text a customer reads"
+for doc in README.md docs/explainer.template.html docs/explainer.html scripts/diagrams.py docs/images/workflow.svg references/session-cliffs.md agents/reviewer.md agents/adjudicator.md skills/work-on/worker.md skills/work-on/foreman.md; do
+  never "$doc" "English p""ass"
+done
+says  references/session-cliffs.md "Add the changelog entry when the repo keeps one"
+never references/session-cliffs.md "which is not plain English"
+says  README.md "the words a customer reads (when the change adds or edits any)"
+says  docs/explainer.template.html "the words a customer reads (when the change adds or edits any)"
+never agents/reviewer.md "plain English"
+says  scripts/diagrams.py "7. push check"
 
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]

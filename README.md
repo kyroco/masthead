@@ -92,16 +92,15 @@ then the fix. When an issue builds a decision record, a fresh reviewer reads
 the whole record and checks the work against it, assuming it was done wrong.
 
 When a worker thinks it's done, it doesn't grade its own work. It sends the
-diff, and nothing else, to five reviewers at once, one angle each: bugs, edge
-cases, contracts, reuse, cleanup, and a security reviewer when the change
+diff, and nothing else, to reviewers at once, one angle each: bugs, edge
+cases, contracts, reuse, cleanup, the words a customer reads (when the change
+adds or edits any), and a security reviewer when the change
 touches sign-in, secrets or input from outside. None of them saw the
 worker's notes. None of them can edit anything. None of them can reach the
 network. Then a judge reads the code and their findings, throws out whatever
 it can't prove, and hands back a fix list with a file and a line for each
 item. The worker fixes those, test first again, and the fixes get a check of
-their own. A reader goes over any sentence a customer would read and says
-which is false against the scenarios and which isn't plain English. The
-tests run on the final commit and leave a receipt that names it, and nothing
+their own. The tests run on the final commit and leave a receipt that names it, and nothing
 can be pushed until the receipt matches. Then one pull request goes up, with
 `Fixes #41`, the list of what wasn't proved, and the issue moves to In
 Review.

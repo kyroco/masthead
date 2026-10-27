@@ -134,8 +134,7 @@ WORKER_STEPS = [
     "4. decision-record review",
     "5. blind reviewers, then the judge",
     "6. fix the list, test first; fix checks",
-    "7. English pass on customer text",
-    "8. push check: tests on this commit",
+    "7. push check: tests on this commit",
 ]
 
 
@@ -228,7 +227,7 @@ def review():
     again = c.box(mid(judge) - aw / 2, ay, lines, FOREMAN)
     loop_y = bottom(again) + 30
     c.path(f"M {right(fix):.0f} {fix[1] + 20:.0f} L {right(fix) + 24:.0f} {fix[1] + 20:.0f} L {right(fix) + 24:.0f} {loop_y} L {mid(worker):.0f} {loop_y} L {mid(worker):.0f} {bottom(worker) + 2:.0f}", color=FOREMAN["stroke"])
-    c.text(40, loop_y + 40, "Then: a reader checks the text a customer would read, the tests run on the final commit, and one pull request goes up.", size=13, color="#4b5563")
+    c.text(40, loop_y + 40, "Then: the tests run on the final commit, and one pull request goes up.", size=13, color="#4b5563")
     c.h = int(loop_y + 60)
     c.write("review.svg")
 

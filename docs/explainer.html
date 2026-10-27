@@ -233,7 +233,7 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 </svg>
 </div></figure>
 <p>Then they build. A bug is fixed test first: a failing test in its own commit, then the fix. When an issue builds a decision record, a fresh reviewer reads the whole record and checks the work against it, assuming it was done wrong.</p>
-<p>When a worker thinks it's done, it doesn't grade its own work. It sends the diff, and nothing else, to five reviewers at once, one angle each: bugs, edge cases, contracts, reuse, cleanup, and a security reviewer when the change touches sign-in, secrets or input from outside. None of them saw the worker's notes. None of them can edit anything. None of them can reach the network. Then a judge reads the code and their findings, throws out whatever it can't prove, and hands back a fix list with a file and a line for each item. The worker fixes those, test first again, and the fixes get a check of their own. A reader goes over any sentence a customer would read and says which is false against the scenarios and which isn't plain English. The tests run on the final commit and leave a receipt that names it, and nothing can be pushed until the receipt matches. Then one pull request goes up, with <code>Fixes #41</code>, the list of what wasn't proved, and the issue moves to In Review.</p>
+<p>When a worker thinks it's done, it doesn't grade its own work. It sends the diff, and nothing else, to reviewers at once, one angle each: bugs, edge cases, contracts, reuse, cleanup, the words a customer reads (when the change adds or edits any), and a security reviewer when the change touches sign-in, secrets or input from outside. None of them saw the worker's notes. None of them can edit anything. None of them can reach the network. Then a judge reads the code and their findings, throws out whatever it can't prove, and hands back a fix list with a file and a line for each item. The worker fixes those, test first again, and the fixes get a check of their own. The tests run on the final commit and leave a receipt that names it, and nothing can be pushed until the receipt matches. Then one pull request goes up, with <code>Fixes #41</code>, the list of what wasn't proved, and the issue moves to In Review.</p>
 <figure><div class="paper"><svg xmlns="http://www.w3.org/2000/svg" role="img" viewBox="0 0 1160 536" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="14">
     <defs><marker id="review-m16a34a" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#16a34a"/></marker><marker id="review-m6366f1" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#6366f1"/></marker><marker id="review-m6b7280" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#6b7280"/></marker><marker id="review-md97706" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#d97706"/></marker><marker id="review-mdb2777" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#db2777"/></marker><marker id="review-mdc2626" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#dc2626"/></marker></defs>
   <text x="40" y="40" text-anchor="start" font-size="20" font-weight="600" fill="#1f2937">The review: reviewers who read cold, and a judge that keeps only what it can prove</text>
@@ -283,7 +283,7 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   <text x="653" y="414" text-anchor="middle" font-size="12" fill="#4338ca">the worker fixes each item on the list, test first,</text>
   <text x="653" y="430" text-anchor="middle" font-size="12" fill="#4338ca">and the fixes get a check of their own, up to three rounds</text>
   <path d="M 1100 110 L 1124 110 L 1124 476 L 137 476 L 137 196" fill="none" stroke="#6366f1" stroke-width="2" stroke-linejoin="round" marker-end="url(#review-m6366f1)"/>
-  <text x="40" y="516" text-anchor="start" font-size="13" fill="#4b5563">Then: a reader checks the text a customer would read, the tests run on the final commit, and one pull request goes up.</text>
+  <text x="40" y="516" text-anchor="start" font-size="13" fill="#4b5563">Then: the tests run on the final commit, and one pull request goes up.</text>
 </svg>
 </div>
 <figcaption>The judge sorts every finding three ways: onto the fix list with a file and line, onto a list of new issues when it's serious but outside this change, or out, when it isn't real, isn't proven, or isn't worth a change.</figcaption></figure>
@@ -316,7 +316,7 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   <text x="538" y="246" text-anchor="middle" font-size="12" fill="#166534">end of day: #41 merged, #42 merged, #43 merged, #44 parked (needs a decision), #45 merged ... one line per issue</text>
 </svg>
 </div></figure>
-<figure><div class="paper"><svg xmlns="http://www.w3.org/2000/svg" role="img" viewBox="0 0 1198 717" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="14">
+<figure><div class="paper"><svg xmlns="http://www.w3.org/2000/svg" role="img" viewBox="0 0 1198 701" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="14">
     <defs><marker id="workflow-m16a34a" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#16a34a"/></marker><marker id="workflow-m6366f1" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#6366f1"/></marker><marker id="workflow-m6b7280" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#6b7280"/></marker><marker id="workflow-md97706" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#d97706"/></marker><marker id="workflow-mdb2777" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#db2777"/></marker><marker id="workflow-mdc2626" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#dc2626"/></marker></defs>
   <text x="40" y="40" text-anchor="start" font-size="20" font-weight="600" fill="#1f2937">A run: the issues are checked, a foreman plans, workers build in parallel</text>
   <rect x="40" y="70" width="366" height="90" rx="10" fill="#f3f4f6" stroke="#9ca3af" stroke-width="1.5"/>
@@ -335,7 +335,7 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   <text x="466" y="262" text-anchor="middle" font-size="12" fill="#4338ca">reads the brief and every issue, proposes one plan: build order, dependencies, effort, parallelism</text>
   <text x="466" y="278" text-anchor="middle" font-size="12" fill="#4338ca">you decide how many run at once</text>
   <path d="M 669 160 L 669 190 L 466 190 L 466 218" fill="none" stroke="#6b7280" stroke-width="2" stroke-linejoin="round" marker-end="url(#workflow-m6b7280)"/>
-  <rect x="40" y="364" width="349" height="206" rx="10" fill="#f9fafb" stroke="#d1d5db" stroke-width="1.5"/>
+  <rect x="40" y="364" width="349" height="190" rx="10" fill="#f9fafb" stroke="#d1d5db" stroke-width="1.5"/>
   <text x="214" y="392" text-anchor="middle" font-size="14" font-weight="600" fill="#6b7280">worker for issue #41</text>
   <text x="214" y="408" text-anchor="middle" font-size="12" fill="#6b7280">1. read the issue, the README, the decisions</text>
   <text x="214" y="424" text-anchor="middle" font-size="12" fill="#6b7280">2. plan: a change and a test per scenario</text>
@@ -344,10 +344,9 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   <text x="214" y="472" text-anchor="middle" font-size="12" fill="#6b7280">4. decision-record review</text>
   <text x="214" y="488" text-anchor="middle" font-size="12" fill="#6b7280">5. blind reviewers, then the judge</text>
   <text x="214" y="504" text-anchor="middle" font-size="12" fill="#6b7280">6. fix the list, test first; fix checks</text>
-  <text x="214" y="520" text-anchor="middle" font-size="12" fill="#6b7280">7. English pass on customer text</text>
-  <text x="214" y="536" text-anchor="middle" font-size="12" fill="#6b7280">8. push check: tests on this commit</text>
-  <text x="214" y="552" text-anchor="middle" font-size="12" fill="#6b7280">9. one pull request, Fixes #41</text>
-  <rect x="425" y="364" width="349" height="206" rx="10" fill="#f9fafb" stroke="#d1d5db" stroke-width="1.5"/>
+  <text x="214" y="520" text-anchor="middle" font-size="12" fill="#6b7280">7. push check: tests on this commit</text>
+  <text x="214" y="536" text-anchor="middle" font-size="12" fill="#6b7280">9. one pull request, Fixes #41</text>
+  <rect x="425" y="364" width="349" height="190" rx="10" fill="#f9fafb" stroke="#d1d5db" stroke-width="1.5"/>
   <text x="599" y="392" text-anchor="middle" font-size="14" font-weight="600" fill="#6b7280">worker for issue #42</text>
   <text x="599" y="408" text-anchor="middle" font-size="12" fill="#6b7280">1. read the issue, the README, the decisions</text>
   <text x="599" y="424" text-anchor="middle" font-size="12" fill="#6b7280">2. plan: a change and a test per scenario</text>
@@ -356,10 +355,9 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   <text x="599" y="472" text-anchor="middle" font-size="12" fill="#6b7280">4. decision-record review</text>
   <text x="599" y="488" text-anchor="middle" font-size="12" fill="#6b7280">5. blind reviewers, then the judge</text>
   <text x="599" y="504" text-anchor="middle" font-size="12" fill="#6b7280">6. fix the list, test first; fix checks</text>
-  <text x="599" y="520" text-anchor="middle" font-size="12" fill="#6b7280">7. English pass on customer text</text>
-  <text x="599" y="536" text-anchor="middle" font-size="12" fill="#6b7280">8. push check: tests on this commit</text>
-  <text x="599" y="552" text-anchor="middle" font-size="12" fill="#6b7280">9. one pull request, Fixes #42</text>
-  <rect x="810" y="364" width="349" height="206" rx="10" fill="#f9fafb" stroke="#d1d5db" stroke-width="1.5"/>
+  <text x="599" y="520" text-anchor="middle" font-size="12" fill="#6b7280">7. push check: tests on this commit</text>
+  <text x="599" y="536" text-anchor="middle" font-size="12" fill="#6b7280">9. one pull request, Fixes #42</text>
+  <rect x="810" y="364" width="349" height="190" rx="10" fill="#f9fafb" stroke="#d1d5db" stroke-width="1.5"/>
   <text x="984" y="392" text-anchor="middle" font-size="14" font-weight="600" fill="#6b7280">worker for issue #45</text>
   <text x="984" y="408" text-anchor="middle" font-size="12" fill="#6b7280">1. read the issue, the README, the decisions</text>
   <text x="984" y="424" text-anchor="middle" font-size="12" fill="#6b7280">2. plan: a change and a test per scenario</text>
@@ -368,22 +366,21 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   <text x="984" y="472" text-anchor="middle" font-size="12" fill="#6b7280">4. decision-record review</text>
   <text x="984" y="488" text-anchor="middle" font-size="12" fill="#6b7280">5. blind reviewers, then the judge</text>
   <text x="984" y="504" text-anchor="middle" font-size="12" fill="#6b7280">6. fix the list, test first; fix checks</text>
-  <text x="984" y="520" text-anchor="middle" font-size="12" fill="#6b7280">7. English pass on customer text</text>
-  <text x="984" y="536" text-anchor="middle" font-size="12" fill="#6b7280">8. push check: tests on this commit</text>
-  <text x="984" y="552" text-anchor="middle" font-size="12" fill="#6b7280">9. one pull request, Fixes #45</text>
+  <text x="984" y="520" text-anchor="middle" font-size="12" fill="#6b7280">7. push check: tests on this commit</text>
+  <text x="984" y="536" text-anchor="middle" font-size="12" fill="#6b7280">9. one pull request, Fixes #45</text>
   <path d="M 466 294 L 466 334 L 214 334 L 214 362" fill="none" stroke="#6366f1" stroke-width="2" stroke-linejoin="round" marker-end="url(#workflow-m6366f1)"/>
   <path d="M 466 294 L 466 334 L 599 334 L 599 362" fill="none" stroke="#6366f1" stroke-width="2" stroke-linejoin="round" marker-end="url(#workflow-m6366f1)"/>
   <path d="M 466 294 L 466 334 L 984 334 L 984 362" fill="none" stroke="#6366f1" stroke-width="2" stroke-linejoin="round" marker-end="url(#workflow-m6366f1)"/>
   <text x="214" y="326" text-anchor="middle" font-size="12" fill="#4338ca">one fresh session per issue, each in its own worktree</text>
   <path d="M 1128 364 L 1128 257 L 835 257" fill="none" stroke="#6b7280" stroke-width="2" stroke-linejoin="round" stroke-dasharray="5 4" marker-end="url(#workflow-m6b7280)"/>
   <text x="845" y="249" text-anchor="start" font-size="11" fill="#6b7280">plans, questions and reports come back to the foreman</text>
-  <rect x="40" y="610" width="1118" height="57" rx="10" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5"/>
-  <text x="599" y="635" text-anchor="middle" font-size="13" font-weight="600" fill="#14532d">the foreman queues each passing pull request, closes its issue and any big issue now done, and gives that worker its next issue</text>
-  <text x="599" y="651" text-anchor="middle" font-size="12" fill="#166534">the run ends when every issue is merged, parked or skipped, with one line per issue saying which</text>
-  <line x1="214" y1="570" x2="214" y2="608" stroke="#16a34a" stroke-width="2" marker-end="url(#workflow-m16a34a)"/>
-  <line x1="599" y1="570" x2="599" y2="608" stroke="#16a34a" stroke-width="2" marker-end="url(#workflow-m16a34a)"/>
-  <line x1="984" y1="570" x2="984" y2="608" stroke="#16a34a" stroke-width="2" marker-end="url(#workflow-m16a34a)"/>
-  <text x="40" y="697" text-anchor="start" font-size="12" fill="#6b7280">A worker that stops on a failure gets one message; a second failure parks the issue with a comment. Memory steps run only when Korium is connected.</text>
+  <rect x="40" y="594" width="1118" height="57" rx="10" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5"/>
+  <text x="599" y="619" text-anchor="middle" font-size="13" font-weight="600" fill="#14532d">the foreman queues each passing pull request, closes its issue and any big issue now done, and gives that worker its next issue</text>
+  <text x="599" y="635" text-anchor="middle" font-size="12" fill="#166534">the run ends when every issue is merged, parked or skipped, with one line per issue saying which</text>
+  <line x1="214" y1="554" x2="214" y2="592" stroke="#16a34a" stroke-width="2" marker-end="url(#workflow-m16a34a)"/>
+  <line x1="599" y1="554" x2="599" y2="592" stroke="#16a34a" stroke-width="2" marker-end="url(#workflow-m16a34a)"/>
+  <line x1="984" y1="554" x2="984" y2="592" stroke="#16a34a" stroke-width="2" marker-end="url(#workflow-m16a34a)"/>
+  <text x="40" y="681" text-anchor="start" font-size="12" fill="#6b7280">A worker that stops on a failure gets one message; a second failure parks the issue with a comment. Memory steps run only when Korium is connected.</text>
 </svg>
 </div>
 <figcaption>The whole run on one page: the issues are checked, the foreman plans, you pick how many workers, each worker follows the same nine steps, and the foreman merges and hands out the next issue.</figcaption></figure>
