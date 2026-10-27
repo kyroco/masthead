@@ -320,7 +320,7 @@ def day5():
         ws.append(b); y = bottom(b) + 12
     for b in ws:
         c.arrow(right(fore), fore[1] + fore[3] / 2, b[0] - 2, b[1] + b[3] / 2, color=FOREMAN["stroke"])
-    plan = c.box(right(ws[0]) + 50, 40, [("a worker's first message: its plan, five lines or fewer", "title"),
+    plan = c.box(right(ws[0]) + 50, 40, [("a worker's first message: its plan, one line per scenario", "title"),
                                         ("scenario 1: change sign_in/form.ex,", "mono"), ("  test: remembers the email on reload", "mono"),
                                         ("scenario 2: change sign_in/cookie.ex,", "mono"), ("  test: the cookie expires after 30 days", "mono"),
                                         ('the foreman checks each line against the scenarios and says "go"', "body")], INK, title_size=13)

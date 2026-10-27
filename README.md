@@ -81,8 +81,7 @@ pick a number. Say three.
 Three fresh sessions start, each with its own copy of the repository and a
 branch tied to its issue. Each worker reads its issue, the README and the
 decision record cover to cover, looks up what earlier sessions learned, and
-sends the foreman a plan in five lines or fewer: for each scenario, what it
-will change and the test that proves it. The foreman holds that plan against
+sends the foreman a plan, one line per scenario: what it will change and the test that proves it. The foreman holds that plan against
 the scenarios and the README's rule that the simplest thing that meets the
 result wins, and says go, or sends it back naming the line.
 
@@ -177,7 +176,7 @@ delete.
 
 An issue says what is true when the work is done, never how to get there,
 in four parts: **Why** (what a person can't do today, with the file and line
-when known), **Scenarios** (one to five lines of "Given, When, Then", each
+when known), **Scenarios** (at least one line of "Given, When, Then", each
 naming the decision, README rule or your own words it rests on), **Out of
 scope** (what this issue leaves to another), and **Questions** (what the
 sources don't settle, each marked `[NEEDS CLARIFICATION]`). One issue is one

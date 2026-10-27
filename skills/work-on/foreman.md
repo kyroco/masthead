@@ -143,8 +143,8 @@ it carries a question, the question goes to the user first.
 - Rely on `notify_when_idle` notices, or in the desktop app on the notes the
   app sends when a worker ends a turn. A worker silent past reason gets one
   message asking for status.
-- A worker's first message is its plan, five lines or fewer: for each
-  scenario, what it will change and the test that shows it. Check each line
+- A worker's first message is its plan, one line per scenario:
+  what it will change and the test that shows it. Check each line
   against its scenario, the ADR section that scenario rests on (read that
   whole section now), and the project README's rule that the simplest thing
   that meets the result wins. Reply "go", or send it back naming the line to
