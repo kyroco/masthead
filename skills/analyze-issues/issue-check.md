@@ -30,6 +30,10 @@ evidence (the line of the issue, the source or the comment it rests on):
 3. Sources: each scenario cites a source line (a decision record, a README
    rule, or the user's words) that exists. Open the source and quote the
    line. A citation you cannot open, or cannot find in the source, fails.
+   A [NEEDS CLARIFICATION] line already on the issue without its
+   "looked in:" part fails check 3 too: the sources were not opened for it.
+   Look for its answer; settle it with the line quoted, or add where you
+   looked.
 4. Shape: each scenario is "Given ..., When ..., Then ..." on one line, and
    a test can show it.
 5. No how: nothing says how to build (a module as a design, "on every X",
