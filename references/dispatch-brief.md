@@ -1,6 +1,6 @@
 # Dispatch brief
 
-Three hooks read every `Agent` call. `hooks/agent-brief-gates.sh`, in the
+Two hooks read every `Agent` call. `hooks/agent-brief-gates.sh`, in the
 plugin's hooks folder, runs the one brief check, the model option and the
 dispatch record, and joins their refusals into one message.
 `hooks/skill-review-gate.py` runs on its own.
@@ -160,8 +160,9 @@ or sets no model and the agent has no file naming one (general-purpose, Plan),
 so it inherits this session's. Set `model: "haiku"` (or sonnet) on the call and
 no line is needed. Opus is for work that decides something no later step
 checks: writing code, judging a design. Not covered: agents whose file names a
-model (verifier, security-reviewer and diagnoser name opus; reader names haiku,
-so a reader that must judge takes `model: "opus"` and the line), forks,
+model (verifier, security-reviewer and diagnoser name opus; the adjudicator
+and reader name haiku, so a reader that must judge takes `model: "opus"` and
+the line), forks,
 Explore, claude-code-guide, statusline-setup and plugin agents.
 
 **`gate-verify-brief` checks briefs to `verifier` and `security-reviewer`

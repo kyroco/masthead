@@ -15,7 +15,7 @@ the window that already holds them. Use `verifier`, `security-reviewer` or
 **A narrower tool grant.** Work that should run without Write, Edit or the
 network. `reader` holds no Write or Edit, its shell is fenced to read-only
 commands, and it can read the web. Add an agent only when its grant differs from
-all four.
+all five.
 
 **Parallel fan-out.** Several independent pieces of reading or checking at once,
 or a noisy job whose answer is short (a test run, a log dig, a wide search). Use

@@ -392,7 +392,7 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 <p>Open Claude Code in a repository and run these two inside the session, not in a terminal, because only the in-session install asks you the four install options (a terminal install takes the defaults silently):</p>
 <pre>/plugin marketplace add kyroco/masthead
 /plugin install masthead@masthead</pre>
-<p>It asks whether to connect Korium memory (off unless you say so), whether to keep AI attribution out of commits (on), and whether a helper needs a reason before running on the biggest model (off). Then run <code>/masthead:setup</code>. It asks three questions about the repository and writes nothing until you say yes: just you or the team (whether the settings are committed with the code), tests before a push (it finds your test command), and whether to connect a memory now, later or not at all. Run it again whenever you want to change an answer.</p>
+<p>It asks whether to connect Korium memory (off unless you say so), whether to keep a code index in Korium (off), whether to keep AI attribution out of commits (on), and whether a helper needs a reason before running on the biggest model (off). Then run <code>/masthead:setup</code>. It asks three questions about the repository and writes nothing until you say yes: just you or the team (whether the settings are committed with the code), tests before a push (it finds your test command), and whether to connect a memory now, later or not at all. Run it again whenever you want to change an answer.</p>
 <p>To change an install option later, run <code>/plugin configure masthead@masthead</code>:</p>
 <div class="tablewrap"><table>
 <tr><th>Option</th><th>Default</th><th>What it does</th></tr>

@@ -281,7 +281,7 @@ The skills under `skills/` are the written procedures Claude follows:
 `work-on` (the foreman and the worker), `analyze-issues` (the checks before a
 build), `github-issues` (how the tracker is used), `setup`, and the two
 Korium skills. `agents/` holds the verifier, the security reviewer, the
-judge, the diagnoser and the reader. `references/` holds the pull request steps and the brief
+judge (the `adjudicator` agent), the diagnoser and the reader. `references/` holds the pull request steps and the brief
 format. `bash hooks/run-tests.sh` runs every check's tests, and CI runs them
 on Linux and macOS.
 

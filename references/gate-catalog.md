@@ -50,6 +50,8 @@ gate twice.
 | `hooks/engram-protocol.sh gate-verify-brief` | Refuses a brief to `verifier` or `security-reviewer` with no claims list in the one exact form (a line that is exactly `Claims:` at column zero, then a `- ` bullet of at least four words; any other spelling is refused with the form), and a verifier's re-verify brief (a line that begins `Re-verify: round N` at column zero; any other spelling is refused) when the dispatch log already holds two of the verifier's re-verify rows for the session on this branch; the number in the brief is not read, and the security reviewer's row does not count. A dead or declined verifier still spends its round, so the worker reports to the foreman one round early rather than a round late. Retired with it on 2026-10-27 (issue #20): the Korium-line, fix-evidence, wave-brief and brief-inference checks, which refused four honest briefs in one day | Checks the line is there, not that the claims are the right ones. Off switch `MASTHEAD_BRIEF_GATE=off`. Proven by `test-brief-gates.py` |
 | `hooks/engram-protocol.sh gate-capture` | Refuses a subagent capture filed under another acting agent's name | Main-session payloads carry no acting-agent field |
 | `hooks/engram-protocol.sh gate-stop` and `gate-substop` | Refuse one finish when the session or subagent made no successful Korium capture | Refuse once, then stand down; a quota refusal stands aside |
+| `hooks/capture-finding-reminder.py` | On Stop, reminds once per turn, on stderr, when the reply reported a finding (a verdict, a root cause, a correction, a measurement) and nothing was captured since the user last spoke | Never blocks: a reminder, not a gate. Runs only with the Korium memory option on |
+| `hooks/korium-index-on-stop.sh` | On Stop, runs `korium-cli index` in the background for the session's checkout, one run per checkout at a time, logged in its git folder | Never refuses; stands aside with no `korium-cli`. Runs only with the Korium memory and code index options on. Off switch `MASTHEAD_INDEX_ON_STOP=off`, or `git config korium.indexOnStop false` |
 
 ## Ownership, safety, and review gates
 
@@ -72,6 +74,7 @@ gate twice.
 | `hooks/review-write-fence.py` | Refuses a write from `verifier` or `security-reviewer` to anything but its own findings file in `<checkout>/<state>/review/` | Not covered: a shell write. Proven by `tests/review-write-fence-test.sh` |
 | `hooks/bash-scope-diagnoser.sh` | Allowlists the `diagnoser` and `reader` shells to test runners and read-only inspection | Scoped by `agent_type` |
 | `verdict-gate.sh` | Refuses a Stop when a changed case file has no `file:line` in its verdict or fewer than two numbered observations | Project-wide on Stop |
+| `hooks/prime-context.py` | At SessionStart, prints the Korium memory protocol; on each user prompt, injects the procedure from `session-cliffs.md` whose bold lead matches the prompt (a commit, a push, a PR, a test result) | Injects, never refuses, and fails open; a subagent's report, another session's message or a task notice gets no procedure |
 
 
 
