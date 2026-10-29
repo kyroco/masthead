@@ -75,12 +75,10 @@ gate_abilities() {
   local named path out
   named="$(project_fact "$TOP" PROJECT_ABILITIES)"
   [ -n "$named" ] || return 0
-  path="$(project_fact "$TOP" --path PROJECT_ABILITIES)"
-  if [ -z "$path" ]; then
-    echo "WARN: PROJECT_ABILITIES names '$named', which does not exist, so no abilities file was checked." >&2
-    return 0
-  fi
-  if ! out="$(python3 "$_HOOK_DIR/abilities.py" gate --top "$TOP" --path "$path" ${BASE:+--base "$BASE"} 2>&1)"; then
+  # A path gone from the checkout is still checked: its ids at the base must not vanish with it.
+  case "$named" in /*) path="$named" ;; *) path="$TOP/$named" ;; esac
+  # Pass no base: abilities.py takes origin/main first, as this gate does, so the check review-design runs by hand is the same.
+  if ! out="$(python3 "$_HOOK_DIR/abilities.py" gate --top "$TOP" --path "$path" 2>&1)"; then
     echo "BLOCK: the abilities check refused this push:" >&2
     printf '%s\n' "$out" | sed 's/^/  /' >&2
     return 1

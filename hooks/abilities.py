@@ -15,6 +15,7 @@ import datetime
 import html
 import os
 import re
+import shlex
 import subprocess
 import sys
 
@@ -34,7 +35,6 @@ ID_SHAPE = re.compile(r"^[A-Z][A-Z0-9]*-[0-9]+$")
 HOLE = re.compile(r"\{([^{}]*)\}")
 HOLE_NAME = re.compile(r"^[a-z_][a-z0-9_]*$")
 RETIRED_SHAPE = re.compile(r"^(\d{4}-\d{2}-\d{2})[,;:]?\s+(\S.*)$")
-CONTROL = re.compile(r"[\x00-\x1f\x7f]")
 STAMP = "masthead-abilities"
 STAMP_TAG = re.compile(r'<meta name="{}" content="([^"]*)">'.format(STAMP))
 
@@ -47,15 +47,29 @@ def need_yaml():
 
 
 def clean(text):
-    """TEXT on one line: a new line or other control character in a file's value is shown, never acted on."""
-    return CONTROL.sub(lambda m: "\\x{:02x}".format(ord(m.group(0))), str(text))
+    """TEXT on one line: any character that does not print (a new line, a Unicode line break) is shown, never acted on."""
+    return "".join(c if c.isprintable() else ("\\x{:02x}" if ord(c) < 256 else "\\u{:04x}").format(ord(c))
+                   for c in str(text))
 
 
 def files_in(path):
     if os.path.isdir(path):
         return sorted(os.path.join(path, n) for n in os.listdir(path)
                       if n.endswith((".yaml", ".yml")) and os.path.isfile(os.path.join(path, n)))
-    return [path]
+    return [path] if os.path.lexists(path) else []
+
+
+def read_text(path):
+    """The text of PATH, or (None, (line, words)) when it cannot be read or is not UTF-8."""
+    try:
+        with open(path, "rb") as handle:
+            data = handle.read()
+    except OSError as err:
+        return None, (1, "cannot be read: {}".format(err))
+    try:
+        return data.decode("utf-8"), None
+    except UnicodeDecodeError as err:
+        return None, (data[:err.start].count(b"\n") + 1, "this file is not UTF-8 text")
 
 
 def line_of(node):
@@ -96,9 +110,11 @@ def aliases(text):
     return out
 
 
-def read(text, problems):
-    """Parse the file's text into its parts, adding each problem with its line."""
-    found = aliases(text)
+def read(text, problems, allow_alias=False):
+    """Parse the file's text into its parts, adding each problem with its line.
+
+    ALLOW_ALIAS reads a file that holds an alias anyway, for a base copy whose ids still count."""
+    found = [] if allow_alias else aliases(text)
     for n, name in found:
         problems.append((n, "'*{}' is an alias; write the value out, so each line holds its own words".format(name)))
     if found:
@@ -256,11 +272,9 @@ def head_lines(paths, found):
     lines, owner = {}, {}
     for root in paths:
         for path in files_in(root):
-            try:
-                with open(path) as handle:
-                    text = handle.read()
-            except OSError as err:
-                found.append((path, 1, "cannot be read: {}".format(err)))
+            text, bad = read_text(path)
+            if bad:
+                found.append((path,) + bad)
                 continue
             problems = []
             doc = read(text, problems)
@@ -281,34 +295,34 @@ def head_lines(paths, found):
     return lines
 
 
-def base_lines(paths, base):
-    """Every line in the files under PATHS as they were at BASE, by id."""
+def base_lines(paths, base, top=None):
+    """Every line in the files under PATHS as they were at BASE, by id. A path gone from the checkout still counts."""
     lines = {}
     for root in paths:
-        top = git_top(root)
-        if not top:
+        here = top or git_top(root) or git_top(os.path.dirname(os.path.abspath(root)))
+        if not here:
             continue
-        rel = os.path.relpath(os.path.realpath(root), top)
-        listed = git(top, "ls-tree", "-r", "-z", "--name-only", base, "--", rel) or ""
+        rel = os.path.relpath(os.path.realpath(root), here)
+        listed = git(here, "ls-tree", "-r", "-z", "--name-only", base, "--", rel) or ""
         for name in listed.split("\0"):
-            if not name.endswith((".yaml", ".yml")) or (os.path.isdir(root) and os.path.dirname(name) != rel.rstrip("/")):
+            if not name.endswith((".yaml", ".yml")) or (name != rel and os.path.dirname(name) != rel):
                 continue
-            text = git(top, "show", "{}:{}".format(base, name))
+            text = git(here, "show", "{}:{}".format(base, name))
             if text is None:
                 continue
-            doc = read(text, [])
+            doc = read(text, [], allow_alias=True)
             for line in (doc or {}).get("lines", []):
                 if line.get("id") and line["id"] not in lines:
-                    lines[line["id"]] = (os.path.join(top, name), line)
+                    lines[line["id"]] = (os.path.join(here, name), line)
     return lines
 
 
-def check(paths, base=None):
+def check(paths, base=None, top=None):
     """Every problem in the files under PATHS, as (path, line, words)."""
     found = []
     now = head_lines(paths, found)
     if base:
-        for ident, (path, old) in sorted(base_lines(paths, base).items()):
+        for ident, (path, old) in sorted(base_lines(paths, base, top).items()):
             if ident not in now:
                 found.append((path, old["_line"], "id {}, on this line before this branch, is gone. A line that stops being true is retired, never deleted: put it back with 'retired: <date>, <decision line>'".format(ident)))
                 continue
@@ -413,7 +427,7 @@ def stamp_of(page_text):
 
 def stamp_source(page, stamp):
     """The file a page's stamp names, or None when the stamp is not a plain path beside the page, inside its repo."""
-    if not stamp or CONTROL.search(stamp) or os.path.isabs(stamp):
+    if not stamp or any(not c.isprintable() for c in stamp) or os.path.isabs(stamp):
         return None
     source = os.path.realpath(os.path.join(os.path.dirname(os.path.abspath(page)), stamp))
     top = git_top(page) or os.path.realpath(os.path.dirname(os.path.abspath(page)))
@@ -424,11 +438,9 @@ def stamp_source(page, stamp):
 
 def verify_page(page, allowed=None):
     """Each problem with the built page PAGE, as (line, words). ALLOWED, when given, is the files it may come from."""
-    try:
-        with open(page) as handle:
-            text = handle.read()
-    except OSError as err:
-        return [(1, "cannot be read: {}".format(err))]
+    text, bad = read_text(page)
+    if bad:
+        return [bad]
     stamp = stamp_of(text)
     if stamp is None:
         return [(1, "this page was built from an abilities file and its stamp is gone. Build it again; a built page is never edited by hand")]
@@ -445,14 +457,16 @@ def verify_page(page, allowed=None):
     if fresh != text:
         old, new = text.splitlines(), fresh.splitlines()
         n = next((i for i, (a, b) in enumerate(zip(old, new)) if a != b), min(len(old), len(new)))
-        return [(n + 1, "this page differs from a fresh build of {}. It is never edited by hand: change the file, then run 'python3 {} page {} -o {}'".format(
-            clean(stamp), os.path.abspath(__file__), clean(os.path.relpath(source)), clean(os.path.relpath(page))))]
+        command = " ".join(shlex.quote(w) for w in (
+            "python3", os.path.abspath(__file__), "page", os.path.relpath(source), "-o", os.path.relpath(page)))
+        return [(n + 1, "this page differs from a fresh build of {}. It is never edited by hand: change the file, then run: {}".format(
+            clean(stamp), clean(command)))]
     return []
 
 
 def find_base(top):
-    """The commit this branch left from: origin's default branch, origin/main or origin/master."""
-    for ref in ("origin/HEAD", "origin/main", "origin/master"):
+    """The commit this branch left from: origin/main first, as the push gate takes it, then origin/master, then origin's default."""
+    for ref in ("origin/main", "origin/master", "origin/HEAD"):
         out = git(top, "merge-base", "HEAD", ref)
         if out and out.strip():
             return out.strip()
@@ -460,22 +474,29 @@ def find_base(top):
 
 
 def gate(top, path, base):
-    """What the push gate checks: every problem as (path, line, words), or [] when the push touches no abilities file."""
+    """What the push gate checks: every problem as (path, line, words), [] when the push touches no abilities file,
+    or None when it touches one and PyYAML is missing."""
     top = os.path.realpath(top)
     path = os.path.realpath(path)
     files = {os.path.realpath(f) for f in files_in(path)}
     base = base or find_base(top)
 
     def listed(*args):
-        return [os.path.realpath(os.path.join(top, n)) for n in (git(top, *args) or "").split("\0") if n]
+        out = (git(top, *args) or "").split("\0")
+        return [os.path.realpath(os.path.join(top, n.strip("\n"))) for n in out if n.strip("\n")]
 
-    changed = set(listed("diff", "--name-only", "-z", "HEAD")) | set(listed("ls-files", "--others", "--exclude-standard", "-z"))
+    # --no-renames lists a moved or renamed file under its old name too, so its ids are compared.
+    changed = set(listed("diff", "--no-renames", "--name-only", "-z", "HEAD")) | \
+        set(listed("ls-files", "--others", "--exclude-standard", "-z"))
+    stamp = 'name="{}"'.format(STAMP)
+    pages = set(listed("grep", "-l", "-z", "--fixed-strings", "-e", stamp, "--", "*.html"))
     if base:
-        changed |= set(listed("diff", "--name-only", "-z", base, "HEAD"))
-    pages = set(listed("grep", "-l", "-z", "--fixed-strings", "-e", 'name="{}"'.format(STAMP), "--", "*.html"))
-    if base:
-        before = (git(top, "grep", "-l", "-z", "--fixed-strings", "-e", 'name="{}"'.format(STAMP), base, "--", "*.html") or "").split("\0")
+        changed |= set(listed("diff", "--no-renames", "--name-only", "-z", base, "HEAD"))
+        before = (git(top, "grep", "-l", "-z", "--fixed-strings", "-e", stamp, base, "--", "*.html") or "").split("\0")
         pages |= {os.path.realpath(os.path.join(top, n.split(":", 1)[1])) for n in before if ":" in n}
+        # A page that carried a stamp at any commit on this branch is still a built page.
+        pages |= set(listed("log", "-z", "--no-renames", "--format=", "--name-only", "-G", re.escape(stamp),
+                            "{}..HEAD".format(base), "--", "*.html"))
     pages = {p for p in pages if os.path.isfile(p)}
 
     def ability(p):
@@ -483,9 +504,11 @@ def gate(top, path, base):
 
     if not any(ability(p) or p in pages for p in changed):
         return []
-    found = [(p, n, w) for p, n, w in check([path], base)]
+    if yaml is None:
+        return None
+    found = check([path], base, top)
     if not base:
-        found.append((path, 1, "no base branch was found (origin/HEAD, origin/main or origin/master), so deleted and reused ids could not be checked. Run 'git fetch origin' and push again"))
+        found.append((path, 1, "no base branch was found (origin/main, origin/master or origin/HEAD), so deleted and reused ids could not be checked. Run 'git fetch origin' and push again"))
     for page in sorted(pages):
         found.extend((page, n, w) for n, w in verify_page(page, files))
     return found
@@ -501,8 +524,19 @@ def main(argv):
     if not argv or argv[0] not in ("check", "page", "verify-page", "gate"):
         print(__doc__.strip(), file=sys.stderr)
         return 2
-    need_yaml()
     cmd, args = argv[0], argv[1:]
+    if cmd == "gate":
+        # The gate decides first whether the push touches an abilities file, so a push that does not needs no PyYAML.
+        opts = dict(zip(args[::2], args[1::2]))
+        if "--top" not in opts or "--path" not in opts:
+            print("abilities gate: --top TOP --path PATH [--base REV]", file=sys.stderr)
+            return 2
+        found = gate(opts["--top"], opts["--path"], opts.get("--base"))
+        if found is None:
+            need_yaml()
+        show(found, os.path.realpath(opts["--top"]))
+        return 1 if found else 0
+    need_yaml()
     if cmd == "check":
         base = None
         if args[:1] == ["--base"]:
@@ -510,16 +544,8 @@ def main(argv):
         if not args:
             print("abilities check: name a file or folder", file=sys.stderr)
             return 2
-        found = check(args, base)
+        found = [(p, 1, "does not exist") for p in args if not os.path.lexists(p)] + check(args, base)
         show(found)
-        return 1 if found else 0
-    if cmd == "gate":
-        opts = dict(zip(args[::2], args[1::2]))
-        if "--top" not in opts or "--path" not in opts:
-            print("abilities gate: --top TOP --path PATH [--base REV]", file=sys.stderr)
-            return 2
-        found = gate(opts["--top"], opts["--path"], opts.get("--base"))
-        show(found, os.path.realpath(opts["--top"]))
         return 1 if found else 0
     if cmd == "page":
         if len(args) != 3 or args[1] != "-o":
