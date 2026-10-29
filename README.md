@@ -77,10 +77,15 @@ comes to you, one question at a time, with a recommendation. You answer in a
 sentence. It goes on the issue in your words. An issue with a question still
 open stays out of the run until you've answered it.
 
-Now the foreman hands you one table: the issues in build order, which depend
-on which, which can run side by side without touching the same files, how
-much effort each one needs, and how many workers it would run at once. You
-pick a number. Say three.
+Now the foreman tells you, in one sentence, what it is about to do, and asks
+how many workers. You pick a number. Say three. It names the three issues
+that fill those slots, each with what the customer gets, and brings you the
+questions those issues still carry, one at a time, in plain words. You answer;
+each answer goes onto the issue in your words. Then it tells you how far the
+queue of issues with no open question runs behind them, and takes the next
+questions whenever you want, so the run never waits on one. The order, the
+effort each worker runs at and what can run side by side are its calls, and
+it does not hand you a table to judge them by.
 
 ![The foreman's plan; you pick how many run at once](docs/images/day-4-plan.svg)
 
@@ -129,16 +134,17 @@ to In Review.
 Meanwhile you're having coffee. A worker's question lands at the foreman,
 which re-reads the issue's comments and Korium for an answer you already
 gave and relays it with the line quoted. Anything you have not answered
-reaches you as a numbered line, in customer words, and your answer goes back
-verbatim and onto the issue so the next session finds it. The foreman decides
-nothing a customer would feel. A worker that stops on a failure gets one
+reaches you one question at a time, in customer words, and your answer goes
+back verbatim and onto the issue so the next session finds it. The foreman
+decides how the work runs; what the product does, says or charges, and who
+may do what, are yours. A worker that stops on a failure gets one
 message; a second failure parks the issue with a comment saying what
 happened, and the run goes on without it.
 
 ![You have coffee; questions reach you only when nothing settles them](docs/images/day-6-coffee.svg)
 
-When a pull request is ready, its "seen, not done" list comes to you as
-numbered lines, and you answer each one: fix now, fix later, or proceed. Fix
+When a pull request is ready, its "seen, not done" list comes to you one
+item at a time, and you answer each one: fix now, fix later, or proceed. Fix
 later is the only way an issue gets filed. When its checks pass, its review is
 clean, every line is answered and the worker has cleaned up after itself, the
 foreman queues it to be merged. It closes the issue, and any big issue whose
