@@ -37,6 +37,9 @@ This is a verification; you change no code.
 
 Scenario: <the scenario, word for word: Given, When, Then>.
 Rests on: <the decision-record lines the scenario names, quoted>.
+Who uses this: <the README's opening paragraph, quoted>.
+Abilities: <the abilities line the scenario rests on, quoted>, or "none".
+Mockup: <the mockup page the scenario names>, or "none".
 Verify <the diff command, with the head commit>. Write your findings to
 <state>/review/findings-verifier-<scenario>-<name>.json, where <state> is the
 repo's PROJECT_STATE_DIR fact from the env block of its .claude/settings.json
@@ -94,8 +97,9 @@ where it has them) and the findings file
 
 ## The adjudicator's brief
 
-It gets the round and nothing of yours: no claims, no did-not-prove list, no
-summary of the change, no opinion of any finding.
+It gets the round and what it needs to judge it, and nothing of yours: no
+claims, no did-not-prove list, no summary of the change, no opinion of any
+finding.
 
 ```
 read_only: true
@@ -107,6 +111,10 @@ The reviewed files are:
 <git diff --name-only <base>..<first-verification head>, one per line>
 The findings files are:
 <one path per line, every file the round wrote>
+Who uses this: <the README's opening paragraph, quoted>.
+Scenarios:
+<each scenario of the round, word for word, each followed by its Rests on:
+and Abilities: lines as the verifier's brief gives them>
 ```
 
 The reviewed files are the first verification's on every round, re-verify
