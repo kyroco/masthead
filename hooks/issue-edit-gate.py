@@ -112,9 +112,11 @@ def shell_tokens(text):
     """The words of a shell command with each operator (`;`, `&&`, `|`, `(`,
     a newline and the like) as a token of its own; None when the quotes do not
     close."""
+    # A backslash at the end of a line joins it to the next, as in the shell.
     # The shell starts a comment only at the start of a word; shlex would cut
     # `notes#1.md` too, so a `#` inside a word is hidden from it.
-    lexer = shlex.shlex(MID_WORD_HASH.sub("\0", text), posix=True, punctuation_chars=OPERATORS)
+    text = MID_WORD_HASH.sub("\0", text.replace("\\\n", ""))
+    lexer = shlex.shlex(text, posix=True, punctuation_chars=OPERATORS)
     lexer.whitespace = " \t\r"
     lexer.whitespace_split = True
     try:
@@ -196,13 +198,14 @@ def checkout_root(cwd):
 
 def edits_in(command, cwd):
     """Every gh issue edit in the command: (refs, repo, body, problem). The
-    arguments are the rest of the edit's line."""
+    arguments run to the first shell operator, across a backslash line end or
+    a line break inside quotes, as the shell reads them."""
     found = []
     root = None
     for match in EDIT.finditer(command):
         line_end = command.find("\n", match.end())
         args = command[match.end():] if line_end < 0 else command[match.end():line_end]
-        refs, repo, (how, value) = parse_edit(edit_args(args))
+        refs, repo, (how, value) = parse_edit(edit_args(command[match.end():]))
         if "<<" in args:
             found.append((refs, repo, None, "the body comes from a heredoc or a here-string"))
             continue
