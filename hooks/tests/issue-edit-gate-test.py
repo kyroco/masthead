@@ -222,6 +222,7 @@ def main():
         ("hash inside the file name", "gh issue edit 21 --body-file drop#said.md", "deny"),
         ("joined flag on a continued line", "gh issue edit 21 \\\n  -Fdrop-said.md", "deny"),
         ("body file on a continued line", "gh issue edit 21 \\\n  --body-file drop-said.md", "deny"),
+        ("line ending in an escaped backslash is not joined", "gh issue edit 21 -F drop-said.md --title a\\\\\n  x -F clean.md", "deny"),
         ("body file after a title with a line break", "gh issue edit 21 --title 'two\nlines' --body-file drop-said.md", "deny"),
         ("file the same command rewrites", "cp drop-said.md clean-copy.md; gh issue edit 21 --body-file clean-copy.md", "deny"),
         ("cd into another folder first", "cd sub && gh issue edit 21 --body-file clean.md", "deny"),
