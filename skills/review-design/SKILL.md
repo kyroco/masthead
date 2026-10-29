@@ -14,7 +14,9 @@ skill finds it first. It writes no code, no issue and no plan.
 
 All of it, not a search over it: the decision record, every line; the
 architecture doc; every mockup page the record or the doc names, and the
-mockup's model where there is one; the rubric or test support file the repo
+mockup's model where there is one; the record's abilities file, when the repo
+names one as `PROJECT_ABILITIES` in its settings; the rubric or test support
+file the repo
 keeps for the record; the code each decision touches, found with
 `code_locate` first; and Korium, `agent_search` with `limit` 5, for the
 record's subject, for each decision, and for the user's earlier answers.
@@ -32,7 +34,10 @@ each decision, look for:
 - a thing one artifact has and the others do not: a refusal on a mockup with
   no decision behind it, a decision with no screen, a setting in the code no
   decision names, a rule in the rubric the record no longer says;
-- an older record it changes without saying so.
+- an older record it changes without saying so;
+- in the abilities file, a state a line names that the record, the mockup or
+  the code does not settle, and a state the line is missing: what happens
+  there is written down nowhere, so a builder would have to guess.
 
 A finding names the two lines that disagree, or the state and the decision
 that is silent on it. "Could be clearer" and "I would have done it another
@@ -47,6 +52,12 @@ customer sees today, your one recommendation and why, and the question.
 Wait for the answer. Write it down in the user's words. Then the next one.
 Never write a decision the user did not make.
 
+An unsettled state on an abilities line is one question like any other, never
+several at once. Its answer lands in two places: a dated line in the record,
+in the user's words, under the decision the line's `why` names; and the
+line's own row, where the state and what is true in it go under `states` and
+`why` points at that dated line.
+
 ## Making the artifacts agree
 
 After each answer, and for each finding a source settled, change every
@@ -55,6 +66,17 @@ record, with a dated line in the user's words under the decision it changes;
 the architecture doc; the mockup page and its model; the rubric or test
 support file. The mockups change too. Save and push each the way its home
 asks: the wiki by a push, the repo by a PR.
+
+The abilities file is the one copy of every can and can't: the record keeps
+the why, the file keeps the what. Change a line there, never on the abilities
+page. Then rebuild the page from the file with
+`python3 ${CLAUDE_PLUGIN_ROOT}/hooks/abilities.py page <file> -o <page>` and
+run `python3 ${CLAUDE_PLUGIN_ROOT}/hooks/abilities.py check <file>`, which
+names each bad line; the push gate runs the same check and refuses a page
+that differs from a fresh build. A line that stops being true is never
+deleted and its id is never reused: give it
+`retired: <date>, <the decision line that retired it>`. The file keeps no
+log; git holds every change and the record's dated line holds the why.
 
 ## Report, and capture
 

@@ -435,6 +435,37 @@ each_root() {
 [ -n "$KOTLIN" ] && each_root gate_kotlin gradlew KOTLIN
 [ -n "$TF" ]     && gate_tf
 
+# Abilities: when the repo names its abilities file, refuse a bad line and a hand-edited abilities page.
+gate_abilities() {
+  named="$(project_fact "$TOP" PROJECT_ABILITIES)"
+  [ -n "$named" ] || return 0
+  path="$(project_fact "$TOP" --path PROJECT_ABILITIES)"
+  if [ -z "$path" ]; then
+    warn "PROJECT_ABILITIES names '$named', which does not exist, so no abilities file was checked."
+    return 0
+  fi
+  case "$path" in /*) ;; *) path="$TOP/$path" ;; esac
+  pages="$(git grep -l -e 'name="masthead-abilities"' -- '*.html' 2>/dev/null | sed "s|^|$TOP/|")"
+  # Run only when the branch touched an abilities file or a page built from one.
+  touched=""
+  for f in $CHANGED; do
+    case "$f" in "$path"|"$path"/*) touched=1 ;; esac
+    printf '%s\n' "$pages" | grep -qxF "$f" && touched=1
+  done
+  [ -n "$touched" ] || return 0
+  if ! out="$(python3 "$_HOOK_DIR/abilities.py" check ${BASE:+--base "$BASE"} "$path" 2>&1)"; then
+    block "the abilities file has problems, each named by its line:"
+    printf '%s\n' "$out" | sed "s|$TOP/||; s/^/  /" >&2
+  fi
+  for page in $pages; do
+    if ! out="$(python3 "$_HOOK_DIR/abilities.py" verify-page "$page" 2>&1)"; then
+      block "an abilities page is not a fresh build of its file:"
+      printf '%s\n' "$out" | sed "s|$TOP/||; s/^/  /" >&2
+    fi
+  done
+}
+gate_abilities
+
 # Local tests: require the push-check script's receipt for HEAD, and refuse a push of any other commit.
 gate_local_tests() {
   check_script="$(project_fact "$TOP" --path PROJECT_PUSH_CHECK)"

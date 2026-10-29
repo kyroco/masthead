@@ -97,6 +97,11 @@ fixed shape (why it aligns with the project's principles, what counts as done,
 and a checked list of factual claims)?" On yes, add `"ADR_DIR": "<folder>"` to
 the env block.
 
+If the repository already keeps abilities files (YAML with `record`, `roles`
+and `lines`, one per decision record), ask: "Should a push be refused when an
+abilities file has a bad line or its page was edited by hand?" On yes, add
+`"PROJECT_ABILITIES": "<the file or its folder>"` to the env block.
+
 ## 7. Write, then show what is on
 
 Show the exact env block and the file it goes to, and ask "Shall I write
