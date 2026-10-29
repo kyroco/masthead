@@ -56,7 +56,7 @@ there. Four parts, in this order, under these headings:
   each naming what it rests on: a decision record, a project README rule, or
   the user's words quoted. How much one issue holds is the Size rule's call, never a count of
   scenarios. Nothing about modules, calls or where a check runs: that is the
-  worker's plan, written before code and checked by the foreman.
+  worker's plan, written before code and checked by a blind verifier.
 - **Out of scope:** what this issue leaves to another, by number when it
   exists.
 - **Questions:** what the decision records, the README and memory do not
@@ -91,7 +91,9 @@ connector's tools for the same calls. `<org>` is the repository's owner.
   `bug` label serves as Bug), plus any topic label already in the repository.
 - A blocked-by link for a real sequence dependency, never for "this would be
   tidier after that". The one exception marks shared work: a follow-up filed
-  from a PR's review is blocked by the issue whose review found it.
+  from a PR's review is blocked by the issue whose review found it, and only
+  the user files one, by answering "fix later" to its line; no agent files an
+  issue from a review on its own.
   `gh api -X POST repos/<repo>/issues/<blocked>/dependencies/blocked_by -F issue_id=<blocker's id>`
   (the id is `gh api repos/<repo>/issues/<n> --jq .id`, not the number).
 - A sub-issue: `gh api -X POST repos/<repo>/issues/<parent>/sub_issues -F sub_issue_id=<child's id>`.

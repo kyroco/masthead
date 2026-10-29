@@ -58,7 +58,7 @@
   <path d="M 1236 364 L 1236 257 L 838 257" fill="none" stroke="#6b7280" stroke-width="2" stroke-linejoin="round" stroke-dasharray="5 4" marker-end="url(#m6b7280)"/>
   <text x="848" y="249" text-anchor="start" font-size="11" fill="#6b7280">plans, questions and reports come back to the foreman</text>
   <rect x="40" y="594" width="1226" height="57" rx="10" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5"/>
-  <text x="653" y="619" text-anchor="middle" font-size="13" font-weight="600" fill="#14532d">the foreman queues each passing pull request, closes its issue and any big issue now done, and gives that worker its next issue</text>
+  <text x="653" y="619" text-anchor="middle" font-size="13" font-weight="600" fill="#14532d">you answer each PR's seen-not-done lines; the foreman queues it, closes its issue, and gives that worker its next issue</text>
   <text x="653" y="635" text-anchor="middle" font-size="12" fill="#166534">the run ends when every issue is merged, parked or skipped, with one line per issue saying which</text>
   <line x1="232" y1="554" x2="232" y2="592" stroke="#16a34a" stroke-width="2" marker-end="url(#m16a34a)"/>
   <line x1="653" y1="554" x2="653" y2="592" stroke="#16a34a" stroke-width="2" marker-end="url(#m16a34a)"/>

@@ -90,14 +90,17 @@ order. The steps live here and nowhere else; a repo supplies only its own facts
    round) and the path of every findings file the round wrote, and nothing
    else: not your claims, not your did-not-prove list, not your view of any
    finding. It runs each reproduction a verifier showed where it can,
-   confirms the claim is false, and places it: fix in this PR, or new issue.
-   That placement is final. What it throws out is gone: it is not logged or
-   filed. File each finding on its New issue list as its own issue, as the
-   repo's tracker skill says, in the same milestone and blocked by this one,
-   and link it in the PR body; fix none of them here, and never ask for one
-   to be fixed here. Its For the foreman section (a security finding it
-   could not settle) goes to the foreman unedited (to the user when there is
-   none), who decides; the PR waits for that answer.
+   confirms the claim is false, and places it: fix in this PR, or "seen, not
+   done". That placement is final for you and the foreman. What it throws out
+   is gone: it is not logged or filed. Put its "seen, not done" list in the
+   PR body under that heading, in its words; fix none of them here, file
+   none, and never ask for one to be fixed here. The foreman brings the list
+   to the user as numbered lines, who answers each: fix now (you fix it in
+   this PR, test first, as step 4 says), fix later (the foreman files one
+   issue for it, in the same milestone and blocked by this one), or proceed
+   (nothing). Its For the foreman section (a security finding it could not
+   settle) goes to the foreman unedited (to the user when there is none), who
+   brings it to the user; the PR waits for that answer.
 4. Fix each finding on the adjudicator's fix list in this PR, test first,
    in two commits of its own: a test that reproduces it and fails, then the
    fix. When no test can reproduce it (instruction text, a fault only a
@@ -117,9 +120,11 @@ order. The steps live here and nowhere else; a repo supplies only its own facts
    reviewer's dispatch does not spend a round; a verifier that died or was
    declined did). If the second round still leaves anything on the fix
    list, stop and report it to the foreman, or to the user when there is
-   none. That is fix-break-fix churn, and it needs a person.
-6. Log nothing. There is no Nit log: a finding is either on the fix list and
-   fixed, or thrown out.
+   none. That is fix-break-fix churn, and it needs a person: the foreman
+   brings it to the user as numbered lines and rules on none of it.
+6. Log nothing and file nothing. There is no Nit log: a finding is on the
+   fix list and fixed, on the "seen, not done" list for the user, or thrown
+   out.
 7. Add the changelog entry when the repo keeps one, or its label for internal
    work.
 8. Commit, then run the repo's pre-push check on that last commit: the script
@@ -129,8 +134,9 @@ order. The steps live here and nowhere else; a repo supplies only its own facts
    it prints, and stop and report only when that fails too. `hard-gate.sh`
    refuses the push and the PR until the check's receipt matches the commit.
 9. Push and open one PR to main. Its body gives the unproven list, the
-   agent-run count (the rows added to `<state>/dispatches.tsv` for this
-   issue whose outcome is not refused), and `Fixes #<issue>`. Never
+   "seen, not done" list, the agent-run count (the rows added to
+   `<state>/dispatches.tsv` for this issue whose outcome is not refused), and
+   `Fixes #<issue>`. Never
    commit or push to main: main changes only by merging the reviewed PR once
    its checks are green.
 10. Once it merges, clean up what your own work created, from the main

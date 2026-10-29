@@ -117,7 +117,8 @@ touches sign-in, secrets or input from outside, with the repository's
 security rules as its claims. None of them can edit anything. None of them
 can reach the network. Then a judge reads the code and the false claims,
 runs each reproduction it can, confirms it, and places each one: fixed in
-this pull request, or filed as a new issue. That placement is final. The
+this pull request, or on a "seen, not done" list. That placement is final for
+the worker and the foreman; nobody files anything. The
 worker fixes the list, test first again, and only the claims the fix broke
 go back to a verifier, at most twice. The tests run on the final commit and
 leave a receipt that names it, and nothing can be pushed until the receipt
@@ -126,21 +127,26 @@ wasn't proved, the number of agent dispatches it took, and the issue moves
 to In Review.
 
 Meanwhile you're having coffee. A worker's question lands at the foreman,
-which re-reads the issue's comments and the sources and answers with the
-line quoted. Only when nothing settles it does the question reach you, and
-your answer goes on the issue so the next session finds it. A worker that
-stops on a failure gets one message; a second failure parks the issue with a
-comment saying what happened, and the run goes on without it.
+which re-reads the issue's comments and Korium for an answer you already
+gave and relays it with the line quoted. Anything you have not answered
+reaches you as a numbered line, in customer words, and your answer goes back
+verbatim and onto the issue so the next session finds it. The foreman decides
+nothing a customer would feel. A worker that stops on a failure gets one
+message; a second failure parks the issue with a comment saying what
+happened, and the run goes on without it.
 
 ![You have coffee; questions reach you only when nothing settles them](docs/images/day-6-coffee.svg)
 
-When a pull request's checks pass, its review is clean and the worker has
-cleaned up after itself, the foreman queues it to be merged. It closes the
-issue, and any big issue whose pieces are now all done, then starts the next
-issue, a follow-up that waited on this one first, in that worker in the
-desktop app or in a fresh session in the terminal. By the end of the
-day every issue is merged, parked or skipped, and you get one
-line per issue saying which.
+When a pull request is ready, its "seen, not done" list comes to you as
+numbered lines, and you answer each one: fix now, fix later, or proceed. Fix
+later is the only way an issue gets filed. When its checks pass, its review is
+clean, every line is answered and the worker has cleaned up after itself, the
+foreman queues it to be merged. It closes the issue, and any big issue whose
+pieces are now all done, then starts the next issue, a fix-later issue that
+waited on this one first, in that worker in the desktop app or in a fresh
+session in the terminal. By the end of the day every issue is merged, parked
+or skipped, and you get one line per issue saying which, with how many
+merged and how many were filed.
 
 ![A run: issues checked, a foreman plan, workers in parallel, merges](docs/images/workflow.svg)
 

@@ -74,11 +74,11 @@ done
 # 3. Follow-up timing.
 says  references/session-cliffs.md "blocked by this one"
 says  skills/github-issues/SKILL.md "a follow-up filed from a PR's review is blocked by the issue whose review found it"
-says  skills/work-on/worker.md "the follow-up issues you filed"
+never skills/work-on/worker.md "the follow-up issues you filed"
 says  skills/work-on/foreman.md "as soon as its blocker merges, ahead of unrelated work"
 says  skills/work-on/foreman.md "dependencies/blocking"
 says  skills/work-on/foreman.md "its follow-ups wait with it"
-says  skills/work-on/foreman.md "a follow-up first once its blocker merges"
+says  skills/work-on/foreman.md "a fix-later issue first once its blocker merges"
 says  skills/work-on/foreman.md "is part of the run the user already approved"
 says  skills/work-on/foreman.md "already approved: once ready, it starts"
 says  skills/work-on/foreman.md "within the user's worker limit"
@@ -103,7 +103,7 @@ says  docs/explainer.html "writes a plan, one line per scenario"
 says  docs/explainer.html "its plan, one line per scenario"
 says  docs/images/day-5-workers.svg "its plan, one line per scenario"
 says  scripts/diagrams.py "its plan, one line per scenario"
-says  .claude-plugin/plugin.json '"version": "0.1.7"'
+says  .claude-plugin/plugin.json '"version": "0.1.8"'
 
 never_phrase() {
   local hit
@@ -210,8 +210,8 @@ says  agents/adjudicator.md "run the reproduction the verifier showed"
 says  agents/adjudicator.md "That placement is final"
 never agents/adjudicator.md "or that is not plain English"
 never agents/adjudicator.md "each finding you could not place"
-says  skills/work-on/worker.md "never fixed in this PR"
-says  skills/work-on/foreman.md "never fixed in this PR"
+never skills/work-on/worker.md "never fixed in this PR"
+never skills/work-on/foreman.md "never fixed in this PR"
 never skills/work-on/foreman.md "each finding it could not place"
 # Scenario 5: one brief check.
 says  hooks/agent-brief-gates.sh "gate-verify-brief"
@@ -437,10 +437,10 @@ says  README.md "until the index is asked"
 never README.md "already answered; otherwise nothing"
 says  docs/explainer.template.html "until the index is asked"
 never docs/explainer.template.html "already answered; otherwise nothing"
-# An unsettled security finding goes to the foreman (adjudicator.md step 5).
-says  docs/explainer.template.html "goes to the foreman instead"
-says  scripts/diagrams.py "goes to the foreman"
-says  docs/images/review.svg "goes to the foreman"
+# An unsettled security finding reaches the user through the foreman (issue #29 changed this from "goes to the foreman").
+says  docs/explainer.template.html "goes to you the same way"
+says  scripts/diagrams.py "goes to you"
+says  docs/images/review.svg "goes to you"
 # The worker box numbers eight steps with no gap.
 says  scripts/diagrams.py "8. one pull request"
 never scripts/diagrams.py "9. one pull request"
@@ -477,6 +477,54 @@ says  docs/explainer.template.html "the refresh only with"
 # Setup asks two questions when a memory is already connected.
 says  README.md "or two when a memory is already connected"
 says  docs/explainer.template.html "or two when a memory is already connected"
+
+# 11. Issue #29: nobody files work but the user. The judge lists what it saw
+# outside the change, the foreman relays and asks as numbered lines, and the
+# user answers each one: fix now, fix later, or proceed. Robert, October 28,
+# 2026: "Why are you filing anything?", "No means don't build it."
+says  skills/work-on/foreman.md "files no issues, and decides nothing a customer would"
+says  skills/work-on/foreman.md "Two fixed points, and no others, are where the user is asked"
+says  skills/work-on/foreman.md "fix now"
+says  skills/work-on/foreman.md "fix later"
+says  skills/work-on/foreman.md "\"Proceed\" means merge as"
+says  skills/work-on/foreman.md "The foreman never fills a gap in the sources with a ruling"
+says  skills/work-on/foreman.md "sessions alive, the ones waiting for the merge queue"
+says  skills/work-on/foreman.md "The foreman does not rule on it"
+says  skills/work-on/foreman.md "The moment filed exceeds closed, stop dispatching"
+says  skills/work-on/foreman.md "and not filing any other issue"
+never skills/work-on/foreman.md "answer it from the sources above, in order, with the line quoted, or ask the user"
+never skills/work-on/foreman.md "tell the worker to fix it, file it or leave it"
+never skills/work-on/foreman.md "a finding it placed as a new issue is filed"
+says  agents/adjudicator.md "You file no issue and name none to file"
+says  agents/adjudicator.md "**Seen, not done**"
+says  agents/adjudicator.md "final for the worker and the foreman"
+never agents/adjudicator.md "**New issue**"
+never agents/adjudicator.md "the worker files a new issue"
+never agents/adjudicator.md "goes on the New issue list"
+says  agents/verifier.md "Nothing else is a claim"
+says  skills/work-on/worker.md "you file no issue"
+says  skills/work-on/worker.md "its \"seen, not done\" list as numbered lines"
+never skills/work-on/worker.md "is filed, blocked by this issue"
+says  references/session-cliffs.md "fix none of them here, file none"
+says  references/session-cliffs.md "Log nothing and file nothing"
+never references/session-cliffs.md "File each finding on its New issue list"
+says  skills/github-issues/SKILL.md "no agent files an issue from a review on its own"
+says  skills/github-issues/SKILL.md "checked by a blind verifier"
+never skills/github-issues/SKILL.md "checked by the foreman"
+for doc in README.md docs/explainer.template.html docs/explainer.html; do
+  says  "$doc" "nobody files anything"
+  says  "$doc" "fix now, fix later, or proceed"
+  says  "$doc" "The foreman decides nothing a customer would feel"
+  never "$doc" "or filed as a new issue"
+  never "$doc" "a follow-up that waited on this one first"
+  never "$doc" "answers with the line quoted. Only when nothing settles it"
+done
+says  scripts/diagrams.py "seen, not done"
+says  docs/images/review.svg "seen, not done"
+never docs/images/review.svg "new issues to file"
+says  docs/images/day-6-coffee.svg "relays your earlier answer"
+never docs/images/day-6-coffee.svg "answers from the sources"
+says  docs/images/workflow.svg "seen-not-done lines"
 
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
