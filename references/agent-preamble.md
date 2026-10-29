@@ -43,7 +43,9 @@ boundary.
 
 ## Korium
 
-File captures under your own agent name. To re-file a capture another agent
+File captures under your own agent name without the plugin prefix: as
+`source_agent` a `masthead:verifier` sends `verifier`, since Korium refuses a
+colon. To re-file a capture another agent
 failed to save, keep its `source_agent` and set `captured_by` to your name.
 
 </preamble>

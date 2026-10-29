@@ -388,11 +388,17 @@ EOF
     [ -n "$claimed" ] || exit 0
     [ -n "$(field '.tool_input.captured_by // ""')" ] && exit 0
 
+    # The name to file under is the bare agent name: masthead:verifier files as verifier (Robert, 2026-10-29: "just verifier"), since Korium refuses a colon.
     a="$(printf '%s' "${acting##*:}" | tr 'A-Z' 'a-z')"
     c="$(printf '%s' "${claimed##*:}" | tr 'A-Z' 'a-z')"
+    # Korium's own source_agent pattern; a name it would refuse is refused here, with the name that passes both.
+    if ! printf '%s' "$claimed" | grep -qE '^[a-z][a-z0-9_-]{1,63}$'; then
+      deny_tool "Korium refuses source_agent '$claimed': it must match ^[a-z][a-z0-9_-]{1,63}\$, so no colon and no capital. File this capture as source_agent '$a', your agent name without the plugin prefix. MASTHEAD_CAPTURE_GATE=off in the operator's environment turns this gate off."
+      exit 0
+    fi
     [ "$a" = "$c" ] && exit 0
     case "$c" in "$a"-*|"$a"_*) exit 0 ;; esac
-    deny_tool "This capture is filed under '$claimed' but the agent making it is '$acting'. ADR-0120: source_agent is the one field that answers who decided this, and filing under another name falsifies exactly that. Use your own name. If you are genuinely re-filing for an agent whose own capture failed, keep their source_agent and set captured_by to your name, which this gate allows. MASTHEAD_CAPTURE_GATE=off in the operator's environment turns it off."
+    deny_tool "This capture is filed under '$claimed' but the agent making it is '$acting'. ADR-0120: source_agent is the one field that answers who decided this, and filing under another name falsifies exactly that. File it as source_agent '$a', your agent name without any plugin prefix. If you are genuinely re-filing for an agent whose own capture failed, keep their source_agent and set captured_by to your name, which this gate allows. MASTHEAD_CAPTURE_GATE=off in the operator's environment turns it off."
     ;;
 
   # gate-verify-brief: refuse a brief to verifier or security-reviewer that carries no claims list, and a third re-verify round.
