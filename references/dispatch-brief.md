@@ -92,25 +92,6 @@ security conventions as its claims (its CLAUDE.md and `docs/conventions/`
 where it has them) and the findings file
 `<state>/review/findings-security-reviewer-<name>.json`.
 
-**A plan brief** is sent before any code is written, to one `verifier`, with
-the plan, the issue and the decision-record sections the issue names, and
-nothing else: no code, no account of how you will build it.
-
-```
-read_only: true
-This is a plan verification; you change no code and read no code.
-
-Issue #<n>: <the issue, body and comments, as gh issue view prints it>.
-Decision record: <the sections the issue names, quoted in full>.
-
-Claims:
-- <the plan, one bullet per scenario: what will change and the test that shows it>
-
-Answer each of Robert's five questions in your agent file about this plan,
-and say whether any step undoes a decision recorded above. Verdict: pass or
-fail, with the lines to change.
-```
-
 ## The adjudicator's brief
 
 It gets the round and nothing of yours: no claims, no did-not-prove list, no

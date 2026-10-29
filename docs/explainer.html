@@ -204,8 +204,8 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   <text x="681" y="162" text-anchor="middle" font-size="12" fill="#9d174d">nothing starts until you say a number</text>
 </svg>
 </div></figure>
-<p>Three fresh sessions start, each with its own copy of the repository and a branch tied to its issue. Each worker reads its issue, the README and the decision record cover to cover, looks up what earlier sessions learned, and writes a plan, one line per scenario: what it will change and the test that proves it. Then it sends the plan to a verifier that saw none of its reasoning. The verifier reads only the plan, the issue and the decisions the issue names, and answers five questions: does it over build, does it cut corners, does it add things nobody asked for, does it find the holes in the design and fill them, and does it get to a correct result in the least time. It also says if any step undoes a recorded decision. A plan that fails is revised; one that fails twice stops and asks. When it passes, the worker tells the foreman and builds.</p>
-<figure><div class="paper"><svg xmlns="http://www.w3.org/2000/svg" role="img" viewBox="0 0 1240 265" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="14">
+<p>Three fresh sessions start, each with its own copy of the repository and a branch tied to its issue. Each worker reads its issue, the README and the decision record cover to cover, looks up what earlier sessions learned, and builds. It writes no plan and waits for no go: the design was reviewed before the issues were written, and the verifier checks each scenario once the code exists.</p>
+<figure><div class="paper"><svg xmlns="http://www.w3.org/2000/svg" role="img" viewBox="0 0 1230 265" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="14">
     <defs><marker id="day5workers-m16a34a" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#16a34a"/></marker><marker id="day5workers-m6366f1" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#6366f1"/></marker><marker id="day5workers-m6b7280" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#6b7280"/></marker><marker id="day5workers-md97706" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#d97706"/></marker><marker id="day5workers-mdb2777" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#db2777"/></marker><marker id="day5workers-mdc2626" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#dc2626"/></marker></defs>
   <rect x="40" y="110" width="140" height="58" rx="10" fill="#eef2ff" stroke="#6366f1" stroke-width="1.5"/>
   <text x="110" y="136" text-anchor="middle" font-size="14" font-weight="600" fill="#312e81">the foreman</text>
@@ -222,13 +222,13 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   <line x1="180" y1="139" x2="248" y2="64" stroke="#6366f1" stroke-width="2" marker-end="url(#day5workers-m6366f1)"/>
   <line x1="180" y1="139" x2="248" y2="126" stroke="#6366f1" stroke-width="2" marker-end="url(#day5workers-m6366f1)"/>
   <line x1="180" y1="139" x2="248" y2="186" stroke="#6366f1" stroke-width="2" marker-end="url(#day5workers-m6366f1)"/>
-  <rect x="615" y="40" width="586" height="121" rx="10" fill="#f3f4f6" stroke="#9ca3af" stroke-width="1.5"/>
-  <text x="908" y="65" text-anchor="middle" font-size="13" font-weight="600" fill="#374151">a worker's first message: its plan, one line per scenario, passed</text>
-  <text x="908" y="81" text-anchor="middle" font-size="12" font-family="Menlo, Consolas, monospace" fill="#4b5563">scenario 1: change sign_in/form.ex,</text>
-  <text x="908" y="97" text-anchor="middle" font-size="12" font-family="Menlo, Consolas, monospace" fill="#4b5563">  test: remembers the email on reload</text>
-  <text x="908" y="113" text-anchor="middle" font-size="12" font-family="Menlo, Consolas, monospace" fill="#4b5563">scenario 2: change sign_in/cookie.ex,</text>
-  <text x="908" y="129" text-anchor="middle" font-size="12" font-family="Menlo, Consolas, monospace" fill="#4b5563">  test: the cookie expires after 30 days</text>
-  <text x="908" y="145" text-anchor="middle" font-size="12" fill="#4b5563">a blind verifier read the plan, the issue and the decisions, and passed it</text>
+  <rect x="615" y="40" width="575" height="121" rx="10" fill="#f3f4f6" stroke="#9ca3af" stroke-width="1.5"/>
+  <text x="903" y="65" text-anchor="middle" font-size="13" font-weight="600" fill="#374151">a worker's first message: a question, a split or its PR</text>
+  <text x="903" y="81" text-anchor="middle" font-size="12" font-family="Menlo, Consolas, monospace" fill="#4b5563">scenario 1: change sign_in/form.ex,</text>
+  <text x="903" y="97" text-anchor="middle" font-size="12" font-family="Menlo, Consolas, monospace" fill="#4b5563">  test: remembers the email on reload</text>
+  <text x="903" y="113" text-anchor="middle" font-size="12" font-family="Menlo, Consolas, monospace" fill="#4b5563">scenario 2: change sign_in/cookie.ex,</text>
+  <text x="903" y="129" text-anchor="middle" font-size="12" font-family="Menlo, Consolas, monospace" fill="#4b5563">  test: the cookie expires after 30 days</text>
+  <text x="903" y="145" text-anchor="middle" font-size="12" fill="#4b5563">it read its issue and the decisions, and built; the verifier checks the code</text>
   <line x1="565" y1="126" x2="613" y2="126" stroke="#6b7280" stroke-width="2" marker-end="url(#day5workers-m6b7280)"/>
   <text x="40" y="245" text-anchor="start" font-size="12" fill="#6b7280">A plan that fails its verifier twice stops and asks. A line the sources don't settle is a question for you, not a guess.</text>
 </svg>

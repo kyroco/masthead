@@ -92,15 +92,9 @@ it does not hand you a table to judge them by.
 Three fresh sessions start, each with its own copy of the repository and a
 branch tied to its issue. Each worker reads its issue, the README and the
 decision record cover to cover, looks up what earlier sessions learned, and
-writes a plan, one line per scenario: what it will change and the test
-that proves it. Then it sends the plan to a verifier that saw none of its
-reasoning. The verifier reads only the plan, the issue and the decisions the
-issue names, and answers five questions: does it over build, does it cut
-corners, does it add things nobody asked for, does it find the holes in the
-design and fill them, and does it get to a correct result in the least time.
-It also says if any step undoes a recorded decision. A plan that fails is
-revised; one that fails twice stops and asks. When it passes, the worker
-tells the foreman and builds.
+builds. It writes no plan and waits for no go: the design was reviewed before
+the issues were written, and the verifier checks each scenario once the code
+exists.
 
 ![Three workers, each with its own session, send their plans](docs/images/day-5-workers.svg)
 
@@ -292,8 +286,9 @@ for the sessions that open it.
 ## For the curious
 
 The skills under `skills/` are the written procedures Claude follows:
-`work-on` (the foreman and the worker), `analyze-issues` (the checks before a
-build), `github-issues` (how the tracker is used), `setup`, and the two
+`work-on` (the foreman and the worker), `review-design` (the design checked
+against the code and the mockups before issues are written), `analyze-issues`
+(the checks on each issue before a build), `github-issues` (how the tracker is used), `setup`, and the two
 Korium skills. `agents/` holds the verifier, the security reviewer, the
 judge (the `adjudicator` agent), the diagnoser and the reader. `references/` holds the pull request steps and the brief
 format. `bash hooks/run-tests.sh` runs every check's tests, and CI runs them

@@ -56,7 +56,7 @@ there. Four parts, in this order, under these headings:
   each naming what it rests on: a decision record, a project README rule, or
   the user's words quoted. How much one issue holds is the Size rule's call, never a count of
   scenarios. Nothing about modules, calls or where a check runs: that is the
-  worker's plan, written before code and checked by a blind verifier.
+  worker's to decide when it builds.
 - **Out of scope:** what this issue leaves to another, by number when it
   exists.
 - **Questions:** what the decision records, the README and memory do not

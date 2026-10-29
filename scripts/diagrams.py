@@ -320,10 +320,10 @@ def day5():
         ws.append(b); y = bottom(b) + 12
     for b in ws:
         c.arrow(right(fore), fore[1] + fore[3] / 2, b[0] - 2, b[1] + b[3] / 2, color=FOREMAN["stroke"])
-    plan = c.box(right(ws[0]) + 50, 40, [("a worker's first message: its plan, one line per scenario, passed", "title"),
+    plan = c.box(right(ws[0]) + 50, 40, [("a worker's first message: a question, a split or its PR", "title"),
                                         ("scenario 1: change sign_in/form.ex,", "mono"), ("  test: remembers the email on reload", "mono"),
                                         ("scenario 2: change sign_in/cookie.ex,", "mono"), ("  test: the cookie expires after 30 days", "mono"),
-                                        ("a blind verifier read the plan, the issue and the decisions, and passed it", "body")], INK, title_size=13)
+                                        ("it read its issue and the decisions, and built; the verifier checks the code", "body")], INK, title_size=13)
     c.arrow(right(ws[1]), ws[1][1] + ws[1][3] / 2, plan[0] - 2, ws[1][1] + ws[1][3] / 2)
     c.w = int(max(c.w, right(plan) + 40))
     low = max(bottom(plan), bottom(ws[-1]))
