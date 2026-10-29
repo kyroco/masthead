@@ -314,6 +314,14 @@ def main():
         merged.update(env or {})
         return run(["bash", PROTOCOL, mode], json.dumps(payload), env=merged)
 
+    def kgate_raw(mode, payload):
+        # The hook's whole answer, for a case that reads the refusal's words.
+        env = dict(os.environ, TMPDIR=KTMP + "/")
+        env.pop("CLAUDE_PROJECT_DIR", None)
+        return subprocess.run(["bash", PROTOCOL, mode], input=json.dumps(payload),
+                              capture_output=True, text=True, check=False,
+                              env=env).stdout
+
     def edit_gate(sid, env=None):
         return kgate("gate-edit", {"session_id": sid, "cwd": KCWD,
                                    "tool_name": "Write",
@@ -378,6 +386,25 @@ def main():
     check("re-filing with captured_by set",
           cap_gate("zeina", "thiago", {"captured_by": "zeina"}), "allow")
     check("the main session names no agent", cap_gate(None, "anything"), "allow")
+    # Issue #28: the name the gate demands must pass Korium's own pattern, or
+    # no capture by a Masthead agent can be saved.
+    KORIUM_SOURCE_AGENT = re.compile(r"\A[a-z][a-z0-9_-]{1,63}\Z")
+    for name in ("reader", "verifier", "security-reviewer", "adjudicator",
+                 "diagnoser"):
+        check(f"masthead:{name} files as its bare name",
+              cap_gate(f"masthead:{name}", name), "allow")
+        check(f"masthead:{name} filed with the colon is refused",
+              cap_gate(f"masthead:{name}", f"masthead:{name}"), "deny")
+        out = kgate_raw("gate-capture", {
+            "session_id": "k-cap", "cwd": KCWD, "agent_name": f"masthead:{name}",
+            "tool_name": "mcp__korium__agent_capture",
+            "tool_input": {"source_agent": f"masthead:{name}"}})
+        demanded = re.findall(r"as source_agent '([^']*)'", out)
+        check(f"masthead:{name}: the name the refusal demands passes Korium",
+              str(bool(demanded) and all(KORIUM_SOURCE_AGENT.match(d) for d in demanded)),
+              "True")
+    check("the masthead- spelling is not the agent's name",
+          cap_gate("masthead:reader", "masthead-reader"), "deny")
     check("the operator's capture escape",
           kgate("gate-capture", {"session_id": "k-cap", "cwd": KCWD,
                                  "agent_name": "zeina",
