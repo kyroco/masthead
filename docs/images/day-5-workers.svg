@@ -24,5 +24,5 @@
   <text x="903" y="129" text-anchor="middle" font-size="12" font-family="Menlo, Consolas, monospace" fill="#4b5563">  test: the cookie expires after 30 days</text>
   <text x="903" y="145" text-anchor="middle" font-size="12" fill="#4b5563">it read its issue and the decisions, and built; the verifier checks the code</text>
   <line x1="565" y1="126" x2="613" y2="126" stroke="#6b7280" stroke-width="2" marker-end="url(#m6b7280)"/>
-  <text x="40" y="245" text-anchor="start" font-size="12" fill="#6b7280">A plan that fails its verifier twice stops and asks. A line the sources don't settle is a question for you, not a guess.</text>
+  <text x="40" y="245" text-anchor="start" font-size="12" fill="#6b7280">A worker is done when every scenario has a passing test and its PR is open. A line the sources don't settle is a question for you, not a guess.</text>
 </svg>
