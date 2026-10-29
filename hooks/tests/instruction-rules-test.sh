@@ -95,7 +95,7 @@ never docs/explainer.html "writes a plan, one line per scenario"
 never docs/explainer.html "its plan, one line per scenario"
 never docs/images/day-5-workers.svg "its plan, one line per scenario"
 never scripts/diagrams.py "its plan, one line per scenario"
-says  .claude-plugin/plugin.json '"version": "0.1.14"'
+says  .claude-plugin/plugin.json '"version": "0.1.15"'
 
 never_phrase() {
   local hit
@@ -563,6 +563,15 @@ for doc in README.md docs/explainer.template.html docs/explainer.html; do
   never "$doc" "hands you one table"
   never "$doc" "numbered line"
 done
+# Issue #39: a screen starts from the template its accepted mockup page became,
+# and review-design asks about each undrawn state before a page becomes one.
+says  skills/work-on/worker.md "starts from the template its mockup page became"
+says  skills/work-on/worker.md "change none of its words or layout"
+says  skills/work-on/worker.md "is a question, not a redraw"
+says  skills/work-on/foreman.md "the templates the screens became"
+says  skills/review-design/SKILL.md "name each state it does not draw (empty, error, refused) and ask the user"
+says  skills/review-design/SKILL.md "The PR body lists each page and the template file it became"
+says  skills/work-on/foreman.md "the review-design PR lists them"
 never scripts/diagrams.py "the foreman's plan, one table"
 never docs/images/day-4-plan.svg "effort"
 

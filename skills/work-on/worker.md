@@ -32,7 +32,9 @@ none of it, name the sub-issues and stop.
 Read the project README, which is the brief, and the milestone's description.
 Then read the decision record the issue links, all of it, with the
 architecture doc and mockups it names. The record decides what gets built
-and wins over the issue, the README, Korium and the foreman.
+and wins over the issue, the README, Korium and the foreman. For a screen,
+find the template its mockup page became: review-design turns each accepted
+page into one in the repo, and its PR names the page and the file.
 
 Search Korium for the person's decisions and for code already built nearby.
 
@@ -79,6 +81,11 @@ refused ones; your report counts the rows added after it.
 Started by the person, tell them in a few lines what you will build and
 wait for their go; dispatched, build. Write and test the code yourself. To
 show a flaky test is fixed, run it two or three times, not dozens.
+
+A screen starts from the template its mockup page became, never from a
+drawing of the mockup: add its data and events, and change none of its words
+or layout. A screen whose page has no template yet, or whose words or layout
+would have to change, is a question, not a redraw.
 
 ## 6. Prove it and open the PR
 
