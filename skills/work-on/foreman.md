@@ -29,7 +29,8 @@ Before you plan, read what earlier sessions left in Korium about this work (a
 few focused `agent_search` queries, each with `limit` 5), the project README in
 full, because it is the brief, and every issue with every comment, because the
 person's answers arrive as comments. Note which decision record, architecture
-doc and mockups the issues point at, by path, so every worker and every answer
+doc and mockups the issues point at, and the templates the screens became, by
+path, so every worker and every answer
 uses the same ones. Do not read those end to end yourself: every worker will,
 and a foreman that reads everything up front runs out of room before the first
 worker starts.
