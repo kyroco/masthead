@@ -128,13 +128,10 @@ def gates():
 # ------------------------------------------------------------- workflow.svg
 WORKER_STEPS = [
     "1. read the issue, the README, the decisions",
-    "2. plan: a change and a test per scenario",
-    "   (a blind verifier passes it first)",
-    "3. build, test first; search memory",
-    "4. decision-record review",
-    "5. one verifier per scenario, then the judge",
-    "6. fix the list, test first; re-verify what broke",
-    "7. push check: tests on this commit",
+    "2. build, test first; search memory",
+    "3. one verifier per scenario, then the judge",
+    "4. fix the list, test first; re-verify what broke",
+    "5. push check: tests on this commit",
 ]
 
 
@@ -162,7 +159,7 @@ def workflow():
     cols = []
     x = 40
     for n in ("41", "42", "45"):
-        lines = [(f"worker for issue #{n}", "title")] + [(s, "body") for s in WORKER_STEPS] + [(f"8. one pull request, Fixes #{n}", "body")]
+        lines = [(f"worker for issue #{n}", "title")] + [(s, "body") for s in WORKER_STEPS] + [(f"6. one pull request, Fixes #{n}", "body")]
         b = c.box(x, wy, lines, OUTBOX, pad=16)
         cols.append(b)
         x = right(b) + 36
@@ -175,11 +172,11 @@ def workflow():
     c.text(mid(cols[0]), wy - 38, "one fresh session per issue, each in its own worktree", size=12, color=FOREMAN["sub"], anchor="middle")
     rx = right(cols[-1]) - 30
     c.path(f"M {rx:.0f} {wy:.0f} L {rx:.0f} {foreman[1] + foreman[3] / 2:.0f} L {right(foreman) + 2:.0f} {foreman[1] + foreman[3] / 2:.0f}", color=GREY, dash=True)
-    c.text(right(foreman) + 12, foreman[1] + foreman[3] / 2 - 8, "plans, questions and reports come back to the foreman", size=11, color=GREY)
+    c.text(right(foreman) + 12, foreman[1] + foreman[3] / 2 - 8, "questions, extras and reports come back to the foreman", size=11, color=GREY)
 
     # merge bar
     my = bottom(cols[0]) + 40
-    bar = c.box(40, my, [("you answer each PR's seen-not-done lines; the foreman queues it, closes its issue, and gives that worker its next issue", "title"),
+    bar = c.box(40, my, [("you answer the extras each worker brings; the foreman queues it, closes its issue, and gives that worker its next issue", "title"),
                          ("the run ends when every issue is merged, parked or skipped, with one line per issue saying which", "body")], GOOD, min_w=total - 40, title_size=13)
     for b in cols:
         c.arrow(mid(b), bottom(b), mid(b), my - 2, color=GOOD["stroke"])
@@ -191,7 +188,7 @@ def workflow():
 # --------------------------------------------------------------- review.svg
 def review():
     c = Canvas(1100, 620)
-    c.text(40, 40, "The verification: verifiers who read cold, and a judge that confirms and places", size=20, color="#1f2937", bold=True)
+    c.text(40, 40, "The verification: verifiers who read cold, and a judge that reads and places", size=20, color="#1f2937", bold=True)
     worker = c.box(40, 120, [("the worker", "title"), ("finishes the change and sends", "body"), ("each scenario, the diff, its claims", "body")], FOREMAN)
     rx = right(worker) + 50
     names = ["verifier: scenario 1", "verifier: scenario 2", "verifier: scenario 3", "verifier: scenario 4"]
@@ -206,14 +203,14 @@ def review():
     c.arrow(right(worker), worker[1] + 40, revs[1][0] - 2, worker[1] + 40)
 
     jx = right(revs[0]) + 70
-    judge = c.box(jx, 150, [("the judge", "title"), ("runs each false claim's reproduction,", "body"), ("nothing from the worker,", "body"), ("and places it; that is final for the worker;", "body"), ("an unsettled security finding", "body"), ("goes to you", "body")], JUDGE)
+    judge = c.box(jx, 150, [("the judge", "title"), ("reads the code along each false claim's path,", "body"), ("nothing from the worker,", "body"), ("and places it; that is final for the worker;", "body"), ("an unsettled security finding", "body"), ("goes to you", "body")], JUDGE)
     c.arrow(right(revs[2]), revs[2][1] + 18, judge[0] - 2, revs[2][1] + 18)
     c.text((right(revs[2]) + judge[0]) / 2, revs[2][1] + 8, "false claims", size=12, anchor="middle")
 
     ox = right(judge) + 60
-    fix = c.box(ox, 90, [("the fix list", "title"), ("confirmed, and belongs to this change;", "body"), ("a file and a line for each one", "body")], GOOD)
-    new = c.box(ox, bottom(fix) + 24, [("seen, not done", "title"), ("confirmed and serious, but outside this change:", "body"), ("you answer each: fix now, fix later, or proceed", "body")], INK)
-    out = c.box(ox, bottom(new) + 24, [("thrown out", "title"), ("not real, not confirmed, or not worth", "body"), ("a change; gone for good", "body")], OUTBOX)
+    fix = c.box(ox, 90, [("the fix list", "title"), ("a Then is false, something broke, or words", "body"), ("a person reads are wrong; a file and a line", "body")], GOOD)
+    new = c.box(ox, bottom(fix) + 24, [("extras", "title"), ("real, but not this change's to fix: the worker", "body"), ("brings you what scores 8 or higher, and you answer", "body"), ("each: fix now, fix later, or proceed", "body")], INK)
+    out = c.box(ox, bottom(new) + 24, [("thrown out", "title"), ("does not hold, or is noise;", "body"), ("gone for good", "body")], OUTBOX)
     c.arrow(right(judge), judge[1] + 30, fix[0] - 2, fix[1] + fix[3] / 2, color=GOOD["stroke"])
     c.arrow(right(judge), judge[1] + 50, new[0] - 2, new[1] + new[3] / 2)
     c.arrow(right(judge), judge[1] + 70, out[0] - 2, out[1] + out[3] / 2, dash=True)
@@ -327,7 +324,7 @@ def day5():
     c.arrow(right(ws[1]), ws[1][1] + ws[1][3] / 2, plan[0] - 2, ws[1][1] + ws[1][3] / 2)
     c.w = int(max(c.w, right(plan) + 40))
     low = max(bottom(plan), bottom(ws[-1]))
-    c.text(40, low + 34, "A plan that fails its verifier twice stops and asks. A line the sources don't settle is a question for you, not a guess.", size=12)
+    c.text(40, low + 34, "A worker is done when every scenario has a passing test and its PR is open. A line the sources don't settle is a question for you, not a guess.", size=12)
     c.h = int(low + 54)
     c.write("day-5-workers.svg")
 

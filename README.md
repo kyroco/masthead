@@ -92,38 +92,48 @@ it does not hand you a table to judge them by.
 Three fresh sessions start, each with its own copy of the repository and a
 branch tied to its issue. Each worker reads its issue, the README and the
 decision record cover to cover, looks up what earlier sessions learned, and
-builds. It writes no plan and waits for no go: the design was reviewed before
-the issues were written, and the verifier checks each scenario once the code
-exists.
+builds. It writes no plan and waits for no go: the design was reviewed
+before the issues were written, and the verifier checks each scenario once
+the code exists. A worker is done when every scenario has a test that
+passes, the screens the issue touches work, the push check passes and the
+pull request is open. Then it stops.
 
-![Three workers, each with its own session, send their plans](docs/images/day-5-workers.svg)
+![Three workers, each with its own session and its own copy of the repository](docs/images/day-5-workers.svg)
 
-Then they build. A bug is fixed test first: a failing test in its own commit,
-then the fix. When an issue builds a decision record, a fresh reviewer reads
-the whole record and checks the work against it, assuming it was done wrong.
+Then they build. A bug is fixed test first: a failing test in its own
+commit, then the fix. Anything a worker notices that the issue didn't ask
+for is an extra. It scores each one from 1 to 10, where 10 means leaving it
+would cause a catastrophic failure, and brings you only what scores 8 or
+higher. The rest is dropped, not filed.
 
 When a worker thinks it's done, it doesn't grade its own work. For each
 scenario it sends one verifier the scenario, the decision lines it rests on,
-the diff, and two lists: what it claims works and what it could not prove.
-Nothing else: not its notes, not an earlier review. The verifier assumes the
-code is wrong and tries to prove it, with every way a change goes wrong as
-its methods: a write that fails halfway, an input nobody handled, a promise
-to a caller the code breaks, a shared module written again, a sentence a
-customer reads that is false in some state. For every claim it returns
+the README's opening paragraph on who uses the product, the abilities line
+and the mockup page the scenario rests on, the diff, and two lists: what it
+claims works and what it could not prove. Nothing else: not its notes, not
+an earlier review. The verifier assumes the code is wrong and tries to prove
+it, with every way a change goes wrong as its methods: a write that fails
+halfway, an input nobody handled, a promise to a caller the code breaks, a
+shared module written again, a sentence a customer reads that is false in
+some state. It tries only states production can reach, starting from a real
+entry point such as a route, a job or a webhook. For every claim it returns
 either "true in every state", with the run that shows it, or each state
-where it is false, with the run. A security reviewer joins when the change
-touches sign-in, secrets or input from outside, with the repository's
-security rules as its claims. None of them can edit anything. None of them
-can reach the network. Then a judge reads the code and the false claims,
-runs each reproduction it can, confirms it, and places each one: fixed in
-this pull request, or on a "seen, not done" list. That placement is final for
-the worker and the foreman; nobody files anything. The
-worker fixes the list, test first again, and only the claims the fix broke
-go back to a verifier, at most twice. The tests run on the final commit and
-leave a receipt that names it, and nothing can be pushed until the receipt
-matches. Then one pull request goes up, with `Fixes #41`, the list of what
-wasn't proved, the number of agent dispatches it took, and the issue moves
-to In Review.
+where it is false, with the run; never partly. A security reviewer joins
+when the change touches sign-in, secrets or input from outside, with the
+repository's security rules as its claims. None of them can edit anything.
+None of them can reach the network. Then a judge, given the same product
+context and nothing from the worker, reads the code along each verifier's
+path without running the tests a third time, and places each finding that
+holds: fixed in this pull request when a scenario's Then is false, something
+that worked before broke, or words a person reads are now wrong; otherwise
+an extra, which the worker scores like its own. That placement is final for
+the worker and the foreman; nobody files anything. The worker fixes the
+list, test first again, and only the claims the fix broke go back to a
+verifier, at most twice. The tests run on the final commit and leave a
+receipt that names it, and nothing can be pushed until the receipt matches.
+Then one pull request goes up, with `Fixes #41`, the list of what wasn't
+proved, the number of agent dispatches it took, and the issue moves to In
+Review.
 
 Meanwhile you're having coffee. A worker's question lands at the foreman,
 which re-reads the issue's comments and Korium for an answer you already
@@ -137,16 +147,16 @@ happened, and the run goes on without it.
 
 ![You have coffee; questions reach you only when nothing settles them](docs/images/day-6-coffee.svg)
 
-When a pull request is ready, its "seen, not done" list comes to you one
+When a pull request is ready, the extras its worker brought come to you one
 item at a time, and you answer each one: fix now, fix later, or proceed. Fix
-later is the only way an issue gets filed. When its checks pass, its review is
-clean, every line is answered and the worker has cleaned up after itself, the
-foreman queues it to be merged. It closes the issue, and any big issue whose
-pieces are now all done, then starts the next issue, a fix-later issue that
-waited on this one first, in that worker in the desktop app or in a fresh
-session in the terminal. By the end of the day every issue is merged, parked
-or skipped, and you get one line per issue saying which, with how many
-merged and how many were filed.
+later is the only way an issue gets filed. When its checks pass, its review
+is clean, every line is answered and the worker has cleaned up after itself,
+the foreman queues it to be merged. It closes the issue, and any big issue
+whose pieces are now all done, then starts the next issue, a fix-later issue
+that waited on this one first, in that worker in the desktop app or in a
+fresh session in the terminal. By the end of the day every issue is merged,
+parked or skipped, and you get one line per issue saying which, with how
+many merged and how many were filed.
 
 ![A run: issues checked, a foreman plan, workers in parallel, merges](docs/images/workflow.svg)
 
@@ -161,9 +171,8 @@ what to do instead.
 ### One issue on its own
 
 `/work-on #123` does the same for a single issue with you as the foreman.
-The worker reports its brief and waits for your go before building, and an
-issue with the `design-sheet` label that builds no decision record gets a
-one-page sheet written into the issue for you to approve first.
+The worker tells you in a few lines what it will build and waits for your
+go.
 
 ## Install
 
@@ -287,7 +296,8 @@ for the sessions that open it.
 
 The skills under `skills/` are the written procedures Claude follows:
 `work-on` (the foreman and the worker), `review-design` (the design checked
-against the code and the mockups before issues are written), `analyze-issues`
+against the code and the mockups before issues are written, and, when you say
+yes, the mockups turned into screens), `analyze-issues`
 (the checks on each issue before a build), `github-issues` (how the tracker is used), `setup`, and the two
 Korium skills. `agents/` holds the verifier, the security reviewer, the
 judge (the `adjudicator` agent), the diagnoser and the reader. `references/` holds the pull request steps and the brief

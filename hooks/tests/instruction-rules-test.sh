@@ -144,7 +144,7 @@ never references/session-cliffs.md "which is not plain English"
 says  README.md "a sentence a customer reads that is false in some state"
 says  docs/explainer.template.html "a sentence a customer reads that is false in some state"
 never agents/verifier.md "plain English"
-says  scripts/diagrams.py "7. push check"
+says  scripts/diagrams.py "5. push check"
 
 # 7. Issue #20: claim verification replaces the angle reviews, the plan is
 # verified before code, the fix loop re-verifies only what broke and stops at
@@ -274,11 +274,11 @@ says  skills/work-on/foreman.md "agent-run count"
 for doc in README.md docs/explainer.template.html docs/explainer.html; do
   never "$doc" "a brief that hides what memory found"
 done
-says  docs/explainer.template.html "isn't real, isn't confirmed, or isn't worth a change"
-says  docs/explainer.html "isn't real, isn't confirmed, or isn't worth a change"
+says  docs/explainer.template.html "out, when it doesn't hold or is noise"
+says  docs/explainer.html "out, when it doesn't hold or is noise"
 for doc in scripts/diagrams.py docs/images/review.svg docs/explainer.html; do
   never "$doc" "could not be confirmed by running it"
-  says  "$doc" "not real, not confirmed, or not worth"
+  never "$doc" "not real, not confirmed, or not worth"
 done
 says  references/session-cliffs.md "the security reviewer's dispatch does not spend a round"
 # Fix check 1 of issue #20: the count is of agents sent, and a declined one is in it.
@@ -406,11 +406,12 @@ says  README.md "in a fresh session in the terminal"
 never README.md "gives that worker its next issue"
 says  docs/explainer.template.html "in a fresh session in the terminal"
 never docs/explainer.template.html "gives that worker its next issue"
-# No sheet for an issue that builds a decision record (worker.md step 6).
-says  README.md "label that builds no decision record gets a"
-never README.md "label gets a one-page sheet"
-says  docs/explainer.template.html "label that builds no decision record gets a"
-never docs/explainer.template.html "label gets a one-page sheet"
+# The worker writes no design sheet; started by the person, it says what it
+# will build and waits for the go (worker.md section 5).
+says  README.md "The worker tells you in a few lines what it will build"
+never README.md "one-page sheet"
+says  docs/explainer.template.html "The worker tells you in a few lines what it will build"
+never docs/explainer.template.html "one-page sheet"
 # Setup asks more than three questions in some repos (setup SKILL.md 6 and 7).
 says  README.md "one or two more when it finds a folder of decision records"
 never README.md "asks three questions about the repository and writes nothing"
@@ -449,12 +450,13 @@ never docs/explainer.template.html "already answered; otherwise nothing"
 says  docs/explainer.template.html "goes to you the same way"
 says  scripts/diagrams.py "goes to you"
 says  docs/images/review.svg "goes to you"
-# The worker box numbers eight steps with no gap.
-says  scripts/diagrams.py "8. one pull request"
-never scripts/diagrams.py "9. one pull request"
-never docs/images/workflow.svg "9. one pull request"
-says  docs/explainer.template.html "the same eight steps"
-never docs/explainer.template.html "the same nine steps"
+# The worker box numbers six steps with no gap, and has no plan step.
+says  scripts/diagrams.py "6. one pull request"
+never scripts/diagrams.py "7. one pull request"
+never docs/images/workflow.svg "7. one pull request"
+never scripts/diagrams.py "a change and a test per scenario"
+says  docs/explainer.template.html "the same six steps"
+never docs/explainer.template.html "the same eight steps"
 # The catalog says which install options switch its gates on (run.sh, agent-brief-gates.sh).
 says  references/gate-catalog.md "runs only with the Korium memory install option on"
 says  references/gate-catalog.md "since the previous Stop"
@@ -528,12 +530,15 @@ for doc in README.md docs/explainer.template.html docs/explainer.html; do
   never "$doc" "a follow-up that waited on this one first"
   never "$doc" "answers with the line quoted. Only when nothing settles it"
 done
-says  scripts/diagrams.py "seen, not done"
-says  docs/images/review.svg "seen, not done"
+says  scripts/diagrams.py "brings you what scores 8 or higher"
+never docs/images/review.svg "seen, not done"
+never docs/images/review.svg "reproduction"
 never docs/images/review.svg "new issues to file"
 says  docs/images/day-6-coffee.svg "relays your earlier answer"
 never docs/images/day-6-coffee.svg "answers from the sources"
-says  docs/images/workflow.svg "seen-not-done lines"
+says  docs/images/workflow.svg "the extras each worker brings"
+never README.md "seen, not done"
+never docs/explainer.template.html "seen, not done"
 
 # 12. Masthead issue #31: the foreman and worker speak in a plain voice, say
 # what matters and leave the how to the session, never set a reply format,
