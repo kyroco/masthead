@@ -1,6 +1,6 @@
 ---
 name: review-design
-description: Review a decision record, its architecture doc and its mockups against each other, the code and Korium before any issue is written from them. It assumes the design is wrong, finds every state the artifacts are silent on and every place they disagree, asks the user one question at a time, and edits the artifacts, mockups included, until they all say the same thing. /review-design ADR-0170. Then it finds the issues that quote the lines it changed and fixes only those. Run it from the repo that holds the code and the mockups.
+description: Review a decision record, its architecture doc and its mockups against each other, the code and Korium before any issue is written from them. It assumes the design is wrong, finds every state the artifacts are silent on and every place they disagree, asks the user one question at a time, and edits the artifacts, mockups included, until they all say the same thing. When the user says yes, it turns the mockups into screens. Then it finds the issues that quote the lines it changed and fixes only those. /review-design ADR-0170. Run it from the repo that holds the code and the mockups.
 disable-model-invocation: true
 ---
 
@@ -8,7 +8,8 @@ disable-model-invocation: true
 
 Issues are copied from the decision record and the mockups. A hole in those
 is a hole in every issue, and a worker finds it halfway through a build. This
-skill finds it first. It writes no code, no issue and no plan.
+skill finds it first. It files no issue and writes no plan, and it writes
+code only when the user says yes to the screens.
 
 ## What you read
 
@@ -87,6 +88,30 @@ One table: each decision, what disagreed or was missing, what the user
 answered, what changed where. Capture the run in Korium with `agent_capture`
 and give its id.
 
+## Then the screens
+
+When the artifacts agree, ask the user whether to turn the mockups into
+screens now, and wait. No worker starts on it until they say yes. On a yes,
+it is one PR in the repo, with its local tests green.
+
+The walk-through: where it quotes a mockup's words the review changed,
+change the same words in the walk, in the same commit, and nothing else. If
+it is locked, open the lock for that one edit and close it after. The PR
+says which lines changed and why.
+
+The screens: every page a mockup draws becomes a template in the app. A page
+that exists keeps its real data and events, and only its words and layout
+change. A page that does not exist yet is written from the mockup with the
+app's own components, and made-up data where the real data is not built.
+The words and the layout are the mockup's exactly. The mockup's model stays
+behind; its rules already live in the rubric. Before a page is converted,
+name each state it does not draw (empty, error, refused) and ask the user
+about each one, one at a time.
+
+When the PR is open, give the user each page, the template file it became,
+and whether it was edited or new. Then stop until they say to go on to the
+issues.
+
 ## Then the issues
 
 Issues written before the review quote lines you changed. Find those and fix
@@ -106,8 +131,3 @@ body to a file inside the checkout and send it with
 without a decision the user has not made is one question to them, and you
 wait. When they are all done, say which issues changed and which you left
 alone.
-
-## What this skill never does
-
-It writes no code, no issue and no plan, and never a scenario the sources do
-not support. It runs before the issues are written and at no other time.
