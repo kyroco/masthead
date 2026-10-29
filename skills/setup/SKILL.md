@@ -104,7 +104,12 @@ records may live in a wiki while their abilities files sit in the repository
 (YAML with `record`, `roles` and `lines`, one per decision record). If you
 find any, ask: "Should a push be refused when an abilities file has a bad line
 or its page was edited by hand?" On yes, add
-`"PROJECT_ABILITIES": "<the file or its folder>"` to the env block.
+`"PROJECT_ABILITIES": "<the file or its folder>"` to the env block, and run
+`python3 "${CLAUDE_PLUGIN_ROOT}/hooks/abilities.py" install-yaml`, since the
+check reads YAML with PyYAML and a fresh Mac lacks it. It installs PyYAML for
+the `python3` the push gate runs (Homebrew's Python refuses a plain
+`pip install`, so it retries into the user's own folder), or prints the one
+command that does; show that command to the person if it failed.
 
 ## 7. Write, then show what is on
 
