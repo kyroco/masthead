@@ -10,7 +10,7 @@ effort: medium
 # Runaway guard, not a budget. Over the 30 days to 2026-10-09 the longest run of
 # any of the four agents was 156 turns and 99% ended under 111.
 maxTurns: 200
-tools: Read, Glob, Grep, Bash, mcp__korium
+tools: Read, Glob, Grep, Bash, mcp__korium, mcp__claude_ai_korium
 disallowedTools: Write, Edit, MultiEdit, NotebookEdit, Agent, WebFetch, WebSearch
 ---
 

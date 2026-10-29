@@ -16,9 +16,10 @@ maxTurns: 200
 # ToolSearch is listed because the two Korium tools are deferred: an agent
 # cannot call them until ToolSearch loads them. Of Korium it holds only the
 # code index and capture: it never searches memory, so no author's note can
-# reach it.
-tools: Read, Glob, Grep, Bash, ToolSearch, mcp__korium__code_locate, mcp__korium__agent_capture
-disallowedTools: Agent, Edit, MultiEdit, Write, NotebookEdit, WebFetch, WebSearch, mcp__korium__agent_search, mcp__korium__korium_browse, mcp__korium__korium_trace, mcp__korium__korium_reconstruct, mcp__korium__korium_hydrate
+# reach it. Each Korium tool is named twice, as the local korium server and
+# the claude.ai connector name it, so it works whichever one the session has.
+tools: Read, Glob, Grep, Bash, ToolSearch, mcp__korium__code_locate, mcp__claude_ai_korium__code_locate, mcp__korium__agent_capture, mcp__claude_ai_korium__agent_capture
+disallowedTools: Agent, Edit, MultiEdit, Write, NotebookEdit, WebFetch, WebSearch, mcp__korium__agent_search, mcp__claude_ai_korium__agent_search, mcp__korium__korium_browse, mcp__claude_ai_korium__korium_browse, mcp__korium__korium_trace, mcp__claude_ai_korium__korium_trace, mcp__korium__korium_reconstruct, mcp__claude_ai_korium__korium_reconstruct, mcp__korium__korium_hydrate, mcp__claude_ai_korium__korium_hydrate
 ---
 
 Follow shared actions in `${CLAUDE_PLUGIN_ROOT}/references/agent-preamble.md`.
@@ -43,7 +44,10 @@ when they are in front of you. You do not search Korium's memory.
 ## Before anything else: load your tools
 
 Load the two Korium tools with `ToolSearch` and the query
-`select:mcp__korium__code_locate,mcp__korium__agent_capture`, in one call.
+`select:mcp__korium__code_locate,mcp__korium__agent_capture,mcp__claude_ai_korium__code_locate,mcp__claude_ai_korium__agent_capture`,
+in one call. A session reaches Korium either through the local `korium`
+server or through the claude.ai connector, so only one pair comes back; use
+that one.
 
 ## The checklist
 
