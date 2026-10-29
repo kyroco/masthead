@@ -159,7 +159,7 @@ base="$(git -C "$repo" rev-parse HEAD)"
 good | python3 -c 'import sys; t=sys.stdin.read(); print(t[:t.index("  - id: OM-181")], end="")' > "$repo/abilities.yaml"
 check --base "$base" "$repo/abilities.yaml"
 ok "$STATUS" 1 "a deleted id exits 1"
-has "$OUT" "id OM-181 (line 23 before this branch) is gone" "names the id and its old line"
+has "$OUT" "abilities.yaml:23: id OM-181, on this line before this branch, is gone" "names the id and its old line"
 check "$repo/abilities.yaml"
 ok "$STATUS" 0 "without a base the same file passes"
 
@@ -236,7 +236,7 @@ ok "$STATUS" 1 "words written as a list are refused"
 has "$OUT" "listwords.yaml:27: 'words' of line OM-181 must be text" "names the words line"
 # A retired value must carry a real decision line and a real date.
 for v in '"2026-11-02, ,"' '"2026-11-02 -"' '"2026-11-02, n/a"' '"2026-02-30, ADR-0170 D6"'; do
-  good | sed "s/^    rule: 24$/    rule: 24\n    retired: $v/" > "$TMP/retired-x.yaml"
+  good | sed "s|^    rule: 24$|    rule: 24\n    retired: $v|" > "$TMP/retired-x.yaml"
   check "$TMP/retired-x.yaml"
   has "$OUT" "retired-x.yaml:23: 'retired' of line OM-153 must be the date and the decision line" "retired: $v is refused"
 done

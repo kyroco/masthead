@@ -66,7 +66,34 @@ CHANGED="$( {
   [ -n "$BASE" ] && git diff --name-only "$BASE" HEAD 2>/dev/null
   git status --porcelain --untracked-files=all 2>/dev/null | awk '{print $NF}'
 } | sort -u | sed "s|^|$TOP/|")"
-[ -z "$CHANGED" ] && exit 0
+
+# Abilities: when the repo names its abilities file, refuse a bad line and a hand-edited abilities page.
+# abilities.py picks what to check (only when the branch touched an abilities file or a page built from one),
+# finds its own base when origin/main is missing, and prints each path relative to the repo top, so this
+# rung runs even when the changed list above is empty.
+gate_abilities() {
+  local named path out
+  named="$(project_fact "$TOP" PROJECT_ABILITIES)"
+  [ -n "$named" ] || return 0
+  path="$(project_fact "$TOP" --path PROJECT_ABILITIES)"
+  if [ -z "$path" ]; then
+    echo "WARN: PROJECT_ABILITIES names '$named', which does not exist, so no abilities file was checked." >&2
+    return 0
+  fi
+  if ! out="$(python3 "$_HOOK_DIR/abilities.py" gate --top "$TOP" --path "$path" ${BASE:+--base "$BASE"} 2>&1)"; then
+    echo "BLOCK: the abilities check refused this push:" >&2
+    printf '%s\n' "$out" | sed 's/^/  /' >&2
+    return 1
+  fi
+}
+if [ -z "$CHANGED" ]; then
+  if ! gate_abilities; then
+    echo "" >&2
+    echo "Nothing was pushed. Fix the failures above and push again; the gate re-runs on the branch." >&2
+    exit 2
+  fi
+  exit 0
+fi
 # Warn that uncommitted edits are checked on disk but the push carries the committed copy.
 _DIRTY="$(git diff --name-only HEAD 2>/dev/null | head -5)"
 [ -n "$_DIRTY" ] && echo "WARN: uncommitted edits are checked as they are on disk, but this push carries the committed version of: $(printf '%s' "$_DIRTY" | tr '\n' ' ')" >&2
@@ -435,36 +462,7 @@ each_root() {
 [ -n "$KOTLIN" ] && each_root gate_kotlin gradlew KOTLIN
 [ -n "$TF" ]     && gate_tf
 
-# Abilities: when the repo names its abilities file, refuse a bad line and a hand-edited abilities page.
-gate_abilities() {
-  named="$(project_fact "$TOP" PROJECT_ABILITIES)"
-  [ -n "$named" ] || return 0
-  path="$(project_fact "$TOP" --path PROJECT_ABILITIES)"
-  if [ -z "$path" ]; then
-    warn "PROJECT_ABILITIES names '$named', which does not exist, so no abilities file was checked."
-    return 0
-  fi
-  case "$path" in /*) ;; *) path="$TOP/$path" ;; esac
-  pages="$(git grep -l -e 'name="masthead-abilities"' -- '*.html' 2>/dev/null | sed "s|^|$TOP/|")"
-  # Run only when the branch touched an abilities file or a page built from one.
-  touched=""
-  for f in $CHANGED; do
-    case "$f" in "$path"|"$path"/*) touched=1 ;; esac
-    printf '%s\n' "$pages" | grep -qxF "$f" && touched=1
-  done
-  [ -n "$touched" ] || return 0
-  if ! out="$(python3 "$_HOOK_DIR/abilities.py" check ${BASE:+--base "$BASE"} "$path" 2>&1)"; then
-    block "the abilities file has problems, each named by its line:"
-    printf '%s\n' "$out" | sed "s|$TOP/||; s/^/  /" >&2
-  fi
-  for page in $pages; do
-    if ! out="$(python3 "$_HOOK_DIR/abilities.py" verify-page "$page" 2>&1)"; then
-      block "an abilities page is not a fresh build of its file:"
-      printf '%s\n' "$out" | sed "s|$TOP/||; s/^/  /" >&2
-    fi
-  done
-}
-gate_abilities
+gate_abilities || fail=1
 
 # Local tests: require the push-check script's receipt for HEAD, and refuse a push of any other commit.
 gate_local_tests() {

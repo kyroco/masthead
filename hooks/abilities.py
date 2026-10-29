@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 """The abilities file: one copy of every can and can't for one decision record.
 
-  abilities.py check [--base REV] PATH...   refuse a bad file, naming the line
-  abilities.py page FILE -o OUT             write the abilities page from FILE
-  abilities.py verify-page PAGE             refuse a page that differs from a fresh build
+  abilities.py check [--base REV] PATH...      refuse a bad file, naming the line
+  abilities.py page FILE -o OUT                write the abilities page from FILE
+  abilities.py verify-page PAGE                refuse a page that differs from a fresh build
+  abilities.py gate --top TOP --path PATH [--base REV]
+                                               what the push gate runs
 
-PATH is a file or a folder of .yaml and .yml files. Each problem prints as
-"path:line: what is wrong"; exit 1 when there is one, 2 when nothing could be read.
+PATH is a file or a folder of .yaml and .yml files, checked as one set of ids.
+Each problem prints as "path:line: what is wrong"; exit 1 when there is one, 2
+when nothing could be read.
 """
 import datetime
 import html
@@ -23,19 +26,29 @@ except ImportError:  # the gate blocks on exit 2
 TOP_KEYS = ("record", "roles", "plans", "examples", "lines")
 LINE_KEYS = ("id", "role", "plans", "kind", "action", "words", "states", "why", "screen", "rule", "retired")
 REQUIRED = ("id", "role", "kind", "action", "states", "why")
+LOG_KEYS = ("log", "history", "versions", "changes", "changelog")
+LOG_HINT = " The file keeps no log: git holds the history and the record's dated line the why."
 KINDS = ("can", "cant")
+NULLS = ("", "~", "null", "Null", "NULL")
 ID_SHAPE = re.compile(r"^[A-Z][A-Z0-9]*-[0-9]+$")
 HOLE = re.compile(r"\{([^{}]*)\}")
 HOLE_NAME = re.compile(r"^[a-z_][a-z0-9_]*$")
 RETIRED_SHAPE = re.compile(r"^(\d{4}-\d{2}-\d{2})[,;:]?\s+(\S.*)$")
+CONTROL = re.compile(r"[\x00-\x1f\x7f]")
 STAMP = "masthead-abilities"
+STAMP_TAG = re.compile(r'<meta name="{}" content="([^"]*)">'.format(STAMP))
 
 
 def need_yaml():
     if yaml is None:
-        print("abilities: PyYAML is not installed, so no abilities file could be read. Run 'python3 -m pip install pyyaml'.",
-              file=sys.stderr)
+        print("abilities: PyYAML is not installed, so no abilities file was read and no page was compared. "
+              "Run 'python3 -m pip install pyyaml'.", file=sys.stderr)
         sys.exit(2)
+
+
+def clean(text):
+    """TEXT on one line: a new line or other control character in a file's value is shown, never acted on."""
+    return CONTROL.sub(lambda m: "\\x{:02x}".format(ord(m.group(0))), str(text))
 
 
 def files_in(path):
@@ -50,10 +63,12 @@ def line_of(node):
 
 
 def scalar(node):
-    """The text of a scalar node, or None for a list, a map or an empty value."""
-    if isinstance(node, yaml.ScalarNode) and node.value != "":
-        return node.value
-    return None
+    """The text of a scalar node, or None for a list, a map, a null or a blank value."""
+    if not isinstance(node, yaml.ScalarNode):
+        return None
+    if node.style is None and node.value in NULLS:
+        return None
+    return node.value if node.value.strip() else None
 
 
 def pairs(node, where, problems):
@@ -69,8 +84,25 @@ def pairs(node, where, problems):
     return out
 
 
+def aliases(text):
+    """Each alias in TEXT as (line, name). An alias makes one value stand in two places."""
+    out = []
+    try:
+        for event in yaml.parse(text):
+            if isinstance(event, yaml.AliasEvent):
+                out.append((event.start_mark.line + 1, event.anchor))
+    except yaml.YAMLError:
+        pass
+    return out
+
+
 def read(text, problems):
     """Parse the file's text into its parts, adding each problem with its line."""
+    found = aliases(text)
+    for n, name in found:
+        problems.append((n, "'*{}' is an alias; write the value out, so each line holds its own words".format(name)))
+    if found:
+        return None
     try:
         root = yaml.compose(text)
     except yaml.YAMLError as err:
@@ -84,8 +116,7 @@ def read(text, problems):
     top = {}
     for key, knode, v in pairs(root, "the file", problems):
         if key not in TOP_KEYS:
-            hint = " The file keeps no log: git holds the history and the record's dated line the why." \
-                if key in ("log", "history", "versions", "changes", "changelog") else ""
+            hint = LOG_HINT if str(key).lower() in LOG_KEYS else ""
             problems.append((line_of(knode), "'{}' is not a part of the file; it holds only {}.{}".format(
                 key, ", ".join(TOP_KEYS), hint)))
             continue
@@ -132,8 +163,9 @@ def read_line(node, doc, problems):
     nodes = {}
     for key, knode, v in pairs(node, "this line", problems):
         if key not in LINE_KEYS:
-            problems.append((line_of(knode), "'{}' is not a field of a line; a line holds only {}".format(
-                key, ", ".join(LINE_KEYS))))
+            hint = LOG_HINT if str(key).lower() in LOG_KEYS else ""
+            problems.append((line_of(knode), "'{}' is not a field of a line; a line holds only {}.{}".format(
+                key, ", ".join(LINE_KEYS), hint)))
             continue
         nodes[key] = (knode, v)
     ident = scalar(nodes["id"][1]) if "id" in nodes else None
@@ -163,10 +195,12 @@ def read_line(node, doc, problems):
                     line["plans"].append(p.value)
         else:
             text = scalar(v)
-            if text is None and key != "words":
+            line["_" + key] = line_of(v)
+            if not isinstance(v, yaml.ScalarNode):
+                problems.append((line_of(knode), "'{}' of {} must be text".format(key, label)))
+            elif text is None and key != "words":
                 problems.append((line_of(knode), "'{}' of {} is empty".format(key, label)))
             line[key] = text
-            line["_" + key] = line_of(v)
     if ident and not ID_SHAPE.match(ident):
         problems.append((line["_id"], "id '{}' is not a record prefix and a number, like OM-153".format(ident)))
     role = line.get("role")
@@ -184,36 +218,42 @@ def read_line(node, doc, problems):
                 problems.append((line["_words"], "'{{{}}}' in the words of {} is not a hole name".format(hole, label)))
             elif hole not in doc["examples"]:
                 problems.append((line["_words"], "hole '{{{}}}' in the words of {} has no example in 'examples'".format(hole, label)))
-    retired = line.get("retired")
-    if retired:
-        m = RETIRED_SHAPE.match(retired)
-        ok = False
-        if m:
-            try:
-                datetime.date.fromisoformat(m.group(1))
-                ok = True
-            except ValueError:
-                pass
-        if not ok:
-            problems.append((line["_retired"], "'retired' of {} must be the date and the decision line that retired it, like '2026-11-02, ADR-0170 D6'".format(label)))
+    if "retired" in nodes and not retired_ok(line.get("retired")):
+        problems.append((line["_retired"], "'retired' of {} must be the date and the decision line that retired it, like '2026-11-02, ADR-0170 D6'".format(label)))
     return line
 
 
-def git_show(rev, path):
-    """The text of PATH at REV, or None when it was not there."""
+def retired_ok(value):
+    """A real calendar date, then a decision line that names something: letters and a number."""
+    m = RETIRED_SHAPE.match(value or "")
+    if not m:
+        return False
     try:
-        top = subprocess.run(["git", "-C", os.path.dirname(os.path.abspath(path)), "rev-parse", "--show-toplevel"],
-                             capture_output=True, text=True, check=True).stdout.strip()
-        rel = os.path.relpath(os.path.realpath(path), os.path.realpath(top))
-        out = subprocess.run(["git", "-C", top, "show", "{}:{}".format(rev, rel)], capture_output=True, text=True)
-    except (OSError, subprocess.CalledProcessError):
+        datetime.date.fromisoformat(m.group(1))
+    except ValueError:
+        return False
+    rest = m.group(2)
+    return bool(re.search(r"[A-Za-z]", rest) and re.search(r"[0-9]", rest))
+
+
+def git(top, *args):
+    """The output of a git command in TOP, or None when it failed."""
+    try:
+        out = subprocess.run(["git", "-C", top] + list(args), capture_output=True, text=True)
+    except OSError:
         return None
     return out.stdout if out.returncode == 0 else None
 
 
-def check(paths, base=None):
-    """Every problem in the files under PATHS, as (path, line, words)."""
-    found, owner = [], {}
+def git_top(path):
+    d = path if os.path.isdir(path) else os.path.dirname(os.path.abspath(path))
+    out = git(d, "rev-parse", "--show-toplevel")
+    return os.path.realpath(out.strip()) if out else None
+
+
+def head_lines(paths, found):
+    """Every line in the files under PATHS, refusing an id written twice anywhere among them."""
+    lines, owner = {}, {}
     for root in paths:
         for path in files_in(root):
             try:
@@ -227,44 +267,57 @@ def check(paths, base=None):
             found.extend((path, n, words) for n, words in problems)
             if not doc:
                 continue
-            ids = set()
             for line in doc["lines"]:
                 ident = line.get("id")
                 if not ident:
                     continue
-                ids.add(ident)
                 if ident in owner:
                     first = owner[ident]
                     found.append((path, line["_id"], "id {} is reused; it is already at {}:{}. An id is never reused, even once retired".format(
                         ident, first[0], first[1])))
                 else:
                     owner[ident] = (path, line["_id"])
-            if base:
-                found.extend(dropped(path, base, ids))
-    return found
+                    lines[ident] = (path, line)
+    return lines
 
 
-def dropped(path, base, ids):
-    """Ids that were in PATH at BASE and are gone now: a line is retired, never deleted."""
-    text = git_show(base, path)
-    if text is None:
-        return []
-    try:
-        root = yaml.compose(text)
-    except yaml.YAMLError:
-        return []
-    out = []
-    for key, v in (root.value if isinstance(root, yaml.MappingNode) else []):
-        if getattr(key, "value", None) != "lines" or not isinstance(v, yaml.SequenceNode):
+def base_lines(paths, base):
+    """Every line in the files under PATHS as they were at BASE, by id."""
+    lines = {}
+    for root in paths:
+        top = git_top(root)
+        if not top:
             continue
-        for item in v.value:
-            if not isinstance(item, yaml.MappingNode):
+        rel = os.path.relpath(os.path.realpath(root), top)
+        listed = git(top, "ls-tree", "-r", "-z", "--name-only", base, "--", rel) or ""
+        for name in listed.split("\0"):
+            if not name.endswith((".yaml", ".yml")) or (os.path.isdir(root) and os.path.dirname(name) != rel.rstrip("/")):
                 continue
-            for k, iv in item.value:
-                if getattr(k, "value", None) == "id" and isinstance(iv, yaml.ScalarNode) and iv.value not in ids:
-                    out.append((path, 1, "id {} (line {} before this branch) is gone. A line that stops being true is retired, never deleted: put it back with 'retired: <date>, <decision line>'".format(
-                        iv.value, line_of(iv))))
-    return out
+            text = git(top, "show", "{}:{}".format(base, name))
+            if text is None:
+                continue
+            doc = read(text, [])
+            for line in (doc or {}).get("lines", []):
+                if line.get("id") and line["id"] not in lines:
+                    lines[line["id"]] = (os.path.join(top, name), line)
+    return lines
+
+
+def check(paths, base=None):
+    """Every problem in the files under PATHS, as (path, line, words)."""
+    found = []
+    now = head_lines(paths, found)
+    if base:
+        for ident, (path, old) in sorted(base_lines(paths, base).items()):
+            if ident not in now:
+                found.append((path, old["_line"], "id {}, on this line before this branch, is gone. A line that stops being true is retired, never deleted: put it back with 'retired: <date>, <decision line>'".format(ident)))
+                continue
+            new_path, new = now[ident]
+            if old.get("retired") and (not new.get("retired") or any(
+                    old.get(k) != new.get(k) for k in ("action", "role", "kind"))):
+                found.append((new_path, new["_id"], "id {} was retired before this branch ({}); a retired id is never reused or brought back: give the new line a new id".format(
+                    ident, old.get("retired"))))
+    return found
 
 
 def fill(words, examples):
@@ -341,24 +394,111 @@ def item(ln, examples):
 
 
 def build(source_path, page_path):
-    """The page text for SOURCE_PATH as it would sit at PAGE_PATH, or (None, problems)."""
-    with open(source_path) as handle:
-        text = handle.read()
-    problems = []
-    doc = read(text, problems)
-    if problems or not doc:
+    """The page text for SOURCE_PATH as it would sit at PAGE_PATH, or (None, problems).
+
+    The file must pass the same check the push gate runs on it, so no page is built from a file it refuses."""
+    problems = [(n, words) for _, n, words in check([source_path])]
+    if problems:
         return None, problems
-    rel = os.path.relpath(os.path.abspath(source_path), os.path.dirname(os.path.abspath(page_path)))
+    with open(source_path) as handle:
+        doc = read(handle.read(), [])
+    rel = os.path.relpath(os.path.realpath(source_path), os.path.dirname(os.path.realpath(page_path)))
     return render(doc, rel.replace(os.sep, "/")), []
 
 
 def stamp_of(page_text):
-    m = re.search(r'<meta name="{}" content="([^"]*)">'.format(STAMP), page_text)
+    m = STAMP_TAG.search(page_text)
     return html.unescape(m.group(1)) if m else None
 
 
+def stamp_source(page, stamp):
+    """The file a page's stamp names, or None when the stamp is not a plain path beside the page, inside its repo."""
+    if not stamp or CONTROL.search(stamp) or os.path.isabs(stamp):
+        return None
+    source = os.path.realpath(os.path.join(os.path.dirname(os.path.abspath(page)), stamp))
+    top = git_top(page) or os.path.realpath(os.path.dirname(os.path.abspath(page)))
+    if os.path.commonpath([source, top]) != top:
+        return None
+    return source
+
+
+def verify_page(page, allowed=None):
+    """Each problem with the built page PAGE, as (line, words). ALLOWED, when given, is the files it may come from."""
+    try:
+        with open(page) as handle:
+            text = handle.read()
+    except OSError as err:
+        return [(1, "cannot be read: {}".format(err))]
+    stamp = stamp_of(text)
+    if stamp is None:
+        return [(1, "this page was built from an abilities file and its stamp is gone. Build it again; a built page is never edited by hand")]
+    source = stamp_source(page, stamp)
+    if source is None:
+        return [(1, "its stamp names '{}', which is not a file beside this page in this repo".format(clean(stamp)))]
+    if not os.path.isfile(source):
+        return [(1, "the abilities file it was built from, {}, is gone".format(clean(stamp)))]
+    if allowed is not None and source not in allowed:
+        return [(1, "it was built from {}, which PROJECT_ABILITIES does not name. Build it from a file the setting names".format(clean(stamp)))]
+    fresh, problems = build(source, page)
+    if fresh is None:
+        return [(1, "its abilities file {} has problems, so the page cannot be rebuilt".format(clean(stamp)))]
+    if fresh != text:
+        old, new = text.splitlines(), fresh.splitlines()
+        n = next((i for i, (a, b) in enumerate(zip(old, new)) if a != b), min(len(old), len(new)))
+        return [(n + 1, "this page differs from a fresh build of {}. It is never edited by hand: change the file, then run 'python3 {} page {} -o {}'".format(
+            clean(stamp), os.path.abspath(__file__), clean(os.path.relpath(source)), clean(os.path.relpath(page))))]
+    return []
+
+
+def find_base(top):
+    """The commit this branch left from: origin's default branch, origin/main or origin/master."""
+    for ref in ("origin/HEAD", "origin/main", "origin/master"):
+        out = git(top, "merge-base", "HEAD", ref)
+        if out and out.strip():
+            return out.strip()
+    return None
+
+
+def gate(top, path, base):
+    """What the push gate checks: every problem as (path, line, words), or [] when the push touches no abilities file."""
+    top = os.path.realpath(top)
+    path = os.path.realpath(path)
+    files = {os.path.realpath(f) for f in files_in(path)}
+    base = base or find_base(top)
+
+    def listed(*args):
+        return [os.path.realpath(os.path.join(top, n)) for n in (git(top, *args) or "").split("\0") if n]
+
+    changed = set(listed("diff", "--name-only", "-z", "HEAD")) | set(listed("ls-files", "--others", "--exclude-standard", "-z"))
+    if base:
+        changed |= set(listed("diff", "--name-only", "-z", base, "HEAD"))
+    pages = set(listed("grep", "-l", "-z", "--fixed-strings", "-e", 'name="{}"'.format(STAMP), "--", "*.html"))
+    if base:
+        before = (git(top, "grep", "-l", "-z", "--fixed-strings", "-e", 'name="{}"'.format(STAMP), base, "--", "*.html") or "").split("\0")
+        pages |= {os.path.realpath(os.path.join(top, n.split(":", 1)[1])) for n in before if ":" in n}
+    pages = {p for p in pages if os.path.isfile(p)}
+
+    def ability(p):
+        return p == path or (os.path.dirname(p) == path and p.endswith((".yaml", ".yml")))
+
+    if not any(ability(p) or p in pages for p in changed):
+        return []
+    found = [(p, n, w) for p, n, w in check([path], base)]
+    if not base:
+        found.append((path, 1, "no base branch was found (origin/HEAD, origin/main or origin/master), so deleted and reused ids could not be checked. Run 'git fetch origin' and push again"))
+    for page in sorted(pages):
+        found.extend((page, n, w) for n, w in verify_page(page, files))
+    return found
+
+
+def show(found, top=None):
+    for path, n, words in found:
+        name = os.path.relpath(path, top) if top else path
+        print("{}:{}: {}".format(clean(name), n, clean(words)))
+
+
 def main(argv):
-    if not argv or argv[0] not in ("check", "page", "verify-page"):
+    if not argv or argv[0] not in ("check", "page", "verify-page", "gate"):
         print(__doc__.strip(), file=sys.stderr)
         return 2
     need_yaml()
@@ -371,8 +511,15 @@ def main(argv):
             print("abilities check: name a file or folder", file=sys.stderr)
             return 2
         found = check(args, base)
-        for path, n, words in found:
-            print("{}:{}: {}".format(path, n, words))
+        show(found)
+        return 1 if found else 0
+    if cmd == "gate":
+        opts = dict(zip(args[::2], args[1::2]))
+        if "--top" not in opts or "--path" not in opts:
+            print("abilities gate: --top TOP --path PATH [--base REV]", file=sys.stderr)
+            return 2
+        found = gate(opts["--top"], opts["--path"], opts.get("--base"))
+        show(found, os.path.realpath(opts["--top"]))
         return 1 if found else 0
     if cmd == "page":
         if len(args) != 3 or args[1] != "-o":
@@ -380,38 +527,17 @@ def main(argv):
             return 2
         page, problems = build(args[0], args[2])
         if page is None:
-            for n, words in problems:
-                print("{}:{}: {}".format(args[0], n, words))
+            show((args[0], n, words) for n, words in problems)
             return 1
         with open(args[2], "w") as handle:
             handle.write(page)
         return 0
-    # verify-page
     if len(args) != 1:
         print("abilities verify-page: PAGE", file=sys.stderr)
         return 2
-    path = args[0]
-    with open(path) as handle:
-        text = handle.read()
-    source = stamp_of(text)
-    if source is None:
-        print("{}:1: this page carries no abilities stamp".format(path))
-        return 1
-    source_path = os.path.join(os.path.dirname(os.path.abspath(path)), source)
-    if not os.path.isfile(source_path):
-        print("{}:1: the abilities file it was built from, {}, is gone".format(path, source))
-        return 1
-    fresh, problems = build(source_path, path)
-    if fresh is None:
-        print("{}:1: its abilities file {} has problems, so the page cannot be rebuilt".format(path, source))
-        return 1
-    if fresh != text:
-        old, new = text.splitlines(), fresh.splitlines()
-        n = next((i for i, (a, b) in enumerate(zip(old, new)) if a != b), min(len(old), len(new)))
-        print("{}:{}: this page differs from a fresh build of {}. It is never edited by hand: change the file, then run 'abilities.py page {} -o {}'".format(
-            path, n + 1, source, source, os.path.basename(path)))
-        return 1
-    return 0
+    problems = verify_page(args[0])
+    show((args[0], n, words) for n, words in problems)
+    return 1 if problems else 0
 
 
 if __name__ == "__main__":
