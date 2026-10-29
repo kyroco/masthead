@@ -56,7 +56,11 @@ show it to them.
 ## Agree the run
 
 When you understand the work, say in one sentence what you are about to do and
-ask how many workers. That number is sessions alive, the ones waiting for the
+ask how many workers. Say the count three ways and never mix them: how many
+issues are ready (scenarios written, no open question), how many of those can
+start now (every blocker merged), and how many wait on a merge. "Six are ready"
+when seventy are ready and six can start is false, and the person reads it as
+a problem with the issues. That number is sessions alive, the ones waiting for the
 merge queue included: a worker counts from its start until its session is
 stopped after its merge. Nothing starts before the person gives it.
 
