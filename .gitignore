@@ -1,3 +1,4 @@
 __pycache__/
 .DS_Store
 *.pyc
+state/web-access-writes.log

@@ -101,7 +101,7 @@ never docs/explainer.html "writes a plan, one line per scenario"
 never docs/explainer.html "its plan, one line per scenario"
 never docs/images/day-5-workers.svg "its plan, one line per scenario"
 never scripts/diagrams.py "its plan, one line per scenario"
-says  .claude-plugin/plugin.json '"version": "0.1.10"'
+says  .claude-plugin/plugin.json '"version": "0.1.11"'
 
 never_phrase() {
   local hit
@@ -187,6 +187,7 @@ never skills/work-on/worker.md "A second fail: stop and ask"
 never skills/work-on/worker.md "a plan fails its verifier twice"
 never skills/work-on/worker.md "wait for its \"go\""
 says  skills/work-on/foreman.md "A worker writes no plan and waits for no go"
+says  skills/work-on/foreman.md "Say the count three ways and never mix them"
 never skills/work-on/foreman.md "with its verifier's pass"
 never skills/work-on/foreman.md "Reply \"go\""
 never skills/work-on/foreman.md "Check each line against its scenario"
@@ -200,6 +201,9 @@ says  skills/review-design/SKILL.md "Assume the design is wrong and prove it rig
 says  skills/review-design/SKILL.md "one at a time"
 says  skills/review-design/SKILL.md "The mockups change too"
 says  skills/review-design/SKILL.md "It writes no code, no issue and no plan"
+says  skills/review-design/SKILL.md "## Then the issues"
+says  skills/review-design/SKILL.md "Change nothing until they say go"
+says  skills/review-design/SKILL.md "leave every other issue alone"
 says  skills/work-on/SKILL.md "except the verifier's and the adjudicator's"
 # Scenario 3: the fix loop stays small.
 says  references/session-cliffs.md "one \`verifier\` per scenario"
