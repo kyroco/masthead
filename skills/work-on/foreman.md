@@ -150,13 +150,12 @@ before you queue its PR.
 
 Some things are not yours to settle and go to the person as they stand, one at
 a time: a disagreement between review rounds (one round placed a finding on
-the fix list and the next on the "seen, not done" list, or the second
+the fix list and the next among its extras, or the second
 re-verify round left something on the fix list), and a security finding the
 adjudicator could not settle (its For the foreman section, 300 words or less).
 A PR with one of those unanswered is not queued. Everything else the
-adjudicator placed is final for the worker and for you: a finding on the
-"seen, not done" list is not fixed in this PR and not filed by anyone until
-the person answers it.
+adjudicator placed is final for the worker and for you: an extra is not
+fixed in this PR and not filed by anyone until the person answers it.
 
 Permission prompts belong to the person: tell them which session and what it
 asks (`claude attach <id>` in the terminal; in the desktop app, a link to the
@@ -171,7 +170,7 @@ conflict, a dependency, or changes that interact. Say which.
 
 ## Merge and clean up
 
-When a worker reports its PR, bring the person its "seen, not done" list, one
+When a worker reports its PR, bring the person the extras it brings, one
 item at a time, in plain words: what the customer sees today, and the answers
 fix now, fix later, or proceed. An empty list is one line and needs no answer.
 
@@ -182,9 +181,8 @@ fix now, fix later, or proceed. An empty list is one line and needs no answer.
   joins the run as a fix-later issue. This is the only issue a foreman files.
 - **Proceed**: nothing. The PR body already holds the line.
 
-Queue the PR when all of these hold: CI is green; the worker reports its
-decision-record review with no Important finding left; nothing is left on the
-adjudicator's fix list; every "seen, not done" item is answered; the PR body's
+Queue the PR when all of these hold: CI is green; nothing is left on the
+adjudicator's fix list; every extra the worker brought is answered; the PR body's
 unproven list holds nothing a customer would see; and the worker, told you are
 ready to queue, has answered "cleaned up" (its test stack and code index are
 gone; its worktree and branch stay). Otherwise park it with the reason. Auto

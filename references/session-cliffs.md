@@ -77,7 +77,9 @@ order. The steps live here and nowhere else; a repo supplies only its own facts
    you did not prove. Every verifier gets both.
 2. Send the first verification of the finished diff in one message, so they
    run blind and at the same time: one `verifier` per scenario, given the
-   scenario, the decision-record lines it rests on, the diff and both lists;
+   scenario, the decision-record lines it rests on, the README's opening
+   paragraph, the abilities line and the mockup page the scenario rests on
+   where there is one, the diff and both lists;
    where the diff adds or edits text a customer reads (screen text, a refusal
    sentence, the site's docs, the changelog), every sentence of it is a claim
    of the scenario it belongs to. Add the `security-reviewer` when
@@ -87,15 +89,18 @@ order. The steps live here and nowhere else; a repo supplies only its own facts
    read, merge or drop their results. `/code-review` is not used.
 3. Send the `adjudicator` the commit range, the reviewed files (the files the
    change touched before its first verification, the same list on every
-   round) and the path of every findings file the round wrote, and nothing
-   else: not your claims, not your did-not-prove list, not your view of any
-   finding. It runs each reproduction a verifier showed where it can,
-   confirms the claim is false, and places it: fix in this PR, or "seen, not
-   done". That placement is final for you and the foreman. What it throws out
-   is gone: it is not logged or filed. Put its "seen, not done" list in the
-   PR body under that heading, in its words; fix none of them here, file
-   none, and never ask for one to be fixed here. The foreman brings the list
-   to the user as numbered lines, who answers each: fix now (you fix it in
+   round), the path of every findings file the round wrote, the README's
+   opening paragraph, and each scenario with the decision-record lines and
+   abilities line it rests on, and nothing else: not your claims, not your
+   did-not-prove list, not your view of any finding. It reads the code along
+   each verifier's path, decides whether the finding holds, and places it:
+   fix in this PR, or an extra. That placement is final for you and the
+   foreman. What it throws out is gone: it is not logged or filed. Judge its
+   extras as
+   the worker's "What done is" says: bring the user each item that scores 8
+   or higher, in plain words, through the foreman when there is one, and
+   drop the rest; fix none of them here and file none. The user answers
+   each: fix now (you fix it in
    this PR, test first, as step 4 says), fix later (the foreman files one
    issue for it, in the same milestone and blocked by this one), or proceed
    (nothing). Its For the foreman section (a security finding it could not
@@ -123,8 +128,7 @@ order. The steps live here and nowhere else; a repo supplies only its own facts
    none. That is fix-break-fix churn, and it needs a person: the foreman
    brings it to the user as numbered lines and rules on none of it.
 6. Log nothing and file nothing. There is no Nit log: a finding is on the
-   fix list and fixed, on the "seen, not done" list for the user, or thrown
-   out.
+   fix list and fixed, brought to the user, or dropped.
 7. Add the changelog entry when the repo keeps one, or its label for internal
    work.
 8. Commit, then run the repo's pre-push check on that last commit: the script
@@ -134,7 +138,7 @@ order. The steps live here and nowhere else; a repo supplies only its own facts
    it prints, and stop and report only when that fails too. `hard-gate.sh`
    refuses the push and the PR until the check's receipt matches the commit.
 9. Push and open one PR to main. Its body gives the unproven list, the
-   "seen, not done" list, the agent-run count (the rows added to
+   extras brought to the user, the agent-run count (the rows added to
    `<state>/dispatches.tsv` for this issue whose outcome is not refused), and
    `Fixes #<issue>`. Never
    commit or push to main: main changes only by merging the reviewed PR once
