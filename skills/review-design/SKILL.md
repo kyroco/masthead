@@ -108,8 +108,9 @@ behind; its rules already live in the rubric. Before a page is converted,
 name each state it does not draw (empty, error, refused) and ask the user
 about each one, one at a time.
 
-When the PR is open, give the user each page, the template file it became,
-and whether it was edited or new. Then stop until they say to go on to the
+The PR body lists each page and the template file it became, and whether it
+was edited or new, so a worker that builds the screen later finds its
+template there. When the PR is open, give the user the same list. Then stop until they say to go on to the
 issues.
 
 ## Then the issues
