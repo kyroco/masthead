@@ -574,6 +574,12 @@ says  skills/review-design/SKILL.md "The PR body lists each page and the templat
 says  skills/work-on/foreman.md "the review-design PR lists them"
 never scripts/diagrams.py "the foreman's plan, one table"
 never docs/images/day-4-plan.svg "effort"
+# Issue #9: step 10 of Opening a PR hands the remote branch to the user,
+# since the irreversible-action gate refuses every way a session deletes one.
+says  references/session-cliffs.md "delete the branch locally, and name the remote branch for the user to delete"
+never references/session-cliffs.md "locally and on the remote"
+never references/session-cliffs.md "push origin --delete"
+never references/session-cliffs.md "refs/heads"
 
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]

@@ -147,8 +147,10 @@ order. The steps live here and nowhere else; a repo supplies only its own facts
     checkout: bring down the test stack and any tunnels as the repo's
     procedures say, delete the branch's code index
     (`korium-cli delete <branch>`), `git worktree remove` the worktree (never
-    forced; report what blocks it), and delete the branch locally and on the
-    remote.
+    forced; report what blocks it), delete the branch locally, and name the
+    remote branch for the user to delete. The irreversible-action gate
+    refuses a session that deletes a remote branch, so the user makes that
+    call.
 
 **Updating main.** Never commit or push directly to main. Build on a branch,
 open a PR, and let main change only by merging the reviewed PR once its checks
