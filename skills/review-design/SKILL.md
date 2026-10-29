@@ -70,10 +70,13 @@ asks: the wiki by a push, the repo by a PR.
 The abilities file is the one copy of every can and can't: the record keeps
 the why, the file keeps the what. Change a line there, never on the abilities
 page. Then rebuild the page from the file with
-`python3 ${CLAUDE_PLUGIN_ROOT}/hooks/abilities.py page <file> -o <page>` and
-run `python3 ${CLAUDE_PLUGIN_ROOT}/hooks/abilities.py check <file>`, which
-names each bad line; the push gate runs the same check and refuses a page
-that differs from a fresh build. A line that stops being true is never
+`python3 ${CLAUDE_PLUGIN_ROOT}/hooks/abilities.py page <file> -o <page>`.
+Before you push, run the push gate's own check from the repository's top
+folder:
+`python3 ${CLAUDE_PLUGIN_ROOT}/hooks/abilities.py gate --top . --path <the PROJECT_ABILITIES value>`.
+It checks every file the setting names as one set, against the branch's base,
+along with every page built from them, and names each bad line. The push gate
+runs exactly this and refuses the push on the same lines. A line that stops being true is never
 deleted and its id is never reused: give it
 `retired: <date>, <the decision line that retired it>`. The file keeps no
 log; git holds every change and the record's dated line holds the why.
