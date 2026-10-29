@@ -26,9 +26,8 @@ app, `mcp__ccd_turn__update_plan`; in the terminal, `TaskCreate` and
 `TaskUpdate` after a `ToolSearch` for them). Mark each one done only when it
 is done; when one does not apply, mark it done and say why. The steps:
 read the issue and its parent, read the project README, read the decision
-record, read the architecture doc, read the mockups, search Korium, plan and
-have the plan verified, build and test, the decision-record review, the PR
-review and the report.
+record, read the architecture doc, read the mockups, search Korium, build and
+test, the decision-record review, the PR review and the report.
 
 ## 1. A worktree of your own
 
@@ -113,27 +112,16 @@ secrets hook refuses any command naming them. Print the exact `cp` commands
 and ask the person to run them, then stop; dispatched, send them to your
 foreman and stop, so the issue waits rather than building without its config.
 
-## 4. Plan, and have the plan verified
+## 4. Hold the issue against the code
 
 Before any code, hold the issue's scenarios (its `Done when:` on an issue not
 yet checked by analyze-issues) and the project's rules against the code the
 index points at, and decide whether this session can finish and prove it
 alone.
 
-Write your plan: one line per scenario, each saying what you will change (the
-module and function) and the test that shows it. The plan is the one place
-the how is written down; the issue never holds it. Send the plan to one
-`verifier`, as the plan brief in `${CLAUDE_PLUGIN_ROOT}/references/dispatch-brief.md`
-says, with only the plan, the issue and the decision-record sections the
-issue names. It answers the person's five questions (does it over build, does
-it cut corners, does it add things nobody asked for, does it find the holes
-in the design and fill them, does it get to a correct result in the least
-time) and says whether any step undoes a recorded decision. A fail: revise
-and send again. A second fail: stop and ask your foreman, or the person when
-they started you. A pass: dispatched, send your foreman the plan and the
-verdict and build; the foreman does not check the plan and gives no go.
-Started by the person, the brief in step 5 carries the plan and the verdict.
-Note now how many rows in `.claude/state/dispatches.tsv` were not refused
+There is no plan and no plan check: the design was reviewed before the issue
+was written (`/review-design`), and the verifier checks each scenario once the
+code exists. How you build is yours; the issue never holds it. Note now how many rows in `.claude/state/dispatches.tsv` were not refused
 (the file may not exist yet); your report counts the rows added after it.
 
 Dispatched, or on an issue that builds a decision record, there is no design
@@ -177,10 +165,9 @@ with the sub-issue numbers, to your foreman or at the end of your turn.
 
 Started by the person: first report the brief and wait for their go. The brief
 is what the project is for and the rules that bind this work, the issue and
-its scenarios, what Korium changed about the approach, and the plan with its
-verifier's verdict. Say that the first build in a fresh worktree compiles from
-scratch and will be slow. Dispatched: the verifier's pass was the go, so build
-without waiting, and put the brief in your Korium capture at the end.
+its scenarios, and what Korium changed about the approach. Say that the first
+build in a fresh worktree compiles from scratch and will be slow. Dispatched:
+build without waiting, and put the brief in your Korium capture at the end.
 
 Write the code in this session, with the file from `.claude/references/stacks/`
 loaded for each stack you touch, and helpers only for the three reasons in
@@ -244,7 +231,7 @@ issue. Dispatched, send all of it to your foreman with `SendMessage`.
 Never merge, deploy, force-push or push to main. Stop and report, rather than
 route around, when a gate refuses the same action twice, a decision would
 change the requested outcome (replacing the approach after a review is one),
-credentials the work needs are missing, a plan fails its verifier twice, or
+credentials the work needs are missing, or
 the second re-verify round leaves anything on the adjudicator's fix list;
 that goes to the foreman, who brings it to the person, and you build nothing
 on it until the answer comes back. A gate that refuses because of a rule the

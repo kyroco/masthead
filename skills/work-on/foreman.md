@@ -114,11 +114,8 @@ Rely on `notify_when_idle` notices, or in the desktop app on the notes it
 sends when a worker ends a turn. A worker silent past reason gets one message
 asking for status. Never read a worker's transcript into this session.
 
-A worker's first message is its plan, one line per scenario, with its
-verifier's pass. You do not check the plan and you send no go: the worker
-builds once the verifier passes it. A plan that fails its verifier twice goes
-to the person: the plan line, what the check said, and the worker's proposed
-change. Their answer goes back as they gave it.
+A worker writes no plan and waits for no go: it builds as soon as it has
+read its sources. Its first message is a question, a split or its PR.
 
 A worker that split its issue sends the sub-issue numbers and stops, and that
 worker is free: start one worker per sub-issue, in blocked-by order. In the

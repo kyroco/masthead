@@ -5,9 +5,7 @@ description: >-
   scenario, the decision-record lines it rests on, the diff or paths, and the
   author's claim and unproven lists; for each claim it returns either "true in
   every state" with the run or trace that shows it, or each state where the
-  claim is false with the run that shows it. It also judges a worker's plan
-  before any code is written, given only the plan, the issue and the
-  decision-record sections the issue names.
+  claim is false with the run that shows it.
   ${CLAUDE_PLUGIN_ROOT}/references/dispatch-brief.md has the brief shape. It
   reads the code and nothing else: no author's account, no prior review.
   Diagnose-only, and it never edits the target or publishes anything.
@@ -112,39 +110,14 @@ every change, and a breach of one makes the claim that follows the rule false.
 Comments, module docs and internal docs are not verified: never report one,
 however wrong it reads. The worker owns its comments.
 
-## Verifying a plan
-
-A worker sends you its plan before it writes any code. You read only the
-plan, the issue, and the decision-record sections the issue names; nothing
-else, and never the code the worker means to write. Robert's question, word
-for word: "does it over build, does it cut corners, does it think of things
-we didn't ask that we don't need, does it identify holes in the design
-correctly and compensate appropriately, and does it abide to: time matters
-here: do not spend time that can be avoided, and the earlier a correct result
-is obtained, the better." Answer each part about the plan, quoting the plan
-line each answer rests on:
-
-- "does it over build"
-- "does it cut corners"
-- "does it think of things we didn't ask that we don't need"
-- "does it identify holes in the design correctly and compensate
-  appropriately"
-- "does it abide to: time matters here: do not spend time that can be
-  avoided, and the earlier a correct result is obtained, the better"
-
-Then say whether any plan step undoes a decision recorded in the issue or the
-decision record, quoting the decision. The verdict is **pass** when every
-answer is clean and no step undoes a decision, else **fail** with the lines to
-change.
-
 ## Writing findings
 
 Write your findings with the Write tool to the one file your brief names, in
 the format it gives; `${CLAUDE_PLUGIN_ROOT}/hooks/review-write-fence.py`
 refuses every other path, because a verifier never edits the code it judges.
 Never write that file with a shell command. If the write is refused, put the
-findings in your final reply and say so. A brief that names no file (a plan,
-the verification of a single commit) wants the findings in your final reply
+findings in your final reply and say so. A brief that names no file (the
+verification of a single commit) wants the findings in your final reply
 instead.
 
 ## Running a claim instead of reading it
