@@ -104,12 +104,20 @@ records may live in a wiki while their abilities files sit in the repository
 (YAML with `record`, `roles` and `lines`, one per decision record). If you
 find any, ask: "Should a push be refused when an abilities file has a bad line
 or its page was edited by hand?" On yes, add
-`"PROJECT_ABILITIES": "<the file or its folder>"` to the env block.
+`"PROJECT_ABILITIES": "<the file or its folder>"` to the env block. The check
+reads YAML with PyYAML, which a fresh Mac lacks; step 7 installs it once the
+person says yes to writing.
 
 ## 7. Write, then show what is on
 
 Show the exact env block and the file it goes to, and ask "Shall I write
-this?" On yes, merge it into the file (keep everything already there). If
+this?" When the block holds `PROJECT_ABILITIES`, say that yes also installs
+PyYAML for the abilities check. On yes, merge it into the file (keep
+everything already there), and when it holds `PROJECT_ABILITIES` run
+`python3 "${CLAUDE_PLUGIN_ROOT}/hooks/abilities.py" install-yaml`. It installs
+PyYAML for the `python3` the push gate runs (Homebrew's Python refuses a plain
+`pip install`, so it retries into the user's own folder), or prints the one
+command that does; show that command to the person if it failed. If
 `.claude/state/` is not in `.gitignore`, ask whether to add it; Masthead keeps
 its small working files there.
 

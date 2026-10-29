@@ -14,7 +14,7 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y jq
       - name: Install PyYAML for the abilities checker
-        run: python3 -c 'import yaml' 2>/dev/null || python3 -m pip install --user pyyaml || python3 -m pip install --user --break-system-packages pyyaml
+        run: python3 hooks/abilities.py install-yaml
       - name: Run the hook suites
         run: bash hooks/run-tests.sh
   manifest:

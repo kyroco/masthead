@@ -11,6 +11,14 @@ set -uo pipefail
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
 TOOL="$HERE/abilities.py"
 GATE="$HERE/hard-gate.sh"
+
+# Without PyYAML the checker reads nothing, so every case would fail for that one reason.
+# Exit 77 tells run-tests.sh this suite was skipped, not failed.
+if ! python3 -c 'import yaml' 2>/dev/null; then
+  echo "skipped: PyYAML is not installed for $(command -v python3), so the abilities checker cannot run. Run 'python3 $TOOL install-yaml'."
+  exit 77
+fi
+
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/abilities-test.XXXXXX")"
 trap 'rm -rf "$TMP"' EXIT
 

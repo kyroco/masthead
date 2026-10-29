@@ -1,20 +1,28 @@
 #!/usr/bin/env bash
 # Run every test suite for the shared hooks in this folder; nothing runs these in CI.
 # Usage: bash hooks/run-tests.sh (CLAUDE_PROJECT_DIR is unset so the calling repo cannot make a hook stand down).
+# RUN_ONLY="<label>" runs that one suite. A suite that exits 77 was skipped: its last line says why, and it is not a failure.
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 unset CLAUDE_PROJECT_DIR
 cd "${TMPDIR:-/tmp}" || exit 1
 
 failed=0
+skipped=0
 suites=0
 run() {
   local label="$1"
   shift
+  [ -n "${RUN_ONLY:-}" ] && [ "$RUN_ONLY" != "$label" ] && return
   suites=$((suites + 1))
-  local out
-  if out="$("$@" 2>&1)"; then
+  local out status
+  out="$("$@" 2>&1)"
+  status=$?
+  if [ "$status" -eq 0 ]; then
     printf 'ok    %-28s %s\n' "$label" "$(printf '%s' "$out" | tail -1 | cut -c1-90)"
+  elif [ "$status" -eq 77 ]; then
+    skipped=$((skipped + 1))
+    printf 'skip  %-28s %s\n' "$label" "$(printf '%s' "$out" | tail -1)"
   else
     failed=$((failed + 1))
     printf 'FAIL  %-28s\n' "$label"
@@ -44,6 +52,7 @@ run "wiki refresh"           bash "$here/tests/wiki-refresh-test.sh"
 run "push gate"              bash "$here/tests/hard-gate-test.sh"
 run "push check script"      bash "$here/tests/push-check-test.sh"
 run "abilities file"         bash "$here/tests/abilities-test.sh"
+run "abilities PyYAML"       bash "$here/tests/abilities-install-test.sh"
 run "scope gate"             bash "$here/tests/scope-gate-test.sh"
 run "verdict gate"           bash "$here/tests/verdict-gate-test.sh"
 run "index on stop"          bash "$here/tests/korium-index-on-stop-test.sh"
@@ -62,4 +71,8 @@ if [ "$failed" -gt 0 ]; then
   echo "$failed suite(s) failed"
   exit 1
 fi
-echo "all $suites suites pass"
+if [ "$skipped" -gt 0 ]; then
+  echo "all $((suites - skipped)) suites that ran pass; $skipped skipped, each saying why above"
+else
+  echo "all $suites suites pass"
+fi

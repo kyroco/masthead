@@ -6,6 +6,7 @@
   abilities.py verify-page PAGE                refuse a page that differs from a fresh build
   abilities.py gate --top TOP --path PATH [--base REV]
                                                what the push gate runs
+  abilities.py install-yaml                    install PyYAML for this Python, or print the command that does
 
 PATH is a file or a folder of .yaml and .yml files, checked as one set of ids.
 Each problem prints as "path:line: what is wrong"; exit 1 when there is one, 2
@@ -42,8 +43,36 @@ STAMP_TAG = re.compile(r'<meta name="{}" content="([^"]*)">'.format(STAMP))
 def need_yaml():
     if yaml is None:
         print("abilities: PyYAML is not installed, so no abilities file was read and no page was compared. "
-              "Run 'python3 -m pip install pyyaml'.", file=sys.stderr)
+              "Run '{} {} install-yaml', which installs it.".format(
+                  shlex.quote(sys.executable), shlex.quote(os.path.realpath(__file__))), file=sys.stderr)
         sys.exit(2)
+
+
+def has_yaml():
+    """True when a fresh run of this Python imports yaml, so an install made a moment ago counts."""
+    return subprocess.run([sys.executable, "-c", "import yaml"], stdout=subprocess.DEVNULL,
+                          stderr=subprocess.DEVNULL).returncode == 0
+
+
+def install_yaml():
+    """Install PyYAML for the Python running this file. Homebrew's Python refuses a plain pip install
+    (externally-managed-environment), so that refusal is retried into the user's own folder."""
+    if has_yaml():
+        print("abilities: PyYAML is already installed for {}.".format(sys.executable))
+        return 0
+    # Inside a virtualenv a --user install is refused, and a plain one stays in the environment.
+    cmd = [sys.executable, "-m", "pip", "install"] + ([] if sys.prefix != sys.base_prefix else ["--user"])
+    tries = [cmd + ["pyyaml"]]
+    out = subprocess.run(tries[0], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors="replace")
+    if "externally-managed-environment" in out.stdout:
+        tries.append(cmd + ["--break-system-packages", "pyyaml"])
+        subprocess.run(tries[1], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    if has_yaml():
+        print("abilities: installed PyYAML with '{}'.".format(" ".join(shlex.quote(a) for a in tries[-1])))
+        return 0
+    print("abilities: PyYAML could not be installed for {}. Run '{}'.".format(
+        sys.executable, " ".join(shlex.quote(a) for a in tries[-1])), file=sys.stderr)
+    return 2
 
 
 def clean(text):
@@ -521,10 +550,12 @@ def show(found, top=None):
 
 
 def main(argv):
-    if not argv or argv[0] not in ("check", "page", "verify-page", "gate"):
+    if not argv or argv[0] not in ("check", "page", "verify-page", "gate", "install-yaml"):
         print(__doc__.strip(), file=sys.stderr)
         return 2
     cmd, args = argv[0], argv[1:]
+    if cmd == "install-yaml":
+        return install_yaml()
     if cmd == "gate":
         # The gate decides first whether the push touches an abilities file, so a push that does not needs no PyYAML.
         opts = dict(zip(args[::2], args[1::2]))
