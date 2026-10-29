@@ -27,8 +27,8 @@ Load your Korium tools with `ToolSearch` and the query
 `select:mcp__korium__agent_search,mcp__korium__code_locate,mcp__korium__agent_capture,mcp__claude_ai_korium__agent_search,mcp__claude_ai_korium__code_locate,mcp__claude_ai_korium__agent_capture`,
 in one call. A session reaches Korium either through the local `korium`
 server or through the claude.ai connector, so only one set comes back; use
-that one. When they are already loaded, the call returns them and nothing
-changes. Load any other Korium tool you need the same way, by its
+that one. When they are already loaded, or your session offers no
+`ToolSearch`, call them directly. Load any other Korium tool you need the same way, by its
 two names, before you call it.
 
 ## The contract
