@@ -1,6 +1,6 @@
 ---
 name: review-design
-description: Review a decision record, its architecture doc and its mockups against each other, the code and Korium before any issue is written from them. It assumes the design is wrong, finds every state the artifacts are silent on and every place they disagree, asks the user one question at a time, and edits the artifacts, mockups included, until they all say the same thing. /review-design ADR-0170. Run it from the repo that holds the code and the mockups.
+description: Review a decision record, its architecture doc and its mockups against each other, the code and Korium before any issue is written from them. It assumes the design is wrong, finds every state the artifacts are silent on and every place they disagree, asks the user one question at a time, and edits the artifacts, mockups included, until they all say the same thing. /review-design ADR-0170. Then it finds the issues that quote the lines it changed and fixes only those. Run it from the repo that holds the code and the mockups.
 disable-model-invocation: true
 ---
 
@@ -61,6 +61,26 @@ asks: the wiki by a push, the repo by a PR.
 One table: each decision, what disagreed or was missing, what the user
 answered, what changed where. Capture the run in Korium with `agent_capture`
 and give its id.
+
+## Then the issues
+
+Issues written before the review quote lines you changed. Find those and fix
+only them, and leave every other issue alone. Start from your own report:
+every decision, criterion and mockup line the review changed. Read the body
+of each open issue the record's milestones hold. An issue is stale when one
+of its scenarios rests on a line you changed, or quotes words that no longer
+match it. Nothing else makes it stale: not wording you would prefer, not a
+scenario you would have written differently.
+
+Bring the user the stale issues as a table: the issue, the scenario line, and
+the changed line it rests on. Change nothing until they say go. Then fix them
+one at a time: rewrite only the stale scenario so it says what the artifact
+now says, in the shape it had, keep every line the user wrote, write the new
+body to a file inside the checkout and send it with
+`gh issue edit <n> --body-file <path>`. A scenario that cannot be fixed
+without a decision the user has not made is one question to them, and you
+wait. When they are all done, say which issues changed and which you left
+alone.
 
 ## What this skill never does
 
