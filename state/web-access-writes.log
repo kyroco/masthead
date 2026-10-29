@@ -79,3 +79,15 @@ mark-8	agent=main	Write	CLAUDE.md, which loads into every session automatically	
 scope-6	agent=researcher	mcp__korium__agent_capture	a Korium memory that every future session reads at start	hosts=example.invalid	marker=yes
 mark-7	agent=main	mcp__korium__agent_capture	a Korium memory that every future session reads at start	hosts=example.invalid	marker=yes
 mark-8	agent=main	Write	CLAUDE.md, which loads into every session automatically	hosts=example.invalid	marker=yes
+scope-6	agent=researcher	mcp__korium__agent_capture	a Korium memory that every future session reads at start	hosts=example.invalid	marker=yes
+mark-7	agent=main	mcp__korium__agent_capture	a Korium memory that every future session reads at start	hosts=example.invalid	marker=yes
+mark-8	agent=main	Write	CLAUDE.md, which loads into every session automatically	hosts=example.invalid	marker=yes
+scope-6	agent=researcher	mcp__korium__agent_capture	a Korium memory that every future session reads at start	hosts=example.invalid	marker=yes
+mark-7	agent=main	mcp__korium__agent_capture	a Korium memory that every future session reads at start	hosts=example.invalid	marker=yes
+mark-8	agent=main	Write	CLAUDE.md, which loads into every session automatically	hosts=example.invalid	marker=yes
+scope-6	agent=researcher	mcp__korium__agent_capture	a Korium memory that every future session reads at start	hosts=example.invalid	marker=yes
+mark-7	agent=main	mcp__korium__agent_capture	a Korium memory that every future session reads at start	hosts=example.invalid	marker=yes
+mark-8	agent=main	Write	CLAUDE.md, which loads into every session automatically	hosts=example.invalid	marker=yes
+scope-6	agent=researcher	mcp__korium__agent_capture	a Korium memory that every future session reads at start	hosts=example.invalid	marker=yes
+mark-7	agent=main	mcp__korium__agent_capture	a Korium memory that every future session reads at start	hosts=example.invalid	marker=yes
+mark-8	agent=main	Write	CLAUDE.md, which loads into every session automatically	hosts=example.invalid	marker=yes

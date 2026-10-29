@@ -66,7 +66,32 @@ CHANGED="$( {
   [ -n "$BASE" ] && git diff --name-only "$BASE" HEAD 2>/dev/null
   git status --porcelain --untracked-files=all 2>/dev/null | awk '{print $NF}'
 } | sort -u | sed "s|^|$TOP/|")"
-[ -z "$CHANGED" ] && exit 0
+
+# Abilities: when the repo names its abilities file, refuse a bad line and a hand-edited abilities page.
+# abilities.py picks what to check (only when the branch touched an abilities file or a page built from one),
+# finds its own base when origin/main is missing, and prints each path relative to the repo top, so this
+# rung runs even when the changed list above is empty.
+gate_abilities() {
+  local named path out
+  named="$(project_fact "$TOP" PROJECT_ABILITIES)"
+  [ -n "$named" ] || return 0
+  # A path gone from the checkout is still checked: its ids at the base must not vanish with it.
+  case "$named" in /*) path="$named" ;; *) path="$TOP/$named" ;; esac
+  # Pass no base: abilities.py takes origin/main first, as this gate does, so the check review-design runs by hand is the same.
+  if ! out="$(python3 "$_HOOK_DIR/abilities.py" gate --top "$TOP" --path "$path" 2>&1)"; then
+    echo "BLOCK: the abilities check refused this push:" >&2
+    printf '%s\n' "$out" | sed 's/^/  /' >&2
+    return 1
+  fi
+}
+if [ -z "$CHANGED" ]; then
+  if ! gate_abilities; then
+    echo "" >&2
+    echo "Nothing was pushed. Fix the failures above and push again; the gate re-runs on the branch." >&2
+    exit 2
+  fi
+  exit 0
+fi
 # Warn that uncommitted edits are checked on disk but the push carries the committed copy.
 _DIRTY="$(git diff --name-only HEAD 2>/dev/null | head -5)"
 [ -n "$_DIRTY" ] && echo "WARN: uncommitted edits are checked as they are on disk, but this push carries the committed version of: $(printf '%s' "$_DIRTY" | tr '\n' ' ')" >&2
@@ -434,6 +459,8 @@ each_root() {
 [ -n "$SWIFT" ]  && each_root gate_swift Package.swift SWIFT
 [ -n "$KOTLIN" ] && each_root gate_kotlin gradlew KOTLIN
 [ -n "$TF" ]     && gate_tf
+
+gate_abilities || fail=1
 
 # Local tests: require the push-check script's receipt for HEAD, and refuse a push of any other commit.
 gate_local_tests() {
