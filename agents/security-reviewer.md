@@ -15,8 +15,8 @@ effort: medium
 # any of the four agents was 156 turns and 99% ended under 111.
 maxTurns: 200
 # Of Korium it holds only the code index and capture, as the reviewer does.
-tools: Read, Glob, Grep, Bash, Write, mcp__semgrep, mcp__korium__code_locate, mcp__korium__agent_capture
-disallowedTools: Agent, Edit, MultiEdit, NotebookEdit, WebFetch, WebSearch, mcp__korium__agent_search, mcp__korium__korium_browse, mcp__korium__korium_trace, mcp__korium__korium_reconstruct, mcp__korium__korium_hydrate
+tools: Read, Glob, Grep, Bash, Write, mcp__semgrep, mcp__korium__code_locate, mcp__claude_ai_korium__code_locate, mcp__korium__agent_capture, mcp__claude_ai_korium__agent_capture
+disallowedTools: Agent, Edit, MultiEdit, NotebookEdit, WebFetch, WebSearch, mcp__korium__agent_search, mcp__claude_ai_korium__agent_search, mcp__korium__korium_browse, mcp__claude_ai_korium__korium_browse, mcp__korium__korium_trace, mcp__claude_ai_korium__korium_trace, mcp__korium__korium_reconstruct, mcp__claude_ai_korium__korium_reconstruct, mcp__korium__korium_hydrate, mcp__claude_ai_korium__korium_hydrate
 ---
 
 Follow shared actions in `${CLAUDE_PLUGIN_ROOT}/references/agent-preamble.md`.

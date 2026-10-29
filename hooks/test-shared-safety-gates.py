@@ -502,6 +502,39 @@ def main():
             bad.append(command[-50:])
     check("every entry names a hook file that is installed", "; ".join(bad) or "all present", "all present")
 
+    # A session reaches Korium through the local korium server (mcp__korium__*)
+    # or the claude.ai connector (mcp__claude_ai_korium__*), so an agent that
+    # names a Korium tool one way only has no Korium the other way.
+    print("\n--- every Korium tool an agent file names, it names both ways ---")
+    agents_dir = os.path.join(HOOKS, os.pardir, "agents")
+    names = {"local": "mcp__korium", "connector": "mcp__claude_ai_korium"}
+    grants = {}
+    one_way = []
+    for agent in sorted(f for f in os.listdir(agents_dir) if f.endswith(".md")):
+        head = open(os.path.join(agents_dir, agent)).read().split("\n---", 1)[0]
+        for field in ("tools", "disallowedTools"):
+            line = re.search(r"^{}:(.*)$".format(field), head, re.M)
+            items = [i.strip() for i in line.group(1).split(",")] if line else []
+            grants[(agent[:-3], field)] = items
+            tails = {}
+            for item in items:
+                for way, prefix in names.items():
+                    if item == prefix or item.startswith(prefix + "__"):
+                        tails.setdefault(item[len(prefix):], set()).add(way)
+            one_way += ["{} {} {}".format(agent, field, t or "(whole server)")
+                        for t, ways in sorted(tails.items()) if len(ways) == 1]
+    print("      {} agent files".format(len({a for a, _ in grants})))
+    check("no agent names a Korium tool under one name only", "; ".join(one_way) or "none", "none")
+
+    for agent in ("verifier", "security-reviewer", "adjudicator"):
+        for prefix in names.values():
+            check("the {} holds {}__code_locate and agent_capture".format(agent, prefix),
+                  all(prefix + t in grants[(agent, "tools")] for t in ("__code_locate", "__agent_capture")), True)
+            check("and cannot search memory under {}".format(prefix),
+                  prefix + "__agent_search" in grants[(agent, "disallowedTools")]
+                  and prefix not in grants[(agent, "tools")]
+                  and prefix + "__agent_search" not in grants[(agent, "tools")], True)
+
     print("")
     if failures:
         print("{} of the cases are wrong:".format(len(failures)))

@@ -11,8 +11,8 @@ effort: high
 # Runaway guard, not a budget. Over the 30 days to 2026-10-09 the longest run of
 # any of the four agents was 156 turns and 99% ended under 111.
 maxTurns: 200
-tools: Read, Glob, Grep, Bash, WebFetch, WebSearch, SendMessage, mcp__korium
-disallowedTools: Agent, Write, Edit, MultiEdit, NotebookEdit, mcp__korium__code_delete, mcp__korium__code_submit, mcp__korium__korium_hydrate, mcp__korium__korium_relation, mcp__korium__korium_relation_correct, mcp__korium__korium_set_provenance_alias, mcp__korium__korium_register_vocabulary
+tools: Read, Glob, Grep, Bash, WebFetch, WebSearch, SendMessage, mcp__korium, mcp__claude_ai_korium
+disallowedTools: Agent, Write, Edit, MultiEdit, NotebookEdit, mcp__korium__code_delete, mcp__claude_ai_korium__code_delete, mcp__korium__code_submit, mcp__claude_ai_korium__code_submit, mcp__korium__korium_hydrate, mcp__claude_ai_korium__korium_hydrate, mcp__korium__korium_relation, mcp__claude_ai_korium__korium_relation, mcp__korium__korium_relation_correct, mcp__claude_ai_korium__korium_relation_correct, mcp__korium__korium_set_provenance_alias, mcp__claude_ai_korium__korium_set_provenance_alias, mcp__korium__korium_register_vocabulary, mcp__claude_ai_korium__korium_register_vocabulary
 ---
 
 Follow shared actions in `${CLAUDE_PLUGIN_ROOT}/references/agent-preamble.md`.
