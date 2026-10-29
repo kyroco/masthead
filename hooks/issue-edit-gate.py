@@ -58,6 +58,7 @@ FILE_FLAGS = {"--body-file", "-F"}
 REPO_FLAGS = {"--repo", "-R"}
 SHORT_VALUE_FLAGS = {f for f in VALUE_FLAGS if len(f) == 2}
 OPERATORS = "();<>|&\n"
+CONTINUED = re.compile(r"(?<!\\)((?:\\\\)*)\\\n")
 MID_WORD_HASH = re.compile(r"(?<=[^\s();<>|&])#")
 QUOTED = re.compile(r'"([^"]+)"')
 QUESTION_LINE = re.compile(r"^\s*(?:[-*+]|\d+[.)])?\s*\[NEEDS CLARIFICATION\b|\[NEEDS CLARIFICATION:", re.I)
@@ -112,10 +113,11 @@ def shell_tokens(text):
     """The words of a shell command with each operator (`;`, `&&`, `|`, `(`,
     a newline and the like) as a token of its own; None when the quotes do not
     close."""
-    # A backslash at the end of a line joins it to the next, as in the shell.
+    # A backslash at the end of a line joins it to the next, as in the shell,
+    # unless that backslash is itself escaped by one before it.
     # The shell starts a comment only at the start of a word; shlex would cut
     # `notes#1.md` too, so a `#` inside a word is hidden from it.
-    text = MID_WORD_HASH.sub("\0", text.replace("\\\n", ""))
+    text = MID_WORD_HASH.sub("\0", CONTINUED.sub(r"\1", text))
     lexer = shlex.shlex(text, posix=True, punctuation_chars=OPERATORS)
     lexer.whitespace = " \t\r"
     lexer.whitespace_split = True
