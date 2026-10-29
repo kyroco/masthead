@@ -366,6 +366,17 @@ says  skills/analyze-issues/milestone-check.md "gh issue edit <n> --body-file <p
 says  skills/analyze-issues/SKILL.md "gh issue edit <n> --body-file <path>"
 never skills/analyze-issues/issue-check.md "--body-file - <<"
 never skills/analyze-issues/milestone-check.md "--body-file - <<"
+# The GitHub connector is used where it is loaded, gh is the fallback, and git and the merge queue stay off it (issue #27).
+says  skills/github-issues/SKILL.md "## Which tool makes the call"
+says  skills/github-issues/SKILL.md "**Commits and pushes go through git.**"
+says  skills/github-issues/SKILL.md "**The merge queue goes through \`gh\`.**"
+says  skills/work-on/foreman.md "That goes through \`gh api graphql\` even where the GitHub"
+says  skills/work-on/SKILL.md "and \`gh\` is the fallback"
+says  skills/analyze-issues/issue-check.md "send the whole body with \`issue_write\` (method \`update\`)"
+says  skills/analyze-issues/milestone-check.md "send the whole new body with \`issue_write\` (method \`update\`)"
+says  skills/analyze-issues/SKILL.md "send the whole new body with \`issue_write\` (method \`update\`)"
+says  README.md "| \`connector-commit-gate.py\` | before a GitHub connector call |"
+says  docs/explainer.template.html "<tr><td><code>connector-commit-gate.py</code></td>"
 never README.md "skill rewrites issues into this shape"
 never docs/explainer.template.html "skill rewrites issues into this shape"
 

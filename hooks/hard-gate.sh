@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# hard-gate.sh -- the done gate for every stack: a PreToolUse hook on Bash that runs on `git push` and `gh pr create`.
+# hard-gate.sh -- the done gate for every stack: a PreToolUse hook on Bash that runs on `git push` and `gh pr create`,
+# and on a GitHub connector's create_pull_request.
 # It blocks (exit 2) when a check on the files the branch changed fails; every other command passes.
 
 set -uo pipefail
@@ -21,15 +22,17 @@ if [ ! -t 0 ]; then
 fi
 # Pass any call that is not a push before starting an interpreter.
 case "$_PAYLOAD" in
-  *push*|*"pr create"*|*create-pr*) ;;
+  *push*|*"pr create"*|*create-pr*|*create_pull_request*) ;;
   *) exit 0 ;;
 esac
 # Parse the payload in one python3 call: the cwd on the first line, the command after it.
-_PARSED="$(printf '%s' "$_PAYLOAD" | python3 -c 'import json,sys
+# A GitHub connector's create_pull_request opens a PR the way `gh pr create` does, so it is read as that (issue #27).
+_PARSED="$(printf '%s' "$_PAYLOAD" | python3 -c 'import json,re,sys
 try: d=json.load(sys.stdin)
 except Exception: sys.exit(0)
 print(d.get("cwd",""))
-print((d.get("tool_input") or {}).get("command",""))' 2>/dev/null || true)"
+if re.match(r"^mcp__.+__create_pull_request$", str(d.get("tool_name") or "")): print("gh pr create")
+else: print((d.get("tool_input") or {}).get("command",""))' 2>/dev/null || true)"
 _CWD="$(printf '%s\n' "$_PARSED" | head -1)"
 _CMD="$(printf '%s\n' "$_PARSED" | tail -n +2)"
 # Pass the command unless it is a git push, a `gh pr create` or a create-pr.sh run; a here-string avoids a SIGPIPE false pass.

@@ -61,7 +61,9 @@ in full; never "as in section 2". Add nothing the sources do not support.
   quoted, not asked. A design choice is not a question. Add the
   needs-decision label when a question is open.
 - Write the whole new body to a file inside the checkout with the Write
-  tool, then edit with `gh issue edit <n> --body-file <path>`. A check in
+  tool, then edit with `gh issue edit <n> --body-file <path>`, or, where the
+  GitHub connector is loaded, read the issue with its `issue_read` (method
+  `get`) and send the whole body with `issue_write` (method `update`). A check in
   front of the edit reads that one form, refuses `--body`, standard input, a
   heredoc or a here-string, and refuses a body that drops a line quoted as
   the user's or a question without its "looked in:" part. Fix the body;

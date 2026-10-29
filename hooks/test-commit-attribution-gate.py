@@ -44,6 +44,16 @@ def decide(command, cwd=None, raw=None, tool="Bash"):
         return "unparseable: " + out[:70]
 
 
+def connector(tool, **fields):
+    """A GitHub connector call, as the hook sees it, with the given fields."""
+    return json.dumps({
+        "session_id": "test-commit-attribution-gate",
+        "cwd": os.getcwd(),
+        "tool_name": tool,
+        "tool_input": dict({"owner": "kyroco", "repo": "masthead"}, **fields),
+    })
+
+
 def main():
     tmp = tempfile.mkdtemp(prefix="commit-gate-")
     trailer_file = os.path.join(tmp, "msg.txt")
@@ -78,6 +88,15 @@ def main():
         ("pr create -F link", "gh pr create -t t -F body.md", "deny"),
         ("pr edit body trailer", 'gh pr edit 12 --body "b\n' + TRAILER + '"', "deny"),
         ("just pr --fill with body link", 'gh pr create --fill && gh pr edit --body "x\n' + TRAILER + '"', "deny"),
+        # DENY: the same PR bodies written through a GitHub connector (issue #27).
+        ("connector pr create body link", None, "deny", {"raw": connector(
+            "mcp__claude_ai_GitHub__create_pull_request", title="t", head="b", base="main",
+            body="b\n\nhttps://claude.ai/code/session_01ABC")}),
+        ("connector pr update body trailer", None, "deny", {"raw": connector(
+            "mcp__github__update_pull_request", pullNumber=12, body="b\n" + TRAILER)}),
+        ("connector pr create generated footer", None, "deny", {"raw": connector(
+            "mcp__plugin_github_github__create_pull_request", title="t", head="b", base="main",
+            body="b\n\nGenerated with Claude Code")}),
         # ALLOW: ordinary authoring, and every non-authoring mention of the words.
         ("clean -m", 'git commit -m "Fix the thing"', "allow"),
         ("clean -F file", "git commit -F clean.txt", "allow"),
@@ -91,6 +110,13 @@ def main():
         ("pr create clean", 'gh pr create --fill --label no-changelog', "allow"),
         ("commit word inside path", "cat notes/commit-guide.txt", "allow"),
         ("missing -F file", "git commit -F does-not-exist.txt", "allow"),
+        ("connector pr create clean", None, "allow", {"raw": connector(
+            "mcp__claude_ai_GitHub__create_pull_request", title="t", head="b", base="main",
+            body="Fixes #27")}),
+        ("connector pr update title only", None, "allow", {"raw": connector(
+            "mcp__claude_ai_GitHub__update_pull_request", pullNumber=12, title="t")}),
+        ("connector pr read with a trailer", None, "allow", {"raw": connector(
+            "mcp__claude_ai_GitHub__pull_request_read", method="get", pullNumber=12, body=TRAILER)}),
         # FAIL OPEN: broken plumbing allows.
         ("malformed json", None, "allow", {"raw": "{not json"}),
         ("empty stdin", None, "allow", {"raw": ""}),

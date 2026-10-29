@@ -44,7 +44,7 @@ After step 6's audit (the code read, the plan clear), and before any code:
 2. Put it in the issue itself, never in a comment: a `## Sheet` section at the
    end of the issue body, with everything above it unchanged. Read the body to
    a file with `gh issue view <n> --json body --jq .body`, append the section,
-   and write it back with `gh issue edit <n> --body-file <file>`.
+   and write it back with `gh issue edit <n> --body-file <file>`. Where the GitHub connector is loaded, read the issue with its `issue_read` (method `get`) and send the whole new body with `issue_write` (method `update`) instead; the check reads that call too.
 3. Give the user the issue link, then stop and wait. Write no product code
    until the user approves it.
 4. On an adjustment or an answer, rewrite the sheet in place (GitHub keeps the

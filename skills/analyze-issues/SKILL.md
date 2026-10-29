@@ -56,7 +56,7 @@ Otherwise, on GitHub, it:
 A check in front of the edit (`issue-edit-gate.py`) reads one form, the
 body in a file inside the checkout sent with `gh issue edit <n> --body-file <path>`,
 and refuses a body that drops a line quoted as the user's, or a question
-without its "looked in:" part.
+without its "looked in:" part. Where the GitHub connector is loaded, read the issue with its `issue_read` (method `get`) and send the whole new body with `issue_write` (method `update`) instead; the check reads that call too.
 
 It returns only a verdict per check with its evidence, what it edited, the
 sub-issue numbers and the open questions word for word.

@@ -34,7 +34,11 @@ offer a list. A typo is not a missing argument: do what was meant. The word
 ## Which repo
 
 Work in the repo the session was started in; this skill never moves a session
-to another repo, and every `gh` command runs against this one. The repo's own
+to another repo, and every `gh` command and GitHub connector call runs
+against this one. Where the connector is loaded, issue, pull request, comment
+and Status calls go through it and `gh` is the fallback; git keeps the
+commits and pushes, and the merge queue stays on `gh` (the github-issues
+skill, **Which tool makes the call**). The repo's own
 facts come first: where its `CLAUDE.md` or `docs/conventions/` sets a test
 command, a pre-push check, its changelog or a worktree
 standard, those bind. The PR steps themselves are **Opening a PR** in

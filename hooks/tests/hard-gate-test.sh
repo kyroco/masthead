@@ -43,6 +43,15 @@ run_gate() {
   ERR="$(cat "$TMP/err")"
 }
 
+# Run the gate in $1 as the PreToolUse hook sees a GitHub connector call named $2 (issue #27).
+run_connector() {
+  payload="$(python3 -c 'import json,sys; print(json.dumps({"hook_event_name":"PreToolUse","tool_name":sys.argv[2],"cwd":sys.argv[1],"tool_input":{"owner":"o","repo":"r","title":"t","head":"b","base":"main","body":"Fixes #27","pullNumber":1}}))' "$1" "$2")"
+  ( cd "$1" && printf '%s' "$payload" \
+      | CLAUDE_PROJECT_DIR="$1" GIT_CEILING_DIRECTORIES="$TMP" bash "$GATE" 2>"$TMP/err" ; echo $? > "$TMP/status" )
+  STATUS="$(cat "$TMP/status")"
+  ERR="$(cat "$TMP/err")"
+}
+
 ok() {
   if [ "$1" = "$2" ]; then
     pass=$((pass + 1))
@@ -433,6 +442,11 @@ contains "$ERR" "local tests have not passed" "it says the local tests have not 
 contains "$ERR" "receipt is for another commit" "it passes on the check's reason"
 run_gate "$d" "gh pr create --fill"
 ok "$STATUS" "2" "opening a PR is gated the same way"
+run_connector "$d" "mcp__claude_ai_GitHub__create_pull_request"
+ok "$STATUS" "2" "opening a PR through a GitHub connector is gated the same way"
+contains "$ERR" "local tests have not passed" "the connector refusal says the local tests have not passed"
+run_connector "$d" "mcp__claude_ai_GitHub__pull_request_read"
+ok "$STATUS" "0" "reading a PR through a GitHub connector is not gated"
 run_gate "$d" "git push origin --delete old-branch"
 ok "$STATUS" "0" "deleting a remote branch pushes no work and is not gated"
 run_gate "$d" "git push origin :old-branch"

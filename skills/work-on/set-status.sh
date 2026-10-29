@@ -6,7 +6,9 @@
 # The repo defaults to the one the current folder's git remote points at.
 # Status is an option of the project's Status field, for example Backlog,
 # In Progress, In Review, Done or Canceled. Prints one line per project.
-# Needs gh signed in with the project scope.
+# Needs gh signed in with the project scope. Where the GitHub connector is
+# loaded, its projects_write (method update_project_item) does the same; the
+# github-issues skill, "Which tool makes the call", gives the fields.
 set -euo pipefail
 
 num="${1:?issue number}"
