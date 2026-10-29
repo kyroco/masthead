@@ -395,14 +395,18 @@ def main():
               cap_gate(f"masthead:{name}", name), "allow")
         check(f"masthead:{name} filed with the colon is refused",
               cap_gate(f"masthead:{name}", f"masthead:{name}"), "deny")
-        out = kgate_raw("gate-capture", {
-            "session_id": "k-cap", "cwd": KCWD, "agent_name": f"masthead:{name}",
-            "tool_name": "mcp__korium__agent_capture",
-            "tool_input": {"source_agent": f"masthead:{name}"}})
-        demanded = re.findall(r"as source_agent '([^']*)'", out)
-        check(f"masthead:{name}: the name the refusal demands passes Korium",
-              str(bool(demanded) and all(KORIUM_SOURCE_AGENT.match(d) for d in demanded)),
-              "True")
+        # Both refusals name a source_agent: the colon spelling reaches the
+        # pattern refusal, the hyphen spelling the another-agent refusal.
+        for sent, which in ((f"masthead:{name}", "pattern"),
+                            (f"masthead-{name}", "another-agent")):
+            out = kgate_raw("gate-capture", {
+                "session_id": "k-cap", "cwd": KCWD, "agent_name": f"masthead:{name}",
+                "tool_name": "mcp__korium__agent_capture",
+                "tool_input": {"source_agent": sent}})
+            demanded = re.findall(r"as source_agent '([^']*)'", out)
+            check(f"masthead:{name}: the {which} refusal demands a name Korium takes",
+                  str(bool(demanded) and all(KORIUM_SOURCE_AGENT.match(d) for d in demanded)),
+                  "True")
     check("the masthead- spelling is not the agent's name",
           cap_gate("masthead:reader", "masthead-reader"), "deny")
     check("the operator's capture escape",
