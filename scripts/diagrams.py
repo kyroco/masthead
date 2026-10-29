@@ -147,12 +147,12 @@ def workflow():
                                          ("one check of every issue: what was dropped, what is too big", "body"), ("asks you only what nothing settles", "body")], CHECK)
     c.arrow(right(work), work[1] + 40, check[0] - 2, work[1] + 40)
     fy = bottom(check) + 60
-    foreman = c.box(0, fy, [("/work-on foreman", "title"), ("reads the brief and every issue, proposes one plan: build order, dependencies, effort, parallelism", "body"),
+    foreman = c.box(0, fy, [("/work-on foreman", "title"), ("reads the brief and every issue, works out the order, asks how many workers", "body"),
                             ("you decide how many run at once", "body")], FOREMAN)
     # centre the foreman under the two boxes above
     fx = (right(check) + 40) / 2 - foreman[2] / 2
     c.parts = c.parts[:-4]  # redraw at the centred x
-    foreman = c.box(fx, fy, [("/work-on foreman", "title"), ("reads the brief and every issue, proposes one plan: build order, dependencies, effort, parallelism", "body"),
+    foreman = c.box(fx, fy, [("/work-on foreman", "title"), ("reads the brief and every issue, works out the order, asks how many workers", "body"),
                              ("you decide how many run at once", "body")], FOREMAN)
     ey = (bottom(check) + foreman[1]) / 2
     c.path(f"M {mid(check):.0f} {bottom(check):.0f} L {mid(check):.0f} {ey:.0f} L {mid(foreman):.0f} {ey:.0f} L {mid(foreman):.0f} {foreman[1] - 2:.0f}")
@@ -291,14 +291,14 @@ def day3():
 
 def day4():
     c = Canvas(1000, 260)
-    rows = ["issue   after    with     effort   why",
-            "#41     none     #42      medium   small screen change",
-            "#42     none     #41      medium   one module, one test file",
-            "#43     #41      none     high     touches the plan limits",
-            "#44     none     #45      medium   read side only",
-            "#45     none     #44      medium   ...",
-            "suggested: 3 workers at once"]
-    plan = c.box(40, 30, [("the foreman's plan, one table", "title")] + [(r, "mono") for r in rows], FOREMAN, pad=16)
+    rows = ["Got it: 9 issues, the first three can start today,",
+            "the rest wait on #41. How many workers?",
+            "",
+            "#41  a member shares a memory into a workspace",
+            "#42  the owner stops sharing it again",
+            "#44  the Inbox lists what needs your answer",
+            "#41 has one question for you; the other two have none"]
+    plan = c.box(40, 30, [("the foreman, in a sentence", "title")] + [(r, "mono") for r in rows], FOREMAN, pad=16)
     c.arrow(right(plan), plan[1] + 90, right(plan) + 50, plan[1] + 90)
     cx = right(plan) + 100
     c.add(f'<circle cx="{cx + 60:.0f}" cy="{plan[1] + 40:.0f}" r="26" fill="#fce7f3" stroke="#db2777" stroke-width="2"/>')

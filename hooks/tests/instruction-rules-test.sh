@@ -83,7 +83,7 @@ says  skills/work-on/foreman.md "is part of the run the user already approved"
 says  skills/work-on/foreman.md "already approved: once ready, it starts"
 says  skills/work-on/foreman.md "within the user's worker limit"
 says  skills/work-on/foreman.md "the question goes to the user first"
-says  skills/work-on/foreman.md "ready issue as step 2 says, those first"
+says  skills/work-on/foreman.md "its next ready issue, those first"
 
 # 4. No scenario count. The check is exact on purpose, not a prose scanner: it
 # holds the lines where the rule now lives, and refuses the three phrases this
@@ -103,7 +103,7 @@ says  docs/explainer.html "writes a plan, one line per scenario"
 says  docs/explainer.html "its plan, one line per scenario"
 says  docs/images/day-5-workers.svg "its plan, one line per scenario"
 says  scripts/diagrams.py "its plan, one line per scenario"
-says  .claude-plugin/plugin.json '"version": "0.1.8"'
+says  .claude-plugin/plugin.json '"version": "0.1.9"'
 
 never_phrase() {
   local hit
@@ -482,16 +482,16 @@ says  docs/explainer.template.html "or two when a memory is already connected"
 # outside the change, the foreman relays and asks as numbered lines, and the
 # user answers each one: fix now, fix later, or proceed. Robert, October 28,
 # 2026: "Why are you filing anything?", "No means don't build it."
-says  skills/work-on/foreman.md "files no issues, and decides nothing a customer would"
-says  skills/work-on/foreman.md "Two fixed points, and no others, are where the user is asked"
+says  skills/work-on/foreman.md "What the product does, what it says, what it charges, and who may do what are the person's to decide"
+says  skills/work-on/foreman.md "one question at a time; never fill the gap yourself"
 says  skills/work-on/foreman.md "fix now"
 says  skills/work-on/foreman.md "fix later"
-says  skills/work-on/foreman.md "\"Proceed\" means merge as"
-says  skills/work-on/foreman.md "The foreman never fills a gap in the sources with a ruling"
+says  skills/work-on/foreman.md "**Proceed**: nothing. The PR body already holds the line"
+says  skills/work-on/foreman.md "This is the only issue a foreman files"
 says  skills/work-on/foreman.md "sessions alive, the ones waiting for the merge queue"
-says  skills/work-on/foreman.md "The foreman does not rule on it"
+says  skills/work-on/foreman.md "Some things are not yours to settle and go to the person as they stand"
 says  skills/work-on/foreman.md "The moment filed exceeds closed, stop dispatching"
-says  skills/work-on/foreman.md "and not filing any other issue"
+says  skills/work-on/foreman.md "file no issue except"
 never skills/work-on/foreman.md "answer it from the sources above, in order, with the line quoted, or ask the user"
 never skills/work-on/foreman.md "tell the worker to fix it, file it or leave it"
 never skills/work-on/foreman.md "a finding it placed as a new issue is filed"
@@ -503,7 +503,7 @@ never agents/adjudicator.md "the worker files a new issue"
 never agents/adjudicator.md "goes on the New issue list"
 says  agents/verifier.md "Nothing else is a claim"
 says  skills/work-on/worker.md "you file no issue"
-says  skills/work-on/worker.md "its \"seen, not done\" list as numbered lines"
+says  skills/work-on/worker.md "its \"seen, not done\" list in plain words"
 never skills/work-on/worker.md "is filed, blocked by this issue"
 says  references/session-cliffs.md "fix none of them here, file none"
 says  references/session-cliffs.md "Log nothing and file nothing"
@@ -514,7 +514,7 @@ never skills/github-issues/SKILL.md "checked by the foreman"
 for doc in README.md docs/explainer.template.html docs/explainer.html; do
   says  "$doc" "nobody files anything"
   says  "$doc" "fix now, fix later, or proceed"
-  says  "$doc" "The foreman decides nothing a customer would feel"
+  says  "$doc" "The foreman decides how the work runs"
   never "$doc" "or filed as a new issue"
   never "$doc" "a follow-up that waited on this one first"
   never "$doc" "answers with the line quoted. Only when nothing settles it"
@@ -525,6 +525,32 @@ never docs/images/review.svg "new issues to file"
 says  docs/images/day-6-coffee.svg "relays your earlier answer"
 never docs/images/day-6-coffee.svg "answers from the sources"
 says  docs/images/workflow.svg "seen-not-done lines"
+
+# 12. Masthead issue #31: the foreman and worker speak in a plain voice, say
+# what matters and leave the how to the session, never set a reply format,
+# and never show the person effort levels or a whole-milestone table. Robert,
+# October 28, 2026: "the foreman must not override the style a user set,
+# period", "#3333 high means nothing", "this is what we need".
+says  skills/work-on/foreman.md "How you talk to the person is set by their own instructions and output style"
+says  skills/work-on/foreman.md "Nothing here fixes a format, a shape or a batch size for a reply"
+says  skills/work-on/foreman.md "say in one sentence what you are about to do and ask how many workers"
+says  skills/work-on/foreman.md "so do not show it to them"
+says  skills/work-on/foreman.md "how far the queue of issues with no open question runs behind them"
+says  skills/work-on/foreman.md "one item at a time, in plain words"
+never skills/work-on/foreman.md "numbered line"
+never skills/work-on/foreman.md "each issue's effort level with a one-clause reason"
+never skills/work-on/foreman.md "give the user one plan, as a table"
+says  skills/work-on/worker.md "How you talk to the person is set by their own instructions and output style"
+says  skills/work-on/worker.md "Time matters. Do not spend time that can be avoided"
+never skills/work-on/worker.md "numbered lines"
+for doc in README.md docs/explainer.template.html docs/explainer.html; do
+  says  "$doc" "asks how many workers"
+  says  "$doc" "one item at a time"
+  never "$doc" "hands you one table"
+  never "$doc" "numbered line"
+done
+never scripts/diagrams.py "the foreman's plan, one table"
+never docs/images/day-4-plan.svg "effort"
 
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
