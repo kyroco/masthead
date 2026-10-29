@@ -50,7 +50,9 @@ and decides where each false claim goes.
 
 The claims are: each Then line of the scenario; each line of the author's
 claim list; and every sentence a customer reads that the change adds or edits.
-For each claim:
+Nothing else is a claim: a fault you meet in code the change did not touch,
+and that makes no claim false, is not a finding and is not reported. For each
+claim:
 
 1. List every state that shows it: the ordinary inputs, the empty and the
    missing ones, a retry, a crash or deploy halfway, two callers at once, and

@@ -234,8 +234,8 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 </svg>
 </div></figure>
 <p>Then they build. A bug is fixed test first: a failing test in its own commit, then the fix. When an issue builds a decision record, a fresh reviewer reads the whole record and checks the work against it, assuming it was done wrong.</p>
-<p>When a worker thinks it's done, it doesn't grade its own work. For each scenario it sends one verifier the scenario, the decision lines it rests on, the diff, and two lists: what it claims works and what it could not prove. Nothing else: not its notes, not an earlier review. The verifier assumes the code is wrong and tries to prove it, with every way a change goes wrong as its methods: a write that fails halfway, an input nobody handled, a promise to a caller the code breaks, a shared module written again, a sentence a customer reads that is false in some state. For every claim it returns either "true in every state", with the run that shows it, or each state where it is false, with the run. A security reviewer joins when the change touches sign-in, secrets or input from outside, with the repository's security rules as its claims. None of them can edit anything. None of them can reach the network. Then a judge reads the code and the false claims, runs each reproduction it can, confirms it, and places each one: fixed in this pull request, or filed as a new issue. That placement is final. The worker fixes the list, test first again, and only the claims the fix broke go back to a verifier, at most twice. The tests run on the final commit and leave a receipt that names it, and nothing can be pushed until the receipt matches. Then one pull request goes up, with <code>Fixes #41</code>, the list of what wasn't proved, the number of agent dispatches it took, and the issue moves to In Review.</p>
-<figure><div class="paper"><svg xmlns="http://www.w3.org/2000/svg" role="img" viewBox="0 0 1390 536" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="14">
+<p>When a worker thinks it's done, it doesn't grade its own work. For each scenario it sends one verifier the scenario, the decision lines it rests on, the diff, and two lists: what it claims works and what it could not prove. Nothing else: not its notes, not an earlier review. The verifier assumes the code is wrong and tries to prove it, with every way a change goes wrong as its methods: a write that fails halfway, an input nobody handled, a promise to a caller the code breaks, a shared module written again, a sentence a customer reads that is false in some state. For every claim it returns either "true in every state", with the run that shows it, or each state where it is false, with the run. A security reviewer joins when the change touches sign-in, secrets or input from outside, with the repository's security rules as its claims. None of them can edit anything. None of them can reach the network. Then a judge reads the code and the false claims, runs each reproduction it can, confirms it, and places each one: fixed in this pull request, or on a "seen, not done" list. That placement is final for the worker and the foreman; nobody files anything. The worker fixes the list, test first again, and only the claims the fix broke go back to a verifier, at most twice. The tests run on the final commit and leave a receipt that names it, and nothing can be pushed until the receipt matches. Then one pull request goes up, with <code>Fixes #41</code>, the list of what wasn't proved, the number of agent dispatches it took, and the issue moves to In Review.</p>
+<figure><div class="paper"><svg xmlns="http://www.w3.org/2000/svg" role="img" viewBox="0 0 1441 536" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="14">
     <defs><marker id="review-m16a34a" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#16a34a"/></marker><marker id="review-m6366f1" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#6366f1"/></marker><marker id="review-m6b7280" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#6b7280"/></marker><marker id="review-md97706" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#d97706"/></marker><marker id="review-mdb2777" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#db2777"/></marker><marker id="review-mdc2626" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#dc2626"/></marker></defs>
   <text x="40" y="40" text-anchor="start" font-size="20" font-weight="600" fill="#1f2937">The verification: verifiers who read cold, and a judge that confirms and places</text>
   <rect x="40" y="120" width="280" height="74" rx="10" fill="#eef2ff" stroke="#6366f1" stroke-width="1.5"/>
@@ -256,65 +256,65 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   <text x="528" y="292" text-anchor="middle" font-size="12" fill="#6b7280">each one tries to make every claim false:</text>
   <text x="528" y="308" text-anchor="middle" font-size="12" fill="#6b7280">no author's notes, no editing, no network</text>
   <line x1="320" y1="160" x2="368" y2="160" stroke="#6b7280" stroke-width="2" marker-end="url(#review-m6b7280)"/>
-  <rect x="610" y="150" width="294" height="122" rx="10" fill="#ecfeff" stroke="#0891b2" stroke-width="1.5"/>
-  <text x="757" y="176" text-anchor="middle" font-size="14" font-weight="600" fill="#164e63">the judge</text>
-  <text x="757" y="192" text-anchor="middle" font-size="12" fill="#155e75">runs each false claim's reproduction,</text>
-  <text x="757" y="208" text-anchor="middle" font-size="12" fill="#155e75">nothing from the worker,</text>
-  <text x="757" y="224" text-anchor="middle" font-size="12" fill="#155e75">and places it; that is final;</text>
-  <text x="757" y="240" text-anchor="middle" font-size="12" fill="#155e75">an unsettled security finding</text>
-  <text x="757" y="256" text-anchor="middle" font-size="12" fill="#155e75">goes to the foreman</text>
+  <rect x="610" y="150" width="345" height="122" rx="10" fill="#ecfeff" stroke="#0891b2" stroke-width="1.5"/>
+  <text x="782" y="176" text-anchor="middle" font-size="14" font-weight="600" fill="#164e63">the judge</text>
+  <text x="782" y="192" text-anchor="middle" font-size="12" fill="#155e75">runs each false claim's reproduction,</text>
+  <text x="782" y="208" text-anchor="middle" font-size="12" fill="#155e75">nothing from the worker,</text>
+  <text x="782" y="224" text-anchor="middle" font-size="12" fill="#155e75">and places it; that is final for the worker;</text>
+  <text x="782" y="240" text-anchor="middle" font-size="12" fill="#155e75">an unsettled security finding</text>
+  <text x="782" y="256" text-anchor="middle" font-size="12" fill="#155e75">goes to you</text>
   <line x1="540" y1="168" x2="608" y2="168" stroke="#6b7280" stroke-width="2" marker-end="url(#review-m6b7280)"/>
   <text x="575" y="158" text-anchor="middle" font-size="12" fill="#6b7280">false claims</text>
-  <rect x="964" y="90" width="302" height="74" rx="10" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5"/>
-  <text x="1115" y="116" text-anchor="middle" font-size="14" font-weight="600" fill="#14532d">the fix list</text>
-  <text x="1115" y="132" text-anchor="middle" font-size="12" fill="#166534">confirmed, and belongs to this change;</text>
-  <text x="1115" y="148" text-anchor="middle" font-size="12" fill="#166534">a file and a line for each one</text>
-  <rect x="964" y="188" width="366" height="74" rx="10" fill="#f3f4f6" stroke="#9ca3af" stroke-width="1.5"/>
-  <text x="1148" y="214" text-anchor="middle" font-size="14" font-weight="600" fill="#374151">new issues to file</text>
-  <text x="1148" y="230" text-anchor="middle" font-size="12" fill="#4b5563">confirmed and serious, but outside this change:</text>
-  <text x="1148" y="246" text-anchor="middle" font-size="12" fill="#4b5563">filed and linked, never fixed here</text>
-  <rect x="964" y="286" width="294" height="74" rx="10" fill="#f9fafb" stroke="#d1d5db" stroke-width="1.5"/>
-  <text x="1112" y="312" text-anchor="middle" font-size="14" font-weight="600" fill="#6b7280">thrown out</text>
-  <text x="1112" y="328" text-anchor="middle" font-size="12" fill="#6b7280">not real, not confirmed, or not worth</text>
-  <text x="1112" y="344" text-anchor="middle" font-size="12" fill="#6b7280">a change; gone for good</text>
-  <line x1="904" y1="180" x2="962" y2="127" stroke="#16a34a" stroke-width="2" marker-end="url(#review-m16a34a)"/>
-  <line x1="904" y1="200" x2="962" y2="225" stroke="#6b7280" stroke-width="2" marker-end="url(#review-m6b7280)"/>
-  <line x1="904" y1="220" x2="962" y2="323" stroke="#6b7280" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#review-m6b7280)"/>
-  <rect x="513" y="390" width="489" height="56" rx="10" fill="#eef2ff" stroke="#6366f1" stroke-width="1.5"/>
-  <text x="757" y="414" text-anchor="middle" font-size="12" fill="#4338ca">the worker fixes each item on the list, test first,</text>
-  <text x="757" y="430" text-anchor="middle" font-size="12" fill="#4338ca">and only the claims the fix broke are re-verified, at most twice</text>
-  <path d="M 1266 110 L 1355 110 L 1355 476 L 180 476 L 180 196" fill="none" stroke="#6366f1" stroke-width="2" stroke-linejoin="round" marker-end="url(#review-m6366f1)"/>
+  <rect x="1015" y="90" width="302" height="74" rx="10" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5"/>
+  <text x="1166" y="116" text-anchor="middle" font-size="14" font-weight="600" fill="#14532d">the fix list</text>
+  <text x="1166" y="132" text-anchor="middle" font-size="12" fill="#166534">confirmed, and belongs to this change;</text>
+  <text x="1166" y="148" text-anchor="middle" font-size="12" fill="#166534">a file and a line for each one</text>
+  <rect x="1015" y="188" width="366" height="74" rx="10" fill="#f3f4f6" stroke="#9ca3af" stroke-width="1.5"/>
+  <text x="1198" y="214" text-anchor="middle" font-size="14" font-weight="600" fill="#374151">seen, not done</text>
+  <text x="1198" y="230" text-anchor="middle" font-size="12" fill="#4b5563">confirmed and serious, but outside this change:</text>
+  <text x="1198" y="246" text-anchor="middle" font-size="12" fill="#4b5563">you answer each: fix now, fix later, or proceed</text>
+  <rect x="1015" y="286" width="294" height="74" rx="10" fill="#f9fafb" stroke="#d1d5db" stroke-width="1.5"/>
+  <text x="1162" y="312" text-anchor="middle" font-size="14" font-weight="600" fill="#6b7280">thrown out</text>
+  <text x="1162" y="328" text-anchor="middle" font-size="12" fill="#6b7280">not real, not confirmed, or not worth</text>
+  <text x="1162" y="344" text-anchor="middle" font-size="12" fill="#6b7280">a change; gone for good</text>
+  <line x1="955" y1="180" x2="1013" y2="127" stroke="#16a34a" stroke-width="2" marker-end="url(#review-m16a34a)"/>
+  <line x1="955" y1="200" x2="1013" y2="225" stroke="#6b7280" stroke-width="2" marker-end="url(#review-m6b7280)"/>
+  <line x1="955" y1="220" x2="1013" y2="323" stroke="#6b7280" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#review-m6b7280)"/>
+  <rect x="538" y="390" width="489" height="56" rx="10" fill="#eef2ff" stroke="#6366f1" stroke-width="1.5"/>
+  <text x="782" y="414" text-anchor="middle" font-size="12" fill="#4338ca">the worker fixes each item on the list, test first,</text>
+  <text x="782" y="430" text-anchor="middle" font-size="12" fill="#4338ca">and only the claims the fix broke are re-verified, at most twice</text>
+  <path d="M 1316 110 L 1405 110 L 1405 476 L 180 476 L 180 196" fill="none" stroke="#6366f1" stroke-width="2" stroke-linejoin="round" marker-end="url(#review-m6366f1)"/>
   <text x="40" y="516" text-anchor="start" font-size="13" fill="#4b5563">Then: the tests run on the final commit, and one pull request goes up.</text>
 </svg>
 </div>
-<figcaption>The judge runs each false claim's reproduction and sorts it three ways: onto the fix list with a file and line, onto a list of new issues when it's serious but outside this change, or out, when it isn't real, isn't confirmed, or isn't worth a change. Its placement is final. A security finding it cannot settle goes to the foreman instead, and the pull request waits for that answer.</figcaption></figure>
-<p>Meanwhile you're having coffee. A worker's question lands at the foreman, which re-reads the issue's comments and the sources and answers with the line quoted. Only when nothing settles it does the question reach you, and your answer goes on the issue so the next session finds it. A worker that stops on a failure gets one message; a second failure parks the issue with a comment saying what happened, and the run goes on without it.</p>
-<p>When a pull request's checks pass, its review is clean and the worker has cleaned up after itself, the foreman queues it to be merged. It closes the issue, and any big issue whose pieces are now all done, then starts the next issue, a follow-up that waited on this one first, in that worker in the desktop app or in a fresh session in the terminal. By the end of the day every issue is merged, parked or skipped, and you get one line per issue saying which.</p>
-<figure><div class="paper"><svg xmlns="http://www.w3.org/2000/svg" role="img" viewBox="0 0 1076 282" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="14">
+<figcaption>The judge runs each false claim's reproduction and sorts it three ways: onto the fix list with a file and line, onto the "seen, not done" list when it's serious but outside this change, for you to answer, or out, when it isn't real, isn't confirmed, or isn't worth a change. Its placement is final for the worker and the foreman; you answer each "seen, not done" line: fix now, fix later, or proceed. A security finding it cannot settle goes to you the same way, and the pull request waits for that answer.</figcaption></figure>
+<p>Meanwhile you're having coffee. A worker's question lands at the foreman, which re-reads the issue's comments and Korium for an answer you already gave and relays it with the line quoted. Anything you have not answered reaches you as a numbered line, in customer words, and your answer goes back verbatim and onto the issue so the next session finds it. The foreman decides nothing a customer would feel. A worker that stops on a failure gets one message; a second failure parks the issue with a comment saying what happened, and the run goes on without it.</p>
+<p>When a pull request is ready, its "seen, not done" list comes to you as numbered lines, and you answer each one: fix now, fix later, or proceed. Fix later is the only way an issue gets filed. When its checks pass, its review is clean, every line is answered and the worker has cleaned up after itself, the foreman queues it to be merged. It closes the issue, and any big issue whose pieces are now all done, then starts the next issue, a fix-later issue that waited on this one first, in that worker in the desktop app or in a fresh session in the terminal. By the end of the day every issue is merged, parked or skipped, and you get one line per issue saying which, with how many merged and how many were filed.</p>
+<figure><div class="paper"><svg xmlns="http://www.w3.org/2000/svg" role="img" viewBox="0 0 1090 282" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="14">
     <defs><marker id="day6coffee-m16a34a" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#16a34a"/></marker><marker id="day6coffee-m6366f1" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#6366f1"/></marker><marker id="day6coffee-m6b7280" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#6b7280"/></marker><marker id="day6coffee-md97706" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#d97706"/></marker><marker id="day6coffee-mdb2777" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#db2777"/></marker><marker id="day6coffee-mdc2626" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#dc2626"/></marker></defs>
   <circle cx="90" cy="64" r="26" fill="#fce7f3" stroke="#db2777" stroke-width="2"/>
   <text x="90" y="69" text-anchor="middle" font-size="13" font-weight="600" fill="#9d174d">you</text>
   <path d="M 128 56 h 26 v 20 a 6 6 0 0 1 -6 6 h -14 a 6 6 0 0 1 -6 -6 z" fill="#fde68a" stroke="#d97706"/><path d="M 154 62 h 6 a 5 5 0 0 1 0 10 h -6" fill="none" stroke="#d97706"/>
   <text x="90" y="180" text-anchor="middle" font-size="12" fill="#6b7280">having coffee</text>
-  <rect x="330" y="60" width="201" height="58" rx="10" fill="#eef2ff" stroke="#6366f1" stroke-width="1.5"/>
-  <text x="430" y="86" text-anchor="middle" font-size="14" font-weight="600" fill="#312e81">the foreman</text>
-  <text x="430" y="102" text-anchor="middle" font-size="12" fill="#4338ca">answers from the sources</text>
-  <rect x="641" y="50" width="395" height="73" rx="10" fill="#f9fafb" stroke="#d1d5db" stroke-width="1.5"/>
-  <text x="838" y="75" text-anchor="middle" font-size="13" font-weight="600" fill="#6b7280">a worker asks</text>
-  <text x="838" y="91" text-anchor="middle" font-size="12" fill="#6b7280">"does the limit count drafts, or only saved notes?"</text>
-  <text x="838" y="107" text-anchor="middle" font-size="12" fill="#6b7280">it already re-read the issue's comments</text>
-  <line x1="641" y1="86" x2="533" y2="86" stroke="#6b7280" stroke-width="2" marker-end="url(#day6coffee-m6b7280)"/>
+  <rect x="330" y="60" width="215" height="58" rx="10" fill="#eef2ff" stroke="#6366f1" stroke-width="1.5"/>
+  <text x="438" y="86" text-anchor="middle" font-size="14" font-weight="600" fill="#312e81">the foreman</text>
+  <text x="438" y="102" text-anchor="middle" font-size="12" fill="#4338ca">relays your earlier answer</text>
+  <rect x="655" y="50" width="395" height="73" rx="10" fill="#f9fafb" stroke="#d1d5db" stroke-width="1.5"/>
+  <text x="853" y="75" text-anchor="middle" font-size="13" font-weight="600" fill="#6b7280">a worker asks</text>
+  <text x="853" y="91" text-anchor="middle" font-size="12" fill="#6b7280">"does the limit count drafts, or only saved notes?"</text>
+  <text x="853" y="107" text-anchor="middle" font-size="12" fill="#6b7280">it already re-read the issue's comments</text>
+  <line x1="655" y1="86" x2="547" y2="86" stroke="#6b7280" stroke-width="2" marker-end="url(#day6coffee-m6b7280)"/>
   <rect x="330" y="154" width="322" height="48" rx="10" fill="#f3f4f6" stroke="#9ca3af" stroke-width="1.5"/>
   <text x="491" y="174" text-anchor="middle" font-size="12" fill="#4b5563">found in the decision record, line quoted:</text>
   <text x="491" y="190" text-anchor="middle" font-size="12" fill="#4b5563">"saved notes only." Written on the issue.</text>
-  <line x1="430" y1="118" x2="430" y2="152" stroke="#6b7280" stroke-width="2" marker-end="url(#day6coffee-m6b7280)"/>
+  <line x1="438" y1="118" x2="438" y2="152" stroke="#6b7280" stroke-width="2" marker-end="url(#day6coffee-m6b7280)"/>
   <path d="M 330 90 L 230 90 L 230 150 L 90 150 L 90 92" fill="none" stroke="#db2777" stroke-width="2" stroke-linejoin="round" stroke-dasharray="5 4" marker-end="url(#day6coffee-mdb2777)"/>
-  <text x="160" y="142" text-anchor="middle" font-size="11" fill="#9d174d">only when nothing settles it</text>
+  <text x="160" y="142" text-anchor="middle" font-size="11" fill="#9d174d">what you have not answered</text>
   <rect x="682" y="154" width="322" height="48" rx="10" fill="#fff7ed" stroke="#ea580c" stroke-width="1.5"/>
   <text x="844" y="174" text-anchor="middle" font-size="12" fill="#7c2d12">a worker fails twice: the issue is parked,</text>
   <text x="844" y="190" text-anchor="middle" font-size="12" fill="#7c2d12">with a comment saying what happened</text>
-  <rect x="40" y="226" width="996" height="32" rx="10" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5"/>
-  <text x="538" y="246" text-anchor="middle" font-size="12" fill="#166534">end of day: #41 merged, #42 merged, #43 merged, #44 parked (needs a decision), #45 merged ... one line per issue</text>
+  <rect x="40" y="226" width="1010" height="32" rx="10" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5"/>
+  <text x="545" y="246" text-anchor="middle" font-size="12" fill="#166534">end of day: #41 merged, #42 merged, #43 merged, #44 parked (needs a decision), #45 merged ... one line per issue</text>
 </svg>
 </div></figure>
 <figure><div class="paper"><svg xmlns="http://www.w3.org/2000/svg" role="img" viewBox="0 0 1306 701" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="14">
@@ -376,7 +376,7 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   <path d="M 1236 364 L 1236 257 L 838 257" fill="none" stroke="#6b7280" stroke-width="2" stroke-linejoin="round" stroke-dasharray="5 4" marker-end="url(#workflow-m6b7280)"/>
   <text x="848" y="249" text-anchor="start" font-size="11" fill="#6b7280">plans, questions and reports come back to the foreman</text>
   <rect x="40" y="594" width="1226" height="57" rx="10" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5"/>
-  <text x="653" y="619" text-anchor="middle" font-size="13" font-weight="600" fill="#14532d">the foreman queues each passing pull request, closes its issue and any big issue now done, and gives that worker its next issue</text>
+  <text x="653" y="619" text-anchor="middle" font-size="13" font-weight="600" fill="#14532d">you answer each PR's seen-not-done lines; the foreman queues it, closes its issue, and gives that worker its next issue</text>
   <text x="653" y="635" text-anchor="middle" font-size="12" fill="#166534">the run ends when every issue is merged, parked or skipped, with one line per issue saying which</text>
   <line x1="232" y1="554" x2="232" y2="592" stroke="#16a34a" stroke-width="2" marker-end="url(#workflow-m16a34a)"/>
   <line x1="653" y1="554" x2="653" y2="592" stroke="#16a34a" stroke-width="2" marker-end="url(#workflow-m16a34a)"/>

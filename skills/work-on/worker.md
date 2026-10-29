@@ -239,17 +239,21 @@ from another session.
    that leaves you out of rounds, report to the foreman one round early
    rather than send a third. A work-on issue adds one thing:
    once the PR is open, set the Status to In Review with `set-status.sh`.
-   Nothing goes on a Nit log. A finding the adjudicator placed as a new
-   issue is filed, blocked by this issue, and never fixed in this PR; do not
-   ask your foreman to move it.
+   Nothing goes on a Nit log, and you file no issue. A finding the
+   adjudicator placed on its "seen, not done" list goes in the PR body under
+   that heading, in the adjudicator's words, and is not fixed in this PR; do
+   not ask your foreman to move it. The foreman brings the list to the user,
+   who answers each item: fix now (you fix it here, test first), fix later
+   (the foreman files it), or proceed (nothing).
 5. **Report.** Capture the result in Korium, then finish with one table and
    the PR number: one row per change, whether it meets the criteria (yes or
    no), and the evidence (a command and its result, a `file:line`, or a PR
    check). The criteria are the issue's scenarios and the brief's rules. A
    row that says no is unfinished: fix it before the PR, or stop and report.
    Under the table, give the ADR review's findings by level, the
-   adjudicator's fix and thrown-out counts for each round, the follow-up
-   issues you filed from its New issue lists, the agent-run count (the
+   adjudicator's fix and thrown-out counts for each round, its "seen, not
+   done" list as numbered lines (what the customer sees today, where, in
+   plain words), the agent-run count (the
    agents you sent: the rows added to `<state>/dispatches.tsv` since the
    number you noted in step 6 that were not refused, so the issue can be set
    against the 34 runs on kyroco #3348; a dispatch declined at a permission
@@ -268,7 +272,9 @@ route around, when a gate refuses the same action twice, a decision would
 change the requested outcome (replacing the approach after a review is one),
 credentials the work needs are missing, a plan fails its verifier twice, or
 the second re-verify round leaves anything on the adjudicator's fix list
-(step 5 of **Opening a PR**). A gate that refuses because of
+(step 5 of **Opening a PR**); that goes to the foreman, who brings it to the
+user, and you build nothing on it until the answer comes back. A gate that
+refuses because of
 a rule the ADR you build does not mention is reported to the user with the
 exact refusal; never add an exception to a gate's list to get past it. Apart
 from those, the stops in steps 1, 5 and 6, and a pre-push

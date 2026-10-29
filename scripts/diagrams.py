@@ -179,7 +179,7 @@ def workflow():
 
     # merge bar
     my = bottom(cols[0]) + 40
-    bar = c.box(40, my, [("the foreman queues each passing pull request, closes its issue and any big issue now done, and gives that worker its next issue", "title"),
+    bar = c.box(40, my, [("you answer each PR's seen-not-done lines; the foreman queues it, closes its issue, and gives that worker its next issue", "title"),
                          ("the run ends when every issue is merged, parked or skipped, with one line per issue saying which", "body")], GOOD, min_w=total - 40, title_size=13)
     for b in cols:
         c.arrow(mid(b), bottom(b), mid(b), my - 2, color=GOOD["stroke"])
@@ -206,13 +206,13 @@ def review():
     c.arrow(right(worker), worker[1] + 40, revs[1][0] - 2, worker[1] + 40)
 
     jx = right(revs[0]) + 70
-    judge = c.box(jx, 150, [("the judge", "title"), ("runs each false claim's reproduction,", "body"), ("nothing from the worker,", "body"), ("and places it; that is final;", "body"), ("an unsettled security finding", "body"), ("goes to the foreman", "body")], JUDGE)
+    judge = c.box(jx, 150, [("the judge", "title"), ("runs each false claim's reproduction,", "body"), ("nothing from the worker,", "body"), ("and places it; that is final for the worker;", "body"), ("an unsettled security finding", "body"), ("goes to you", "body")], JUDGE)
     c.arrow(right(revs[2]), revs[2][1] + 18, judge[0] - 2, revs[2][1] + 18)
     c.text((right(revs[2]) + judge[0]) / 2, revs[2][1] + 8, "false claims", size=12, anchor="middle")
 
     ox = right(judge) + 60
     fix = c.box(ox, 90, [("the fix list", "title"), ("confirmed, and belongs to this change;", "body"), ("a file and a line for each one", "body")], GOOD)
-    new = c.box(ox, bottom(fix) + 24, [("new issues to file", "title"), ("confirmed and serious, but outside this change:", "body"), ("filed and linked, never fixed here", "body")], INK)
+    new = c.box(ox, bottom(fix) + 24, [("seen, not done", "title"), ("confirmed and serious, but outside this change:", "body"), ("you answer each: fix now, fix later, or proceed", "body")], INK)
     out = c.box(ox, bottom(new) + 24, [("thrown out", "title"), ("not real, not confirmed, or not worth", "body"), ("a change; gone for good", "body")], OUTBOX)
     c.arrow(right(judge), judge[1] + 30, fix[0] - 2, fix[1] + fix[3] / 2, color=GOOD["stroke"])
     c.arrow(right(judge), judge[1] + 50, new[0] - 2, new[1] + new[3] / 2)
@@ -338,13 +338,13 @@ def day6():
     c.text(90, 69, "you", size=13, color=YOU["text"], anchor="middle", bold=True)
     c.add('<path d="M 128 56 h 26 v 20 a 6 6 0 0 1 -6 6 h -14 a 6 6 0 0 1 -6 -6 z" fill="#fde68a" stroke="#d97706"/><path d="M 154 62 h 6 a 5 5 0 0 1 0 10 h -6" fill="none" stroke="#d97706"/>')
     c.text(90, 180, "having coffee", size=12, anchor="middle")
-    fore = c.box(330, 60, [("the foreman", "title"), ("answers from the sources", "body")], FOREMAN)
+    fore = c.box(330, 60, [("the foreman", "title"), ("relays your earlier answer", "body")], FOREMAN)
     ask = c.box(right(fore) + 110, 50, [("a worker asks", "title"), ('"does the limit count drafts, or only saved notes?"', "body"), ("it already re-read the issue's comments", "body")], OUTBOX, title_size=13)
     c.arrow(ask[0], ask[1] + 36, right(fore) + 2, ask[1] + 36)
     found = c.box(fore[0], bottom(fore) + 36, [("found in the decision record, line quoted:", "body"), ('"saved notes only." Written on the issue.', "body")], INK, pad=10)
     c.arrow(mid(fore), bottom(fore), mid(fore), found[1] - 2)
     c.path(f"M {fore[0]:.0f} {fore[1] + 30:.0f} L 230 {fore[1] + 30:.0f} L 230 150 L 90 150 L 90 92", color=YOU["stroke"], dash=True)
-    c.text(160, 142, "only when nothing settles it", size=11, color=YOU["text"], anchor="middle")
+    c.text(160, 142, "what you have not answered", size=11, color=YOU["text"], anchor="middle")
     parked = c.box(right(found) + 30, found[1], [("a worker fails twice: the issue is parked,", "body"), ("with a comment saying what happened", "body")], WARN, pad=10)
     c.w = int(max(c.w, right(ask) + 40, right(parked) + 40))
     end = c.box(40, max(bottom(found), bottom(parked)) + 24, [("end of day: #41 merged, #42 merged, #43 merged, #44 parked (needs a decision), #45 merged ... one line per issue", "body")], GOOD, min_w=c.w - 80, pad=10)
