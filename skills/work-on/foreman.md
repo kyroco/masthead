@@ -116,7 +116,8 @@ question, the question goes to the user first.
 ## While they work
 
 Rely on `notify_when_idle` notices, or in the desktop app on the notes it
-sends when a worker ends a turn. A worker silent past reason gets one message
+sends when a worker ends a turn, and on `Monitor`, not a shell loop, for a
+queued PR or a CI run. A worker silent past reason gets one message
 asking for status. Never read a worker's transcript into this session.
 
 A worker writes no plan and waits for no go: it builds as soon as it has
@@ -171,9 +172,11 @@ conflict, a dependency, or changes that interact. Say which.
 
 ## Merge and clean up
 
-When a worker reports its PR, bring the person the extras it brings, one
-item at a time, in plain words: what the customer sees today, and the answers
-fix now, fix later, or proceed. An empty list is one line and needs no answer.
+When a worker reports its PR, any extra it scored 8 or higher is fix now:
+send it back to the worker without asking the person. Bring the person the
+rest, one item at a time, in plain words: what the customer sees today, and
+the answers fix now, fix later, or proceed. An empty list is one line and
+needs no answer.
 
 - **Fix now**: the worker fixes it in this PR, test first.
 - **Fix later**: file one issue, in the same milestone, blocked by this issue,
@@ -201,7 +204,8 @@ List what it blocked, its fix-later issues among them:
     gh api repos/{owner}/{repo}/issues/<n>/dependencies/blocking --jq '.[] | "#\(.number) \(.state) \(.title)"'
 
 Then give that worker its next ready issue, those first. In the terminal, stop
-the worker's session and start the next issue in a new one.
+the worker's session (its id and worktree come from `claude agents --json`,
+not from memory) and start the next issue in a new one.
 
 Every report to the person carries two counts for the run: issues closed by a
 merge, and issues filed. The moment filed exceeds closed, stop dispatching, say
