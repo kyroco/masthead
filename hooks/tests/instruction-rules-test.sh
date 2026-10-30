@@ -99,7 +99,7 @@ never docs/explainer.html "writes a plan, one line per scenario"
 never docs/explainer.html "its plan, one line per scenario"
 never docs/images/day-5-workers.svg "its plan, one line per scenario"
 never scripts/diagrams.py "its plan, one line per scenario"
-says  .claude-plugin/plugin.json '"version": "0.1.16"'
+says  .claude-plugin/plugin.json '"version": "0.1.18"'
 
 never_phrase() {
   local hit

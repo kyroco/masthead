@@ -105,8 +105,9 @@ it stops.
 Then they build. A bug is fixed test first: a failing test in its own
 commit, then the fix. Anything a worker notices that the issue didn't ask
 for is an extra. It scores each one from 1 to 10, where 10 means leaving it
-would cause a catastrophic failure, and brings you only what scores 8 or
-higher. The rest is dropped, not filed.
+would cause a catastrophic failure, and brings its foreman only what scores 8
+or higher, which the foreman sends back as fix now. The rest is dropped, not
+filed.
 
 When a worker thinks it's done, it doesn't grade its own work. For each
 scenario it sends one verifier the scenario, the decision lines it rests on,
@@ -149,9 +150,11 @@ happened, and the run goes on without it.
 
 ![You have coffee; questions reach you only when nothing settles them](docs/images/day-6-coffee.svg)
 
-When a pull request is ready, the extras its worker brought come to you one
-item at a time, and you answer each one: fix now, fix later, or proceed. Fix
-later is the only way an issue gets filed. When its checks pass, its review
+When a pull request is ready, an extra its worker scored 8 or higher is
+fixed in it before it merges, and nothing else reaches you unless a security
+finding could not be settled; that comes one item at a time, and you answer
+each: fix now, fix later, or proceed. Fix later is the only way an issue gets
+filed. When its checks pass, its review
 is clean, every line is answered and the worker has cleaned up after itself,
 the foreman queues it to be merged. It closes the issue, and any big issue
 whose pieces are now all done, then starts the next issue, a fix-later issue
