@@ -30,7 +30,7 @@ Fix these yourself, on GitHub:
 Each fix rests on a line you quote from the ADR, the architecture doc, the
 mockups or the old body. If no line settles it, do not change it: report
 it. Write the new body to a file inside the checkout, then edit with
-`gh issue edit <n> --body-file <path>`, the one form the edit check reads.
+`gh issue edit <n> --body-file <path>`, the one form the edit check reads. Where the GitHub connector is loaded, read the issue with its `issue_read` (method `get`) and send the whole new body with `issue_write` (method `update`) instead; the check reads that call too.
 
 Report, and change nothing for, these:
 

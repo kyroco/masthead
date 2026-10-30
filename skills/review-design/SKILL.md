@@ -103,7 +103,7 @@ the changed line it rests on. Change nothing until they say go. Then fix them
 one at a time: rewrite only the stale scenario so it says what the artifact
 now says, in the shape it had, keep every line the user wrote, write the new
 body to a file inside the checkout and send it with
-`gh issue edit <n> --body-file <path>`. A scenario that cannot be fixed
+`gh issue edit <n> --body-file <path>` (where the GitHub connector is loaded, read the issue with its `issue_read` (method `get`) and send the whole new body with `issue_write` (method `update`) instead; the check reads that call too). A scenario that cannot be fixed
 without a decision the user has not made is one question to them, and you
 wait. When they are all done, say which issues changed and which you left
 alone.

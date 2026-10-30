@@ -75,10 +75,59 @@ each work on their own and fit one worker session. Then merge neighbouring
 slices that share a file until each fills one worker session with room to
 spare.
 
+## Which tool makes the call
+
+Where the GitHub connector is loaded (its tools show as
+`mcp__<server>__issue_read` and the like), make issue, pull request, comment,
+label and project calls through it: typed calls, structured answers, and no
+shell for a permission check or a fence to refuse. Where it is not, use `gh`;
+a Mac with only `gh` signed in works as before. The standard install is the
+claude.ai GitHub connector, and the user sets it up on a new Mac (Robert,
+October 29, 2026, on issue #27: "yes this is a claude plugin"; who installs
+it: "the user"). Three things stay off the connector, whichever is loaded:
+
+- **Commits and pushes go through git.** `push_files`,
+  `create_or_update_file` and `delete_file` build a commit on GitHub from file
+  contents, which skips the local test receipt; `connector-commit-gate.py`
+  refuses them.
+- **The merge queue goes through `gh`.** The connector has no call that adds
+  a pull request to the queue, so the foreman queues with the
+  `enqueuePullRequest` GraphQL mutation through `gh api graphql`.
+- **The branch linked to the issue comes from `gh issue develop`.** The
+  connector's `create_branch` makes a branch without the link; with no `gh`,
+  make the branch with git and let `Fixes #<n>` in the PR body do the linking.
+
+The connector's call for each `gh` form below:
+
+| `gh` form | Connector call |
+|---|---|
+| `gh issue view <n> --comments` | `issue_read`, method `get`, then method `get_comments` |
+| `gh issue list --search "<words>" --state all` | `search_issues` |
+| `gh issue create` | `issue_write`, method `create` (`milestone` takes the milestone's number) |
+| `gh issue edit <n> --body-file <path>` | `issue_read` method `get` first, then `issue_write` method `update` with the whole body |
+| `gh issue edit <n> --add-label <label>` | `issue_read`, method `get_labels`, then `issue_write`, method `update`, with `labels` holding every label the issue has plus the new one: `labels` replaces the issue's whole set, so a list of the new label alone strips the rest |
+| `gh issue comment <n>` | `add_issue_comment` |
+| sub-issue (`gh api .../sub_issues`) | `sub_issue_write`, method `add` |
+| `gh project item-add` | `projects_write`, method `add_project_item`, with `item_type` `issue` |
+| `set-status.sh <n> "<Status>"` | No single connector call says which projects an issue is in, so find them: `projects_list`, method `list_projects`, for the owner, then for each project method `list_project_items` with `query` `repo:<owner>/<repo>`, paging through, and keep the projects that hold the issue. For each, `projects_write`, method `update_project_item`, with `owner`, `project_number`, `item_owner`, `item_repo`, `issue_number` and `updated_field` `{"name": "Status", "value": "<Status>"}`. In no project means nothing to set, as `set-status.sh` says. This searches the repo owner's projects only; a project under another account needs `gh` |
+| `gh pr create` | `create_pull_request` |
+| `gh pr edit` | `update_pull_request` |
+| `gh pr view` | `pull_request_read` |
+
+The checks that read a `gh` command read the connector call too: the issue
+edit check (it needs the issue read with `issue_read` in this session when
+`gh` cannot answer), the attribution check on a PR's title and body, and the
+push gate on `create_pull_request`. A new project is `projects_write`, method
+`create_project`, with `owner`, `owner_type` and `title`. A new milestone has
+no connector call and stays on `gh`. A blocked-by link is
+`issue_dependency_write` where the connector offers it (GitHub ships it behind
+a feature switch, so not every connector has it); where it does not, the link
+stays on `gh`.
+
 ## Filing
 
-Use `gh` where there is a terminal; in Claude Desktop, use the GitHub
-connector's tools for the same calls. `<org>` is the repository's owner.
+`<org>` is the repository's owner. Each `gh` form has its connector call in
+the table above.
 
 - Check first that it is not already filed:
   `gh issue list --search "<words>" --state all`.

@@ -67,7 +67,24 @@ exit 0
 """
 
 
-def run(command, tmp, old=OLD, raw=None, tool="Bash", cwd=None):
+def call(tool, session="test-issue-edit-gate", response=None, **fields):
+    """A GitHub connector call on kyroco/masthead, as the hook sees it (issue #27)."""
+    payload = {
+        "session_id": session,
+        "tool_name": tool,
+        "tool_input": dict({"owner": "kyroco", "repo": "masthead"}, **fields),
+    }
+    if response is not None:
+        payload["tool_response"] = response
+    return json.dumps(payload)
+
+
+def as_text(issue):
+    """The connector's answer to issue_read: the issue as JSON in a text block."""
+    return {"content": [{"type": "text", "text": json.dumps(issue)}]}
+
+
+def run(command, tmp, old=OLD, raw=None, tool="Bash", cwd=None, mode=None, records=()):
     payload = raw if raw is not None else json.dumps({
         "session_id": "test-issue-edit-gate",
         "cwd": cwd or tmp,
@@ -80,7 +97,14 @@ def run(command, tmp, old=OLD, raw=None, tool="Bash", cwd=None):
     env["STUB_OLD_BODY_22"] = OLD_22
     env["STUB_GH_FAIL"] = "1" if old is None else ""
     env["STUB_LOG"] = os.path.join(tmp, "gh.log")
-    result = subprocess.run(["python3", HOOK], input=payload, capture_output=True,
+    # Each run starts with no recorded reads, then replays the PostToolUse records it names.
+    state = tempfile.mkdtemp(prefix="state-", dir=tmp)
+    env["TMPDIR"] = state
+    for record in records:
+        subprocess.run(["python3", HOOK, "record"], input=record, capture_output=True,
+                       text=True, check=False, env=env, cwd=tmp)
+    args = ["python3", HOOK] + ([mode] if mode else [])
+    result = subprocess.run(args, input=payload, capture_output=True,
                             text=True, check=False, env=env, cwd=tmp)
     out = result.stdout.strip()
     if not out:
@@ -165,6 +189,59 @@ def main():
     body("drop", OLD)
     body("drop#said.md", drop_said)
     os.symlink(os.path.join(tmp, "clean.md"), os.path.join(tmp, "inner-link.md"))
+
+    # The same edits through a GitHub connector (issue #27). With gh answering,
+    # the old body comes from gh; with no gh, from the issue as the session last
+    # read it or wrote it through the connector.
+    write = "mcp__claude_ai_GitHub__issue_write"
+    read = "mcp__claude_ai_GitHub__issue_read"
+
+    def edit(new, number=21, tool=write, **fields):
+        return call(tool, method="update", issue_number=number, body=new, **fields)
+
+    read_21 = call(read, method="get", issue_number=21, response=as_text({"number": 21, "body": OLD}))
+    read_21_list = call(read, method="get", issue_number=21,
+                        response=[{"type": "text", "text": json.dumps({"number": 21, "body": OLD})}])
+    read_21_string = call(read, method="get", issue_number=21, response=json.dumps({"number": 21, "body": OLD}))
+    read_22 = call(read, method="get", issue_number=22, response=as_text({"number": 22, "body": OLD_22}))
+    read_21_comments = call(read, method="get_comments", issue_number=21,
+                            response=as_text([{"body": "a comment"}]))
+    read_21_other_session = call(read, session="another-session", method="get", issue_number=21,
+                                 response=as_text({"number": 21, "body": OLD}))
+    read_21_other_repo = call(read, method="get", issue_number=21, repo="elsewhere",
+                              response=as_text({"number": 21, "body": OLD}))
+    wrote_21 = call(write, method="update", issue_number=21, body=OLD,
+                    response=as_text({"number": 21, "body": OLD}))
+    no_gh = {"old": None}
+
+    connector_cases = [
+        # DENY: the edit drops the user's line or asks an unsourced question.
+        ("connector edit drops a quote, gh answers", None, "deny", {"raw": edit(drop_said)}),
+        ("connector edit drops a quote bullet, gh answers", None, "deny", {"raw": edit(drop_bullet)}),
+        ("connector edit adds a question without looked in", None, "deny", {"raw": edit(with_question)}),
+        ("older update_issue tool drops a quote", None, "deny",
+         {"raw": call("mcp__github__update_issue", issue_number=21, body=drop_said)}),
+        ("no gh: drops a quote the session read", None, "deny", dict(no_gh, raw=edit(drop_said), records=[read_21])),
+        ("no gh: read answered as a list of blocks", None, "deny", dict(no_gh, raw=edit(drop_said), records=[read_21_list])),
+        ("no gh: read answered as a string", None, "deny", dict(no_gh, raw=edit(drop_said), records=[read_21_string])),
+        ("no gh: drops a quote the session last wrote", None, "deny", dict(no_gh, raw=edit(drop_said), records=[wrote_21])),
+        ("no gh: nothing read", None, "deny", dict(no_gh, raw=edit(OLD))),
+        ("no gh: only another issue read", None, "deny", dict(no_gh, raw=edit(OLD), records=[read_22])),
+        ("no gh: only the comments read", None, "deny", dict(no_gh, raw=edit(OLD), records=[read_21_comments])),
+        ("no gh: read in another session", None, "deny", dict(no_gh, raw=edit(OLD), records=[read_21_other_session])),
+        ("no gh: read on another repo", None, "deny", dict(no_gh, raw=edit(OLD), records=[read_21_other_repo])),
+        # ALLOW: the user's lines survive, or the call is not a body edit.
+        ("connector edit keeps every line, gh answers", None, "allow", {"raw": edit(OLD)}),
+        ("connector edit with a sourced question", None, "allow", {"raw": edit(full_looked)}),
+        ("no gh: keeps every line of the read", None, "allow", dict(no_gh, raw=edit(OLD), records=[read_21])),
+        ("connector edit with no body", None, "allow",
+         {"raw": call(write, method="update", issue_number=21, labels=["bug"])}),
+        ("connector create", None, "allow", {"raw": call(write, method="create", title="t", body=drop_said)}),
+        ("connector read", None, "allow", {"raw": read_21}),
+        ("connector comment", None, "allow", {"raw": call("mcp__claude_ai_GitHub__add_issue_comment",
+                                                          issue_number=21, body="ok")}),
+        ("record mode never refuses", None, "allow", dict(no_gh, raw=edit(drop_said), mode="record")),
+    ]
 
     cases = [
         # DENY: a line quoted as the user's is gone.
@@ -268,7 +345,7 @@ def main():
         ("empty stdin", None, "allow", {"raw": ""}),
         ("other tool", "gh issue edit 21 --body-file drop-said.md", "allow", {"tool": "Write"}),
         ("no command field", None, "allow", {"raw": json.dumps({"tool_name": "Bash", "tool_input": {}})}),
-    ]
+    ] + connector_cases
 
     failures = []
     for case in cases:
@@ -295,6 +372,8 @@ def main():
         ("no-checkout refusal says why", "gh issue edit 21 --body-file clean.md", {"cwd": outside}, "not inside a git checkout"),
         ("outside refusal names the checkout", "gh issue edit 21 --body-file " + os.path.join(outside, "clean.md"), {}, "outside the checkout " + os.path.realpath(tmp)),
         ("missing file refusal names the file", "gh issue edit 21 --body-file does-not-exist.md", {}, "does-not-exist.md is not there"),
+        ("no-read refusal says to read the issue first", None, dict(no_gh, raw=edit(OLD)), "issue_read"),
+        ("connector dropped-line refusal names the issue", None, {"raw": edit(drop_said)}, "issue 21 drops a line"),
     ]
     for label, command, extra, needle in reasons:
         got, reason = run(command, tmp, **extra)

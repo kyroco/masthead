@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""PreToolUse gate that refuses a `git commit` or `gh pr create|edit` whose message or body carries AI attribution; fails open."""
+"""PreToolUse gate that refuses a `git commit`, a `gh pr create|edit`, or a GitHub connector call that creates or updates a pull request, whose message, title or body carries AI attribution; fails open."""
 import json
 import os
 import re
@@ -24,6 +24,10 @@ GIT_COMMIT = re.compile(
 GH_PR = re.compile(
     r"^\s*(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*gh\s+pr\s+(create|edit)(?:\s|$)"
 )
+
+# A GitHub connector call that writes a PR, by the last part of its tool name, and the fields it writes (issue #27).
+CONNECTOR_PR = re.compile(r"^mcp__.+__(create_pull_request|update_pull_request)$")
+CONNECTOR_FIELDS = ("title", "body")
 
 SEGMENT_SPLIT = re.compile(r"[;\n]|\|\|?|&&?")
 
@@ -82,9 +86,17 @@ def main():
         data = json.load(sys.stdin)
     except Exception:
         sys.exit(0)
-    if data.get("tool_name") != "Bash":
+    tool = data.get("tool_name") or ""
+    tool_input = data.get("tool_input") or {}
+    if CONNECTOR_PR.match(tool):
+        text = "\n".join(v for v in (tool_input.get(f) for f in CONNECTOR_FIELDS) if isinstance(v, str))
+        found = find_marker(text)
+        if found:
+            deny(found, "the {} call".format(tool.rsplit("__", 1)[1]))
         sys.exit(0)
-    command = (data.get("tool_input") or {}).get("command")
+    if tool != "Bash":
+        sys.exit(0)
+    command = tool_input.get("command")
     if not isinstance(command, str) or not command:
         sys.exit(0)
 
@@ -106,7 +118,10 @@ def main():
                 break
     if not found:
         sys.exit(0)
+    deny(found, where)
 
+
+def deny(found, where):
     label, line, excerpt = found
     reason = (
         "Blocked: this commit message or PR body carries {label} (line {line} of "

@@ -51,7 +51,11 @@ The slug is three to six words of the title, lowercase, joined by hyphens.
 Delete the `worktree-<name>` branch the worktree was made on. Set the issue's
 Status to In Progress with
 `${CLAUDE_PLUGIN_ROOT}/skills/work-on/set-status.sh` unless a foreman already
-did.
+did. Where the GitHub connector is loaded, set the Status and make every other
+issue and PR call through it instead (the github-issues skill, **Which tool
+makes the call**); with no `gh`, make the branch with git (`git switch -c`,
+then `git push -u origin`) and let `Fixes #<n>` link it. The push itself is
+always git.
 
 ## 4. What done is
 

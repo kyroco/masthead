@@ -188,7 +188,10 @@ unproven list holds nothing a customer would see; and the worker, told you are
 ready to queue, has answered "cleaned up" (its test stack and code index are
 gone; its worktree and branch stay). Otherwise park it with the reason. Auto
 merge is off, so queue with the `enqueuePullRequest` GraphQL mutation, using
-the PR's node id.
+the PR's node id. That goes through `gh api graphql` even where the GitHub
+connector is loaded: the connector has no call that queues a PR. Every other
+GitHub call here goes through the connector when it is loaded, as **Which
+tool makes the call** in the github-issues skill says.
 
 Once it merges: close its issue if the `Fixes` line did not, then each parent
 up the chain that has no open sub-issue left, and set the merged issue and
