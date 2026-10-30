@@ -105,11 +105,11 @@ The connector's call for each `gh` form below:
 | `gh issue list --search "<words>" --state all` | `search_issues` |
 | `gh issue create` | `issue_write`, method `create` (`milestone` takes the milestone's number) |
 | `gh issue edit <n> --body-file <path>` | `issue_read` method `get` first, then `issue_write` method `update` with the whole body |
-| `gh issue edit <n> --add-label <label>` | `issue_write`, method `update`, with `labels` |
+| `gh issue edit <n> --add-label <label>` | `issue_read`, method `get_labels`, then `issue_write`, method `update`, with `labels` holding every label the issue has plus the new one: `labels` replaces the issue's whole set, so a list of the new label alone strips the rest |
 | `gh issue comment <n>` | `add_issue_comment` |
 | sub-issue (`gh api .../sub_issues`) | `sub_issue_write`, method `add` |
 | `gh project item-add` | `projects_write`, method `add_project_item`, with `item_type` `issue` |
-| `set-status.sh <n> "<Status>"` | `projects_write`, method `update_project_item`, with `project_number`, `item_owner`, `item_repo`, `issue_number` and `updated_field` `{"name": "Status", "value": "<Status>"}`, once for each project the issue is in (`projects_list` finds the project numbers) |
+| `set-status.sh <n> "<Status>"` | `projects_write`, method `update_project_item`, with `project_number`, `item_owner`, `item_repo`, `issue_number` and `updated_field` `{"name": "Status", "value": "<Status>"}`. No connector call says which projects an issue is in, so `project_number` is the run's own project, the number in its URL. `set-status.sh` sets every project the issue is in; an issue in a second project needs `gh` for that one |
 | `gh pr create` | `create_pull_request` |
 | `gh pr edit` | `update_pull_request` |
 | `gh pr view` | `pull_request_read` |
@@ -117,8 +117,12 @@ The connector's call for each `gh` form below:
 The checks that read a `gh` command read the connector call too: the issue
 edit check (it needs the issue read with `issue_read` in this session when
 `gh` cannot answer), the attribution check on a PR's title and body, and the
-push gate on `create_pull_request`. A blocked-by link and a new milestone or
-project have no connector call; they stay on `gh`.
+push gate on `create_pull_request`. A new project is `projects_write`, method
+`create_project`, with `owner`, `owner_type` and `title`. A new milestone has
+no connector call and stays on `gh`. A blocked-by link is
+`issue_dependency_write` where the connector offers it (GitHub ships it behind
+a feature switch, so not every connector has it); where it does not, the link
+stays on `gh`.
 
 ## Filing
 
