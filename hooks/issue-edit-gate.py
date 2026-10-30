@@ -5,13 +5,19 @@ quoted as the user's, or that adds a [NEEDS CLARIFICATION] question with no
 query searched (issue #21). Fails open on broken plumbing.
 
 The gate reads one exact form and no shell: `gh issue edit <n> --body-file
-<path>` (or `-F <path>`), where the path names a file that exists inside the
-checkout. Any other way of giving the body is refused with that form to use:
+<path>` (or `-F <path>`, `-F<path>`), alone in its command, where the path
+names a file, not a link, that exists inside the git checkout of the session
+folder. Any other way of giving the body is refused with that form to use:
 `--body` or `-b`, `--body-file -`, a heredoc or a here-string on the edit's
-line, a file that is not there or sits outside the checkout. The gate guards
-against an agent dropping a line by accident, like the other gates; a shell
-shape it does not read (a wrapper, a file the same command rewrites, a `cd`)
-is outside what it checks.
+line, a file that is not there, is a link or sits outside the checkout, a
+session folder that is no checkout, and an edit that is not a command of its
+own: a wrapper or a variable before `gh` (sudo, env, time, command, xargs,
+eval, `GH_REPO=`), a `$(...)` or backticks around it, a shell keyword, a `cd`
+or any other command in the same call, which could change the file or the
+repository after the gate read them (issue #23). Comment and blank lines
+around the edit are fine. An edit that sends no body is not checked, wherever
+it sits. The gate guards against an agent dropping a line by accident, like
+the other gates; it does not resist a session set on getting past it.
 
 A line quoted as the user's is a double-quoted span of three or more words on
 a line that names the user: the first name from `git config user.name` in the
@@ -50,6 +56,10 @@ VALUE_FLAGS = {
 BODY_FLAGS = {"--body", "-b"}
 FILE_FLAGS = {"--body-file", "-F"}
 REPO_FLAGS = {"--repo", "-R"}
+SHORT_VALUE_FLAGS = {f for f in VALUE_FLAGS if len(f) == 2}
+OPERATORS = "();<>|&\n"
+CONTINUED = re.compile(r"(?<!\\)((?:\\\\)*)\\\n")
+MID_WORD_HASH = re.compile(r"(?<=[^\s();<>|&])#")
 QUOTED = re.compile(r'"([^"]+)"')
 QUESTION_LINE = re.compile(r"^\s*(?:[-*+]|\d+[.)])?\s*\[NEEDS CLARIFICATION\b|\[NEEDS CLARIFICATION:", re.I)
 QUESTION = re.compile(r"\[NEEDS CLARIFICATION\b.*$", re.I)
@@ -99,6 +109,54 @@ def words_of(text):
         return text.split()
 
 
+def shell_tokens(text):
+    """The words of a shell command with each operator (`;`, `&&`, `|`, `(`,
+    a newline and the like) as a token of its own; None when the quotes do not
+    close."""
+    # A backslash at the end of a line joins it to the next, as in the shell,
+    # unless that backslash is itself escaped by one before it.
+    # The shell starts a comment only at the start of a word; shlex would cut
+    # `notes#1.md` too, so a `#` inside a word is hidden from it.
+    text = MID_WORD_HASH.sub("\0", CONTINUED.sub(r"\1", text))
+    lexer = shlex.shlex(text, posix=True, punctuation_chars=OPERATORS)
+    lexer.whitespace = " \t\r"
+    lexer.whitespace_split = True
+    try:
+        return [token.replace("\0", "#") for token in lexer]
+    except ValueError:
+        return None
+
+
+def is_operator(token):
+    return bool(token) and all(c in OPERATORS for c in token)
+
+
+def edit_args(text):
+    """The edit's own arguments: its line up to the first shell operator."""
+    tokens = shell_tokens(text)
+    if tokens is None:
+        return words_of(text)
+    args = []
+    for token in tokens:
+        if is_operator(token):
+            break
+        args.append(token)
+    return args
+
+
+def alone(command):
+    """True when the whole command is one plain `gh issue edit`, with only
+    comment and blank lines around it."""
+    tokens = shell_tokens(command)
+    if tokens is None:
+        return False
+    while tokens and tokens[0] == "\n":
+        tokens.pop(0)
+    while tokens and tokens[-1] == "\n":
+        tokens.pop()
+    return tokens[:3] == ["gh", "issue", "edit"] and not any(is_operator(t) for t in tokens)
+
+
 def parse_edit(words):
     """The issue references, the repo, and how the body arrives: ('text',
     value), ('file', path), ('stdin', None) or (None, None)."""
@@ -109,6 +167,10 @@ def parse_edit(words):
     while i < len(words):
         word = words[i]
         flag, has_value, inline = word.partition("=")
+        if word[:2] in SHORT_VALUE_FLAGS and len(word) > 2 and not word.startswith("--"):
+            flag, has_value, inline = word[:2], True, word[2:]
+            if inline.startswith("="):
+                inline = inline[1:]
         if flag in VALUE_FLAGS:
             value = inline if has_value else (words[i + 1] if i + 1 < len(words) else "")
             if flag in BODY_FLAGS:
@@ -133,18 +195,19 @@ def checkout_root(cwd):
             return os.path.realpath(out.stdout.strip())
     except Exception:
         pass
-    return os.path.realpath(cwd)
+    return None
 
 
 def edits_in(command, cwd):
     """Every gh issue edit in the command: (refs, repo, body, problem). The
-    arguments are the rest of the edit's line."""
+    arguments run to the first shell operator, across a backslash line end or
+    a line break inside quotes, as the shell reads them."""
     found = []
     root = None
     for match in EDIT.finditer(command):
         line_end = command.find("\n", match.end())
         args = command[match.end():] if line_end < 0 else command[match.end():line_end]
-        refs, repo, (how, value) = parse_edit(words_of(args))
+        refs, repo, (how, value) = parse_edit(edit_args(command[match.end():]))
         if "<<" in args:
             found.append((refs, repo, None, "the body comes from a heredoc or a here-string"))
             continue
@@ -155,12 +218,21 @@ def edits_in(command, cwd):
             problem = "the body is given with --body"
         elif how == "stdin":
             problem = "the body comes from standard input"
+        elif not alone(command):
+            problem = ("the edit is not a command of its own: something around it (a wrapper, a "
+                       "variable, $(...), a shell keyword, a cd or another command) could change "
+                       "what gh sends after the check read it; run the edit alone in its own call")
         else:
             if root is None:
-                root = checkout_root(cwd)
-            path = os.path.realpath(os.path.join(cwd, os.path.expanduser(value)))
-            if not (path == root or path.startswith(root + os.sep)):
-                problem = "the body file {} is outside the checkout".format(value)
+                root = checkout_root(cwd) or ""
+            given = os.path.join(cwd, os.path.expanduser(value))
+            path = os.path.realpath(given)
+            if not root:
+                problem = "the session folder {} is not inside a git checkout".format(cwd)
+            elif not (path == root or path.startswith(root + os.sep)):
+                problem = "the body file {} is outside the checkout {}".format(value, root)
+            elif os.path.islink(given):
+                problem = "the body file {} is a link".format(value)
             elif not os.path.isfile(path):
                 problem = "the body file {} is not there".format(value)
             else:

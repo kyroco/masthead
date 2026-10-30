@@ -54,7 +54,8 @@ Otherwise, on GitHub, it:
   and Korium query it searched, and adds the `needs-decision` label.
 
 A check in front of the edit (`issue-edit-gate.py`) reads one form, the
-body in a file inside the checkout sent with `gh issue edit <n> --body-file <path>`,
+body in a file inside the checkout sent with `gh issue edit <n> --body-file <path>`
+alone in its own command,
 and refuses a body that drops a line quoted as the user's, or a question
 without its "looked in:" part.
 

@@ -67,10 +67,10 @@ exit 0
 """
 
 
-def run(command, tmp, old=OLD, raw=None, tool="Bash"):
+def run(command, tmp, old=OLD, raw=None, tool="Bash", cwd=None):
     payload = raw if raw is not None else json.dumps({
         "session_id": "test-issue-edit-gate",
-        "cwd": tmp,
+        "cwd": cwd or tmp,
         "tool_name": tool,
         "tool_input": {"command": command},
     })
@@ -161,6 +161,10 @@ def main():
         fh.write(OLD)
     os.symlink(os.path.join(outside, "clean.md"), os.path.join(tmp, "link.md"))
     body("clean.md", OLD)
+    body("clean-copy.md", OLD)
+    body("drop", OLD)
+    body("drop#said.md", drop_said)
+    os.symlink(os.path.join(tmp, "clean.md"), os.path.join(tmp, "inner-link.md"))
 
     cases = [
         # DENY: a line quoted as the user's is gone.
@@ -200,6 +204,31 @@ def main():
         ("body file written by this command", "cat > later.md <<'EOF'\n" + OLD + "EOF\ngh issue edit 21 --body-file later.md", "deny"),
         ("body file outside the checkout", "gh issue edit 21 --body-file " + os.path.join(outside, "clean.md"), "deny"),
         ("symlink to a file outside the checkout", "gh issue edit 21 --body-file link.md", "deny"),
+        # DENY: a shell shape the check does not read (issue #23), each with a
+        # body that would pass, so only the shape refuses it.
+        ("sudo wrapper", "sudo -u me gh issue edit 21 --body-file clean.md", "deny"),
+        ("env wrapper", "env -i gh issue edit 21 --body-file clean.md", "deny"),
+        ("time wrapper", "time -p gh issue edit 21 --body-file clean.md", "deny"),
+        ("command wrapper", "command -p gh issue edit 21 --body-file clean.md", "deny"),
+        ("variable before gh", "GH_REPO=kyroco/other gh issue edit 21 --body-file clean.md", "deny"),
+        ("command substitution", "x=$(gh issue edit 21 --body-file clean.md)", "deny"),
+        ("backticks", "x=`gh issue edit 21 --body-file clean.md`", "deny"),
+        ("eval", "eval 'gh issue edit 21 --body-file clean.md'", "deny"),
+        ("xargs", "echo 21 | xargs -I{} gh issue edit {} --body-file clean.md", "deny"),
+        ("shell keyword before the edit", "if true; then gh issue edit 21 --body-file clean.md; fi", "deny"),
+        ("another command before the edit", "true && gh issue edit 21 --body-file clean.md", "deny"),
+        ("two edits in one call", "gh issue edit 21 --body-file clean.md\ngh issue edit 22 --body-file clean.md", "deny"),
+        ("short flag joined to its file", "gh issue edit 21 -Fdrop-said.md", "deny"),
+        ("hash inside the file name", "gh issue edit 21 --body-file drop#said.md", "deny"),
+        ("joined flag on a continued line", "gh issue edit 21 \\\n  -Fdrop-said.md", "deny"),
+        ("body file on a continued line", "gh issue edit 21 \\\n  --body-file drop-said.md", "deny"),
+        ("line ending in an escaped backslash is not joined", "gh issue edit 21 -F drop-said.md --title a\\\\\n  x -F clean.md", "deny"),
+        ("body file after a title with a line break", "gh issue edit 21 --title 'two\nlines' --body-file drop-said.md", "deny"),
+        ("file the same command rewrites", "cp drop-said.md clean-copy.md; gh issue edit 21 --body-file clean-copy.md", "deny"),
+        ("cd into another folder first", "cd sub && gh issue edit 21 --body-file clean.md", "deny"),
+        ("link to a file inside the checkout", "gh issue edit 21 --body-file inner-link.md", "deny"),
+        ("session folder that is not a checkout", "gh issue edit 21 --body-file clean.md", "deny", {"cwd": outside}),
+        ("unbalanced quote", "gh issue edit 21 --title 'half --body-file clean.md", "deny"),
         ("dot-dot path out of the checkout", "gh issue edit 21 --body-file sub/../../" + os.path.basename(outside) + "/clean.md", "deny"),
         # ALLOW: the user's lines survive; document quotes may change.
         ("same body", "gh issue edit 21 --body-file clean.md", "allow"),
@@ -222,6 +251,14 @@ def main():
         ("question naming decision record in words", body("full-looked-record.md", full_looked_record), "allow"),
         ("looked in with a markdown link", body("linked.md", linked), "allow"),
         ("edit with no body", "gh issue edit 21 --add-label needs-decision", "allow"),
+        ("edit with no body beside other commands", "gh issue edit 21 --add-label parked && gh issue comment 21 --body 'parked'", "allow"),
+        ("comment line above the edit", "# send the body\ngh issue edit 21 --body-file clean.md", "allow"),
+        ("blank lines around the edit", "\n gh issue edit 21 --body-file clean.md \n", "allow"),
+        ("title with shell marks in quotes", "gh issue edit 21 --title 'a; b && c | d' --body-file clean.md", "allow"),
+        ("short flag joined to a clean file", "gh issue edit 21 -Fclean.md", "allow"),
+        ("clean body file on a continued line", "gh issue edit 21 \\\n  --body-file clean.md", "allow"),
+        ("title starting with a hash", "gh issue edit 21 --title '#23 fix' --body-file drop-said.md", "deny"),
+        ("trailing comment after the edit", "gh issue edit 21 --body-file clean.md # sends the body", "allow"),
         ("issue view", "gh issue view 21 --json body", "allow"),
         ("issue create", "gh issue create --title t --body-file drop-said.md", "allow"),
         ("pr edit body", "gh pr edit 21 --body-file drop-said.md", "allow"),
@@ -252,6 +289,11 @@ def main():
         ("dropped-line refusal shows the cut", "gh issue edit 21 --body-file clean.md", {"old": long_quote}, '...". Every line the user wrote stays'),
         ("--body refusal names the form", "gh issue edit 21 --body 'nothing'", {}, "`gh issue edit <n> --body-file <path>`"),
         ("heredoc refusal names the form", "gh issue edit 21 --body-file - <<'BODY'\n" + OLD + "BODY", {}, "`gh issue edit <n> --body-file <path>`"),
+        ("wrapper refusal says why", "sudo -u me gh issue edit 21 --body-file clean.md", {}, "a command of its own"),
+        ("wrapper refusal names the form", "sudo -u me gh issue edit 21 --body-file clean.md", {}, "`gh issue edit <n> --body-file <path>`"),
+        ("link refusal says why", "gh issue edit 21 --body-file inner-link.md", {}, "inner-link.md is a link"),
+        ("no-checkout refusal says why", "gh issue edit 21 --body-file clean.md", {"cwd": outside}, "not inside a git checkout"),
+        ("outside refusal names the checkout", "gh issue edit 21 --body-file " + os.path.join(outside, "clean.md"), {}, "outside the checkout " + os.path.realpath(tmp)),
         ("missing file refusal names the file", "gh issue edit 21 --body-file does-not-exist.md", {}, "does-not-exist.md is not there"),
     ]
     for label, command, extra, needle in reasons:
