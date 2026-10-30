@@ -374,6 +374,7 @@ says  skills/work-on/foreman.md "That goes through \`gh api graphql\` even where
 says  skills/github-issues/SKILL.md "\`labels\` replaces the issue's whole set"
 says  skills/github-issues/SKILL.md "No single connector call says which projects an issue is in, so find them"
 never skills/github-issues/SKILL.md "the run's own project, the number in its URL"
+says  skills/github-issues/SKILL.md "a project under another account needs \`gh\`"
 never skills/github-issues/SKILL.md "A blocked-by link and a new milestone or"
 says  skills/work-on/SKILL.md "and \`gh\` is the fallback"
 says  skills/analyze-issues/issue-check.md "send the whole body with \`issue_write\` (method \`update\`)"

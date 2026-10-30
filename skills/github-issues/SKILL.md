@@ -109,7 +109,7 @@ The connector's call for each `gh` form below:
 | `gh issue comment <n>` | `add_issue_comment` |
 | sub-issue (`gh api .../sub_issues`) | `sub_issue_write`, method `add` |
 | `gh project item-add` | `projects_write`, method `add_project_item`, with `item_type` `issue` |
-| `set-status.sh <n> "<Status>"` | No single connector call says which projects an issue is in, so find them: `projects_list`, method `list_projects`, for the owner, then for each project method `list_project_items` with `query` `repo:<owner>/<repo>`, paging through, and keep the projects that hold the issue. For each, `projects_write`, method `update_project_item`, with `owner`, `project_number`, `item_owner`, `item_repo`, `issue_number` and `updated_field` `{"name": "Status", "value": "<Status>"}`. In no project means nothing to set, as `set-status.sh` says |
+| `set-status.sh <n> "<Status>"` | No single connector call says which projects an issue is in, so find them: `projects_list`, method `list_projects`, for the owner, then for each project method `list_project_items` with `query` `repo:<owner>/<repo>`, paging through, and keep the projects that hold the issue. For each, `projects_write`, method `update_project_item`, with `owner`, `project_number`, `item_owner`, `item_repo`, `issue_number` and `updated_field` `{"name": "Status", "value": "<Status>"}`. In no project means nothing to set, as `set-status.sh` says. This searches the repo owner's projects only; a project under another account needs `gh` |
 | `gh pr create` | `create_pull_request` |
 | `gh pr edit` | `update_pull_request` |
 | `gh pr view` | `pull_request_read` |
