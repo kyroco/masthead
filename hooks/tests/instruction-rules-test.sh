@@ -35,7 +35,7 @@ never() {
 }
 
 # Issue #57: a search for what is adopted reads wider than any other search.
-says  skills/work-on/SKILL.md 'For what is adopted, use `stance: "position"` with a `limit` of 20'
+says  skills/work-on/SKILL.md 'For what is adopted, use `stance: "position"` with a `limit` of 10'
 says  skills/work-on/SKILL.md 'Every other `agent_search` takes a `limit` of 5'
 
 # 1. Slicing.
