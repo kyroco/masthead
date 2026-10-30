@@ -8,7 +8,7 @@
 #   gate-discovery    refuses a Grep, Glob or shell search for a name the code index holds until a fresh code_locate lookup
 #   gate-redundant-grep, gate-span-read  refuse repeating what code_locate just answered
 #   gate-verify-brief  refuses a verifier or security-reviewer brief with no claims list, and a third re-verify round
-#   gate-capture      refuses a subagent capture filed under another agent's name
+#   gate-capture      refuses a decision with no decider or no word on what it replaces, and a subagent capture filed under another agent's name
 #   gate-stop, gate-substop  refuse one finish with no capture
 # Every refusal happens once per session, then stands down. MASTHEAD_<NAME>_GATE=off in the operator's environment switches a gate off.
 
@@ -379,9 +379,22 @@ EOF
     exit 0
     ;;
 
-  # gate-capture: refuse a subagent capture filed under another agent's name.
+  # gate-capture: refuse a decision with no decider or no word on what it replaces, and a subagent capture filed under another agent's name.
   gate-capture)
     case "${MASTHEAD_CAPTURE_GATE:-}" in off|0|false|no) exit 0 ;; esac
+
+    # Issue #57: Korium answers what is adopted only when a decision says who ruled and which earlier rulings stop being live. Any session or agent; a jq error reads as the field missing, so a wrong shape is refused.
+    if [ "$(field '.tool_input.thought_type // ""')" = "decision" ]; then
+      if [ "$(field '.tool_input.decided_by | . != null and . != {} and . != "" and . != []')" != "true" ]; then
+        deny_tool "A decision saved to Korium must say who decided. Name them in decided_by, an object such as {\"name\": \"<who ruled>\"}. If nobody ruled, this is a finding, not a decision: save it with thought_type insight. MASTHEAD_CAPTURE_GATE=off in the operator's environment turns this gate off."
+        exit 0
+      fi
+      if [ "$(field '.tool_input | (.relations | if type == "array" then any(.[]; type == "object" and .relation_type == "supersedes") else false end) or ((.metadata | if type == "object" then .replaces else null end) == "none")')" != "true" ]; then
+        deny_tool "A decision saved to Korium must say what it replaces. Search what is adopted (agent_search with stance \"position\" and limit 20), then list every record this one replaces in relations, each as {\"target_id\": \"<id>\", \"relation_type\": \"supersedes\"}. If it replaces nothing, state that with metadata {\"replaces\": \"none\"}. MASTHEAD_CAPTURE_GATE=off in the operator's environment turns this gate off."
+        exit 0
+      fi
+    fi
+
     acting="$(field '.agent_name // .agent_type // ""')"
     [ -n "$acting" ] || exit 0
     claimed="$(field '.tool_input.source_agent // ""')"
