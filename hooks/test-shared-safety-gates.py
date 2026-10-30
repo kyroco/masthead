@@ -535,6 +535,60 @@ def main():
                   and prefix not in grants[(agent, "tools")]
                   and prefix + "__agent_search" not in grants[(agent, "tools")], True)
 
+    # Korium's tools can reach a subagent deferred, and a deferred tool cannot
+    # be called until ToolSearch loads it. So an agent that holds a Korium tool
+    # must hold ToolSearch and name that tool, both ways, in a select query in
+    # its body. A whole-server grant must load search, the code index and
+    # capture. The query names nothing the agent is denied.
+    print("\n--- every agent that holds a Korium tool can load it ---")
+    WHOLE_SERVER = ("__agent_search", "__code_locate", "__agent_capture")
+
+    def cannot_load(text):
+        head, _, body = text.partition("\n---")
+        fields = {}
+        for field in ("tools", "disallowedTools"):
+            line = re.search(r"^{}:(.*)$".format(field), head, re.M)
+            fields[field] = [i.strip() for i in line.group(1).split(",")] if line else []
+        needed = set()
+        for item in fields["tools"]:
+            for prefix in names.values():
+                if item == prefix:
+                    needed |= {p + t for p in names.values() for t in WHOLE_SERVER}
+                elif item.startswith(prefix + "__"):
+                    needed |= {p + item[len(prefix):] for p in names.values()}
+        if not needed:
+            return []
+        problems = [] if "ToolSearch" in fields["tools"] else ["no ToolSearch"]
+        loaded = set()
+        for query in re.findall(r"`select:([^`]*)`", body):
+            loaded |= {q.strip() for q in query.split(",")}
+        problems += ["not loaded: " + t for t in sorted(needed - loaded)]
+        problems += ["loads a denied tool: " + t for t in sorted(loaded & set(fields["disallowedTools"]))]
+        return problems
+
+    unloadable = []
+    for agent in sorted(f for f in os.listdir(agents_dir) if f.endswith(".md")):
+        unloadable += ["{}: {}".format(agent[:-3], p)
+                       for p in cannot_load(open(os.path.join(agents_dir, agent)).read())]
+    check("every agent loads each Korium tool it holds", "; ".join(unloadable) or "none", "none")
+
+    LOADER = "`select:mcp__korium__code_locate,mcp__claude_ai_korium__code_locate`"
+    check("a fixture without ToolSearch is caught",
+          "; ".join(cannot_load("---\ntools: Read, mcp__korium__code_locate, mcp__claude_ai_korium__code_locate\n---\n" + LOADER)),
+          "no ToolSearch")
+    check("a fixture without a load step is caught",
+          "; ".join(cannot_load("---\ntools: ToolSearch, mcp__korium__code_locate, mcp__claude_ai_korium__code_locate\n---\nBody.")),
+          "not loaded: mcp__claude_ai_korium__code_locate; not loaded: mcp__korium__code_locate")
+    check("a whole-server fixture that loads only the code index is caught",
+          len(cannot_load("---\ntools: ToolSearch, mcp__korium, mcp__claude_ai_korium\n---\n" + LOADER)), 4)
+    check("a fixture that loads a denied tool is caught",
+          "; ".join(cannot_load("---\ntools: ToolSearch, mcp__korium__code_locate, mcp__claude_ai_korium__code_locate\n"
+                      "disallowedTools: mcp__korium__agent_search\n---\n"
+                      "`select:mcp__korium__code_locate,mcp__claude_ai_korium__code_locate,mcp__korium__agent_search`")),
+          "loads a denied tool: mcp__korium__agent_search")
+    check("an agent holding no Korium tool needs no loader",
+          "; ".join(cannot_load("---\ntools: Read, Grep\n---\nBody.")), "")
+
     print("")
     if failures:
         print("{} of the cases are wrong:".format(len(failures)))

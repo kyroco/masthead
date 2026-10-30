@@ -15,7 +15,9 @@ effort: medium
 # any of the four agents was 156 turns and 99% ended under 111.
 maxTurns: 200
 # Of Korium it holds only the code index and capture, as the reviewer does.
-tools: Read, Glob, Grep, Bash, Write, mcp__semgrep, mcp__korium__code_locate, mcp__claude_ai_korium__code_locate, mcp__korium__agent_capture, mcp__claude_ai_korium__agent_capture
+# ToolSearch is listed because Korium's tools can arrive deferred: an agent
+# cannot call them until ToolSearch loads them.
+tools: Read, Glob, Grep, Bash, ToolSearch, Write, mcp__semgrep, mcp__korium__code_locate, mcp__claude_ai_korium__code_locate, mcp__korium__agent_capture, mcp__claude_ai_korium__agent_capture
 disallowedTools: Agent, Edit, MultiEdit, NotebookEdit, WebFetch, WebSearch, mcp__korium__agent_search, mcp__claude_ai_korium__agent_search, mcp__korium__korium_browse, mcp__claude_ai_korium__korium_browse, mcp__korium__korium_trace, mcp__claude_ai_korium__korium_trace, mcp__korium__korium_reconstruct, mcp__claude_ai_korium__korium_reconstruct, mcp__korium__korium_hydrate, mcp__claude_ai_korium__korium_hydrate
 ---
 
@@ -40,6 +42,15 @@ secret or a privilege they should not have makes a claim false even when no
 customer has hit it yet, and so does customer content that reaches a log, an
 error report or a trace. You do not search Korium's memory, as the verifier
 does not.
+
+## Before anything else: load your tools
+
+Load your Korium tools with `ToolSearch` and the query
+`select:mcp__korium__code_locate,mcp__korium__agent_capture,mcp__claude_ai_korium__code_locate,mcp__claude_ai_korium__agent_capture`,
+in one call. A session reaches Korium either through the local `korium`
+server or through the claude.ai connector, so only one set comes back; use
+that one. When they are already loaded, or your session offers no
+`ToolSearch`, call them directly.
 
 ## What you look for
 

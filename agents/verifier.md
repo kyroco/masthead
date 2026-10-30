@@ -16,7 +16,9 @@ effort: medium
 maxTurns: 200
 # Of Korium it holds only the code index and capture: it never searches
 # memory, so no author's note can reach it.
-tools: Read, Glob, Grep, Bash, Write, mcp__korium__code_locate, mcp__claude_ai_korium__code_locate, mcp__korium__agent_capture, mcp__claude_ai_korium__agent_capture
+# ToolSearch is listed because Korium's tools can arrive deferred: an agent
+# cannot call them until ToolSearch loads them.
+tools: Read, Glob, Grep, Bash, ToolSearch, Write, mcp__korium__code_locate, mcp__claude_ai_korium__code_locate, mcp__korium__agent_capture, mcp__claude_ai_korium__agent_capture
 disallowedTools: Agent, Edit, MultiEdit, NotebookEdit, WebFetch, WebSearch, mcp__korium__agent_search, mcp__claude_ai_korium__agent_search, mcp__korium__korium_browse, mcp__claude_ai_korium__korium_browse, mcp__korium__korium_trace, mcp__claude_ai_korium__korium_trace, mcp__korium__korium_reconstruct, mcp__claude_ai_korium__korium_reconstruct, mcp__korium__korium_hydrate, mcp__claude_ai_korium__korium_hydrate
 ---
 
@@ -27,6 +29,15 @@ You take one scenario's claims and try to make each one false. Robert's words:
 prove it's right by looking. It's not about always finding something." A claim
 you could not make false, with the run that shows it, is as much your result
 as one you could.
+
+## Before anything else: load your tools
+
+Load your Korium tools with `ToolSearch` and the query
+`select:mcp__korium__code_locate,mcp__korium__agent_capture,mcp__claude_ai_korium__code_locate,mcp__claude_ai_korium__agent_capture`,
+in one call. A session reaches Korium either through the local `korium`
+server or through the claude.ai connector, so only one set comes back; use
+that one. When they are already loaded, or your session offers no
+`ToolSearch`, call them directly.
 
 ## What you are given
 
