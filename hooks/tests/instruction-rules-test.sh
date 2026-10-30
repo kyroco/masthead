@@ -580,6 +580,13 @@ says  references/session-cliffs.md "delete the branch locally, and name the remo
 never references/session-cliffs.md "locally and on the remote"
 never references/session-cliffs.md "push origin --delete"
 never references/session-cliffs.md "refs/heads"
+# Issue #55: no tracked file names the removed check, its setting, its script or
+# the library it needed. The words are split so this file names none of them.
+named="$(git -C "$ROOT" grep -il -w -e "abil""ities" -e "PROJECT_ABIL""ITIES" -e "Py""YAML" -- .)"
+case $? in
+  1) pass=$((pass + 1)) ;;
+  *) fail=$((fail + 1)); printf 'FAIL these still name the removed check: %s\n' "$named" ;;
+esac
 
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]

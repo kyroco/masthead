@@ -498,6 +498,15 @@ run_gate "$d"
 if [ -e "$d/scratch/ran-here" ]; then fail=$((fail + 1)); echo "  FAIL: an untracked folder's test script ran on push" >&2; else pass=$((pass + 1)); echo "  ok: the untracked folder's test script did not run"; fi
 contains "$ERR" "no package.json above them" "it says the node rung found no tracked root"
 
+echo "24. a repo whose settings still name the removed check pushes, and the gate never mentions it"
+d="$(newrepo old-setting)"
+mkdir -p "$d/.claude"
+printf '{"env":{"%s":"bad.yaml"}}\n' "PROJECT_ABIL""ITIES" > "$d/.claude/settings.json"
+echo 'lines: [' > "$d/bad.yaml"
+run_gate "$d"
+ok "$STATUS" "0" "the old setting does not stop a push"
+ok "$(printf '%s' "$ERR" | grep -ci "abil""ities")" "0" "the gate says nothing about it"
+
 echo ""
 echo "passed $pass, failed $fail"
 [ "$fail" -eq 0 ] || exit 1

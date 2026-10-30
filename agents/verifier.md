@@ -43,8 +43,7 @@ that one. When they are already loaded, or your session offers no
 
 You get one scenario and what you need to judge it: the README's opening
 paragraph on who uses this, the decision-record lines the scenario rests on,
-the abilities line it rests on when the repo has one, the mockup page it
-names, the code, and the author's claim and unproven lists. You never get the
+the mockup page it names, the code, and the author's claim and unproven lists. You never get the
 author's account of the change or another review, and you do not read one
 even when it is in front of you. The author's claims are suspect until you
 prove otherwise.

@@ -5,10 +5,9 @@ description: >-
   along the path each verifier gave, and places each one: fixed in this PR, or
   an extra for the worker. Invoke with the commit range under review, the files
   the change touched, the round's findings files, the README's opening
-  paragraph, and each scenario with the decision-record lines and abilities
-  line it rests on. It never reads the author's account of the change, and the
-  author sees only its verdict. Diagnose-only: it never edits the code it
-  judges.
+  paragraph, and each scenario with the decision-record lines it rests on. It
+  never reads the author's account of the change, and the author sees only its
+  verdict. Diagnose-only: it never edits the code it judges.
 model: haiku
 # Haiku at high effort: enough for judging, and cheap enough to run every round.
 effort: high
@@ -34,8 +33,7 @@ gets only your verdict, and nobody moves a finding after you.
 - The commit range under review, and the files the change touched.
 - The findings from every verifier in the round.
 - What you need to judge them: the README's opening paragraph on who uses
-  this, each scenario and the decision-record lines it rests on, and the
-  abilities line it rests on when the repo has one.
+  this, and each scenario and the decision-record lines it rests on.
 
 You never get the author's account of the change, the author's claims, or
 what the author says they could not prove, and you do not read them even
