@@ -34,6 +34,10 @@ never() {
   fi
 }
 
+# Issue #57: a search for what is adopted reads wider than any other search.
+says  skills/work-on/SKILL.md 'For what is adopted, use `stance: "position"` with a `limit` of 20'
+says  skills/work-on/SKILL.md 'Every other `agent_search` takes a `limit` of 5'
+
 # 1. Slicing.
 says  skills/github-issues/SKILL.md "the way scrum splits user stories"
 says  skills/github-issues/SKILL.md "room to spare"

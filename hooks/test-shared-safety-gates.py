@@ -314,9 +314,10 @@ def main():
         merged.update(env or {})
         return run(["bash", PROTOCOL, mode], json.dumps(payload), env=merged)
 
-    def kgate_raw(mode, payload):
+    def kgate_raw(mode, payload, extra_env=None):
         # The hook's whole answer, for a case that reads the refusal's words.
         env = dict(os.environ, TMPDIR=KTMP + "/")
+        env.update(extra_env or {})
         env.pop("CLAUDE_PROJECT_DIR", None)
         return subprocess.run(["bash", PROTOCOL, mode], input=json.dumps(payload),
                               capture_output=True, text=True, check=False,
@@ -371,7 +372,7 @@ def main():
     # the reason is in the hook's own comment.
     def cap_gate(agent, source, extra=None):
         ti = {"source_agent": source, "content": "x",
-              "thought_type": "decision", "importance": 0.6}
+              "thought_type": "insight", "importance": 0.6}
         if extra:
             ti.update(extra)
         p = {"session_id": "k-cap", "cwd": KCWD,
@@ -415,6 +416,88 @@ def main():
                                  "tool_name": "mcp__korium__agent_capture",
                                  "tool_input": {"source_agent": "thiago"}},
                 {"MASTHEAD_CAPTURE_GATE": "off"}), "allow")
+
+    print("\n--- a decision names who decided and what it replaces ---")
+    # Issue #57: Korium answers what is adopted only when a decision says who
+    # ruled and which earlier rulings stop being live.
+    DECIDER = {"decided_by": {"actor": "robert"}}
+    REPLACES_NONE = {"metadata": {"replaces": "none"}}
+    SUPERSEDES = {"relations": [{"target_id": "abc", "relation_type": "supersedes"}]}
+
+    def decision_raw(agent, extra, env=None):
+        ti = {"source_agent": agent or "main", "content": "x",
+              "thought_type": "decision", "importance": 0.6}
+        ti.update(extra)
+        p = {"session_id": "k-cap", "cwd": KCWD,
+             "tool_name": "mcp__korium__agent_capture", "tool_input": ti}
+        if agent:
+            p["agent_name"] = agent
+        return kgate_raw("gate-capture", p, env)
+
+    def decision(agent, extra, env=None):
+        return "deny" if "deny" in decision_raw(agent, extra, env) else "allow"
+
+    # Any session or agent: the main session names no acting agent.
+    for who in (None, "reader"):
+        label = who or "main session"
+        for name, sent in (("no decided_by", {}),
+                           ("an empty decided_by", {"decided_by": {}}),
+                           ("a null decided_by", {"decided_by": None}),
+                           ("no decided_by, with replaces none", REPLACES_NONE),
+                           ("no decided_by, with a supersedes link", SUPERSEDES)):
+            out = decision_raw(who, sent)
+            check(f"{label}: {name} is refused", str("deny" in out), "True")
+            check(f"{label}: {name} says to name who decided or use insight",
+                  str("decided_by" in out and "insight" in out), "True")
+        for name, sent in (("no word on what it replaces", {}),
+                           ("metadata without replaces", {"metadata": {"topic": "x"}}),
+                           ("replaces set to something else", {"metadata": {"replaces": "maybe"}}),
+                           ("metadata that is not an object", {"metadata": "none"}),
+                           ("no relations in the list", {"relations": []}),
+                           ("relations that are not a list", {"relations": "supersedes"}),
+                           ("a link of another type",
+                            {"relations": [{"target_id": "abc", "relation_type": "supports"}]})):
+            out = decision_raw(who, {**DECIDER, **sent})
+            check(f"{label}: {name} is refused", str("deny" in out), "True")
+            check(f"{label}: {name} says to search and list, or state none",
+                  str("stance" in out and "supersedes" in out and "replaces" in out), "True")
+        for name, sent in (("replaces none", REPLACES_NONE),
+                           ("one supersedes link", SUPERSEDES),
+                           ("several supersedes links",
+                            {"relations": [{"target_id": t, "relation_type": "supersedes"}
+                                           for t in ("abc", "def")]}),
+                           ("a supersedes link among others",
+                            {"relations": [{"target_id": "abc", "relation_type": "supports"},
+                                           {"target_id": "def", "relation_type": "supersedes"}]})):
+            check(f"{label}: a decider and {name} goes through",
+                  decision(who, {**DECIDER, **sent}), "allow")
+
+    # Only a decision is asked: every other type behaves as it did.
+    for kind in ("preference", "lesson", "rejection", "drift", "correction", "insight",
+                 "reflection", "handoff", "pattern", "seed"):
+        check(f"a {kind} needs no decider",
+              kgate("gate-capture", {"session_id": "k-cap", "cwd": KCWD,
+                                     "tool_name": "mcp__korium__agent_capture",
+                                     "tool_input": {"source_agent": "x", "thought_type": kind}}),
+              "allow")
+        check(f"a {kind} under another name is still refused",
+              kgate("gate-capture", {"session_id": "k-cap", "cwd": KCWD, "agent_name": "zeina",
+                                     "tool_name": "mcp__korium__agent_capture",
+                                     "tool_input": {"source_agent": "thiago", "thought_type": kind}}),
+              "deny")
+    # The name rule still holds for a complete decision.
+    check("a complete decision under another name is refused",
+          cap_gate("zeina", "thiago", {"thought_type": "decision", **DECIDER, **REPLACES_NONE}),
+          "deny")
+    check("a complete decision re-filed with captured_by goes through",
+          cap_gate("zeina", "thiago", {"thought_type": "decision", "captured_by": "zeina",
+                                       **DECIDER, **REPLACES_NONE}), "allow")
+    check("captured_by does not excuse a decision with no decider",
+          cap_gate("zeina", "thiago", {"thought_type": "decision", "captured_by": "zeina"}),
+          "deny")
+    for value in ("off", "0", "false", "no"):
+        check(f"MASTHEAD_CAPTURE_GATE={value}: a bare decision goes through",
+              decision(None, {}, {"MASTHEAD_CAPTURE_GATE": value}), "allow")
 
     print("\n--- the brief checks answer together, in one decision ---")
     # agent-brief-gates.sh runs the one brief check, the model option and the

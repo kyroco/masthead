@@ -433,7 +433,7 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 <h3>On or off with an install option</h3>
 <div class="tablewrap"><table>
 <tr><th>Check</th><th>Option</th><th>Refuses</th></tr>
-<tr><td><code>engram-protocol.sh</code></td><td>Connect Korium memory</td><td>the first edit before a memory search; a finish with nothing saved; a capture filed under another agent's name</td></tr>
+<tr><td><code>engram-protocol.sh</code></td><td>Connect Korium memory</td><td>the first edit before a memory search; a finish with nothing saved; a capture filed under another agent's name; a decision saved with no word on who decided or what it replaces</td></tr>
 <tr><td><code>capture-finding-reminder.py</code></td><td>Connect Korium memory</td><td>nothing; reminders only</td></tr>
 <tr><td><code>korium-index-on-stop.sh</code> and the code index gates in <code>engram-protocol.sh</code></td><td>Keep a code index in Korium</td><td>a grep for a name the code index holds until the index is asked (and every grep while korium-cli is signed out or Korium does not answer), a search that repeats a name it just answered, and, once, a whole-file read of a file it just placed; the index refresh at the end of a session refuses nothing</td></tr>
 <tr><td><code>commit-attribution-gate.py</code></td><td>Keep AI attribution out of commits</td><td>a commit message or pull request body with an AI co-author line, a session link or a generated-with footer</td></tr>
