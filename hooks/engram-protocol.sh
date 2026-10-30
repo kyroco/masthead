@@ -390,7 +390,7 @@ EOF
         exit 0
       fi
       if [ "$(field '.tool_input | (.relations | if type == "array" then any(.[]; type == "object" and .relation_type == "supersedes") else false end) or ((.metadata | if type == "object" then .replaces else null end) == "none")')" != "true" ]; then
-        deny_tool "A decision saved to Korium must say what it replaces. Search what is adopted (agent_search with stance \"position\" and limit 20), then list every record this one replaces in relations, each as {\"target_id\": \"<id>\", \"relation_type\": \"supersedes\"}. If it replaces nothing, state that with metadata {\"replaces\": \"none\"}. MASTHEAD_CAPTURE_GATE=off in the operator's environment turns this gate off."
+        deny_tool "A decision saved to Korium must say what it replaces. Search what is adopted (agent_search with stance \"position\" and limit 10), then list every record this one replaces in relations, each as {\"target_id\": \"<id>\", \"relation_type\": \"supersedes\"}. If it replaces nothing, state that with metadata {\"replaces\": \"none\"}. MASTHEAD_CAPTURE_GATE=off in the operator's environment turns this gate off."
         exit 0
       fi
     fi

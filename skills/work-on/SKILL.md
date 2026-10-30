@@ -53,7 +53,7 @@ and list in the PR body each check the repo lacks. The `verifier` and
 Search Korium before each step and before each change, not only at the start:
 `agent_search` for what the step is about, and `code_locate` (with the `repo`
 value from `CLAUDE.md`) for code you are about to read or change. For what is
-adopted, use `stance: "position"` with a `limit` of 20, so a ruling that ranks
+adopted, use `stance: "position"` with a `limit` of 10, so a ruling that ranks
 low is still read. Every other `agent_search` takes a `limit` of 5: each hit comes
 back whole, and at the default of 10 one search has filled 40,000 characters.
 Use what comes back, and put this rule in every subagent brief except the verifier's
