@@ -268,7 +268,7 @@ review is the guard against intent.
 
 | Check | Option | Refuses |
 |---|---|---|
-| `engram-protocol.sh` | Connect Korium memory | the first edit before a memory search; a finish with nothing saved; a capture filed under another agent's name; a decision saved with no word on who decided or what it replaces |
+| `engram-protocol.sh` | Connect Korium memory | the first edit before a memory search; a finish with nothing saved; a capture filed under another agent's name; a decision saved with no `decided_by` field, or with no word on what it replaces (it checks the field is there, not who it names) |
 | `capture-finding-reminder.py` | Connect Korium memory | nothing; reminders only |
 | `korium-index-on-stop.sh` and the code index gates in `engram-protocol.sh` | Keep a code index in Korium | a grep for a name the code index holds until the index is asked (and every grep while korium-cli is signed out or Korium does not answer), a search that repeats a name it just answered, and, once, a whole-file read of a file it just placed; the index refresh at the end of a session refuses nothing |
 | `commit-attribution-gate.py` | Keep AI attribution out of commits | a commit message or pull request body with an AI co-author line, a session link or a generated-with footer |
