@@ -78,8 +78,8 @@ order. The steps live here and nowhere else; a repo supplies only its own facts
 2. Send the first verification of the finished diff in one message, so they
    run blind and at the same time: one `verifier` per scenario, given the
    scenario, the decision-record lines it rests on, the README's opening
-   paragraph, the abilities line and the mockup page the scenario rests on
-   where there is one, the diff and both lists;
+   paragraph, the mockup page the scenario rests on where there is one, the
+   diff and both lists;
    where the diff adds or edits text a customer reads (screen text, a refusal
    sentence, the site's docs, the changelog), every sentence of it is a claim
    of the scenario it belongs to. Add the `security-reviewer` when
@@ -90,9 +90,9 @@ order. The steps live here and nowhere else; a repo supplies only its own facts
 3. Send the `adjudicator` the commit range, the reviewed files (the files the
    change touched before its first verification, the same list on every
    round), the path of every findings file the round wrote, the README's
-   opening paragraph, and each scenario with the decision-record lines and
-   abilities line it rests on, and nothing else: not your claims, not your
-   did-not-prove list, not your view of any finding. It reads the code along
+   opening paragraph, and each scenario with the decision-record lines it
+   rests on, and nothing else: not your claims, not your did-not-prove list,
+   not your view of any finding. It reads the code along
    each verifier's path, decides whether the finding holds, and places it:
    fix in this PR, or an extra. That placement is final for you and the
    foreman. What it throws out is gone: it is not logged or filed. Judge its

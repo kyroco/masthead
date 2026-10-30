@@ -108,8 +108,8 @@ higher. The rest is dropped, not filed.
 
 When a worker thinks it's done, it doesn't grade its own work. For each
 scenario it sends one verifier the scenario, the decision lines it rests on,
-the README's opening paragraph on who uses the product, the abilities line
-and the mockup page the scenario rests on, the diff, and two lists: what it
+the README's opening paragraph on who uses the product, the mockup page the
+scenario rests on, the diff, and two lists: what it
 claims works and what it could not prove. Nothing else: not its notes, not
 an earlier review. The verifier assumes the code is wrong and tries to prove
 it, with every way a change goes wrong as its methods: a write that fails
