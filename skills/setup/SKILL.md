@@ -18,7 +18,7 @@ Quietly gather these, with commands that read and change nothing:
 - The repository: its name from `git remote -v`, and whether it has commits.
 - Facts already set: read `.claude/settings.json` and
   `.claude/settings.local.json` for an `env` block with `PROJECT_PUSH_CHECK`,
-  `PROJECT_STATE_DIR`, `ADR_DIR` or `PROJECT_ABILITIES`. If Masthead was set up before, say so and
+  `PROJECT_STATE_DIR` or `ADR_DIR`. If Masthead was set up before, say so and
   offer to change answers rather than starting over.
 - A test command, from the files present: `package.json` with a `test` script
   means `npm test`; `mix.exs` means `mix test`; `Cargo.toml` means
@@ -97,35 +97,17 @@ fixed shape (why it aligns with the project's principles, what counts as done,
 and a checked list of factual claims)?" On yes, add `"ADR_DIR": "<folder>"` to
 the env block.
 
-## 6b. Abilities files, only if you found one
-
-Look for abilities files whether or not you found a records folder: decision
-records may live in a wiki while their abilities files sit in the repository
-(YAML with `record`, `roles` and `lines`, one per decision record). If you
-find any, ask: "Should a push be refused when an abilities file has a bad line
-or its page was edited by hand?" On yes, add
-`"PROJECT_ABILITIES": "<the file or its folder>"` to the env block. The check
-reads YAML with PyYAML, which a fresh Mac lacks; step 7 installs it once the
-person says yes to writing.
-
 ## 7. Write, then show what is on
 
 Show the exact env block and the file it goes to, and ask "Shall I write
-this?" When the block holds `PROJECT_ABILITIES`, say that yes also installs
-PyYAML for the abilities check. On yes, merge it into the file (keep
-everything already there), and when it holds `PROJECT_ABILITIES` run
-`python3 "${CLAUDE_PLUGIN_ROOT}/hooks/abilities.py" install-yaml`. It installs
-PyYAML for the `python3` the push gate runs (Homebrew's Python refuses a plain
-`pip install`, so it retries into the user's own folder), or prints the one
-command that does; show that command to the person if it failed. If
+this?" On yes, merge it into the file (keep everything already there). If
 `.claude/state/` is not in `.gitignore`, ask whether to add it; Masthead keeps
 its small working files there.
 
 Finish with a table: each guard rail, on or off, and the one way to change it.
 Keep it to the rails this repository has: dangerous-command and secret
 refusals (always on), blind review (always on), push check (on if set), memory
-(on if connected), decision records (on if a folder was named), abilities
-check (on if a file or folder was named). Then name the
+(on if connected), decision records (on if a folder was named). Then name the
 four install options and their defaults, because a terminal install never
 asked them: connect Korium memory (off), keep a code index in Korium (off),
 keep AI attribution out of commits (on), ask for a reason before a helper runs

@@ -10,13 +10,25 @@ effort: medium
 # Runaway guard, not a budget. Over the 30 days to 2026-10-09 the longest run of
 # any of the four agents was 156 turns and 99% ended under 111.
 maxTurns: 200
-tools: Read, Glob, Grep, Bash, mcp__korium, mcp__claude_ai_korium
+# ToolSearch is listed because Korium's tools can arrive deferred: an agent
+# cannot call them until ToolSearch loads them.
+tools: Read, Glob, Grep, Bash, ToolSearch, mcp__korium, mcp__claude_ai_korium
 disallowedTools: Write, Edit, MultiEdit, NotebookEdit, Agent, WebFetch, WebSearch
 ---
 
 Follow shared actions in `${CLAUDE_PLUGIN_ROOT}/references/agent-preamble.md`.
 
 You find the cause. You do not fix it.
+
+## Before anything else: load your tools
+
+Load your Korium tools with `ToolSearch` and the query
+`select:mcp__korium__agent_search,mcp__korium__code_locate,mcp__korium__agent_capture,mcp__claude_ai_korium__agent_search,mcp__claude_ai_korium__code_locate,mcp__claude_ai_korium__agent_capture`,
+in one call. A session reaches Korium either through the local `korium`
+server or through the claude.ai connector, so only one set comes back; use
+that one. When they are already loaded, or your session offers no
+`ToolSearch`, call them directly. Load any other Korium tool you need the same way, by its
+two names, before you call it.
 
 ## Reproduce first
 

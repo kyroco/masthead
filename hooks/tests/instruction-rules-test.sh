@@ -590,6 +590,19 @@ says  skills/review-design/SKILL.md "The PR body lists each page and the templat
 says  skills/work-on/foreman.md "the review-design PR lists them"
 never scripts/diagrams.py "the foreman's plan, one table"
 never docs/images/day-4-plan.svg "effort"
+# Issue #9: step 10 of Opening a PR hands the remote branch to the user,
+# since the irreversible-action gate refuses every way a session deletes one.
+says  references/session-cliffs.md "delete the branch locally, and name the remote branch for the user to delete"
+never references/session-cliffs.md "locally and on the remote"
+never references/session-cliffs.md "push origin --delete"
+never references/session-cliffs.md "refs/heads"
+# Issue #55: no tracked file names the removed check, its setting, its script or
+# the library it needed. The words are split so this file names none of them.
+named="$(git -C "$ROOT" grep -il -w -e "abil""ities" -e "PROJECT_ABIL""ITIES" -e "Py""YAML" -- .)"
+case $? in
+  1) pass=$((pass + 1)) ;;
+  *) fail=$((fail + 1)); printf 'FAIL these still name the removed check: %s\n' "$named" ;;
+esac
 
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
