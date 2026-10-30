@@ -94,9 +94,11 @@ branch tied to its issue. Each worker reads its issue, the README and the
 decision record cover to cover, looks up what earlier sessions learned, and
 builds. It writes no plan and waits for no go: the design was reviewed
 before the issues were written, and the verifier checks each scenario once
-the code exists. A worker is done when every scenario has a test that
-passes, the screens the issue touches work, the push check passes and the
-pull request is open. Then it stops.
+the code exists. Where a mockup page has become a template in the app, the
+worker starts that screen from the template and keeps its words and layout.
+A worker is done when every scenario has a test that passes, the screens the
+issue touches work, the push check passes and the pull request is open. Then
+it stops.
 
 ![Three workers, each with its own session and its own copy of the repository](docs/images/day-5-workers.svg)
 
