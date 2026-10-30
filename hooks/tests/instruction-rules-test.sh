@@ -35,7 +35,7 @@ never() {
 }
 
 # Issue #57: a search for what is adopted reads wider than any other search.
-says  skills/work-on/SKILL.md 'For what is adopted, use `stance: "position"` with a `limit` of 20'
+says  skills/work-on/SKILL.md 'For what is adopted, use `stance: "position"` with a `limit` of 10'
 says  skills/work-on/SKILL.md 'Every other `agent_search` takes a `limit` of 5'
 
 # 1. Slicing.
@@ -99,7 +99,7 @@ never docs/explainer.html "writes a plan, one line per scenario"
 never docs/explainer.html "its plan, one line per scenario"
 never docs/images/day-5-workers.svg "its plan, one line per scenario"
 never scripts/diagrams.py "its plan, one line per scenario"
-says  .claude-plugin/plugin.json '"version": "0.1.16"'
+says  .claude-plugin/plugin.json '"version": "0.1.17"'
 
 never_phrase() {
   local hit
