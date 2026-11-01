@@ -132,4 +132,5 @@ memory holds up saving for the whole account. All of them are `thought_type`
    finding thrown away; the author never sees these.
 
 When they are saved, return the verdict memory's thought id. If a save failed,
-say which finding it was.
+say which finding it was. A thrown-out finding whose save failed is counted,
+never named, since your final message reaches the author.
