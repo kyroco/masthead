@@ -485,6 +485,9 @@ def main():
                   "return the verdict memory's thought id"):
         check(f"the adjudicator's capture section says: {words}",
               str(words in " ".join(capture_section.split())), "True")
+    check("a failed save of a thrown-out finding is reported as a count",
+          str("A thrown-out finding whose save failed is counted, never named"
+              in " ".join(capture_section.split())), "True")
     check("the adjudicator is no longer told to save the verdict whole",
           str("Capture the verdict to Korium" in capture_section), "False")
 
