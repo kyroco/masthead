@@ -450,6 +450,29 @@ def main():
     check("the operator's capture escape covers the length",
           str("deny" in sized_raw("x" * 2001, env={"MASTHEAD_CAPTURE_GATE": "off"})), "False")
 
+    # With no jq the hook reads no field, so the length rule must count another way.
+    NO_JQ = tempfile.mkdtemp(prefix="capture-no-jq-")
+    for tool in ("bash", "cat", "id", "mkdir", "chmod", "dirname", "python3"):
+        os.symlink(os.path.realpath(shutil.which(tool)), os.path.join(NO_JQ, tool))
+    no_jq = {"PATH": NO_JQ}
+    out = sized_raw("x" * 2001, "adjudicator", no_jq)
+    check("no jq: 2,001 characters is refused", str("deny" in out), "True")
+    check("no jq: the refusal says to split it and how to link the pieces",
+          str("Split" in out and "2,001" in out and "supports" in out), "True")
+    check("no jq: the refusal is one JSON answer Claude Code can read",
+          str(out.count("permissionDecisionReason") == 1
+              and json.loads(out)["hookSpecificOutput"]["permissionDecision"] == "deny"
+              if out else False), "True")
+    check("no jq: 2,000 characters goes through",
+          str("deny" in sized_raw("x" * 2000, "adjudicator", no_jq)), "False")
+    check("no jq: characters are counted, not bytes",
+          str("deny" in sized_raw("é" * 2000, "adjudicator", no_jq)), "False")
+    check("no jq: content that is not text is left to Korium",
+          str("deny" in sized_raw(["x"] * 3000, "adjudicator", no_jq)), "False")
+    check("no jq: the operator's capture escape still stands the rule down",
+          str("deny" in sized_raw("x" * 2001, "adjudicator",
+                                  {**no_jq, "MASTHEAD_CAPTURE_GATE": "off"})), "False")
+
     print("\n--- the adjudicator saves one memory per finding ---")
     # Issue #63: what the agent is told to do, read from the file it runs on, since
     # nothing in this suite can run the model.
