@@ -48,4 +48,9 @@ File captures under your own agent name without the plugin prefix: as
 colon. To re-file a capture another agent
 failed to save, keep its `source_agent` and set `captured_by` to your name.
 
+Keep each capture's `content` to 2,000 characters or less; the capture gate
+refuses a longer one. Split a longer report into the claims it makes: one short
+memory first, then each claim as its own memory with a `supports` relation to
+that first one.
+
 </preamble>

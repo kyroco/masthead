@@ -368,8 +368,7 @@ def main():
     # ADR-0120: source_agent is the one field that answers who decided this.
     # MEASURED on 1434 real captures from 2026-08-20: this refuses 0 of them when
     # the name matches and 1076 when it does not, which is the separation the
-    # length and importance rules could not produce. Those are not enforced and
-    # the reason is in the hook's own comment.
+    # length and importance rules could not produce as a test of who wrote it.
     def cap_gate(agent, source, extra=None):
         ti = {"source_agent": source, "content": "x",
               "thought_type": "insight", "importance": 0.6}
@@ -416,6 +415,55 @@ def main():
                                  "tool_name": "mcp__korium__agent_capture",
                                  "tool_input": {"source_agent": "thiago"}},
                 {"MASTHEAD_CAPTURE_GATE": "off"}), "allow")
+
+    print("\n--- a capture is short enough to be one memory ---")
+    # Issue #63: a 7,339 character verdict took 12.5 seconds to embed and blocked
+    # the account's drain for two hours.
+    def sized_raw(content, agent=None, env=None, extra=None):
+        ti = {"source_agent": agent or "main", "content": content,
+              "thought_type": "insight", "importance": 0.6}
+        ti.update(extra or {})
+        p = {"session_id": "k-cap", "cwd": KCWD,
+             "tool_name": "mcp__korium__agent_capture", "tool_input": ti}
+        if agent:
+            p["agent_name"] = agent
+        return kgate_raw("gate-capture", p, env)
+
+    for who in (None, "adjudicator"):
+        label = who or "main session"
+        check(f"{label}: 2,000 characters goes through",
+              str("deny" in sized_raw("x" * 2000, who)), "False")
+        out = sized_raw("x" * 2001, who)
+        check(f"{label}: 2,001 characters is refused", str("deny" in out), "True")
+        check(f"{label}: the refusal says to split it and how to link the pieces",
+              str("Split" in out and "2,001" in out and "supports" in out), "True")
+        check(f"{label}: the 7,339 character verdict is refused",
+              str("deny" in sized_raw("x" * 7339, who)), "True")
+    check("characters are counted, not bytes",
+          str("deny" in sized_raw("é" * 2000)), "False")
+    check("a long decision is refused for its length even when complete",
+          str("Split" in sized_raw("x" * 2001, extra={
+              "thought_type": "decision", "decided_by": {"name": "robert"},
+              "metadata": {"replaces": "none"}})), "True")
+    check("content that is not text is left to Korium",
+          str("deny" in sized_raw(["x"] * 3000)), "False")
+    check("the operator's capture escape covers the length",
+          str("deny" in sized_raw("x" * 2001, env={"MASTHEAD_CAPTURE_GATE": "off"})), "False")
+
+    print("\n--- the adjudicator saves one memory per finding ---")
+    # Issue #63: what the agent is told to do, read from the file it runs on, since
+    # nothing in this suite can run the model.
+    with open(os.path.join(os.path.dirname(PROTOCOL), "..", "agents", "adjudicator.md")) as fh:
+        capture_section = fh.read().split("## Capture", 1)[1]
+    for words in ("one short verdict memory",
+                  "its own memory",
+                  '"relation_type": "supports"',
+                  "2,000 characters",
+                  "return the verdict memory's thought id"):
+        check(f"the adjudicator's capture section says: {words}",
+              str(words in " ".join(capture_section.split())), "True")
+    check("the adjudicator is no longer told to save the verdict whole",
+          str("Capture the verdict to Korium" in capture_section), "False")
 
     print("\n--- a decision names who decided and what it replaces ---")
     # Issue #57: Korium answers what is adopted only when a decision says who

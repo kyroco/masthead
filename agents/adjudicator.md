@@ -115,6 +115,21 @@ Every finding you were handed ends up in one of these, or merged into one.
 
 ## Capture
 
-Capture the verdict to Korium and return the thought id. Add one section the
-author never sees: each thrown-out finding's id, its `file:line`, and one line
-on why, so a round can be checked for a real finding thrown away.
+Save the round as several memories, never one. Keep each one's `content` to
+2,000 characters or less: the capture gate refuses a longer one, because a long
+memory holds up saving for the whole account. All of them are `thought_type`
+`insight`, and each carries the commit range and round in `metadata`.
+
+1. Capture one short verdict memory first: the commit range, the round, the
+   checklist, and how many findings went to fix, extras, the foreman and thrown
+   out. No finding goes in it.
+2. Capture each finding as its own memory, with the details your verdict gives
+   it and where it went, and link it to the verdict with `relations`:
+   `[{"target_id": "<the verdict memory's id>", "relation_type": "supports"}]`.
+   Every fix, extra and For the foreman item gets one, and so does each
+   thrown-out finding. A thrown-out finding's memory holds its id, its
+   `file:line`, and one line on why, so a round can be checked for a real
+   finding thrown away; the author never sees these.
+
+When they are saved, return the verdict memory's thought id. If a save failed,
+say which finding it was.
