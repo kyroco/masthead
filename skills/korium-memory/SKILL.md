@@ -51,7 +51,7 @@ Five fields are required.
 
 | Field | Rule |
 |---|---|
-| `content` | Non-empty memory content. Respect the live service's payload limit and any size refusal. |
+| `content` | Non-empty memory content, 2,000 characters at most: the capture gate refuses a longer one. Respect the live service's payload limit and any size refusal. |
 | `thought_type` | One of the eleven below. Nothing else is accepted. |
 | `source_agent` | The agent recording it. Use its real working name, not the human who approved the decision. |
 | `source_phase` | What kind of work this was: `research`, `build`, `review`. Same shape. |
@@ -173,7 +173,8 @@ saving is paused.
 - Do not save at the end of a session only. The decision you can still explain is
   the one you made an hour ago, not the one from this morning.
 - Do not paste a document in and call it a memory. Split it into the claims it
-  makes and link those.
+  makes and link those: one short memory first, then each claim with a `supports`
+  relation to it.
 - Do not give everything importance 0.5. It is the same as giving nothing an
   importance.
 - Do not write a memory that only makes sense if you were there. Name the thing,
