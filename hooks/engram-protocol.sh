@@ -384,9 +384,22 @@ EOF
     case "${MASTHEAD_CAPTURE_GATE:-}" in off|0|false|no) exit 0 ;; esac
 
     # Issue #63: a 7,339 character verdict took 12.5 seconds to embed and blocked the account's drain for two hours. Any session or agent; content that is not text is left to Korium to refuse.
-    size="$(field '.tool_input.content | if type == "string" then length else 0 end')"
+    # With no jq, field reads nothing and deny_tool prints nothing, so python3 does both here and this rule still holds.
+    if command -v jq >/dev/null 2>&1; then
+      size="$(field '.tool_input.content | if type == "string" then length else 0 end')"
+    else
+      size="$(printf '%s' "$payload" | python3 -I -c 'import json, sys
+content = json.load(sys.stdin)["tool_input"]["content"]
+print(len(content) if isinstance(content, str) else 0)' 2>/dev/null)"
+    fi
     if [ "${size:-0}" -gt 2000 ]; then
-      deny_tool "This capture's content is $(printf '%d,%03d' $((size / 1000)) $((size % 1000))) characters, and the limit is 2,000. Split it into the claims it makes, one memory each. Save one short memory first, then give each of the others a relation to it: {\"target_id\": \"<its id>\", \"relation_type\": \"supports\"}. MASTHEAD_CAPTURE_GATE=off in the operator's environment turns this gate off."
+      reason="This capture's content is $(printf '%d,%03d' $((size / 1000)) $((size % 1000))) characters, and the limit is 2,000. Split it into the claims it makes, one memory each. Save one short memory first, then give each of the others a relation to it: {\"target_id\": \"<its id>\", \"relation_type\": \"supports\"}. MASTHEAD_CAPTURE_GATE=off in the operator's environment turns this gate off."
+      if command -v jq >/dev/null 2>&1; then
+        deny_tool "$reason"
+      else
+        python3 -I -c 'import json, sys
+print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": sys.argv[1]}}))' "$reason"
+      fi
       exit 0
     fi
 
