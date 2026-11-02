@@ -120,6 +120,15 @@ tree = os.path.join(tempfile.mkdtemp(prefix="tracker-tree-"), "wt")
 subprocess.run(["git", "-C", main, "worktree", "add", "-q", tree], check=True)
 expect("worker's shell in a worktree", ask(tree, "--tracker", project=False), "linear")
 
+# Review round 1: a worktree made under git's worktree.useRelativePaths keeps
+# relative links; it still reads the main checkout's answer. (A git older
+# than 2.48 ignores the setting and makes absolute links, so this passes there.)
+rel = os.path.join(os.path.dirname(main), os.path.basename(main) + "-rel")
+subprocess.run(["git", "-C", main, "-c", "worktree.useRelativePaths=true",
+                "worktree", "add", "-q", rel], check=True)
+expect("worker's shell in a relative-link worktree", ask(rel, "--tracker", project=False), "linear")
+expect("relative-link worktree, session set", ask(rel, "--tracker"), "linear")
+
 # A checkout that is not the session's repository supplies no facts.
 other = repo()
 settings(other, {"ISSUE_TRACKER": "linear"})
