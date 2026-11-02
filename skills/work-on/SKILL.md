@@ -1,12 +1,12 @@
 ---
 name: work-on
-description: Work on GitHub issues, one session per issue. /work-on #1418 makes this session the worker for that one issue in this repo, from worktree to one PR. /work-on foreman makes this session the foreman and then asks what to run (a project, milestone or issue numbers); /work-on <project or milestone> does the same with the work already named. The foreman proposes a plan, the user decides how many workers run at once, and each issue runs in a fresh session of its own (a desktop session in the Claude desktop app, a background session in the terminal) through to merge. Run it from the repo the issue lives in.
+description: Work on GitHub or Linear issues, one session per issue. /work-on #1418, or a Linear key such as /work-on KOR-12, makes this session the worker for that one issue in this repo, from worktree to one PR. /work-on foreman makes this session the foreman and then asks what to run (a project, milestone or issue numbers); /work-on <project or milestone> does the same with the work already named. The foreman proposes a plan, the user decides how many workers run at once, and each issue runs in a fresh session of its own (a desktop session in the Claude desktop app, a background session in the terminal) through to merge. Run it from the repo the issue lives in.
 disable-model-invocation: true
 ---
 
 # Work on an issue
 
-One session works on one GitHub issue. Starting hundreds of short sessions is
+One session works on one issue, on GitHub or in Linear. Starting hundreds of short sessions is
 fine; one session carrying several issues drifts.
 
 ## What you typed decides the role
@@ -19,6 +19,11 @@ Read the text typed after `/work-on`:
   `dispatched` means you write no sheet and build through to the PR without
   waiting for a go; a question the issue, its ADR, the architecture doc, the
   mockups and Korium do not answer goes to your foreman. Read `worker.md`.
+- **A Linear key** such as `KOR-12` (the team's key, which may hold
+  letters and digits, such as `K8S-12`, then a hyphen and a number), in a repo whose issues live in Linear: the same as `#1418`, so you
+  are the worker for that issue, and `KOR-12 dispatched` makes a dispatched
+  worker, the same as `#1418 dispatched`. A key is never read as a project or
+  milestone name. Read `worker.md`, and its **On Linear** section.
 - **`foreman`** on its own: you are the **foreman**, with no work yet. Say so
   in one line and ask what to run: a project, a milestone, issue numbers, or a
   mix, in words or GitHub links, now or later in this session. Read

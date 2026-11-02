@@ -140,7 +140,8 @@ order. The steps live here and nowhere else; a repo supplies only its own facts
 9. Push and open one PR to main. Its body gives the unproven list, the
    extras brought to the user, the agent-run count (the rows added to
    `<state>/dispatches.tsv` for this issue whose outcome is not refused), and
-   `Fixes #<issue>`. Never
+   `Fixes #<issue>`, or `Fixes <key>`, such as `Fixes KOR-12`, when the
+   issue lives in Linear. Never
    commit or push to main: main changes only by merging the reviewed PR once
    its checks are green.
 10. Once it merges, clean up what your own work created, from the main
