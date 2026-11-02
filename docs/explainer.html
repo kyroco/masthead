@@ -380,7 +380,7 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 <p>The whole time, a set of small checks runs underneath. Nobody, not a worker, not a verifier, not Claude in a hurry, reads a secret, force-pushes, pushes untested code, or sends a verifier a brief with no claims to check. You don't see those checks unless one says no, and when it does, it says why and what to do instead.</p>
 
 <h3>One issue on its own</h3>
-<p><code>/work-on #123</code> does the same for a single issue with you as the foreman. The worker tells you in a few lines what it will build and waits for your go.</p>
+<p><code>/work-on #123</code> does the same for a single issue with you as the foreman. The worker tells you in a few lines what it will build and waits for your go. In a repository whose issues live in Linear, name the issue by its key: <code>/work-on KOR-12</code>.</p>
 
 <h2>Installing it</h2>
 <p>Open Claude Code in a repository and run these two inside the session, not in a terminal, because only the in-session install asks you the four install options (a terminal install takes the defaults silently):</p>

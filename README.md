@@ -177,7 +177,8 @@ what to do instead.
 
 `/work-on #123` does the same for a single issue with you as the foreman.
 The worker tells you in a few lines what it will build and waits for your
-go.
+go. In a repository whose issues live in Linear, name the issue by its key:
+`/work-on KOR-12`.
 
 ## Install
 

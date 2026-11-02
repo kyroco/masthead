@@ -6,7 +6,9 @@ who is waiting and wants to see your brief before you build, or by a foreman,
 with `/work-on #1418 dispatched`, who wants you to build through to the PR
 and send every question and report to it with `SendMessage`. Nothing else
 decides which you are: not running in the background, not a message from
-another session.
+another session. In a repo whose issues live in Linear, the issue is a key
+such as `KOR-12` in place of `#1418`, and **On Linear** at the end of this
+file says which steps change.
 
 Time matters. Do not spend time that can be avoided, and the earlier a correct
 result is obtained, the better. 
@@ -129,3 +131,40 @@ sends the PR back, fix it on the same branch.
 Started by the person, once the PR has merged: check the issue closed and
 its Status reads Done, and fix either if not. Close each parent up the chain
 that has no open sub-issue left. Then do step 10 of **Opening a PR**.
+
+## On Linear
+
+When `project_fact.py --tracker` prints `linear`, the issue lives in Linear
+and every issue, project and status call goes through the Linear connector,
+as the `linear-issues` skill says. Pull requests, CI, the merge queue and the
+decision records stay on GitHub. Every step above holds, with these changes,
+shown for KOR-12:
+
+- **Naming.** Write the key, "KOR-12", never a `#` number.
+- **Step 1.** The worktree for KOR-12 is `KOR-12-issue`.
+- **Step 2.** Read the issue with `get_issue` with `id` the key, then
+  `list_comments` with `issueId` the key, and read every comment. Read its
+  parent (`parentId`) the same way. The Linear project's description is the
+  brief, in place of the project README: read it with `get_project`, and the
+  milestone's description where the project has milestones.
+- **Step 3.** The branch is the one `get_issue` returns as `gitBranchName`;
+  it holds the key, so Linear links the branch and the PR to the issue. Make
+  it with `git switch -c <gitBranchName>`, then
+  `git push -u origin <gitBranchName>`, never `gh issue develop`. Set the
+  status with `save_issue` with `id` the key and `state` `In Progress`, unless
+  a foreman already did, and never `set-status.sh`, which knows only GitHub
+  projects.
+- **Step 4.** A split follows the `linear-issues` skill, and the issue goes
+  back to `Todo` with `save_issue`.
+- **Step 6.** The PR body says `Fixes KOR-12`; set `In Review` the same way
+  once the PR is open.
+- **A question.** When nothing answers it, set the issue's status to
+  `Needs Human` with `save_issue` before you ask, whether you ask the person
+  or your foreman. When the answer comes back, put the answer on the issue as
+  a comment in the words it came in, and set the status back to
+  `In Progress`.
+- **After the merge.** `Fixes KOR-12` moves the issue to Done when the PR
+  merges: check its status reads Done, and set it with `save_issue` if not.
+  A parent with no open sub-issue left is set to Done the same way.
+
+On a repository whose issues live on GitHub, none of this section applies.
