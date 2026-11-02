@@ -15,6 +15,10 @@ file before they say yes to it. If they say "skip" to any question, skip it.
 
 Quietly gather these, with commands that read and change nothing:
 
+- Whether this session is in a worktree: `git rev-parse --git-dir` and
+  `git rev-parse --git-common-dir` print different folders. Masthead reads a
+  repository's settings from its main checkout only, so answers written in a
+  worktree would never be read. Say so, ask the person to run `/masthead:setup` from the repository's main checkout, and stop.
 - The repository: its name from `git remote -v`, and whether it has commits.
 - Facts already set: read `.claude/settings.json` and
   `.claude/settings.local.json` for an `env` block with `PROJECT_PUSH_CHECK`,
@@ -80,6 +84,12 @@ with one of them at a time, never both."
 - Linear: ask "What is the Linear team's key, the letters before the number in
   an issue like KOR-12?" Then add `"ISSUE_TRACKER": "linear"` and
   `"LINEAR_TEAM_KEY": "<the key>"` to the env block.
+
+Write both to the file the first question chose. When that is the shared
+file, also remove both from settings.local.json, so no older personal answer
+outranks it. When it is "just me", leave the shared file alone: their own
+answer wins on their machine only, and say so when the shared file names a
+different tracker.
 
 When the answer changes an earlier one, say that open issues in the old tracker
 do not move by themselves, and that every Masthead skill follows the new
