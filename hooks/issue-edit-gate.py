@@ -603,10 +603,12 @@ def record_linear(data, tool_input):
     answer gives, so a later edit by either finds it. An issue whose
     description is empty (null, or left out of a full answer) is kept as an
     empty text: there is nothing in it to lose. A get_issue that asked for
-    fields without the description keeps nothing, since it did not read it."""
+    fields without the description, and a save_issue answered without one,
+    keep nothing, since neither read it."""
     response = data.get("tool_response")
     issue = answered_issue(response, "description")
-    if issue is None and not tool_input.get("fields"):
+    full_read = LINEAR_READ.match(data.get("tool_name") or "") and not tool_input.get("fields")
+    if issue is None and full_read:
         issue = answered_issue(response, "id")
     if issue is None:
         return
