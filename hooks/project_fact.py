@@ -98,6 +98,9 @@ def main_checkout(root):
             return None
         with open(os.path.join(record, "gitdir")) as handle:
             back = handle.read().strip()
+        # git's worktree.useRelativePaths writes this link relative to the record.
+        if not os.path.isabs(back):
+            back = os.path.join(record, back)
         if os.path.realpath(back) != os.path.realpath(marker) or \
                 os.path.realpath(os.path.dirname(back)) != os.path.realpath(root):
             return None
