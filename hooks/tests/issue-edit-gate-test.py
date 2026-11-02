@@ -243,6 +243,140 @@ def main():
         ("record mode never refuses", None, "allow", dict(no_gh, raw=edit(drop_said), mode="record")),
     ]
 
+    # The same edits through the Linear connector (MAST-4). Linear has no gh,
+    # so the old description is always the one this session last read with
+    # get_issue or wrote with save_issue.
+    save = "mcp__Linear__save_issue"
+    get = "mcp__Linear__get_issue"
+
+    def linear(tool, session="test-issue-edit-gate", response=None, **fields):
+        payload = {"session_id": session, "tool_name": tool, "tool_input": fields}
+        if response is not None:
+            payload["tool_response"] = response
+        return json.dumps(payload)
+
+    def issue(description, key="MAST-4", uuid="bb43ac5c-4ef8-4cbc-a6cb-60bcf3bfbb25"):
+        return as_text({"id": key, "uuid": uuid, "title": "t", "description": description})
+
+    got_4 = linear(get, id="MAST-4", response=issue(OLD))
+    got_4_lower = linear(get, id="mast-4", response=issue(OLD))
+    got_4_by_uuid = linear(get, id="bb43ac5c-4ef8-4cbc-a6cb-60bcf3bfbb25", response=issue(OLD))
+    got_4_list = linear(get, id="MAST-4", response=[{"type": "text", "text": json.dumps(
+        {"id": "MAST-4", "uuid": "bb43ac5c-4ef8-4cbc-a6cb-60bcf3bfbb25", "description": OLD})}])
+    got_5 = linear(get, id="MAST-5", response=issue(OLD, key="MAST-5", uuid="0000"))
+    got_4_other_session = linear(get, session="another-session", id="MAST-4", response=issue(OLD))
+    saved_4 = linear(save, id="MAST-4", description=OLD, response=issue(OLD))
+    saved_4_status = linear(save, id="MAST-4", state="Todo", response=issue(OLD))
+    created_6 = linear(save, team="Masthead", title="t", description=OLD,
+                       response=issue(OLD, key="MAST-6", uuid="1111"))
+    said = 'Robert said "one thing should get me account statuses".'
+    bullet = '- "the code shouldn\'t know who to call to read and who to update"\n'
+
+    tag = '<issue id="9f1c" href="https://linear.app/kyroco/issue/KYR-1/x">KYR-1</issue>'
+    keyed_plain = OLD.replace("None open.", 'Robert said "fix it the way KYR-1 did".')
+    keyed_tagged = keyed_plain.replace("KYR-1", tag)
+    got_keyed = linear(get, id="MAST-4", response=issue(keyed_tagged))
+    got_null = linear(get, id="MAST-4", response=as_text({"id": "MAST-4", "uuid": "u", "description": None}))
+    got_missing = linear(get, id="MAST-4", response=as_text({"id": "MAST-4", "uuid": "u", "title": "t"}))
+    got_fields = linear(get, id="MAST-4", fields=["id", "title"],
+                        response=as_text({"id": "MAST-4", "title": "t"}))
+
+    def patched(*ops):
+        return linear(save, id="MAST-4", patch=list(ops))
+
+    linear_cases = [
+        # DENY: a new description that drops the user's line.
+        ("linear: description drops a quote the session read", None, "deny",
+         {"raw": linear(save, id="MAST-4", description=drop_said), "records": [got_4]}),
+        ("linear: description drops a quote bullet", None, "deny",
+         {"raw": linear(save, id="MAST-4", description=drop_bullet), "records": [got_4]}),
+        ("linear: read answered as a list of blocks", None, "deny",
+         {"raw": linear(save, id="MAST-4", description=drop_said), "records": [got_4_list]}),
+        ("linear: drops a quote the session last saved", None, "deny",
+         {"raw": linear(save, id="MAST-4", description=drop_said), "records": [saved_4]}),
+        ("linear: read by key, edited by uuid", None, "deny",
+         {"raw": linear(save, id="bb43ac5c-4ef8-4cbc-a6cb-60bcf3bfbb25", description=drop_said),
+          "records": [got_4]}),
+        ("linear: read by uuid, edited by key", None, "deny",
+         {"raw": linear(save, id="MAST-4", description=drop_said), "records": [got_4_by_uuid]}),
+        ("linear: read in lower case, edited by key", None, "deny",
+         {"raw": linear(save, id="MAST-4", description=drop_said), "records": [got_4_lower]}),
+        ("linear: drops a quote of an issue this session created", None, "deny",
+         {"raw": linear(save, id="MAST-6", description=drop_said), "records": [created_6]}),
+        ("linear: description adds a question without looked in", None, "deny",
+         {"raw": linear(save, id="MAST-4", description=with_question), "records": [got_4]}),
+        # DENY: the issue has not been read in this session.
+        ("linear: nothing read", None, "deny", {"raw": linear(save, id="MAST-4", description=OLD)}),
+        ("linear: only another issue read", None, "deny",
+         {"raw": linear(save, id="MAST-4", description=OLD), "records": [got_5]}),
+        ("linear: read in another session", None, "deny",
+         {"raw": linear(save, id="MAST-4", description=OLD), "records": [got_4_other_session]}),
+        ("linear: patch with nothing read", None, "deny",
+         {"raw": patched({"op": "append", "text": "\nmore"})}),
+        # DENY: a patch that removes the user's line.
+        ("linear: patch replaces the quote", None, "deny",
+         {"raw": patched({"op": "replace", "old_string": said, "new_string": "Robert said nothing."}),
+          "records": [got_4]}),
+        ("linear: patch deletes the quote bullet", None, "deny",
+         {"raw": patched({"op": "replace", "old_string": bullet, "new_string": ""}), "records": [got_4]}),
+        ("linear: patch deletes a range holding the quote", None, "deny",
+         {"raw": patched({"op": "replace_range", "from": "## Why", "to": "## Scenarios",
+                          "new_string": "## Why\n\nGone.\n\n"}), "records": [got_4]}),
+        ("linear: second op of a patch removes the quote", None, "deny",
+         {"raw": patched({"op": "append", "text": "\nmore"},
+                         {"op": "replace", "old_string": said, "new_string": "x", "replace_all": True}),
+          "records": [got_4]}),
+        ("linear: patch whose anchor is not in the read", None, "deny",
+         {"raw": patched({"op": "replace", "old_string": "not in the body", "new_string": "x"}),
+          "records": [got_4]}),
+        # ALLOW: the user's lines survive, or the call changes no description.
+        ("linear: description keeps every line", None, "allow",
+         {"raw": linear(save, id="MAST-4", description=OLD + "\nMore.\n"), "records": [got_4]}),
+        ("linear: description with a sourced question", None, "allow",
+         {"raw": linear(save, id="MAST-4", description=full_looked), "records": [got_4]}),
+        ("linear: patch that keeps the quote", None, "allow",
+         {"raw": patched({"op": "replace", "old_string": "None open.", "new_string": "None."},
+                         {"op": "insert_before", "anchor": "## Out of scope", "text": "Note.\n\n"},
+                         {"op": "insert_after", "anchor": "## Questions", "text": "\n"},
+                         {"op": "prepend", "text": "Top.\n"},
+                         {"op": "append", "text": "End.\n"}),
+          "records": [got_4]}),
+        ("linear: status only, nothing read", None, "allow",
+         {"raw": linear(save, id="MAST-4", state="In Progress")}),
+        ("linear: label, link and blocker only", None, "allow",
+         {"raw": linear(save, id="MAST-4", addLabels=["Bug"], blockedBy=["MAST-3"],
+                        links=[{"url": "https://example.com", "title": "x"}])}),
+        ("linear: title only", None, "allow", {"raw": linear(save, id="MAST-4", title="New")}),
+        ("linear: create", None, "allow",
+         {"raw": linear(save, team="Masthead", title="t", description=drop_said)}),
+        ("linear: get_issue itself", None, "allow", {"raw": got_4}),
+        ("linear: record mode never refuses", None, "allow",
+         {"raw": linear(save, id="MAST-4", description=drop_said), "mode": "record"}),
+        ("linear: a status save keeps the read", None, "deny",
+         {"raw": linear(save, id="MAST-4", description=drop_said), "records": [got_4, saved_4_status]}),
+        # Linear answers with each issue key wrapped in a tag of its own (review F-S1).
+        ("linear: quote naming an issue, key sent plain", None, "allow",
+         {"raw": linear(save, id="MAST-4", description=keyed_plain), "records": [got_keyed]}),
+        ("linear: quote naming an issue, tag sent back", None, "allow",
+         {"raw": linear(save, id="MAST-4", description=keyed_tagged), "records": [got_keyed]}),
+        ("linear: quote naming an issue, dropped", None, "deny",
+         {"raw": linear(save, id="MAST-4", description=OLD), "records": [got_keyed]}),
+        ("linear: patch with a plain key on a tagged read", None, "allow",
+         {"raw": patched({"op": "replace", "old_string": "KYR-1 did", "new_string": "KYR-1 did it"}),
+          "records": [got_keyed]}),
+        # A title-only issue has no description to lose (review F-S2).
+        ("linear: read of an issue with a null description", None, "allow",
+         {"raw": linear(save, id="MAST-4", description="## Why\n"), "records": [got_null]}),
+        ("linear: read of an issue with no description field", None, "allow",
+         {"raw": linear(save, id="MAST-4", description="## Why\n"), "records": [got_missing]}),
+        ("linear: a save answered without the description keeps the read", None, "deny",
+         {"raw": linear(save, id="MAST-4", description=drop_said),
+          "records": [got_4, linear(save, id="MAST-4", state="Done",
+                                    response=as_text({"id": "MAST-4", "uuid": "u", "title": "t"}))]}),
+        ("linear: read that asked for fields without the description", None, "deny",
+         {"raw": linear(save, id="MAST-4", description="## Why\n"), "records": [got_fields]}),
+    ]
+
     cases = [
         # DENY: a line quoted as the user's is gone.
         ("drops a quote on a line naming the user", body("drop-said.md", drop_said), "deny"),
@@ -345,7 +479,7 @@ def main():
         ("empty stdin", None, "allow", {"raw": ""}),
         ("other tool", "gh issue edit 21 --body-file drop-said.md", "allow", {"tool": "Write"}),
         ("no command field", None, "allow", {"raw": json.dumps({"tool_name": "Bash", "tool_input": {}})}),
-    ] + connector_cases
+    ] + connector_cases + linear_cases
 
     failures = []
     for case in cases:
@@ -374,6 +508,23 @@ def main():
         ("missing file refusal names the file", "gh issue edit 21 --body-file does-not-exist.md", {}, "does-not-exist.md is not there"),
         ("no-read refusal says to read the issue first", None, dict(no_gh, raw=edit(OLD)), "issue_read"),
         ("connector dropped-line refusal names the issue", None, {"raw": edit(drop_said)}, "issue 21 drops a line"),
+        ("linear refusal names the line", None,
+         {"raw": linear(save, id="MAST-4", description=drop_said), "records": [got_4]},
+         'issue MAST-4 drops a line quoted as the user\'s: "one thing should get me account statuses"'),
+        ("linear patch refusal names the line", None,
+         {"raw": patched({"op": "replace", "old_string": bullet, "new_string": ""}), "records": [got_4]},
+         "the code shouldn't know who to call"),
+        ("linear no-read refusal says to read with get_issue", None,
+         {"raw": linear(save, id="MAST-4", description=OLD)}, "get_issue"),
+        ("linear no-read refusal says a status change sends no description", None,
+         {"raw": linear(save, id="MAST-4", state="Done", description=OLD)},
+         "a status, label, link or blocker change alone, send it without `description` or `patch`"),
+        ("linear tagged-key refusal quotes the line as written", None,
+         {"raw": linear(save, id="MAST-4", description=OLD), "records": [got_keyed]},
+         '"fix it the way KYR-1 did"'),
+        ("linear stale patch refusal says to read again", None,
+         {"raw": patched({"op": "replace", "old_string": "not in the body", "new_string": "x"}),
+          "records": [got_4]}, "get_issue"),
     ]
     for label, command, extra, needle in reasons:
         got, reason = run(command, tmp, **extra)
@@ -382,7 +533,30 @@ def main():
             failures.append(label)
         print("{} {:<62} expected {:<5} got {}".format("ok  " if ok else "FAIL", label, "deny+", got if needle in reason else "no " + repr(needle[:30])))
 
-    total = len(cases) + len(reasons)
+    # The wiring: hooks.json runs the gate before save_issue, and record mode
+    # after get_issue and save_issue (MAST-4), as it does for GitHub's calls.
+    import re
+    with open(os.path.join(os.path.dirname(HERE), "hooks.json")) as fh:
+        wiring = json.load(fh)["hooks"]
+
+    def wired(event, tool, command):
+        return any(re.fullmatch(entry.get("matcher", ""), tool)
+                   and any(h.get("command", "").endswith(command) for h in entry.get("hooks", []))
+                   for entry in wiring.get(event, []))
+
+    wiring_checks = [
+        ("wired: gate before Linear save_issue", wired("PreToolUse", save, "issue-edit-gate.py")),
+        ("wired: gate before GitHub issue_write", wired("PreToolUse", write, "issue-edit-gate.py")),
+        ("wired: record after Linear get_issue", wired("PostToolUse", get, "issue-edit-gate.py record")),
+        ("wired: record after Linear save_issue", wired("PostToolUse", save, "issue-edit-gate.py record")),
+        ("wired: record after GitHub issue_read", wired("PostToolUse", read, "issue-edit-gate.py record")),
+    ]
+    for label, ok in wiring_checks:
+        if not ok:
+            failures.append(label)
+        print("{} {:<62} expected wired got {}".format("ok  " if ok else "FAIL", label, ok))
+
+    total = len(cases) + len(reasons) + len(wiring_checks)
     print()
     if failures:
         print("{} of {} cases are wrong:".format(len(failures), total))

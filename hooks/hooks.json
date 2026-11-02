@@ -203,7 +203,7 @@
         ]
       },
       {
-        "matcher": "mcp__.*__(issue_write|update_issue)",
+        "matcher": "mcp__.*__(issue_write|update_issue|save_issue)",
         "hooks": [
           {
             "type": "command",
@@ -435,7 +435,7 @@
         ]
       },
       {
-        "matcher": "mcp__.*__(issue_read|get_issue|issue_write|update_issue)",
+        "matcher": "mcp__.*__(issue_read|get_issue|issue_write|update_issue|save_issue)",
         "hooks": [
           {
             "type": "command",
