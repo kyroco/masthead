@@ -672,6 +672,9 @@ W=skills/work-on/worker.md
 says  skills/work-on/SKILL.md "**A Linear key** such as \`KOR-12\`"
 says  skills/work-on/SKILL.md "\`KOR-12 dispatched\` makes a dispatched worker, the same as \`#1418 dispatched\`"
 says  skills/work-on/SKILL.md "never read as a project or milestone name"
+# Review fix: a team key may hold digits, such as K8S, as project_fact.py accepts.
+says  skills/work-on/SKILL.md "letters and digits, such as \`K8S-12\`"
+never skills/work-on/SKILL.md "the team's letters, a hyphen, a number"
 says  "$W" "## On Linear"
 # Scenario 2: the issue with every comment, its parent, and the project description as the brief.
 says  "$W" "\`get_issue\` with \`id\` the key, then \`list_comments\` with \`issueId\` the key"
