@@ -19,8 +19,8 @@ Read the text typed after `/work-on`:
   `dispatched` means you write no sheet and build through to the PR without
   waiting for a go; a question the issue, its ADR, the architecture doc, the
   mockups and Korium do not answer goes to your foreman. Read `worker.md`.
-- **A Linear key** such as `KOR-12` (the team's letters, a hyphen, a
-  number), in a repo whose issues live in Linear: the same as `#1418`, so you
+- **A Linear key** such as `KOR-12` (the team's key, which may hold
+  letters and digits, such as `K8S-12`, then a hyphen and a number), in a repo whose issues live in Linear: the same as `#1418`, so you
   are the worker for that issue, and `KOR-12 dispatched` makes a dispatched
   worker, the same as `#1418 dispatched`. A key is never read as a project or
   milestone name. Read `worker.md`, and its **On Linear** section.
