@@ -800,5 +800,7 @@ says  "$F" "gh api repos/{owner}/{repo}/issues/<n>/dependencies/blocking"
 says  "$F" "\`\${CLAUDE_PLUGIN_ROOT}/skills/work-on/set-status.sh <n> \"In Progress\"\`"
 says  "$F" "claude --bg --model opus --effort <level> --name \"<n>-issue\" \"/work-on #<n> dispatched\""
 
+# Review S1-pagination: every page of issues and comments is read.
+says  "$F" "while the answer says \`hasNextPage\` true, call again with its \`cursor\` until no page is left"
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
