@@ -31,6 +31,14 @@ With nothing typed, ask for an issue or a project; do not guess and do not
 offer a list. A typo is not a missing argument: do what was meant. The word
 `foreman` anywhere, or several issues, means foreman.
 
+## Which tracker
+
+Before reading any issue, run `python3 ${CLAUDE_PLUGIN_ROOT}/hooks/project_fact.py --tracker`.
+On `linear`, this repo's issues live in Linear only: follow the `linear-issues`
+skill for every issue, project and status call below, and never look in GitHub
+issues. Where no `linear-issues` skill is installed, say Masthead cannot work
+Linear issues yet, and stop. On `github`, everything below holds as written.
+
 ## Which repo
 
 Work in the repo the session was started in; this skill never moves a session

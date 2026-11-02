@@ -1,6 +1,6 @@
 ---
 name: setup
-description: Set Masthead up for this repository. Three short questions, then it writes the few facts the gates read and shows what is on. Run it once per repository, right after installing the plugin, and again whenever you want to change an answer.
+description: Set Masthead up for this repository. Four short questions, then it writes the few facts the gates read and shows what is on. Run it once per repository, right after installing the plugin, and again whenever you want to change an answer.
 disable-model-invocation: true
 ---
 
@@ -18,7 +18,8 @@ Quietly gather these, with commands that read and change nothing:
 - The repository: its name from `git remote -v`, and whether it has commits.
 - Facts already set: read `.claude/settings.json` and
   `.claude/settings.local.json` for an `env` block with `PROJECT_PUSH_CHECK`,
-  `PROJECT_STATE_DIR` or `ADR_DIR`. If Masthead was set up before, say so and
+  `PROJECT_STATE_DIR`, `ADR_DIR`, `ISSUE_TRACKER` or `LINEAR_TEAM_KEY`. If
+  Masthead was set up before, say so and
   offer to change answers rather than starting over.
 - A test command, from the files present: `package.json` with a `test` script
   means `npm test`; `mix.exs` means `mix test`; `Cargo.toml` means
@@ -37,7 +38,7 @@ Three sentences, then the first question:
 "Masthead adds a few guard rails to Claude Code in this repository: it refuses
 dangerous commands and reads of secret files, it keeps the reviewers of a
 change blind and separate from its author, and it can make sure tests passed
-before anything is pushed. It needs to know three things about this
+before anything is pushed. It needs to know four things about this
 repository. The answers go in a small settings file, and you can change them
 any time by running `/masthead:setup` again."
 
@@ -69,7 +70,22 @@ On yes:
    `$( )` in the command stay as written.
 2. Add `"PROJECT_PUSH_CHECK": ".claude/push-check.sh"` to the env block.
 
-## 5. Question three: a memory across sessions
+## 5. Question three: where do issues live?
+
+Ask: "Where do this repository's issues live: GitHub or Linear? Masthead works
+with one of them at a time, never both."
+
+- GitHub: add `"ISSUE_TRACKER": "github"` to the env block. This is also what
+  Masthead does when the setting is missing, so nothing changes.
+- Linear: ask "What is the Linear team's key, the letters before the number in
+  an issue like KOR-12?" Then add `"ISSUE_TRACKER": "linear"` and
+  `"LINEAR_TEAM_KEY": "<the key>"` to the env block.
+
+When the answer changes an earlier one, say that open issues in the old tracker
+do not move by themselves, and that every Masthead skill follows the new
+answer from the next session on.
+
+## 6. Question four: a memory across sessions
 
 If a `korium` server is already connected, say "Korium memory is connected, so
 each session will search what earlier sessions learned before its first change
@@ -90,14 +106,14 @@ it now, later, or not at all?"
 
 Everything else in Masthead works without Korium.
 
-## 6. Architecture decision records, only if you found a folder
+## 7. Architecture decision records, only if you found a folder
 
 Ask: "I see `<folder>`. Should Masthead hold new decision records there to a
 fixed shape (why it aligns with the project's principles, what counts as done,
 and a checked list of factual claims)?" On yes, add `"ADR_DIR": "<folder>"` to
 the env block.
 
-## 7. Write, then show what is on
+## 8. Write, then show what is on
 
 Show the exact env block and the file it goes to, and ask "Shall I write
 this?" On yes, merge it into the file (keep everything already there). If
@@ -106,8 +122,9 @@ its small working files there.
 
 Finish with a table: each guard rail, on or off, and the one way to change it.
 Keep it to the rails this repository has: dangerous-command and secret
-refusals (always on), blind review (always on), push check (on if set), memory
-(on if connected), decision records (on if a folder was named). Then name the
+refusals (always on), blind review (always on), push check (on if set), where
+issues live (GitHub or Linear, with the team key), memory (on if connected),
+decision records (on if a folder was named). Then name the
 four install options and their defaults, because a terminal install never
 asked them: connect Korium memory (off), keep a code index in Korium (off),
 keep AI attribution out of commits (on), ask for a reason before a helper runs

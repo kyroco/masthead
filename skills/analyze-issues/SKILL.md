@@ -13,6 +13,12 @@ the issue before a worker sees it. It changes no code.
 An issue's shape, and the size rule, are in the `github-issues` skill. Read
 that section first; this skill applies it.
 
+Which tracker holds the issues comes first: `python3 ${CLAUDE_PLUGIN_ROOT}/hooks/project_fact.py --tracker`.
+On `linear`, read and edit every issue through the `linear-issues` skill and
+never look in GitHub issues; where that skill is not installed, say Masthead
+cannot work Linear issues yet, and stop. On `github`, every `gh` step below
+holds as written.
+
 The session that runs this skill starts the agents and stays out of the way.
 It writes no issue itself and holds no edit: each agent edits its issue
 on GitHub directly, and GitHub keeps every earlier body in the issue's edit

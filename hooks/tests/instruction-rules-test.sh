@@ -504,9 +504,10 @@ says  docs/explainer.template.html "every grep while korium-cli is signed out"
 # The wiki refresh has no docs/adr fallback.
 says  README.md "the refresh only with"
 says  docs/explainer.template.html "the refresh only with"
-# Setup asks two questions when a memory is already connected.
-says  README.md "or two when a memory is already connected"
-says  docs/explainer.template.html "or two when a memory is already connected"
+# Setup asks three questions when a memory is already connected (four with the
+# tracker question, MAST-1).
+says  README.md "or three when a memory is already connected"
+says  docs/explainer.template.html "or three when a memory is already connected"
 
 # 11. Issue #29: nobody files work but the user. The judge lists what it saw
 # outside the change, the foreman relays and asks as numbered lines, and the
@@ -620,7 +621,7 @@ never skills/setup/SKILL.md "Three short questions"
 says  skills/github-issues/SKILL.md "project_fact.py --tracker"
 says  skills/github-issues/SKILL.md "never look in GitHub issues"
 says  skills/github-issues/SKILL.md "Masthead cannot work Linear issues yet"
-never skills/github-issues/SKILL.md "GitHub is the tracker. An issue lives"
+never skills/github-issues/SKILL.md "# GitHub issues GitHub is the tracker."
 for skill in skills/work-on/SKILL.md skills/analyze-issues/SKILL.md skills/review-design/SKILL.md; do
   says  "$skill" "project_fact.py --tracker"
   says  "$skill" "Masthead cannot work Linear issues yet"

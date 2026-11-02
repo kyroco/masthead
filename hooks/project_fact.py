@@ -197,6 +197,23 @@ def state_dir(root=None):
     return value or STATE_DIR_DEFAULT
 
 
+TRACKER_FACT = "ISSUE_TRACKER"
+TRACKERS = ("github", "linear")
+LINEAR_TEAM_FACT = "LINEAR_TEAM_KEY"
+
+
+def tracker(root=None):
+    """Where the repository's issues live: "linear" when its settings say so, else "github"."""
+    value = (fact(TRACKER_FACT, "", root) or "").strip().lower()
+    return value if value in TRACKERS else "github"
+
+
+def linear_team(root=None):
+    """The repository's Linear team key in upper case, or None when none is set."""
+    value = (fact(LINEAR_TEAM_FACT, "", root) or "").strip().upper()
+    return value if re.fullmatch(r"[A-Z][A-Z0-9]{0,9}", value) else None
+
+
 def main(argv):
     # --trusted CHECKOUT: exit 0 when the checkout is the session's repository, 1 when not.
     if len(argv) == 2 and argv[0] == "--trusted":
@@ -204,6 +221,13 @@ def main(argv):
     root = None
     if len(argv) >= 2 and argv[0] == "--root":
         root, argv = argv[1], argv[2:]
+    # --tracker prints github or linear; --linear-team prints the team key or nothing.
+    if argv == ["--tracker"]:
+        print(tracker(root))
+        return 0
+    if argv == ["--linear-team"]:
+        print(linear_team(root) or "")
+        return 0
     as_path = bool(argv) and argv[0] == "--path"
     if as_path:
         argv = argv[1:]

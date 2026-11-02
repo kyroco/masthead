@@ -193,11 +193,12 @@ install options (a terminal install takes the defaults silently):
 It asks whether to connect Korium memory (off unless you say so), whether to
 keep a code index in Korium (off), whether to keep AI attribution out of commits (on), and whether a helper needs a reason
 before running on the biggest model (off). Then run `/masthead:setup`. It
-asks three questions about the repository, or two when a memory is already
+asks four questions about the repository, or three when a memory is already
 connected, and one or two more when it finds a folder of decision records or
 no ignore line for its working files, and writes nothing until you say yes: just you or the team
 (whether the settings are committed with the code), tests before a push
-(it finds your test command), and whether to connect a memory now, later or
+(it finds your test command), whether its issues live in GitHub or Linear
+(one at a time, never both), and whether to connect a memory now, later or
 not at all. Run it again whenever you want to change an answer.
 
 To change an install option later, run `/plugin configure masthead@masthead`:
