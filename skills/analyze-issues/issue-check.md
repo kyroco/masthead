@@ -74,3 +74,33 @@ Return only this, in under 150 words: one line per check (pass or fail,
 with its evidence), what you edited or "untouched", the sub-issue numbers,
 every [NEEDS CLARIFICATION] line word for word, and the thought_id.
 ```
+
+## On Linear
+
+When the issues live in Linear, fill in the key (such as `KOR-12`) for the
+number and send the brief with these lines in place of their GitHub ones:
+
+- First line after `no code change`: "This checks one Linear issue against
+  its sources and edits only the part that fails; it may create sub-issues;
+  it changes no file in the repo."
+- What to read: the issue with every comment (`get_issue` with `id` <key>,
+  then `list_comments` with `issueId` <key>), the project description
+  (`get_project` with `query` the project name), which is the brief in
+  place of the project README, then the decision records and mockup pages it
+  names. The checks are the same six, against the same four parts and Size
+  rule.
+- Check 6 fails: make each part a sub-issue with `save_issue` with
+  `parentId` <key>, in the same project, with its own four parts and a
+  `blockedBy` link where one waits on another, and leave the parent as the
+  summary.
+- A question left open: set the issue's status to `Needs Human` with
+  `save_issue` instead of adding a label.
+- The edit: edit only the failing part with `save_issue` with `id` <key>
+  and `patch`, after reading the issue with `get_issue` in this session.
+  The check in front of the edit reads that call, and refuses a description
+  that drops a line quoted as the user's or an issue this session has not
+  read.
+- The capture: include the old text of every part you changed, word for
+  word, since Linear keeps no earlier description the connector can read.
+
+On a repository whose issues live on GitHub, none of this section applies.

@@ -50,3 +50,24 @@ return, in under 500 words: each fix (the issue, what you changed, the line
 it rests on), each finding in one or two lines with the issue numbers and
 where its lines are, what you could not read, and the thought_id.
 ```
+
+## On Linear
+
+When the issues live in Linear, send the brief with these lines in place of
+their GitHub ones:
+
+- "This checks and corrects Linear issues; it changes no file in the repo."
+- What to read: the project description (`get_project` with `query` the
+  project name and `includeMilestones` true), which is the brief in place of
+  the project README, and every open issue with its comments (`list_issues`
+  with `project` the project name, then `get_issue` and `list_comments` for
+  each). A project with no milestones is checked as one set: every open
+  issue of the project, for duplicates, contradictions, gaps and order.
+- The old text: Linear keeps no earlier description the connector can read,
+  so for each issue edited today, read the old text of each changed part
+  from the per-issue agent's Korium capture (`agent_search` with the key).
+- A fix: fix it with `save_issue` with `id` the key and `patch`, after
+  reading the issue with `get_issue`. A blocked-by link is added with
+  `blockedBy` and taken away with `removeBlockedBy`.
+
+On a repository whose issues live on GitHub, none of this section applies.

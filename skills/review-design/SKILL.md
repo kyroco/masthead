@@ -112,3 +112,21 @@ body to a file inside the checkout and send it with
 without a decision the user has not made is one question to them, and you
 wait. When they are all done, say which issues changed and which you left
 alone.
+
+## On Linear
+
+When the issues live in Linear, the steps above hold with these changes,
+each call made through the Linear connector as the `linear-issues` skill
+says:
+
+- The issues to read are those of the Linear projects whose description
+  names the decision record: find the projects with `list_projects`, then
+  their open issues with `list_issues` with `project` each of those projects,
+  and read each with `get_issue`.
+- Bring the user the same table, with each issue's key.
+- On their go, fix each stale issue with `save_issue` with `id` the key and
+  `patch`, after reading it with `get_issue`, rewriting only the stale
+  scenario and keeping every line the user wrote. The check in front of the
+  edit reads that call too.
+
+On a repository whose issues live on GitHub, none of this section applies.

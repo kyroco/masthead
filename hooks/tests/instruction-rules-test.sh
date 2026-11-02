@@ -739,7 +739,7 @@ says  "$MC" "fix it with \`save_issue\` with \`id\` the key and \`patch\`, after
 # Scenario 3: an open question sets the status Needs Human, not a label.
 says  "$A" "sets the issue's status to \`Needs Human\` with \`save_issue\`, never a label"
 says  "$IC" "set the issue's status to \`Needs Human\` with \`save_issue\` instead of adding a label"
-says  "$A" "set the status back to \`Todo\` once no question is left"
+says  "$A" "sets the status back to \`Todo\` once no question is left"
 # Scenario 4: a split makes Linear sub-issues in the same project.
 says  "$IC" "each part a sub-issue with \`save_issue\` with \`parentId\` <key>, in the same project"
 says  "$A" "each part a Linear sub-issue in the same project"
