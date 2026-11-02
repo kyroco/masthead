@@ -93,13 +93,16 @@ number and send the brief with these lines in place of their GitHub ones:
   `parentId` <key>, in the same project, with its own four parts and a
   `blockedBy` link where one waits on another, and leave the parent as the
   summary.
-- A question left open: set the issue's status to `Needs Human` with
-  `save_issue` instead of adding a label.
+- A question left open: write it as
+  [NEEDS CLARIFICATION: the question; looked in: <decision-record section>, <project description rule>, Korium "<query>"],
+  and set the issue's status to `Needs Human` with `save_issue` instead of
+  adding a label.
 - The edit: edit only the failing part with `save_issue` with `id` <key>
   and `patch`, after reading the issue with `get_issue` in this session.
   The check in front of the edit reads that call, and refuses a description
-  that drops a line quoted as the user's or an issue this session has not
-  read.
+  that drops a line quoted as the user's, an issue this session has not
+  read, or a question without its "looked in:" part naming the decision
+  record, the project description rule and the Korium query.
 - The capture: include the old text of every part you changed, word for
   word, since Linear keeps no earlier description the connector can read.
 

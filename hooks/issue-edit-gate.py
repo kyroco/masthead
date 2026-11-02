@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """PreToolUse gate on `gh issue edit`: refuses a new body that drops a line
 quoted as the user's, or that adds a [NEEDS CLARIFICATION] question with no
-"looked in:" part naming the decision record, the README rule and the Korium
-query searched (issue #21). Fails open on broken plumbing.
+"looked in:" part naming the decision record, the README rule (on Linear, the
+project description rule) and the Korium query searched (issue #21). Fails
+open on broken plumbing.
 
 The gate reads one exact form and no shell: `gh issue edit <n> --body-file
 <path>` (or `-F <path>`, `-F<path>`), alone in its command, where the path
@@ -87,7 +88,8 @@ QUESTION = re.compile(r"\[NEEDS CLARIFICATION\b.*$", re.I)
 LOOKED_IN = re.compile(r"looked in:(.*)", re.I)
 NAMES = [
     ("the decision record", re.compile(r"\bADR\b|decision record", re.I)),
-    ("the README rule", re.compile(r"\bREADME\b", re.I)),
+    # On Linear the project description is the brief in place of a README (MAST-5).
+    ("the README or project description rule", re.compile(r"\bREADME\b|project description", re.I)),
     ("the Korium query", re.compile(r"\bKorium\b", re.I)),
 ]
 THE_USER = r"the user(?:\s+(?:said|says|wrote|writes|asked|asks|answered|answers|ruled|rules)\b|'s\s+words|\s*:)"

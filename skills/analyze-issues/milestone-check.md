@@ -60,8 +60,9 @@ their GitHub ones:
 - What to read: the project description (`get_project` with `query` the
   project name and `includeMilestones` true), which is the brief in place of
   the project README, and every open issue with its comments (`list_issues`
-  with `project` the project name, then `get_issue` and `list_comments` for
-  each). A project with no milestones is checked as one set: every open
+  with `project` the project name, then `get_issue` with `includeRelations`
+  true and `list_comments` for each). The relations are each issue's
+  blocked-by and blocks links, which the order check reads. A project with no milestones is checked as one set: every open
   issue of the project, for duplicates, contradictions, gaps and order.
 - The old text: Linear keeps no earlier description the connector can read,
   so for each issue edited today, read the old text of each changed part
