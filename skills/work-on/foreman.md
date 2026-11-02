@@ -233,6 +233,8 @@ on GitHub. Every section above holds, with these changes, shown for KOR-12:
   brief. Find the issues with `list_issues` with `project` the project name,
   then each issue with `get_issue` with `id` the key and `includeRelations`
   true, and `list_comments` with `issueId` the key, reading every comment.
+  Both lists come a page at a time: while the answer says `hasNextPage`
+  true, call again with its `cursor` until no page is left.
   Order them by `relations.blockedBy`, the Linear blocked-by links. An issue
   in `Needs Human` is not ready, and no worker starts on it: it waits on a
   question or a decision, in place of the `needs-decision` label.
