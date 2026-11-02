@@ -716,5 +716,50 @@ says  README.md "\`/work-on KOR-12\`"
 says  docs/explainer.template.html "<code>/work-on KOR-12</code>"
 says  docs/explainer.html "<code>/work-on KOR-12</code>"
 
+# Linear issue MAST-5: /analyze-issues and /review-design read and fix Linear issues.
+A=skills/analyze-issues/SKILL.md
+IC=skills/analyze-issues/issue-check.md
+MC=skills/analyze-issues/milestone-check.md
+RD=skills/review-design/SKILL.md
+DS=references/design-sheet.md
+for f in "$A" "$IC" "$MC" "$RD" "$DS"; do
+  says  "$f" "## On Linear"
+  says  "$f" "On a repository whose issues live on GitHub, none of this section applies"
+done
+# Scenario 1: each issue is read with every comment and the project description,
+# and checked against the same four parts and Size rule.
+says  "$A" "find the project's open issues with \`list_issues\` with \`project\` the project name"
+says  "$IC" "the issue with every comment (\`get_issue\` with \`id\` <key>, then \`list_comments\` with \`issueId\` <key>)"
+says  "$IC" "the project description (\`get_project\` with \`query\` the project name), which is the brief in place of the project README"
+says  "$A" "checks the same four parts and the same Size rule"
+# Scenario 2: the fix edits the Linear description and keeps every line the user said.
+says  "$IC" "edit only the failing part with \`save_issue\` with \`id\` <key> and \`patch\`, after reading the issue with \`get_issue\` in this session"
+says  "$A" "refuses a Linear edit that drops a line quoted as the user's"
+says  "$MC" "fix it with \`save_issue\` with \`id\` the key and \`patch\`, after reading the issue with \`get_issue\`"
+# Scenario 3: an open question sets the status Needs Human, not a label.
+says  "$A" "sets the issue's status to \`Needs Human\` with \`save_issue\`, never a label"
+says  "$IC" "set the issue's status to \`Needs Human\` with \`save_issue\` instead of adding a label"
+says  "$A" "set the status back to \`Todo\` once no question is left"
+# Scenario 4: a split makes Linear sub-issues in the same project.
+says  "$IC" "each part a sub-issue with \`save_issue\` with \`parentId\` <key>, in the same project"
+says  "$A" "each part a Linear sub-issue in the same project"
+# Scenario 5: a project with no milestones is checked as one set.
+says  "$MC" "A project with no milestones is checked as one set: every open issue of the project"
+says  "$A" "A project with no milestones is checked as one set"
+says  "$MC" "duplicates, contradictions, gaps and order"
+# Scenario 6: /review-design finds and fixes Linear issues that quote a changed line.
+says  "$RD" "the Linear projects whose description names the decision record"
+says  "$RD" "\`list_issues\` with \`project\` each of those projects"
+says  "$RD" "fix each stale issue with \`save_issue\` with \`id\` the key and \`patch\`, after reading it with \`get_issue\`"
+says  "$DS" "append the section with \`save_issue\` with \`id\` the key and a \`patch\` of op \`append\`"
+# Scenario 7: on GitHub, the steps stand as written.
+says  "$A" "On \`github\`, every \`gh\` step below"
+says  "$A" "adds the \`needs-decision\` label"
+says  "$IC" "with every comment (\`gh issue view <n> --comments\`), the project README"
+says  "$IC" "Add the needs-decision label when a question is open"
+says  "$MC" "(\`gh issue list --milestone \"<title>\"\`, then \`gh issue view <n> --comments\`)"
+says  "$RD" "\`gh issue edit <n> --body-file <path>\`"
+says  "$DS" "write it back with \`gh issue edit <n> --body-file <file>\`"
+
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
