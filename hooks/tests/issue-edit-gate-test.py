@@ -497,7 +497,30 @@ def main():
             failures.append(label)
         print("{} {:<62} expected {:<5} got {}".format("ok  " if ok else "FAIL", label, "deny+", got if needle in reason else "no " + repr(needle[:30])))
 
-    total = len(cases) + len(reasons)
+    # The wiring: hooks.json runs the gate before save_issue, and record mode
+    # after get_issue and save_issue (MAST-4), as it does for GitHub's calls.
+    import re
+    with open(os.path.join(os.path.dirname(HERE), "hooks.json")) as fh:
+        wiring = json.load(fh)["hooks"]
+
+    def wired(event, tool, command):
+        return any(re.fullmatch(entry.get("matcher", ""), tool)
+                   and any(h.get("command", "").endswith(command) for h in entry.get("hooks", []))
+                   for entry in wiring.get(event, []))
+
+    wiring_checks = [
+        ("wired: gate before Linear save_issue", wired("PreToolUse", save, "issue-edit-gate.py")),
+        ("wired: gate before GitHub issue_write", wired("PreToolUse", write, "issue-edit-gate.py")),
+        ("wired: record after Linear get_issue", wired("PostToolUse", get, "issue-edit-gate.py record")),
+        ("wired: record after Linear save_issue", wired("PostToolUse", save, "issue-edit-gate.py record")),
+        ("wired: record after GitHub issue_read", wired("PostToolUse", read, "issue-edit-gate.py record")),
+    ]
+    for label, ok in wiring_checks:
+        if not ok:
+            failures.append(label)
+        print("{} {:<62} expected wired got {}".format("ok  " if ok else "FAIL", label, ok))
+
+    total = len(cases) + len(reasons) + len(wiring_checks)
     print()
     if failures:
         print("{} of {} cases are wrong:".format(len(failures), total))
