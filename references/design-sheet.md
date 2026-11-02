@@ -62,5 +62,14 @@ takes a question none of them nor Korium answers to its foreman
 
 
 
+## On Linear
+
+When the issue lives in Linear, the sheet still goes at the end of the issue
+body. Read the issue with `get_issue` with `id` the key, then append the
+section with `save_issue` with `id` the key and a `patch` of op `append`.
+Rewrite it in place the same way, with a `replace` op on the old section.
+
+On a repository whose issues live on GitHub, none of this section applies.
+
 Enforced by: nothing mechanical. No hook checks for the sheet or the approval
 before a worker writes code.

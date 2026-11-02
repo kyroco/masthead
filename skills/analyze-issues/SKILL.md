@@ -121,6 +121,38 @@ One table, one row per issue: ready, split into which numbers, or waiting on
 which question. Then what the check in step 3 fixed and what it reported.
 Capture the run in Korium with `agent_capture` and give its id.
 
+## On Linear
+
+When `project_fact.py --tracker` prints `linear`, every step above holds
+with these changes, each call made through the Linear connector as the
+`linear-issues` skill says. An issue is named by its key, such as `KOR-12`.
+
+- **Step 1.** The work is a Linear project or a list of keys: find the
+  project's open issues with `list_issues` with `project` the project name.
+  An issue with a parent (`parentId`) is checked with its parent.
+- **Step 2.** Each agent gets `issue-check.md` with its **On Linear**
+  lines. It reads the issue with every comment and the project description,
+  which is the brief in place of the project README, and checks the same
+  four parts and the same Size rule. It edits only the part that fails with
+  a `save_issue` `patch`, after reading the issue in the same session; the
+  check in front of the edit (`issue-edit-gate.py`) refuses a Linear edit
+  that drops a line quoted as the user's, or one to an issue it has not
+  read. A split makes each part a Linear sub-issue in the same project. An
+  open question sets the issue's status to `Needs Human` with `save_issue`,
+  never a label.
+- **Step 3.** A project with no milestones is checked as one set: every
+  open issue of the project, for duplicates, contradictions, gaps and order.
+  The connector shows no earlier description, so each per-issue agent
+  captures in Korium the old text of every part it changed, and the check
+  in step 3 reads those captures in place of GitHub's edit history.
+- **Step 4.** An issue waiting on a question has the status `Needs Human`,
+  not the label. The answer's agent posts the comment with `save_comment`,
+  takes the question line out with a `save_issue` `patch`, and sets the
+  status back to `Todo` once no question is left. An issue in `Needs Human`
+  is not dispatched.
+
+On a repository whose issues live on GitHub, none of this section applies.
+
 ## What this skill never does
 
 It writes no code, no plan and no design. How a scenario is built is the

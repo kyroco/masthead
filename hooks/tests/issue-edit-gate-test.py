@@ -154,6 +154,8 @@ def main():
     with_question = OLD.replace("None open.", "- [NEEDS CLARIFICATION: which plans show the line?]")
     bare_marker = OLD.replace("None open.", "- [NEEDS CLARIFICATION] which format?")
     half_looked = OLD.replace("None open.", '- [NEEDS CLARIFICATION: which plans show the line? looked in: ADR-0170 Decision 12, README rule 3]')
+    project_looked = OLD.replace("None open.", '- [NEEDS CLARIFICATION: which plans show the line?; looked in: ADR-0170 Decision 12, project description Rule 5, Korium "sign-in status line"]')
+    neither_looked = OLD.replace("None open.", '- [NEEDS CLARIFICATION: which plans show the line?; looked in: ADR-0170 Decision 12, the brief, Korium "sign-in status line"]')
     full_looked = OLD.replace("None open.", '- [NEEDS CLARIFICATION: which plans show the line?; looked in: ADR-0170 Decision 12, README rule 3, Korium "sign-in status line"]')
     full_looked_record = OLD.replace("None open.", '- [NEEDS CLARIFICATION: which plans show the line?; looked in: no decision record names it, README rule 3, Korium "sign-in status line"]')
     linked = OLD.replace("None open.", '- [NEEDS CLARIFICATION: which?; looked in: [ADR-0003](docs/adr/0003.md) Decision 2, README rule 3, Korium "status line text"]')
@@ -334,6 +336,12 @@ def main():
          {"raw": linear(save, id="MAST-4", description=OLD + "\nMore.\n"), "records": [got_4]}),
         ("linear: description with a sourced question", None, "allow",
          {"raw": linear(save, id="MAST-4", description=full_looked), "records": [got_4]}),
+        # On Linear the project description is the brief, so a question names
+        # its rule in place of a README rule (MAST-5 review S2-1).
+        ("linear: question naming a project description rule", None, "allow",
+         {"raw": linear(save, id="MAST-4", description=project_looked), "records": [got_4]}),
+        ("question naming a project description rule", body("project-looked.md", project_looked), "allow"),
+        ("question naming neither README nor project description", body("neither-looked.md", neither_looked), "deny"),
         ("linear: patch that keeps the quote", None, "allow",
          {"raw": patched({"op": "replace", "old_string": "None open.", "new_string": "None."},
                          {"op": "insert_before", "anchor": "## Out of scope", "text": "Note.\n\n"},
