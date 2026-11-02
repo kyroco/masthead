@@ -242,12 +242,16 @@ on GitHub. Every section above holds, with these changes, shown for KOR-12:
   `state` `In Progress`, never `set-status.sh`, which knows only GitHub
   projects. The worker's prompt says `/work-on KOR-12 dispatched`, and in the
   terminal its session takes `--name "KOR-12-issue"`.
-- **A worker's question.** The `haiku` agent that writes the answer down
-  captures it in Korium, posts the question and answer as a comment with
-  `save_comment`, in the person's words, takes the question out of the body
-  with `save_issue` and `patch` after reading it with `get_issue`, and sets
-  the status to `Todo` with `save_issue` once no `[NEEDS CLARIFICATION]` line
-  is left.
+- **A worker's question.** The worker puts the answer on the issue and sets
+  it back to `In Progress` itself (`worker.md`, On Linear), so the `haiku`
+  agent that writes the answer down captures it in Korium and takes the
+  question out of the body with `save_issue` and `patch` after reading it
+  with `get_issue`, and posts no comment and changes no status. A question
+  answered before its issue has a worker (Agree the run) goes on the issue as
+  a comment with `save_comment`, in the person's words, and the issue moves
+  to `Todo` with `save_issue` once no `[NEEDS CLARIFICATION]` line is left.
+- **A worker's report.** A worker's report quotes a line from the project
+  description, in place of the project README.
 - **Park.** A second failure sets the issue's status to `Needs Human` with
   `save_issue` and adds one comment saying what happened, never a `parked`
   label.
