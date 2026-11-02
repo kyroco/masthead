@@ -778,8 +778,16 @@ says  "$F" "order them by \`relations.blockedBy\`"
 # Scenario 2: an issue in Needs Human is not ready.
 says  "$F" "an issue in \`Needs Human\` is not ready, and no worker starts on it"
 # Scenario 3: the answer goes on the issue as a comment, and the issue leaves Needs Human.
-says  "$F" "posts the question and answer as a comment with \`save_comment\`, in the person's words"
-says  "$F" "sets the status to \`Todo\` with \`save_issue\` once no \`[NEEDS CLARIFICATION]\` line is left"
+says  "$F" "goes on the issue as a comment with \`save_comment\`, in the person's words"
+says  "$F" "the issue moves to \`Todo\` with \`save_issue\` once no \`[NEEDS CLARIFICATION]\` line is left"
+# Review S3-answer: on a worker's question the worker posts the answer and
+# sets In Progress, so the foreman's helper posts no second comment and
+# never moves a building issue to Todo.
+says  "$F" "the worker puts the answer on the issue and sets it back to \`In Progress\` itself"
+says  "$F" "posts no comment and changes no status"
+never "$F" "sets the status to \`Todo\` with \`save_issue\` once no"
+# Review S7-readme-gate: on Linear a worker's report quotes the project description.
+says  "$F" "a worker's report quotes a line from the project description, in place of the project README"
 # Scenario 4: a park moves the issue to Needs Human with one comment.
 says  "$F" "a second failure sets the issue's status to \`Needs Human\` with \`save_issue\` and adds one comment saying what happened, never a \`parked\` label"
 # Scenario 5: fix later is a Linear issue in the same project, Backlog, blocked by the reviewed issue.
