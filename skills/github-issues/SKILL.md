@@ -5,7 +5,16 @@ description: How work is tracked in GitHub issues and projects - how projects, m
 
 # GitHub issues
 
-GitHub is the tracker. An issue lives in the repository its work belongs to,
+A repository keeps its issues in one tracker, GitHub or Linear, never both.
+First ask which: `python3 ${CLAUDE_PLUGIN_ROOT}/hooks/project_fact.py --tracker`
+prints `github` or `linear`, from the answer `/masthead:setup` wrote, and
+prints `github` when there is none. On `linear`, every issue, project and
+status lives in Linear: read the `linear-issues` skill instead of this one and
+never look in GitHub issues. Where no `linear-issues` skill is installed, say
+that this repository's issues are in Linear and Masthead cannot work Linear
+issues yet, and stop; do not fall back to GitHub.
+
+On `github`, GitHub is the tracker. An issue lives in the repository its work belongs to,
 and takes that repository's visibility: never put a secret, a customer's name
 or an unfixed security weakness in an issue on a public repository. A
 repository may carry its own tracker notes (its `CLAUDE.md` or a file under

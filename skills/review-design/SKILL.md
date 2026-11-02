@@ -90,6 +90,11 @@ issues.
 
 ## Then the issues
 
+First find where the issues live: `python3 ${CLAUDE_PLUGIN_ROOT}/hooks/project_fact.py --tracker`.
+On `linear`, find and fix them through the `linear-issues` skill and never look
+in GitHub issues; where that skill is not installed, say Masthead cannot work
+Linear issues yet, and stop. On `github`, the steps below hold as written.
+
 Issues written before the review quote lines you changed. Find those and fix
 only them, and leave every other issue alone. Start from your own report:
 every decision, criterion and mockup line the review changed. Read the body

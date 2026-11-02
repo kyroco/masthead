@@ -99,7 +99,7 @@ never docs/explainer.html "writes a plan, one line per scenario"
 never docs/explainer.html "its plan, one line per scenario"
 never docs/images/day-5-workers.svg "its plan, one line per scenario"
 never scripts/diagrams.py "its plan, one line per scenario"
-says  .claude-plugin/plugin.json '"version": "0.1.19"'
+says  .claude-plugin/plugin.json '"version": "0.1.20"'
 
 never_phrase() {
   local hit
@@ -504,9 +504,10 @@ says  docs/explainer.template.html "every grep while korium-cli is signed out"
 # The wiki refresh has no docs/adr fallback.
 says  README.md "the refresh only with"
 says  docs/explainer.template.html "the refresh only with"
-# Setup asks two questions when a memory is already connected.
-says  README.md "or two when a memory is already connected"
-says  docs/explainer.template.html "or two when a memory is already connected"
+# Setup asks three questions when a memory is already connected (four with the
+# tracker question, MAST-1).
+says  README.md "or three when a memory is already connected"
+says  docs/explainer.template.html "or three when a memory is already connected"
 
 # 11. Issue #29: nobody files work but the user. The judge lists what it saw
 # outside the change, the foreman relays and asks as numbered lines, and the
@@ -607,6 +608,32 @@ case $? in
   1) pass=$((pass + 1)) ;;
   *) fail=$((fail + 1)); printf 'FAIL these still name the removed check: %s\n' "$named" ;;
 esac
+
+# Linear issue MAST-1: a repository says its issues live in GitHub or Linear,
+# never both, and every skill that touches an issue follows that one answer.
+says  skills/setup/SKILL.md "Where do this repository's issues live: GitHub or Linear?"
+says  skills/setup/SKILL.md '"ISSUE_TRACKER": "linear"'
+says  skills/setup/SKILL.md '"LINEAR_TEAM_KEY"'
+says  skills/setup/SKILL.md "never both"
+# Review fixes 1 and 3: one answer in one file, written where skills read it.
+says  skills/setup/SKILL.md "also remove both from settings.local.json"
+says  skills/setup/SKILL.md "leave the shared file alone"
+says  skills/setup/SKILL.md "run \`/masthead:setup\` from the repository's main checkout"
+says  skills/setup/SKILL.md "It needs to know four things about this repository"
+never skills/setup/SKILL.md "It needs to know three things about this repository"
+never skills/setup/SKILL.md "Three short questions"
+says  skills/github-issues/SKILL.md "project_fact.py --tracker"
+says  skills/github-issues/SKILL.md "never look in GitHub issues"
+says  skills/github-issues/SKILL.md "Masthead cannot work Linear issues yet"
+never skills/github-issues/SKILL.md "# GitHub issues GitHub is the tracker."
+for skill in skills/work-on/SKILL.md skills/analyze-issues/SKILL.md skills/review-design/SKILL.md; do
+  says  "$skill" "project_fact.py --tracker"
+  says  "$skill" "Masthead cannot work Linear issues yet"
+done
+says  README.md "whether its issues live in GitHub or Linear"
+never README.md "asks three questions about the repository"
+says  docs/explainer.template.html "whether its issues live in GitHub or Linear"
+never docs/explainer.template.html "asks three questions about the repository"
 
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]

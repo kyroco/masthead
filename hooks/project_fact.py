@@ -98,6 +98,9 @@ def main_checkout(root):
             return None
         with open(os.path.join(record, "gitdir")) as handle:
             back = handle.read().strip()
+        # git's worktree.useRelativePaths writes this link relative to the record.
+        if not os.path.isabs(back):
+            back = os.path.join(record, back)
         if os.path.realpath(back) != os.path.realpath(marker) or \
                 os.path.realpath(os.path.dirname(back)) != os.path.realpath(root):
             return None
@@ -197,6 +200,41 @@ def state_dir(root=None):
     return value or STATE_DIR_DEFAULT
 
 
+TRACKER_FACT = "ISSUE_TRACKER"
+TRACKERS = ("github", "linear")
+LINEAR_TEAM_FACT = "LINEAR_TEAM_KEY"
+
+
+def personal_first_fact(name, root=None):
+    """Like fact(), but settings.local.json wins over settings.json, the order
+    Claude Code itself uses, so a "just me" answer holds over a shared one."""
+    root = root or project_root()
+    if not trusted(root):
+        return None
+    base = main_checkout(root) or root
+    for leaf in ("settings.local.json", "settings.json"):
+        try:
+            with open(os.path.join(base, ".claude", leaf)) as handle:
+                env = (json.load(handle) or {}).get("env") or {}
+        except Exception:
+            continue
+        if isinstance(env, dict) and env.get(name):
+            return str(env[name])
+    return None
+
+
+def tracker(root=None):
+    """Where the repository's issues live: "linear" when its settings say so, else "github"."""
+    value = (personal_first_fact(TRACKER_FACT, root) or "").strip().lower()
+    return value if value in TRACKERS else "github"
+
+
+def linear_team(root=None):
+    """The repository's Linear team key in upper case, or None when none is set."""
+    value = (personal_first_fact(LINEAR_TEAM_FACT, root) or "").strip().upper()
+    return value if re.fullmatch(r"[A-Z][A-Z0-9]{0,9}", value) else None
+
+
 def main(argv):
     # --trusted CHECKOUT: exit 0 when the checkout is the session's repository, 1 when not.
     if len(argv) == 2 and argv[0] == "--trusted":
@@ -204,6 +242,19 @@ def main(argv):
     root = None
     if len(argv) >= 2 and argv[0] == "--root":
         root, argv = argv[1], argv[2:]
+    # --tracker prints github or linear; --linear-team prints the team key or nothing.
+    # Skills run these through the Bash tool, where Claude Code sets no
+    # CLAUDE_PROJECT_DIR (it sets it for hooks only), so there the repository
+    # the shell is in is the session's. trusted() still guards --root.
+    if argv in (["--tracker"], ["--linear-team"]) and root is None \
+            and not os.environ.get("CLAUDE_PROJECT_DIR"):
+        os.environ["CLAUDE_PROJECT_DIR"] = checkout_top(os.getcwd())
+    if argv == ["--tracker"]:
+        print(tracker(root))
+        return 0
+    if argv == ["--linear-team"]:
+        print(linear_team(root) or "")
+        return 0
     as_path = bool(argv) and argv[0] == "--path"
     if as_path:
         argv = argv[1:]
