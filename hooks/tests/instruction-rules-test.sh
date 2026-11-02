@@ -767,5 +767,38 @@ says  "$IC" "or a question without its \"looked in:\" part naming the decision r
 # Review S5-1: the whole-set check reads each issue's blocked-by links.
 says  "$MC" "\`get_issue\` with \`includeRelations\` true"
 
+# Linear issue MAST-6: the foreman runs a Linear project.
+F=skills/work-on/foreman.md
+says  "$F" "## On Linear"
+# Scenario 1: the project description is the brief, every issue with its
+# comments, ordered by Linear blocked-by links.
+says  "$F" "read the project description with \`get_project\` with \`query\` the project name, in place of the project README"
+says  "$F" "\`list_issues\` with \`project\` the project name, then each issue with \`get_issue\` with \`id\` the key and \`includeRelations\` true, and \`list_comments\` with \`issueId\` the key"
+says  "$F" "order them by \`relations.blockedBy\`"
+# Scenario 2: an issue in Needs Human is not ready.
+says  "$F" "an issue in \`Needs Human\` is not ready, and no worker starts on it"
+# Scenario 3: the answer goes on the issue as a comment, and the issue leaves Needs Human.
+says  "$F" "posts the question and answer as a comment with \`save_comment\`, in the person's words"
+says  "$F" "sets the status to \`Todo\` with \`save_issue\` once no \`[NEEDS CLARIFICATION]\` line is left"
+# Scenario 4: a park moves the issue to Needs Human with one comment.
+says  "$F" "a second failure sets the issue's status to \`Needs Human\` with \`save_issue\` and adds one comment saying what happened, never a \`parked\` label"
+# Scenario 5: fix later is a Linear issue in the same project, Backlog, blocked by the reviewed issue.
+says  "$F" "\`save_issue\` with no \`id\`, \`team\` the team key, the same \`project\`, \`state\` \`Backlog\` and \`blockedBy\` the key of the issue whose review found it"
+# Scenario 6: merge sets Done up the chain and lists what it blocked from Linear.
+says  "$F" "set the merged issue to \`Done\` with \`save_issue\` if the \`Fixes\` line did not, then each parent up the chain with no open sub-issue left"
+says  "$F" "list what it blocked from \`get_issue\` with \`includeRelations\` true, its \`relations.blocks\`"
+# Scenario 7: the merge queue stays on GitHub.
+says  "$F" "Queuing the PR is unchanged: it goes to GitHub's merge queue"
+# Workers start on the Linear key and the status is set through Linear.
+says  "$F" "\`/work-on KOR-12 dispatched\`"
+says  "$F" "\`--name \"KOR-12-issue\"\`"
+says  "$F" "\`save_issue\` with \`id\` the key and \`state\` \`In Progress\`, never \`set-status.sh\`"
+# Scenario 8: a GitHub project runs as today.
+says  "$F" "On a repository whose issues live on GitHub, none of this section applies"
+says  "$F" "gh issue edit <n> --add-label parked"
+says  "$F" "gh api repos/{owner}/{repo}/issues/<n>/dependencies/blocking"
+says  "$F" "\`\${CLAUDE_PLUGIN_ROOT}/skills/work-on/set-status.sh <n> \"In Progress\"\`"
+says  "$F" "claude --bg --model opus --effort <level> --name \"<n>-issue\" \"/work-on #<n> dispatched\""
+
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
