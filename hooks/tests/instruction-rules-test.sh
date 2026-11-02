@@ -608,5 +608,27 @@ case $? in
   *) fail=$((fail + 1)); printf 'FAIL these still name the removed check: %s\n' "$named" ;;
 esac
 
+# Linear issue MAST-1: a repository says its issues live in GitHub or Linear,
+# never both, and every skill that touches an issue follows that one answer.
+says  skills/setup/SKILL.md "Where do this repository's issues live: GitHub or Linear?"
+says  skills/setup/SKILL.md '"ISSUE_TRACKER": "linear"'
+says  skills/setup/SKILL.md '"LINEAR_TEAM_KEY"'
+says  skills/setup/SKILL.md "never both"
+says  skills/setup/SKILL.md "It needs to know four things about this repository"
+never skills/setup/SKILL.md "It needs to know three things about this repository"
+never skills/setup/SKILL.md "Three short questions"
+says  skills/github-issues/SKILL.md "project_fact.py --tracker"
+says  skills/github-issues/SKILL.md "never look in GitHub issues"
+says  skills/github-issues/SKILL.md "Masthead cannot work Linear issues yet"
+never skills/github-issues/SKILL.md "GitHub is the tracker. An issue lives"
+for skill in skills/work-on/SKILL.md skills/analyze-issues/SKILL.md skills/review-design/SKILL.md; do
+  says  "$skill" "project_fact.py --tracker"
+  says  "$skill" "Masthead cannot work Linear issues yet"
+done
+says  README.md "whether its issues live in GitHub or Linear"
+never README.md "asks three questions about the repository"
+says  docs/explainer.template.html "whether its issues live in GitHub or Linear"
+never docs/explainer.template.html "asks three questions about the repository"
+
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
