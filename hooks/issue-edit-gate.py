@@ -46,7 +46,10 @@ A Linear connector `save_issue` that changes an issue's description is checked
 the same way (MAST-4). Linear has no gh, so its old description is always the
 one this session last read with `get_issue` or saved with `save_issue`, kept by
 `record` mode under the issue's key and its uuid; with neither, the edit is
-refused until the issue is read. A `patch` is applied to that description
+refused until the issue is read. An issue with no description is kept as an
+empty one. Linear wraps each issue key and mention in the text it returns in a
+tag of its own, which both sides lose before the quote check, so a key written
+plainly matches the tagged one. A `patch` is applied to that description
 first, and a patch that does not apply to it is refused, since the issue may
 have changed since. A save with no `id` creates an issue, and a save with no
 `description` or `patch` changes no text (a status, label, link or blocker);
@@ -98,6 +101,8 @@ CONNECTOR_READ = re.compile(r"^mcp__.+__(issue_read|get_issue)$")
 LINEAR_EDIT = re.compile(r"^mcp__.+__save_issue$")
 LINEAR_READ = re.compile(r"^mcp__.+__get_issue$")
 LINEAR = "linear"
+# The tag Linear wraps around an issue key or a mention in the text it returns.
+LINEAR_TAG = re.compile(r"<([a-z]+)\s[^<>]*>([^<>]*)</\1>")
 FORM = ("The check reads one form: `gh issue edit <n> --body-file <path>`, with the whole body in a "
         "file inside the checkout. Write the body to a file first, then edit (issue #21).")
 
@@ -581,16 +586,38 @@ def apply_patch(text, ops):
     return text
 
 
+def plain(text):
+    """Linear's text with each tag it wraps around an issue key or a mention
+    (`<issue id="..." href="...">KYR-1</issue>`) cut back to what it shows, so
+    the tag's own quote marks never split a quote and a key written plainly
+    matches the tagged one."""
+    previous = None
+    while previous != text:
+        previous, text = text, LINEAR_TAG.sub(r"\2", text)
+    return text
+
+
 def record_linear(data, tool_input):
     """Keep the description a Linear get_issue answered with, or the one a
     save_issue left, under the key the call named and the key and uuid the
-    answer gives, so a later edit by either finds it."""
-    issue = answered_issue(data.get("tool_response"), "description")
-    if issue is None or not isinstance(issue.get("description"), str):
+    answer gives, so a later edit by either finds it. An issue whose
+    description is empty (null, or left out of a full answer) is kept as an
+    empty text: there is nothing in it to lose. A get_issue that asked for
+    fields without the description keeps nothing, since it did not read it."""
+    response = data.get("tool_response")
+    issue = answered_issue(response, "description")
+    if issue is None and not tool_input.get("fields"):
+        issue = answered_issue(response, "id")
+    if issue is None:
+        return
+    description = issue.get("description")
+    if description is None:
+        description = ""
+    if not isinstance(description, str):
         return
     refs = {linear_ref(tool_input.get("id")), linear_ref(issue.get("id")), linear_ref(issue.get("uuid"))}
     for ref in refs - {""}:
-        keep(data, LINEAR, ref, issue["description"])
+        keep(data, LINEAR, ref, description)
 
 
 def gate_linear(data, tool_input, cwd):
@@ -605,14 +632,21 @@ def gate_linear(data, tool_input, cwd):
     old = recorded(data, LINEAR, ref)
     if old is None:
         deny("Blocked: this issue edit cannot be checked: this session has not read Linear issue {}. "
-             "Read it first with the Linear connector's get_issue, then send the edit "
+             "Read it first with the Linear connector's get_issue, then send the edit. For a status, "
+             "label, link or blocker change alone, send it without `description` or `patch` "
              "(MAST-4).".format(ref))
-    new = description if isinstance(description, str) else apply_patch(old, patch)
+    if isinstance(description, str):
+        new = description
+    else:
+        # A patch's anchors may hold a key as Linear tags it or as plain text.
+        new = apply_patch(old, patch)
+        if new is None:
+            new = apply_patch(plain(old), patch)
     if new is None:
         deny("Blocked: this issue edit cannot be checked: its patch does not apply to Linear issue {} "
              "as this session last read it, so the issue may have changed. Read it again with "
              "get_issue, then send the edit (MAST-4).".format(ref))
-    check(ref, new, old, cwd)
+    check(ref, plain(new), plain(old), cwd)
     sys.exit(0)
 
 
