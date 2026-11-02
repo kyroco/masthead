@@ -760,6 +760,12 @@ says  "$IC" "Add the needs-decision label when a question is open"
 says  "$MC" "(\`gh issue list --milestone \"<title>\"\`, then \`gh issue view <n> --comments\`)"
 says  "$RD" "\`gh issue edit <n> --body-file <path>\`"
 says  "$DS" "write it back with \`gh issue edit <n> --body-file <file>\`"
+# Review S2-1: a Linear question names the project description rule, and the
+# edit line says the check refuses a question without its "looked in:" part.
+says  "$IC" "<project description rule>"
+says  "$IC" "or a question without its \"looked in:\" part naming the decision record, the project description rule and the Korium query"
+# Review S5-1: the whole-set check reads each issue's blocked-by links.
+says  "$MC" "\`get_issue\` with \`includeRelations\` true"
 
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
