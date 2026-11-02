@@ -338,6 +338,12 @@ says  scripts/diagrams.py "fixes only what fails"
 says  docs/images/day-3-check.svg "fixes only what fails"
 says  docs/images/workflow.svg "fixes only what fails"
 says  hooks/run-tests.sh "issue-edit-gate-test.py"
+# MAST-4 review F-S6: a Linear save that changes no text is not refused, so
+# the rows say which Linear edits are checked.
+for doc in README.md docs/explainer.template.html docs/explainer.html; do
+  never "$doc" "and every Linear edit, is checked"
+  says  "$doc" "and every Linear edit of an issue's text, is checked"
+done
 for doc in README.md docs/explainer.template.html docs/explainer.html scripts/diagrams.py docs/images/workflow.svg docs/images/day-3-check.svg skills/analyze-issues/SKILL.md skills/analyze-issues/issue-check.md skills/analyze-issues/milestone-check.md; do
   never "$doc" "rewrites it on GitHub"
   never "$doc" "rewrites its issue"

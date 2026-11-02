@@ -272,6 +272,15 @@ def main():
     said = 'Robert said "one thing should get me account statuses".'
     bullet = '- "the code shouldn\'t know who to call to read and who to update"\n'
 
+    tag = '<issue id="9f1c" href="https://linear.app/kyroco/issue/KYR-1/x">KYR-1</issue>'
+    keyed_plain = OLD.replace("None open.", 'Robert said "fix it the way KYR-1 did".')
+    keyed_tagged = keyed_plain.replace("KYR-1", tag)
+    got_keyed = linear(get, id="MAST-4", response=issue(keyed_tagged))
+    got_null = linear(get, id="MAST-4", response=as_text({"id": "MAST-4", "uuid": "u", "description": None}))
+    got_missing = linear(get, id="MAST-4", response=as_text({"id": "MAST-4", "uuid": "u", "title": "t"}))
+    got_fields = linear(get, id="MAST-4", fields=["id", "title"],
+                        response=as_text({"id": "MAST-4", "title": "t"}))
+
     def patched(*ops):
         return linear(save, id="MAST-4", patch=list(ops))
 
@@ -345,6 +354,23 @@ def main():
          {"raw": linear(save, id="MAST-4", description=drop_said), "mode": "record"}),
         ("linear: a status save keeps the read", None, "deny",
          {"raw": linear(save, id="MAST-4", description=drop_said), "records": [got_4, saved_4_status]}),
+        # Linear answers with each issue key wrapped in a tag of its own (review F-S1).
+        ("linear: quote naming an issue, key sent plain", None, "allow",
+         {"raw": linear(save, id="MAST-4", description=keyed_plain), "records": [got_keyed]}),
+        ("linear: quote naming an issue, tag sent back", None, "allow",
+         {"raw": linear(save, id="MAST-4", description=keyed_tagged), "records": [got_keyed]}),
+        ("linear: quote naming an issue, dropped", None, "deny",
+         {"raw": linear(save, id="MAST-4", description=OLD), "records": [got_keyed]}),
+        ("linear: patch with a plain key on a tagged read", None, "allow",
+         {"raw": patched({"op": "replace", "old_string": "KYR-1 did", "new_string": "KYR-1 did it"}),
+          "records": [got_keyed]}),
+        # A title-only issue has no description to lose (review F-S2).
+        ("linear: read of an issue with a null description", None, "allow",
+         {"raw": linear(save, id="MAST-4", description="## Why\n"), "records": [got_null]}),
+        ("linear: read of an issue with no description field", None, "allow",
+         {"raw": linear(save, id="MAST-4", description="## Why\n"), "records": [got_missing]}),
+        ("linear: read that asked for fields without the description", None, "deny",
+         {"raw": linear(save, id="MAST-4", description="## Why\n"), "records": [got_fields]}),
     ]
 
     cases = [
@@ -486,6 +512,12 @@ def main():
          "the code shouldn't know who to call"),
         ("linear no-read refusal says to read with get_issue", None,
          {"raw": linear(save, id="MAST-4", description=OLD)}, "get_issue"),
+        ("linear no-read refusal says a status change sends no description", None,
+         {"raw": linear(save, id="MAST-4", state="Done", description=OLD)},
+         "a status, label, link or blocker change alone, send it without `description` or `patch`"),
+        ("linear tagged-key refusal quotes the line as written", None,
+         {"raw": linear(save, id="MAST-4", description=OLD), "records": [got_keyed]},
+         '"fix it the way KYR-1 did"'),
         ("linear stale patch refusal says to read again", None,
          {"raw": patched({"op": "replace", "old_string": "not in the body", "new_string": "x"}),
           "records": [got_4]}, "get_issue"),
