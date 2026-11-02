@@ -99,7 +99,7 @@ never docs/explainer.html "writes a plan, one line per scenario"
 never docs/explainer.html "its plan, one line per scenario"
 never docs/images/day-5-workers.svg "its plan, one line per scenario"
 never scripts/diagrams.py "its plan, one line per scenario"
-says  .claude-plugin/plugin.json '"version": "0.1.20"'
+says  .claude-plugin/plugin.json '"version": "0.1.21"'
 
 never_phrase() {
   local hit
@@ -634,6 +634,37 @@ says  README.md "whether its issues live in GitHub or Linear"
 never README.md "asks three questions about the repository"
 says  docs/explainer.template.html "whether its issues live in GitHub or Linear"
 never docs/explainer.template.html "asks three questions about the repository"
+
+# Linear issue MAST-2: the linear-issues skill says how work is laid out in
+# Linear and names the Linear call for each action github-issues names.
+L=skills/linear-issues/SKILL.md
+# Scenario 1: the layout.
+says  "$L" "The project description is the whole brief"
+says  "$L" "Four parts, in this order"
+for part in "**Why:**" "**Scenarios:**" "**Out of scope:**" "**Questions:**"; do
+  says  "$L" "$part"
+done
+says  "$L" "Order lives in the issues, through blocked-by links"
+says  "$L" "Milestones only where a project has real stages"
+# Scenario 2: one Linear call for each action in the github-issues table.
+says  "$L" "| Read an issue with its comments | \`gh issue view <n> --comments\` | \`get_issue\` with \`id\` the key, then \`list_comments\`"
+says  "$L" "| Search | \`gh issue list --search \"<words>\" --state all\` | \`list_issues\` with \`query\`"
+says  "$L" "| Create | \`gh issue create\` | \`save_issue\` with no \`id\`"
+says  "$L" "| Edit the body | \`gh issue edit <n> --body-file <path>\` | \`get_issue\` first, then \`save_issue\` with \`id\` and \`patch\`"
+says  "$L" "| Set the status | \`set-status.sh <n> \"<Status>\"\` | \`save_issue\` with \`id\` and \`state\`"
+says  "$L" "| Add a blocked-by link | \`gh api .../dependencies/blocked_by\` | \`save_issue\` with \`id\` the waiting issue and \`blockedBy\`"
+says  "$L" "| Add a sub-issue | \`gh api .../sub_issues\` | \`save_issue\` with \`id\` the child and \`parentId\`"
+says  "$L" "| Comment | \`gh issue comment <n>\` | \`save_comment\` with \`issueId\`"
+says  "$L" "| List what an issue blocks | \`gh api .../dependencies/blocking\` | \`get_issue\` with \`includeRelations\` true; the answer's \`relations.blocks\`"
+# Scenario 3: an open question is the Needs Human status, not a label.
+says  "$L" "An issue with an open question has the status Needs Human**, not a label"
+never "$L" "needs-decision"
+never "$L" "parked"
+# Scenario 4: a GitHub repository is sent to github-issues, which still answers.
+says  "$L" "project_fact.py --tracker"
+says  "$L" "On \`github\`, this skill does not apply: read the \`github-issues\` skill instead"
+says  skills/github-issues/SKILL.md "read the \`linear-issues\` skill instead of this one"
+says  README.md "\`linear-issues\` (the same for Linear)"
 
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
