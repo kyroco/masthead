@@ -99,7 +99,7 @@ never docs/explainer.html "writes a plan, one line per scenario"
 never docs/explainer.html "its plan, one line per scenario"
 never docs/images/day-5-workers.svg "its plan, one line per scenario"
 never scripts/diagrams.py "its plan, one line per scenario"
-says  .claude-plugin/plugin.json '"version": "0.1.21"'
+says  .claude-plugin/plugin.json '"version": "0.1.22"'
 
 never_phrase() {
   local hit
@@ -665,6 +665,45 @@ says  "$L" "project_fact.py --tracker"
 says  "$L" "On \`github\`, this skill does not apply: read the \`github-issues\` skill instead"
 says  skills/github-issues/SKILL.md "read the \`linear-issues\` skill instead of this one"
 says  README.md "\`linear-issues\` (the same for Linear)"
+
+# Linear issue MAST-3: /work-on works one Linear issue, from branch to merged PR.
+W=skills/work-on/worker.md
+# Scenario 1: a Linear key makes a worker, and "dispatched" a dispatched one.
+says  skills/work-on/SKILL.md "**A Linear key** such as \`KOR-12\`"
+says  skills/work-on/SKILL.md "\`KOR-12 dispatched\` makes a dispatched worker, the same as \`#1418 dispatched\`"
+says  skills/work-on/SKILL.md "never read as a project or milestone name"
+says  "$W" "## On Linear"
+# Scenario 2: the issue with every comment, its parent, and the project description as the brief.
+says  "$W" "\`get_issue\` with \`id\` the key, then \`list_comments\` with \`issueId\` the key"
+says  "$W" "its parent (\`parentId\`) the same way"
+says  "$W" "the Linear project's description is the brief, in place of the project README"
+# Scenario 3: worktree KOR-12-issue, branch named by Linear and holding the key.
+says  "$W" "the worktree for KOR-12 is \`KOR-12-issue\`"
+says  "$W" "the branch is the one \`get_issue\` returns as \`gitBranchName\`"
+says  "$W" "\`git switch -c <gitBranchName>\`, then \`git push -u origin <gitBranchName>\`"
+says  "$W" "never \`gh issue develop\`"
+# Scenario 4: In Progress through the Linear connector, never set-status.sh.
+says  "$W" "\`save_issue\` with \`id\` the key and \`state\` \`In Progress\`"
+says  "$W" "never \`set-status.sh\`, which knows only GitHub projects"
+# Scenario 5: the PR body says Fixes KOR-12, and merging moves it to Done.
+says  references/session-cliffs.md "\`Fixes <key>\`, such as \`Fixes KOR-12\`, when the issue lives in Linear"
+says  "$W" "the PR body says \`Fixes KOR-12\`"
+says  "$W" "set \`In Review\` the same way once the PR is open"
+says  "$W" "check its status reads Done, and set it with \`save_issue\` if not"
+# Scenario 6: a question nothing answers sets Needs Human until the answer comes.
+says  "$W" "set the issue's status to \`Needs Human\` with \`save_issue\` before you ask"
+says  "$W" "put the answer on the issue as a comment in the words it came in, and set the status back to \`In Progress\`"
+# Scenario 7: a GitHub repository works as today; the GitHub steps stand unchanged.
+says  "$W" "gh issue develop 1418 --name <user>/1418-<short-slug> --base main"
+says  "$W" "Work in a worktree named after the issue, so #1418 is \`1418-issue\`."
+says  "$W" "Status to In Progress with \`\${CLAUDE_PLUGIN_ROOT}/skills/work-on/set-status.sh\` unless a foreman already did."
+says  "$W" "set the Status to In Review with \`set-status.sh\`"
+says  "$W" "On a repository whose issues live on GitHub, none of this section applies"
+says  skills/work-on/SKILL.md "- **\`#1418\`**: you are the **worker** for that issue"
+says  references/session-cliffs.md "\`Fixes #<issue>\`"
+says  README.md "\`/work-on KOR-12\`"
+says  docs/explainer.template.html "<code>/work-on KOR-12</code>"
+says  docs/explainer.html "<code>/work-on KOR-12</code>"
 
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
