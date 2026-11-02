@@ -34,9 +34,15 @@ def settings(root, env, leaf="settings.json"):
         json.dump({"env": env}, handle)
 
 
-def ask(root, flag):
-    env = dict(os.environ, CLAUDE_PROJECT_DIR=root)
-    out = subprocess.run([sys.executable, SCRIPT, flag], cwd=root, env=env,
+def ask(root, flag, cwd=None, project=True):
+    """Run the real script. project=False is a skill's Bash call: Claude Code
+    sets CLAUDE_PROJECT_DIR only for hooks, so the shell there has none."""
+    env = dict(os.environ)
+    env.pop("CLAUDE_PROJECT_DIR", None)
+    env.pop("CLAUDE_CODE_REMOTE", None)
+    if project:
+        env["CLAUDE_PROJECT_DIR"] = root
+    out = subprocess.run([sys.executable, SCRIPT, flag], cwd=cwd or root, env=env,
                          capture_output=True, text=True, check=True)
     return out.stdout.strip()
 
@@ -80,6 +86,39 @@ settings(root, {"ISSUE_TRACKER": "github"})
 expect("before the move", ask(root, "--tracker"), "github")
 settings(root, {"ISSUE_TRACKER": "linear", "LINEAR_TEAM_KEY": "KOR"})
 expect("after the move", ask(root, "--tracker"), "linear")
+
+# Review fix 1: both settings files carry the fact. The personal file wins,
+# as it does in Claude Code itself, so "Just me, Linear" over a committed
+# "github" holds.
+root = repo()
+settings(root, {"ISSUE_TRACKER": "github"})
+settings(root, {"ISSUE_TRACKER": "linear", "LINEAR_TEAM_KEY": "KOR"}, "settings.local.json")
+expect("personal file over shared file", ask(root, "--tracker"), "linear")
+settings(root, {"ISSUE_TRACKER": "linear", "LINEAR_TEAM_KEY": "KOR"})
+settings(root, {"ISSUE_TRACKER": "github"}, "settings.local.json")
+expect("personal github over shared linear", ask(root, "--tracker"), "github")
+
+# Review fix 2: a skill runs the check through the Bash tool, which has no
+# CLAUDE_PROJECT_DIR. The repository the shell is in answers.
+root = repo()
+settings(root, {"ISSUE_TRACKER": "linear", "LINEAR_TEAM_KEY": "KOR"})
+expect("skill's shell, repo top", ask(root, "--tracker", project=False), "linear")
+sub = os.path.join(root, "lib")
+os.mkdir(sub)
+expect("skill's shell, a folder inside", ask(root, "--tracker", cwd=sub, project=False), "linear")
+expect("skill's shell, team key", ask(root, "--linear-team", project=False), "KOR")
+
+# Review fix 2, with a real git worktree: a worker's shell in a worktree reads
+# the main checkout's answer, so every worker of one repository agrees.
+main = tempfile.mkdtemp(prefix="tracker-main-")
+subprocess.run(["git", "init", "-q", main], check=True)
+subprocess.run(["git", "-C", main, "-c", "user.name=t", "-c", "user.email=t@t",
+                "commit", "-q", "--allow-empty", "-m", "init"], check=True)
+os.mkdir(os.path.join(main, ".claude"))
+settings(main, {"ISSUE_TRACKER": "linear"})
+tree = os.path.join(tempfile.mkdtemp(prefix="tracker-tree-"), "wt")
+subprocess.run(["git", "-C", main, "worktree", "add", "-q", tree], check=True)
+expect("worker's shell in a worktree", ask(tree, "--tracker", project=False), "linear")
 
 # A checkout that is not the session's repository supplies no facts.
 other = repo()

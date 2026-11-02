@@ -615,6 +615,9 @@ says  skills/setup/SKILL.md "Where do this repository's issues live: GitHub or L
 says  skills/setup/SKILL.md '"ISSUE_TRACKER": "linear"'
 says  skills/setup/SKILL.md '"LINEAR_TEAM_KEY"'
 says  skills/setup/SKILL.md "never both"
+# Review fixes 1 and 3: one answer in one file, written where skills read it.
+says  skills/setup/SKILL.md "remove both from the other settings file"
+says  skills/setup/SKILL.md "run \`/masthead:setup\` from the repository's main checkout"
 says  skills/setup/SKILL.md "It needs to know four things about this repository"
 never skills/setup/SKILL.md "It needs to know three things about this repository"
 never skills/setup/SKILL.md "Three short questions"
