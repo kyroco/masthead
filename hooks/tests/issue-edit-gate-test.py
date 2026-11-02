@@ -369,6 +369,10 @@ def main():
          {"raw": linear(save, id="MAST-4", description="## Why\n"), "records": [got_null]}),
         ("linear: read of an issue with no description field", None, "allow",
          {"raw": linear(save, id="MAST-4", description="## Why\n"), "records": [got_missing]}),
+        ("linear: a save answered without the description keeps the read", None, "deny",
+         {"raw": linear(save, id="MAST-4", description=drop_said),
+          "records": [got_4, linear(save, id="MAST-4", state="Done",
+                                    response=as_text({"id": "MAST-4", "uuid": "u", "title": "t"}))]}),
         ("linear: read that asked for fields without the description", None, "deny",
          {"raw": linear(save, id="MAST-4", description="## Why\n"), "records": [got_fields]}),
     ]
