@@ -32,7 +32,9 @@ issue labelled needs-decision or parked lands as Needs Human. Each copy's body
 ends with a hidden line naming its GitHub issue. Run it again and nothing is
 copied twice: an issue whose copy carries that line is not made again, and a
 comment already on it is not posted again. A copy whose line was removed is
-not found, and the issue is copied again.
+not found, and the issue is copied again. Last, the parent and blocked-by
+links GitHub holds between two issues that both have a copy are made between
+the copies, each once; a link whose other side has no copy is named, not made.
 
 The Linear key is read from the environment variable the person names, at run
 time. It is never printed, logged or saved: everything Linear sends back is
@@ -384,8 +386,15 @@ def plan(args):
 ISSUE_QUERY = """query($owner:String!,$name:String!,$number:Int!,$after:String){
   repository(owner:$owner,name:$name){ issue(number:$number){ number title body state
     milestone{title} labels(first:100){nodes{name}}
+    parent{ number repository{nameWithOwner} }
+    subIssues(first:100){ pageInfo{hasNextPage} nodes{ number repository{nameWithOwner} } }
+    blockedBy(first:100){ pageInfo{hasNextPage} nodes{ number repository{nameWithOwner} } }
+    blocking(first:100){ pageInfo{hasNextPage} nodes{ number repository{nameWithOwner} } }
     comments(first:100, after:$after){ pageInfo{hasNextPage endCursor}
       nodes{ author{login} createdAt body } } } } }"""
+
+# The GitHub links between issues that the copy keeps, and how a refusal names them.
+LINK_FIELDS = {"subIssues": "sub-issues", "blockedBy": "issues blocking it", "blocking": "issues it blocks"}
 
 # On Linear these two labels are a status, Needs Human, not a label.
 NEEDS_HUMAN_LABELS = ("needs-decision", "parked")
@@ -440,9 +449,34 @@ def read_issue(repo, number):
         if not page["comments"]["pageInfo"]["hasNextPage"]:
             break
         after = page["comments"]["pageInfo"]["endCursor"]
+    for field, name in LINK_FIELDS.items():
+        if ((issue.get(field) or {}).get("pageInfo") or {}).get("hasNextPage"):
+            fail("Issue {} of {} has more than 100 {}, more than one read holds, so a link would be lost. "
+                 "Nothing was written.".format(number, repo, name), 1)
     issue = dict(issue)
     issue["comments"] = comments
     return issue
+
+
+def github_links(repo, issues):
+    """The parent and blocked-by links GitHub holds for these issues, each end as (repository, number):
+    parents as (sub-issue, parent), blocks as (blocker, the issue that waits). Read from both ends,
+    so a link is found whichever of its two issues a run copies."""
+    def end(node):
+        return ((node.get("repository") or {}).get("nameWithOwner") or "").lower(), node.get("number")
+
+    def nodes(issue, field):
+        return (issue.get(field) or {}).get("nodes") or []
+
+    parents, blocks = set(), set()
+    for issue in issues:
+        me = (repo.lower(), issue["number"])
+        if issue.get("parent"):
+            parents.add((me, end(issue["parent"])))
+        parents.update((end(sub), me) for sub in nodes(issue, "subIssues"))
+        blocks.update((end(other), me) for other in nodes(issue, "blockedBy"))
+        blocks.update((me, end(other)) for other in nodes(issue, "blocking"))
+    return parents, blocks
 
 
 def chosen_numbers(repo, project, milestone, numbers):
@@ -491,9 +525,10 @@ TEAM = """query($key:String!){ teams(filter:{key:{eq:$key}}){ nodes{ id key
 PROJECTS = """query($name:String!){ projects(filter:{name:{eq:$name}}){ nodes{ id name
   teams{nodes{id}} projectMilestones{nodes{id name sortOrder}} } } }"""
 
+# Matched whatever the case: the hidden line holds the repository as the person typed it on that run.
 COPIES = """query($team:ID!,$mark:String!,$after:String){
   issues(first:100, after:$after, includeArchived:true,
-         filter:{team:{id:{eq:$team}}, description:{contains:$mark}}){
+         filter:{team:{id:{eq:$team}}, description:{containsIgnoreCase:$mark}}){
     pageInfo{hasNextPage endCursor} nodes{ id description createdAt project{id} } } }"""
 
 PROJECT_BY_ID = """query($id:String!){ project(id:$id){ id name
@@ -531,6 +566,14 @@ def same_text(text):
 COMMENTS = """query($id:String!,$after:String){ issue(id:$id){
   comments(first:100, after:$after){ pageInfo{hasNextPage endCursor} nodes{ body } } } }"""
 
+PARENT = """query($id:String!){ issue(id:$id){ parent{ id } } }"""
+
+RELATIONS = """query($id:String!,$after:String){ issue(id:$id){
+  relations(first:100, after:$after){ pageInfo{hasNextPage endCursor} nodes{ type relatedIssue{ id } } } } }"""
+
+SET_PARENT = """mutation($id:String!,$input:IssueUpdateInput!){
+  issueUpdate(id:$id, input:$input){ success issue{ id } } }"""
+
 
 def made(answer, field, inner):
     """What a create call made, or stop when Linear says it did not."""
@@ -561,6 +604,78 @@ def every_page(key, query, variables, path):
         if not page["pageInfo"]["hasNextPage"]:
             return nodes
         after = page["pageInfo"]["endCursor"]
+
+
+def copies_of(key, team_id, repo):
+    """Every copy on the team of another repository's issues, by GitHub number: the copies an earlier
+    run of the copy made from that repository, whatever case its name was typed in then. As for this
+    repository, the earliest copy wins."""
+    if not re.match(r"^[a-z0-9_.-]+/[a-z0-9_.-]+$", repo):
+        return {}
+    found = {}
+    for node in sorted(every_page(key, COPIES, {"team": team_id, "mark": MARK.format(repo, "")},
+                                  ("issues",)), key=lambda n: n["createdAt"]):
+        number = copied_from(repo, node.get("description"))
+        if number is not None:
+            found.setdefault(number, node["id"])
+    return found
+
+
+def make_links(key, repo, team_id, parents, blocks, copies):
+    """Make each GitHub link between two issues that both have a copy on the team, once: the sub-issue's
+    copy gets the parent's copy as its parent, and the blocker's copy blocks the waiting one's. The
+    other issue may be in another repository copied to the same team. A copy already under another
+    parent in Linear is left there. Returns the lines to print."""
+    found = {repo.lower(): copies}
+
+    def copy_of(end):
+        if end[0] not in found:
+            found[end[0]] = copies_of(key, team_id, end[0])
+        return found[end[0]].get(end[1])
+
+    def name(end):
+        return "#{}".format(end[1]) if end[0] == repo.lower() else "{}#{}".format(shown(end[0]), end[1])
+
+    new_parents = new_blocks = 0
+    missing, kept = [], []
+    for child, parent in sorted(parents):
+        said = "{} is a sub-issue of {}".format(name(child), name(parent))
+        if not (copy_of(child) and copy_of(parent)):
+            missing.append(said)
+            continue
+        now = ((linear(key, PARENT, {"id": copy_of(child)}).get("issue") or {}).get("parent") or {}).get("id")
+        if now == copy_of(parent):
+            continue
+        if now:
+            kept.append(said)
+            continue
+        made(linear(key, SET_PARENT, {"id": copy_of(child), "input": {"parentId": copy_of(parent)}}),
+             "issueUpdate", "issue")
+        new_parents += 1
+    blocked = {}
+    for blocker, waits in sorted(blocks):
+        if not (copy_of(blocker) and copy_of(waits)):
+            missing.append("{} blocks {}".format(name(blocker), name(waits)))
+            continue
+        if copy_of(blocker) not in blocked:
+            blocked[copy_of(blocker)] = {r["relatedIssue"]["id"] for r in every_page(
+                key, RELATIONS, {"id": copy_of(blocker)}, ("issue", "relations")) if r.get("type") == "blocks"}
+        if copy_of(waits) in blocked[copy_of(blocker)]:
+            continue
+        create(key, "issueRelationCreate", "issueRelation",
+               {"issueId": copy_of(blocker), "relatedIssueId": copy_of(waits), "type": "blocks"})
+        blocked[copy_of(blocker)].add(copy_of(waits))
+        new_blocks += 1
+
+    lines = ["Links made now: {} parent link{}, {} blocked-by link{}.".format(
+        new_parents, "" if new_parents == 1 else "s", new_blocks, "" if new_blocks == 1 else "s")]
+    if missing:
+        lines.append("Links not made, because one side has no copy on this Linear team (closed, not copied yet, "
+                     "or in another repository not copied here): " + "; ".join(missing) + ".")
+    if kept:
+        lines.append("Left as it is, because the copy already has another parent in Linear: "
+                     + "; ".join(kept) + ".")
+    return lines
 
 
 PLAN_SOURCE = re.compile(r"^(?:github:)?([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)(?:#|\s+project\s+)(\d+)$", re.I)
@@ -690,6 +805,7 @@ def copy(args):
             if held:
                 fields["stateId"] = needs_human
             target = create(key, "issueCreate", "issue", fields)
+            found[issue["number"]] = target["id"]
             new_issues += 1
             posted = collections.Counter()
         # Counted, not just looked up: two comments with the same words are two comments, and each
@@ -702,12 +818,17 @@ def copy(args):
             create(key, "commentCreate", "comment", {"issueId": target["id"], "body": body})
             new_comments += 1
 
+    # Links last, once every chosen issue has its copy; `found` now holds every copy on the team.
+    parents, blocks = github_links(args.repo, issues)
+    link_lines = make_links(key, args.repo, team["id"], parents, blocks, found)
+
     lines = ['Linear project "{}" holds the {} chosen from {}.'.format(shown(title), plural(len(issues)), args.repo)]
     lines.append("Made now: {} project, {}, {} milestone{}, {} comment{}, {} label{}.".format(
         0 if projects else 1, plural(new_issues), new_milestones, "" if new_milestones == 1 else "s",
         new_comments, "" if new_comments == 1 else "s", new_labels, "" if new_labels == 1 else "s"))
     if len(issues) > new_issues:
         lines.append("Already in Linear, so not made again: {}.".format(plural(len(issues) - new_issues)))
+    lines += link_lines
     lines.append("Nothing was written to GitHub.")
     print(hide("\n".join(lines), key))
 
