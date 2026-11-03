@@ -491,14 +491,22 @@ TEAM = """query($key:String!){ teams(filter:{key:{eq:$key}}){ nodes{ id key
 PROJECTS = """query($name:String!){ projects(filter:{name:{eq:$name}}){ nodes{ id name
   teams{nodes{id}} projectMilestones{nodes{id name sortOrder}} } } }"""
 
-COPIES = """query($id:String!,$after:String){ project(id:$id){
-  issues(first:100, after:$after){ pageInfo{hasNextPage endCursor} nodes{ id description createdAt } } } }"""
+COPIES = """query($team:ID!,$mark:String!,$after:String){
+  issues(first:100, after:$after, includeArchived:true,
+         filter:{team:{id:{eq:$team}}, description:{contains:$mark}}){
+    pageInfo{hasNextPage endCursor} nodes{ id description createdAt project{id} } } }"""
+
+PROJECT_BY_ID = """query($id:String!){ project(id:$id){ id name
+  teams{nodes{id}} projectMilestones{nodes{id name sortOrder}} } }"""
+
+
+MARK = "<!-- copied from GitHub {}#{}"
 
 
 def with_mark(body, repo, number):
     """An issue's body as its Linear copy holds it: the GitHub text, then a hidden line naming the
     GitHub issue, which Linear does not show and a later run reads to find the copy."""
-    mark = "<!-- copied from GitHub {}#{} -->".format(repo, number)
+    mark = MARK.format(repo, number) + " -->"
     body = (body or "").rstrip()
     return "{}\n\n{}".format(body, mark) if body else mark
 
@@ -614,13 +622,29 @@ def copy(args):
         fail('Issues {} need the status "{}", and the team {} has none. Add it in Linear, then run the copy '
              'again. Nothing was written.'.format(", ".join(map(str, held_back)), NEEDS_HUMAN, shown(team["key"])), 1)
 
-    # The project: found by name on this team, or made.
-    projects = [p for p in ((linear(key, PROJECTS, {"name": title}).get("projects") or {}).get("nodes") or [])
-                if any(t["id"] == team["id"] for t in p["teams"]["nodes"])]
+    # Copies already made, anywhere on the team, archived ones too, found by their hidden line only:
+    # a renamed project or a copy moved to another project is still found, and nothing else can tell
+    # which issue a copy came from.
+    found, homes = {}, collections.Counter()
+    for node in sorted(every_page(key, COPIES, {"team": team["id"], "mark": MARK.format(args.repo, "")},
+                                  ("issues",)), key=lambda n: n["createdAt"]):
+        number = copied_from(args.repo, node.get("description"))
+        if number is not None:
+            found.setdefault(number, node["id"])
+            if node.get("project"):
+                homes[node["project"]["id"]] += 1
+
+    # The project: the one the earlier copies sit in, whatever it is called now; else found by name
+    # on this team; else made.
+    if homes:
+        projects = [linear(key, PROJECT_BY_ID, {"id": homes.most_common(1)[0][0]}).get("project")]
+    else:
+        projects = [p for p in ((linear(key, PROJECTS, {"name": title}).get("projects") or {}).get("nodes") or [])
+                    if any(t["id"] == team["id"] for t in p["teams"]["nodes"])]
     if len(projects) > 1:
         fail('{} Linear projects on the team are named "{}". Nothing was written.'.format(len(projects), shown(title)), 1)
-    project = projects[0] if projects else create(key, "projectCreate", "project",
-                                                   {"name": title, "teamIds": [team["id"]]})
+    project = projects[0] if projects and projects[0] else create(key, "projectCreate", "project",
+                                                                   {"name": title, "teamIds": [team["id"]]})
     existing = (project.get("projectMilestones") or {}).get("nodes") or []
     milestones = {m["name"]: m["id"] for m in existing}
     made = {m["name"]: float(m.get("sortOrder") or 0) for m in existing}
@@ -633,16 +657,6 @@ def copy(args):
             milestones[name] = create(key, "projectMilestoneCreate", "projectMilestone",
                                       {"projectId": project["id"], "name": name, "sortOrder": made[name]})["id"]
             new_milestones += 1
-
-    # Each copy's body ends with a hidden line naming its GitHub issue, and a copy is found only by
-    # that line: never by title or words. A copy whose line is gone is not found, and the issue is
-    # copied again; nothing else can tell which issue it came from.
-    found = {}
-    for node in sorted(every_page(key, COPIES, {"id": project["id"]}, ("project", "issues")),
-                       key=lambda n: n["createdAt"]):
-        number = copied_from(args.repo, node.get("description"))
-        if number is not None:
-            found.setdefault(number, node["id"])
 
     new_issues = new_comments = new_labels = 0
     for issue in issues:
