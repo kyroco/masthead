@@ -780,6 +780,9 @@ says  "$F" "an issue in \`Needs Human\` is not ready, and no worker starts on it
 # Scenario 3: the answer goes on the issue as a comment, and the issue leaves Needs Human.
 says  "$F" "goes on the issue as a comment with \`save_comment\`, in the person's words"
 says  "$F" "the issue moves to \`Todo\` with \`save_issue\` once no \`[NEEDS CLARIFICATION]\` line is left"
+# Re-verify 2: a question answered before a worker starts is taken out of the
+# body, so the issue can leave Needs Human.
+says  "$F" "the answered \`[NEEDS CLARIFICATION]\` line is taken out of the body with \`save_issue\` and \`patch\` after reading it with \`get_issue\`"
 # Review S3-answer: on a worker's question the worker posts the answer and
 # sets In Progress, so the foreman's helper posts no second comment and
 # never moves a building issue to Todo.
