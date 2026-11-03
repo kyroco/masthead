@@ -2,8 +2,8 @@
 """Linear issue MAST-14: the migration skill asks before anything is written.
 
 /masthead:migrate-issues moves issues GitHub to Linear and Linear to GitHub.
-Its first step, checked here: it reads the GitHub project and shows what each
-layout would make from the person's own names, it lets the person reach Linear
+Its first step, checked here: it reads the source and shows what it becomes on
+the other side, from the person's own names, it lets the person reach Linear
 with an API key or the Linear connector, and a key is read at run time from
 where the person keeps it and never shows in output or in a file. Nothing in
 the skill names one company's repositories or milestones.
@@ -160,37 +160,35 @@ def no_key(out, err):
     return KEY not in out and KEY not in err
 
 
-# --- Scenario 1: the layouts, from the person's own names, before anything is written.
+# --- Scenario 1: what the GitHub project becomes in Linear, from its own names, before anything is written.
 
 env = fake_gh()
-code, out, err = run(["layouts", "--repo", "acme/site", "--project", "7"], env=env)
-check("layouts runs", code == 0, err)
-check("layouts names the project", 'GitHub project "Website relaunch"' in out, out)
-check("layouts counts only open issues", "6 open issues" in out, out)
-check("mirror: one Linear project named for the GitHub project", 'Linear project "Website relaunch"' in out, out)
-check("mirror: milestone keeps its own name inside the project", 'milestone "1. Build" (3 issues)' in out, out)
-check("mirror: milestones in build order, 2 before 10",
+code, out, err = run(["read-github", "--repo", "acme/site", "--project", "7"], env=env)
+check("read-github runs", code == 0, err)
+check("read-github names the project", 'GitHub project "Website relaunch"' in out, out)
+check("read-github counts only open issues", "6 open issues" in out, out)
+check("the GitHub project becomes one Linear project with the same name", 'Linear project "Website relaunch"' in out, out)
+check("each milestone keeps its own name inside the Linear project", 'milestone "1. Build" (3 issues)' in out, out)
+check("milestones in build order, 2 before 10",
       out.find('milestone "2. Launch"') < out.find('milestone "10. Follow up"'), out)
-check("linear layout: an initiative named for the GitHub project",
-      'Linear initiative "Website relaunch"' in out, out)
-check("mirror: a shorter project prefix on a milestone is dropped too",
+check("a shorter project prefix on a milestone is dropped too",
       'milestone "10. Follow up" (1 issue)' in out, out)
-check("linear layout: each milestone its own project",
-      'project "Website relaunch: 1. Build" (3 issues)' in out, out)
+check("no initiative is made", "initiative" not in out.lower(), out)
+check("there is one mapping, not a choice", "layout" not in out.lower() and "2. " not in out.split("Linear project")[0], out)
 check("an issue from another repository in the project is left out",
       "Store listing" not in out, out)
-check("layouts names the repository", "acme/site" in out, out)
+check("read-github names the repository", "acme/site" in out, out)
 check("a closed issue's milestone is not shown", "Retire old site" not in out, out)
-check("issues with no milestone are counted", "no milestone (1 issue)" in out, out)
-check("layouts says nothing is written yet", "Nothing has been written" in out, out)
+check("issues with no milestone stay in the project with no milestone", "no milestone (1 issue)" in out, out)
+check("read-github says nothing is written yet", "Nothing has been written" in out, out)
 calls = [json.loads(line) for line in open(env["FAKE_GH_LOG"])] if os.path.exists(env["FAKE_GH_LOG"]) else []
-check("layouts reads both pages", any(any(a == "after=CUR1" for a in c) for c in calls), str(calls))
-check("layouts only reads GitHub", calls and all(c[:2] == ["api", "graphql"] for c in calls)
+check("read-github reads both pages", any(any(a == "after=CUR1" for a in c) for c in calls), str(calls))
+check("read-github only reads GitHub", calls and all(c[:2] == ["api", "graphql"] for c in calls)
       and not any("mutation" in a for c in calls for a in c), str(calls))
 
 env = fake_gh(user_only=True)
-code, out, err = run(["layouts", "--repo", "pat/site", "--project", "7"], env=env)
-check("layouts reads a project a person owns", code == 0 and 'GitHub project "Website relaunch"' in out, out + err)
+code, out, err = run(["read-github", "--repo", "pat/site", "--project", "7"], env=env)
+check("read-github reads a project a person owns", code == 0 and 'GitHub project "Website relaunch"' in out, out + err)
 
 # --- Scenarios 3 and 4: a key read at run time, never shown.
 
@@ -314,52 +312,45 @@ code, out, err = run(["read-linear", "--key-env", "MY_LINEAR_KEY", "--issues", "
                      env=linear_env(MY_LINEAR_KEY=KEY))
 check("read-linear refuses a key it cannot find", code != 0 and "WEB-404" in (out + err), out + err)
 
-# --- The plan the person agreed to: the layout and the access, and never the key.
+# --- The plan the person agreed to: what moves and how Linear is reached, and never the key.
 
 work = tempfile.mkdtemp(prefix="migrate-plan-")
 plan_path = os.path.join(work, "plan.json")
 base = ["plan", "--out", plan_path, "--direction", "github-to-linear",
         "--source", "github:acme#7", "--target", "linear:WEB"]
 
-code, out, err = run(base + ["--access", "connector"])
-check("github to linear needs a layout", code != 0 and "layout" in (out + err) and not os.path.exists(plan_path),
-      out + err)
-
-code, out, err = run(base + ["--layout", "linear", "--access", "key", "--key-env", "MY_LINEAR_KEY",
+code, out, err = run(base + ["--access", "key", "--key-env", "MY_LINEAR_KEY",
                              "--kept", "op://Private/Linear/credential"], env=dict(os.environ, MY_LINEAR_KEY=KEY))
 check("a plan with a key reference is saved", code == 0 and os.path.exists(plan_path), out + err)
 if os.path.exists(plan_path):
     text = open(plan_path).read()
     saved = json.loads(text)
-    check("the plan holds the layout", saved.get("layout") == "linear", text)
+    check("the plan holds no layout", "layout" not in saved, text)
     check("the plan holds where the key is kept", saved.get("access", {}).get("kept") == "op://Private/Linear/credential", text)
     check("the plan never holds the key", KEY not in text, text)
     check("the plan is private to the person", stat.S_IMODE(os.stat(plan_path).st_mode) == 0o600)
     os.remove(plan_path)
 
-code, out, err = run(base + ["--layout", "mirror", "--access", "key", "--key-env", "MY_LINEAR_KEY", "--kept", KEY])
+code, out, err = run(base + ["--access", "key", "--key-env", "MY_LINEAR_KEY", "--kept", KEY])
 check("a pasted key is refused as the place it is kept", code != 0 and not os.path.exists(plan_path)
       and no_key(out, err), out + err)
 
-code, out, err = run(base + ["--layout", "mirror", "--access", "key", "--key-env", "MY_LINEAR_KEY",
+code, out, err = run(base + ["--access", "key", "--key-env", "MY_LINEAR_KEY",
                              "--kept", "my key is xyzzy-1234567890"], env=dict(os.environ, MY_LINEAR_KEY="xyzzy-1234567890"))
 check("a place that holds the key's own value is refused", code != 0 and not os.path.exists(plan_path)
       and "xyzzy-1234567890" not in (out + err), out + err)
 
-code, out, err = run(base + ["--layout", "mirror", "--access", "connector", "--key-env", "MY_LINEAR_KEY"])
+code, out, err = run(base + ["--access", "connector", "--key-env", "MY_LINEAR_KEY"])
 check("the connector takes no key", code != 0 and not os.path.exists(plan_path), out + err)
 
-code, out, err = run(base + ["--layout", "mirror", "--access", "key", "--key-env", "MY_LINEAR_KEY"])
+code, out, err = run(base + ["--access", "key", "--key-env", "MY_LINEAR_KEY"])
 check("a key needs a place it is kept", code != 0 and not os.path.exists(plan_path), out + err)
 
 back = ["plan", "--out", plan_path, "--direction", "linear-to-github",
         "--source", "linear:Website relaunch", "--target", "github:acme/site", "--access", "connector"]
-code, out, err = run(back + ["--layout", "linear"])
-check("linear to github keeps the structure, so no other layout", code != 0 and not os.path.exists(plan_path),
-      out + err)
 code, out, err = run(back)
-check("linear to github with the connector is saved as a mirror",
-      code == 0 and json.load(open(plan_path)).get("layout") == "mirror", out + err)
+check("linear to github with the connector is saved",
+      code == 0 and json.load(open(plan_path)).get("access") == {"kind": "connector"}, out + err)
 
 # --- Scenarios 5 to 7: one skill both ways, nothing tied to one company.
 
@@ -373,10 +364,11 @@ def says(text):
 says("disable-model-invocation: true")
 says("One skill moves issues both ways: GitHub to Linear, and Linear to GitHub")
 says("Nothing is written to GitHub or Linear until the person has said yes to the plan")
-says("migrate.py layouts --repo <owner>/<repo> --project <number>")
+says("migrate.py read-github --repo <owner>/<repo> --project <number>")
 says("Show its output as it is")
-says("the mirror layout")
-says("Linear's layout")
+says("The GitHub project becomes a Linear project with the same name")
+says("each GitHub milestone a milestone inside it")
+says("issues with no milestone go into the project with no milestone")
 says("Linear to GitHub keeps the structure as it is")
 says("an API key or the Linear connector")
 says("Never ask for the key itself")
@@ -389,6 +381,8 @@ says("get_project")
 
 for path in sorted(os.listdir(SKILL_DIR)) if os.path.isdir(SKILL_DIR) else []:
     text = open(os.path.join(SKILL_DIR, path)).read()
+    for word in ("initiative", "layout"):
+        check("{} holds no layout choice ({})".format(path, word), word not in text.lower())
     for word in ("kyroco", "flyer", "korium", "KYR-", "MAST-"):
         check("{} names no one company's work ({})".format(path, word), word.lower() not in text.lower())
 
