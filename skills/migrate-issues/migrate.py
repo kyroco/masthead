@@ -942,17 +942,27 @@ def finish(args):
         if number not in copies:
             held.append("#{} has no copy on the team".format(number))
             continue
-        posted = collections.Counter(as_written(c["body"]) for c in every_page(
-            key, COMMENTS, {"id": copies[number]}, ("issue", "comments")))
-        matched = 0
-        for comment in issue["comments"]:
-            if posted[as_written(comment_body(comment))] > 0:
-                posted[as_written(comment_body(comment))] -= 1
-                matched += 1
+        bodies = [c["body"] for c in every_page(key, COMMENTS, {"id": copies[number]}, ("issue", "comments"))]
+        wanted = [comment_body(c) for c in issue["comments"]]
+
+        def found(rule):
+            """How many GitHub comments are on the copy, each Linear comment standing for one, by rule."""
+            posted, count = collections.Counter(rule(b) for b in bodies), 0
+            for body in wanted:
+                if posted[rule(body)] > 0:
+                    posted[rule(body)] -= 1
+                    count += 1
+            return count
+
+        matched = found(as_written)
         linear_comments += matched
         text = linear(key, COPY_TEXT, {"id": copies[number]}).get("issue") or {}
-        if matched < len(issue["comments"]):
-            held.append("#{} has {} of its {} comments in Linear".format(number, matched, len(issue["comments"])))
+        if matched < len(wanted) and found(same_text) == len(wanted):
+            # Every comment is there by the copy's own rule, so running the copy again posts nothing:
+            # the text differs, and only a hand edit mends it.
+            held.append("#{} has a comment whose text differs in Linear".format(number))
+        elif matched < len(wanted):
+            held.append("#{} has {} of its {} comments in Linear".format(number, matched, len(wanted)))
         elif as_written(text.get("title")) != as_written(issue["title"]):
             held.append("#{} has another title in Linear".format(number))
         elif as_written(without_mark(text.get("description"))) != as_written(

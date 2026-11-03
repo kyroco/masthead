@@ -207,7 +207,8 @@ one of its comments, symbol for symbol; only spacing, and Linear writing a
 link's address inside `<>`, are let go. It posts no comment and deletes
 nothing, so nothing on GitHub names the Linear copy, and the copy names its
 GitHub issue only in its hidden line. An issue whose copy is missing, short a
-comment, or holds another title or body stays open and is named. For a
+comment, or holds another title, body or comment text stays open and is
+named. For a
 missing copy or comment, run the copy again. For text that differs, the copy
 cannot help, since it never rewrites a copy it finds: the person makes the
 Linear copy match GitHub by hand. Then finish again. Show what it prints as
