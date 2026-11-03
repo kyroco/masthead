@@ -203,11 +203,14 @@ It writes nothing to Linear. It prints the count of issues and comments on
 GitHub and on their Linear copies, and lists every image in the GitHub text,
 so the person can check each one shows in Linear. Then it closes on GitHub,
 as not planned, each issue whose copy holds the same title, body and every
-one of its comments. It
-posts no comment and deletes nothing, so nothing on GitHub names the Linear
-copy, and the copy names its GitHub issue only in its hidden line. An issue
-whose copy is missing, short a comment, or holds another title or body
-stays open and is named: run the
-copy again, then finish again. Show what it prints as it is.
+one of its comments, symbol for symbol; only spacing, and Linear writing a
+link's address inside `<>`, are let go. It posts no comment and deletes
+nothing, so nothing on GitHub names the Linear copy, and the copy names its
+GitHub issue only in its hidden line. An issue whose copy is missing, short a
+comment, or holds another title or body stays open and is named. For a
+missing copy or comment, run the copy again. For text that differs, the copy
+cannot help, since it never rewrites a copy it finds: the person makes the
+Linear copy match GitHub by hand. Then finish again. Show what it prints as
+it is.
 
 **Linear to GitHub** has not been built yet. Say so, and stop.

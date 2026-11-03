@@ -899,6 +899,13 @@ def without_mark(description):
     return "\n".join(lines[:-1])
 
 
+def as_written(text):
+    """Text as finish compares it: every letter, digit and symbol kept, so "x > 5" and "x < 5" differ.
+    Only spacing is let go, and Linear's habit of writing a link's address as `(<address>)`."""
+    text = re.sub(r"\]\(<([^<>\s]+)>\)", r"](\1)", text or "")
+    return " ".join(text.split())
+
+
 def close_not_planned(repo, number):
     """Close one GitHub issue as not planned, with no comment: nothing is deleted and nothing names
     its Linear copy. True when gh closed it."""
@@ -935,20 +942,20 @@ def finish(args):
         if number not in copies:
             held.append("#{} has no copy on the team".format(number))
             continue
-        posted = collections.Counter(same_text(c["body"]) for c in every_page(
+        posted = collections.Counter(as_written(c["body"]) for c in every_page(
             key, COMMENTS, {"id": copies[number]}, ("issue", "comments")))
         matched = 0
         for comment in issue["comments"]:
-            if posted[same_text(comment_body(comment))] > 0:
-                posted[same_text(comment_body(comment))] -= 1
+            if posted[as_written(comment_body(comment))] > 0:
+                posted[as_written(comment_body(comment))] -= 1
                 matched += 1
         linear_comments += matched
         text = linear(key, COPY_TEXT, {"id": copies[number]}).get("issue") or {}
         if matched < len(issue["comments"]):
             held.append("#{} has {} of its {} comments in Linear".format(number, matched, len(issue["comments"])))
-        elif same_text(text.get("title")) != same_text(issue["title"]):
+        elif as_written(text.get("title")) != as_written(issue["title"]):
             held.append("#{} has another title in Linear".format(number))
-        elif same_text(without_mark(text.get("description"))) != same_text(
+        elif as_written(without_mark(text.get("description"))) != as_written(
                 without_mark(with_mark(issue.get("body"), args.repo, number))):
             held.append("#{} has other text in Linear".format(number))
         else:
@@ -965,7 +972,9 @@ def finish(args):
         lines.append("No image in the GitHub text.")
     if held:
         lines.append("Left open, because the copy does not match yet: " + "; ".join(held)
-                     + ". Run the copy again, then finish again.")
+                     + ". Run the copy again for a missing copy or comment; where the text differs, make the "
+                     "Linear copy match GitHub by hand, since the copy never rewrites one it finds. Then finish "
+                     "again.")
     closed, refused = [], []
     for number in ready:
         (closed if close_not_planned(args.repo, number) else refused).append("#{}".format(number))
