@@ -15,8 +15,9 @@ for whatever is missing, one question at a time, in plain words.
 Nothing is written to GitHub or Linear until the person has said yes to the
 plan. Until then every call reads. The script beside this file,
 `${CLAUDE_PLUGIN_ROOT}/skills/migrate-issues/migrate.py`, does the reading,
-saves the plan, and after the yes makes the copy in Linear. It never writes
-to GitHub, and its copy refuses to run without a saved plan that matches.
+saves the plan, and after the yes makes the copy in Linear, then closes the
+GitHub originals as not planned. Its only write to GitHub is that close, and
+both the copy and the finish refuse to run without a saved plan that matches.
 
 The structure stays the same on both sides. The GitHub project becomes a
 Linear project with the same name, each GitHub milestone a milestone inside
@@ -191,5 +192,20 @@ that copies the other side. A link whose other issue has no copy on the team
 in what the copy prints, not made. A copy already given another parent in
 Linear is left where it is, and named.
 
-Closing the GitHub originals, and **Linear to GitHub**, are not built yet.
-Say so, and stop.
+## 6. Finish: check, then close the GitHub originals
+
+Once the copy has run, finish the move, with the same cut and the same key,
+the same way the copy ran:
+
+    python3 ${CLAUDE_PLUGIN_ROOT}/skills/migrate-issues/migrate.py finish --repo <owner>/<repo> --project <number> --team <KEY> --key-env <NAME>
+
+It writes nothing to Linear. It prints the count of issues and comments on
+GitHub and on their Linear copies, and lists every image in the GitHub text,
+so the person can check each one shows in Linear. Then it closes on GitHub,
+as not planned, each issue whose copy holds every one of its comments. It
+posts no comment and deletes nothing, so nothing on GitHub names the Linear
+copy, and the copy names its GitHub issue only in its hidden line. An issue
+whose copy is missing or short a comment stays open and is named: run the
+copy again, then finish again. Show what it prints as it is.
+
+**Linear to GitHub** has not been built yet. Say so, and stop.

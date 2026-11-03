@@ -12,6 +12,9 @@ usage:
   migrate.py copy --repo <owner>/<repo> --project <number> --team <KEY>
                   --key-env <NAME> [--milestone <title> | --issues <n>...]
                   [--plan <file>]
+  migrate.py finish --repo <owner>/<repo> --project <number> --team <KEY>
+                    --key-env <NAME> [--milestone <title> | --issues <n>...]
+                    [--plan <file>]
 
 read-github reads one repository's open issues in one of its GitHub projects
 through `gh`, and prints what they become in Linear: one Linear project with
@@ -35,6 +38,13 @@ comment already on it is not posted again. A copy whose line was removed is
 not found, and the issue is copied again. Last, the parent and blocked-by
 links GitHub holds between two issues that both have a copy are made between
 the copies, each once; a link whose other side has no copy is named, not made.
+
+finish runs after copy, under the same saved plan. It counts the chosen open
+issues and their comments on GitHub and on their Linear copies, lists every
+image in their text, then closes on GitHub, as not planned, each issue whose
+copy holds every one of its comments. It posts no comment and deletes nothing,
+so nothing on GitHub names the Linear copy. An issue whose copy is missing or
+short a comment stays open and is named.
 
 The Linear key is read from the environment variable the person names, at run
 time. It is never printed, logged or saved: everything Linear sends back is
@@ -833,6 +843,94 @@ def copy(args):
     print(hide("\n".join(lines), key))
 
 
+# ---------------------------------------------------------------- the finish
+
+IMAGES = (re.compile(r"!\[[^\]]*\]\(\s*<?([^)\s>]+)"),
+          re.compile(r"<img\b[^>]*?\bsrc\s*=\s*[\"']?([^\"'\s>]+)", re.I))
+
+
+def images_in(text):
+    """Every image a GitHub body or comment shows, by its address, in the order written."""
+    found = []
+    for pattern in IMAGES:
+        found += [(m.start(), m.group(1)) for m in pattern.finditer(text or "")]
+    return [url for _, url in sorted(found)]
+
+
+def close_not_planned(repo, number):
+    """Close one GitHub issue as not planned, with no comment: nothing is deleted and nothing names
+    its Linear copy. True when gh closed it."""
+    result = subprocess.run(["gh", "issue", "close", str(number), "--repo", repo, "--reason", "not planned"],
+                            capture_output=True, text=True)
+    return result.returncode == 0
+
+
+def finish(args):
+    """Check each chosen GitHub issue against its Linear copy, list every image, then close as not
+    planned each issue whose copy holds every one of its comments. One that does not stays open."""
+    if not re.match(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$", args.repo):
+        fail("--repo takes <owner>/<repo>, such as acme/site.")
+    load_plan(args.plan, args)
+    key = read_key(args.key_env)
+    _, items = chosen_numbers(args.repo, args.project, args.milestone, args.issues)
+    if not items:
+        print("No open issue left to finish. Nothing was written.")
+        return
+    teams = (linear(key, TEAM, {"key": args.team.upper()}).get("teams") or {}).get("nodes") or []
+    if not teams:
+        fail('No Linear team with the key "{}" that this key can see. Nothing was written.'.format(args.team.upper()), 1)
+    issues = [read_issue(args.repo, number) for number, _ in items]
+    copies = copies_of(key, teams[0]["id"], args.repo.lower())
+
+    github_comments = linear_comments = 0
+    ready, held, images = [], [], []
+    for issue in issues:
+        number = issue["number"]
+        for text in [issue.get("body")] + [c.get("body") for c in issue["comments"]]:
+            images += ["#{}: {}".format(number, shown(url)) for url in images_in(text)]
+        github_comments += len(issue["comments"])
+        if number not in copies:
+            held.append("#{} has no copy on the team".format(number))
+            continue
+        posted = collections.Counter(same_text(c["body"]) for c in every_page(
+            key, COMMENTS, {"id": copies[number]}, ("issue", "comments")))
+        matched = 0
+        for comment in issue["comments"]:
+            if posted[same_text(comment_body(comment))] > 0:
+                posted[same_text(comment_body(comment))] -= 1
+                matched += 1
+        linear_comments += matched
+        if matched < len(issue["comments"]):
+            held.append("#{} has {} of its {} comments in Linear".format(number, matched, len(issue["comments"])))
+        else:
+            ready.append(number)
+
+    lines = ["GitHub: {}, {} comment{}.".format(plural(len(issues)), github_comments,
+                                                "" if github_comments == 1 else "s"),
+             "Linear: {} of them copied, {} of those comments.".format(
+                 sum(1 for i in issues if i["number"] in copies), linear_comments)]
+    if images:
+        lines.append("Images in the GitHub text ({}); check each shows in Linear:".format(len(images)))
+        lines += ["   " + line for line in images]
+    else:
+        lines.append("No image in the GitHub text.")
+    if held:
+        lines.append("Left open, because the copy does not match yet: " + "; ".join(held)
+                     + ". Run the copy again, then finish again.")
+    closed, refused = [], []
+    for number in ready:
+        (closed if close_not_planned(args.repo, number) else refused).append("#{}".format(number))
+    if closed:
+        lines.append("Closed on GitHub as not planned: {}.".format(", ".join(closed)))
+    if refused:
+        lines.append("GitHub refused to close: {}. Check `gh auth status` can write issues, then finish "
+                     "again.".format(", ".join(refused)))
+    lines.append("Nothing on GitHub was deleted, and nothing on GitHub names its Linear copy.")
+    print(hide("\n".join(lines), key))
+    if held or refused:
+        sys.exit(1)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = parser.add_subparsers(dest="command", required=True)
@@ -864,9 +962,18 @@ def main():
     chosen.add_argument("--milestone")
     chosen.add_argument("--issues", nargs="+", type=int)
     copied.add_argument("--plan")
+    done = sub.add_parser("finish")
+    done.add_argument("--repo", required=True)
+    done.add_argument("--project", required=True, type=int)
+    done.add_argument("--team", required=True)
+    done.add_argument("--key-env", required=True)
+    cut = done.add_mutually_exclusive_group()
+    cut.add_argument("--milestone")
+    cut.add_argument("--issues", nargs="+", type=int)
+    done.add_argument("--plan")
     args = parser.parse_args()
     {"read-github": read_github, "check-linear": check_linear, "read-linear": read_linear,
-     "plan": plan, "copy": copy}[args.command](args)
+     "plan": plan, "copy": copy, "finish": finish}[args.command](args)
 
 
 if __name__ == "__main__":

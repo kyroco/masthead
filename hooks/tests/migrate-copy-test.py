@@ -48,6 +48,16 @@ import json, os, sys
 args = sys.argv[1:]
 with open(os.environ["FAKE_GH_LOG"], "a") as log:
     log.write(json.dumps(args) + "\n")
+if args[:2] == ["issue", "close"]:
+    world = json.load(open(os.environ["FAKE_GH_WORLD"]))
+    if args[2] in world.get("close_refused", []):
+        sys.exit(1)
+    for node in world["project"]["items"]["nodes"]:
+        if node["content"].get("number") == int(args[2]):
+            node["content"]["state"] = "CLOSED"
+    world["issues"][args[2]]["state"] = "CLOSED"
+    json.dump(world, open(os.environ["FAKE_GH_WORLD"], "w"))
+    sys.exit(0)
 if args[:2] != ["api", "graphql"]:
     sys.exit(3)
 fields = {}
@@ -813,6 +823,98 @@ code, out, err = run(env, plan=save_plan(tmp))
 check("a team with no Needs Human status is refused before any write",
       code != 0 and not store.writes and "Needs Human" in err, out + err)
 
+# --- MAST-17: when the migration finishes, each migrated GitHub issue is closed as not planned, nothing is
+# deleted, and nothing ties it to its Linear copy; the check counts issues and comments on both sides and
+# lists every image.
+
+def finish(env, *extra, plan=None):
+    args = [sys.executable, SCRIPT, "finish", "--repo", "acme/site", "--project", "7", "--team", "WEB",
+            "--key-env", "MY_LINEAR_KEY", "--plan", plan] + list(extra)
+    result = subprocess.run(args, env=env, capture_output=True, text=True, timeout=60)
+    return result.returncode, result.stdout, result.stderr
+
+
+def gh_log(env):
+    return [json.loads(line) for line in open(env["FAKE_GH_LOG"])] if os.path.exists(env["FAKE_GH_LOG"]) else []
+
+
+def closes(env):
+    return [c for c in gh_log(env) if c[:2] != ["api", "graphql"]]
+
+
+def closed_numbers(env):
+    return sorted(int(c[2]) for c in closes(env))
+
+
+WITH_IMAGES = [dict(i) for i in ISSUES]
+WITH_IMAGES[4] = gh_issue(5, "Fix footer", "Website relaunch: 1. Build",
+                          body="See ![the footer](https://github.com/user-attachments/assets/foot.png) here.",
+                          comments=[comment("octocat", "2026-11-03T18:27:00Z",
+                                            'Also <img width="200" src="https://example.com/after.png">.')])
+
+Linear.store = store = Store()
+envf, tmpf = fake_gh(world_for(WITH_IMAGES))
+planf = save_plan(tmpf)
+code, out, err = run(envf, plan=planf)
+check("the copy runs before the finish", code == 0, out + err)
+open(envf["FAKE_GH_LOG"], "w").close()
+writes_before = list(store.writes)
+code, out, err = finish(envf, plan=planf)
+check("finish runs", code == 0, out + err)
+check("each migrated open issue is closed on GitHub", closed_numbers(envf) == [1, 2, 3, 5, 6], closes(envf))
+check("each is closed as not planned, with nothing else said",
+      all(c == ["issue", "close", c[2], "--repo", "acme/site", "--reason", "not planned"] for c in closes(envf)),
+      closes(envf))
+check("the closed issue and the other repository's issue are not touched",
+      not any(c[2] in ("4", "9") for c in closes(envf)), closes(envf))
+everything = json.dumps(gh_log(envf)).lower()
+check("nothing on GitHub is deleted", "delete" not in everything and "transfer" not in everything, gh_log(envf))
+check("no comment is posted on GitHub", "--comment" not in everything and "addcomment" not in everything
+      and not any(a.startswith("query=mutation") for c in gh_log(envf) for a in c), gh_log(envf))
+check("no Linear link or key reaches GitHub", "linear" not in everything and "web-" not in everything, gh_log(envf))
+check("finish writes nothing to Linear", store.writes == writes_before, store.writes)
+check("the issue counts match on both sides", "GitHub: 5 issues, 4 comments." in out
+      and "Linear: 5 of them copied, 4 of those comments." in out, out)
+check("an image in a body is listed", "#5: https://github.com/user-attachments/assets/foot.png" in out, out)
+check("an image in a comment is listed", "#5: https://example.com/after.png" in out, out)
+check("finish says nothing was deleted", "Nothing on GitHub was deleted" in out, out)
+check("the key never appears in what finish prints", KEY not in out and KEY not in err)
+
+code, out, err = finish(envf, plan=planf)
+check("a second finish finds nothing left open and closes nothing",
+      code == 0 and "No open issue left" in out and not closes(envf)[5:], out + err)
+
+# A copy short a comment, or with no copy at all, stays open and is named.
+Linear.store = store = Store()
+envf, tmpf = fake_gh(world_for(WITH_IMAGES))
+code, out, err = run(envf, "--issues", "1", "5", plan=planf)
+store.comments = [c for c in store.comments if not c["body"].endswith("Summer note.")]
+open(envf["FAKE_GH_LOG"], "w").close()
+code, out, err = finish(envf, plan=planf)
+check("finish fails when a copy does not match", code != 0, out + err)
+check("only the issue whose copy matches is closed", closed_numbers(envf) == [5], closes(envf))
+check("the copy short a comment is named", "#1 has 2 of its 3 comments in Linear" in out, out)
+check("an issue with no copy is named", "#2 has no copy on the team" in out, out)
+check("the counts show the gap", "GitHub: 5 issues, 4 comments." in out
+      and "Linear: 2 of them copied, 3 of those comments." in out, out)
+
+# GitHub refusing to close one is named, and the run fails.
+broken = world_for(WITH_IMAGES)
+broken["close_refused"] = ["5"]
+envr, _ = fake_gh(broken)
+code, out, err = finish(envr, "--issues", "5", plan=planf)
+check("a close GitHub refuses is named and fails the run",
+      code != 0 and "GitHub refused to close: #5" in out, out + err)
+
+# Nothing closes without the person's yes to this migration.
+for name, plan_path in (
+        ("no saved plan", os.path.join(tmpf, "missing.json")),
+        ("a plan for another team", save_plan(tmpf, target="OPS")),
+        ("a plan for another project", save_plan(tmpf, source="acme/site#8"))):
+    open(envf["FAKE_GH_LOG"], "w").close()
+    code, out, err = finish(envf, plan=plan_path)
+    check("finish refuses {} and closes nothing".format(name), code != 0 and not closes(envf), out + err)
+
 # --- The skill says how to run the copy, by key and by connector.
 
 text = open(SKILL).read() if os.path.exists(SKILL) else ""
@@ -834,6 +936,9 @@ check("SKILL.md no longer says the copy is not built", "is not built yet" not in
 check("SKILL.md no longer says the links are not built", "Links between the copies" not in text)
 says("parent and blocked-by links")
 says("another repository copied to the same team")
+says("migrate.py finish --repo <owner>/<repo> --project <number> --team <KEY> --key-env")
+says("as not planned")
+check("SKILL.md no longer says closing the originals is not built", "Closing the GitHub originals, and" not in text)
 
 for path in sorted(os.listdir(SKILL_DIR)):
     body = open(os.path.join(SKILL_DIR, path)).read()
