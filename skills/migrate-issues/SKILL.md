@@ -145,8 +145,10 @@ project with the same title and the same body (compared by their letters and
 digits only, so Linear's own reformatting still matches) is not made again,
 and a comment already on its copy is not posted again; two comments with the
 same words are two comments, and each is posted once. Same-titled issues with
-different bodies each get their own copy, whichever run copies them. So when
-a run stops partway, run it again.
+different bodies each get their own copy, whichever run copies them. An issue
+whose body was edited since its copy was made still finds that copy: one with
+its title, in its milestone, whose words belong to no open GitHub issue in
+the project. So when a run stops partway, run it again.
 
 With a key, run the copy the same way step 2 ran its check (under `op run`
 for a 1Password reference). It refuses to write unless the saved plan is for
@@ -169,7 +171,9 @@ title,body,labels,milestone,comments`:
 2. `list_milestones` for the project; for each milestone missing,
    `save_milestone` with the project and its name.
 3. `list_issues` with `project` the project, every page, to find the copies
-   already made, by title and body together as above, never by title alone.
+   already made, by title and body together as above, then for an edited
+   issue by title and milestone among copies no open issue's words match,
+   never by title alone.
 4. For each issue not yet copied, `save_issue` with `team`, `title`,
    `description` the body, `project`, `milestone` where it has one, `labels`
    its labels without `needs-decision` and `parked`, and `state`

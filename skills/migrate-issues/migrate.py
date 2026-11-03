@@ -62,7 +62,7 @@ def fail(message, code=2):
 PROJECT_QUERY = """query($login:String!,$number:Int!,$after:String){
   %s(login:$login){ projectV2(number:$number){ title
     items(first:100, after:$after){ pageInfo{hasNextPage endCursor}
-      nodes{ content{ __typename ... on Issue{ number state
+      nodes{ content{ __typename ... on Issue{ number state title body
         repository{nameWithOwner} milestone{title} } } } } } } }"""
 
 
@@ -84,7 +84,7 @@ def gh_project_page(kind, login, number, after):
 def read_project(repo, number, numbers=False):
     """The project's title and the milestones of its open issues in repo, or None when gh cannot see it.
 
-    With numbers, each item is (issue number, milestone) in place of the milestone alone."""
+    With numbers, each item is (issue number, milestone, title, body) in place of the milestone alone."""
     login = repo.split("/", 1)[0]
     for kind in ("organization", "user"):
         page = gh_project_page(kind, login, number, None)
@@ -99,7 +99,8 @@ def read_project(repo, number, numbers=False):
                 if (content.get("repository") or {}).get("nameWithOwner", "").lower() != repo.lower():
                     continue
                 milestone = (content.get("milestone") or {}).get("title")
-                milestones.append((content.get("number"), milestone) if numbers else milestone)
+                milestones.append((content.get("number"), milestone, content.get("title"), content.get("body"))
+                                  if numbers else milestone)
             info = page["items"]["pageInfo"]
             if not info["hasNextPage"]:
                 return title, milestones
@@ -443,11 +444,14 @@ def read_issue(repo, number):
 
 
 def chosen_numbers(repo, project, milestone, numbers):
-    """The open issue numbers of repo in the project, cut to one milestone or to the numbers named."""
+    """The open issue numbers of repo in the project, cut to one milestone or to the numbers named,
+    and the words (title and body) of every open issue of repo in the project, cut or not."""
     found = read_project(repo, project, numbers=True)
     if found is None:
         fail("gh cannot see project {} of {}. Nothing was written.".format(project, repo.split("/", 1)[0]))
-    title, items = found
+    title, every = found
+    claimed = {(t, same_text(b)) for _, _, t, b in every}
+    items = [(n, m) for n, m, _, _ in every]
     if milestone is not None:
         items = [(n, m) for n, m in items if m == milestone]
         if not items:
@@ -460,7 +464,7 @@ def chosen_numbers(repo, project, milestone, numbers):
             fail("Not open issues of {} in the project: {}. Nothing was written.".format(
                 repo, ", ".join(str(n) for n in missing)))
         items = [(n, m) for n, m in items if n in set(numbers)]
-    return title, sorted(items, key=lambda item: item[0])
+    return title, sorted(items, key=lambda item: item[0]), claimed
 
 
 UNNUMBERED = 1000000.0
@@ -489,7 +493,7 @@ PROJECTS = """query($name:String!){ projects(filter:{name:{eq:$name}}){ nodes{ i
   teams{nodes{id}} projectMilestones{nodes{id name sortOrder}} } } }"""
 
 COPIES = """query($id:String!,$after:String){ project(id:$id){
-  issues(first:100, after:$after){ pageInfo{hasNextPage endCursor} nodes{ id title description createdAt } } } }"""
+  issues(first:100, after:$after){ pageInfo{hasNextPage endCursor} nodes{ id title description createdAt projectMilestone{id} } } } }"""
 
 
 def same_text(text):
@@ -557,7 +561,7 @@ def copy(args):
         fail("--repo takes <owner>/<repo>, such as acme/site.")
     load_plan(args.plan, args)
     key = read_key(args.key_env)
-    title, items = chosen_numbers(args.repo, args.project, args.milestone, args.issues)
+    title, items, claimed = chosen_numbers(args.repo, args.project, args.milestone, args.issues)
     if not items:
         print("No open issue to copy. Nothing was written.")
         return
@@ -600,19 +604,36 @@ def copy(args):
                                       {"projectId": project["id"], "name": name, "sortOrder": made[name]})["id"]
             new_milestones += 1
 
-    # Copies already in the project, oldest first, by title and body together: a GitHub issue pairs
-    # only with a Linear issue holding its own words, so a same-titled issue copied in another run,
-    # or reopened since, is never taken for this one. No link or number ties the two.
-    copies = {}
-    for node in sorted(every_page(key, COPIES, {"id": project["id"]}, ("project", "issues")),
-                       key=lambda n: n["createdAt"]):
-        copies.setdefault((node["title"], same_text(node.get("description"))), []).append(node)
+    # Find each issue's copy already in the project, oldest first, with no link or number between them.
+    # First by title and body together, so a same-titled issue copied in another run, or reopened
+    # since, is never taken for this one. Then, for an issue whose body was edited since, by title and
+    # milestone, but only a copy whose words belong to no open GitHub issue in the project, so it can
+    # never be another issue's copy.
+    every_copy = sorted(every_page(key, COPIES, {"id": project["id"]}, ("project", "issues")),
+                        key=lambda n: n["createdAt"])
+    words = lambda t, b: (t, same_text(b))
+    found = {}
+    for issue in issues:
+        for node in every_copy:
+            if node["id"] not in found.values() and words(node["title"], node.get("description")) == \
+                    words(issue["title"], issue.get("body")):
+                found[issue["number"]] = node["id"]
+                break
+    for issue in issues:
+        if issue["number"] in found:
+            continue
+        milestone = milestones[inside(title, issue["milestone"]["title"])] if issue.get("milestone") else None
+        for node in every_copy:
+            if (node["id"] not in found.values() and node["title"] == issue["title"]
+                    and (node.get("projectMilestone") or {}).get("id") == milestone
+                    and words(node["title"], node.get("description")) not in claimed):
+                found[issue["number"]] = node["id"]
+                break
 
     new_issues = new_comments = new_labels = 0
     for issue in issues:
-        existing = copies.get((issue["title"], same_text(issue.get("body")))) or []
-        if existing:
-            target = existing.pop(0)
+        if issue["number"] in found:
+            target = {"id": found[issue["number"]]}
             posted = collections.Counter(same_text(c["body"]) for c in every_page(
                 key, COMMENTS, {"id": target["id"]}, ("issue", "comments")))
         else:

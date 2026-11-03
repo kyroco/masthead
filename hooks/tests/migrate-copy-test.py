@@ -104,6 +104,7 @@ ISSUES = [
 
 def world_for(issues):
     nodes = [{"content": {"__typename": "Issue", "number": i["number"], "state": i["state"],
+                          "title": i["title"], "body": i["body"],
                           "repository": {"nameWithOwner": i["repository"]}, "milestone": i["milestone"]}}
              for i in issues]
     nodes.append({"content": {"__typename": "DraftIssue"}})
@@ -191,7 +192,8 @@ def answer(store, body):
                                              if m["projectId"] == p["id"]]}}
             for p in store.projects if p["name"] == v["name"]]}}
     if "project(" in query:
-        nodes = [{"id": i["id"], "title": i["title"], "description": i["description"], "createdAt": i["createdAt"]}
+        nodes = [{"id": i["id"], "title": i["title"], "description": i["description"], "createdAt": i["createdAt"],
+                  "projectMilestone": {"id": i["projectMilestoneId"]} if i.get("projectMilestoneId") else None}
                  for i in store.issues if i["projectId"] == v["id"]]
         start = int(v.get("after") or 0)
         more = start + 2 < len(nodes)
