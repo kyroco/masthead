@@ -352,6 +352,54 @@ code, out, err = run(env2, plan=plan)
 check("a new issue whose title is already used is still copied once",
       code == 0 and len(by_title(store, "Fix footer")) == 3 and len(store.issues) == 6, [i["title"] for i in store.issues])
 
+# Two issues with one title, copied one milestone at a time: each gets its own copy in its own milestone.
+SAME_TITLE = [
+    gh_issue(11, "Add tests", "Website relaunch: 1. Build", labels=["Feature"], body="Tests for the build."),
+    gh_issue(12, "Add tests", "Website relaunch: 2. Launch", labels=["bug"], body="Tests for the launch.",
+             comments=[comment("octocat", "2026-11-03T18:27:00Z", "Launch tests note.")]),
+    gh_issue(13, "Add tests", None, body="Tests with no milestone."),
+]
+Linear.store = store = Store()
+env4, _ = fake_gh(world_for(SAME_TITLE))
+run(env4, "--milestone", "Website relaunch: 1. Build", plan=plan)
+code, out, err = run(env4, "--milestone", "Website relaunch: 2. Launch", plan=plan)
+milestone_id = {m["name"]: m["id"] for m in store.milestones}
+launch_copy = [i for i in store.issues if i["description"] == "Tests for the launch."]
+check("a same-titled issue in another milestone, copied in a later run, gets its own copy",
+      code == 0 and len(launch_copy) == 1, out + err + str([i["description"] for i in store.issues]))
+check("that copy is in its own milestone, with its own labels and comment",
+      launch_copy and launch_copy[0].get("projectMilestoneId") == milestone_id.get("2. Launch")
+      and launch_copy[0].get("labelIds") == ["lb-bug"]
+      and [c.endswith("Launch tests note.") for c in comments_on(store, launch_copy[0])] == [True], launch_copy)
+build_copy = [i for i in store.issues if i["description"] == "Tests for the build."]
+check("the earlier copy gets no comment of the later issue",
+      build_copy and comments_on(store, build_copy[0]) == [], [comments_on(store, b) for b in build_copy])
+code, out, err = run(env4, "--issues", "13", plan=plan)
+loose_copy = [i for i in store.issues if i["description"] == "Tests with no milestone."]
+check("a same-titled issue with no milestone, copied in a later run, lands with no milestone",
+      code == 0 and len(loose_copy) == 1 and "projectMilestoneId" not in loose_copy[0], out + err)
+
+# An issue with a title already copied is reopened between two runs: each GitHub issue still has exactly one copy.
+FOOTERS = [gh_issue(3, "Fix footer", None, body="Footer three.", state="CLOSED",
+                    comments=[comment("octocat", "2026-11-03T18:00:00Z", "Three's note.")]),
+           gh_issue(5, "Fix footer", None, body="Footer five.",
+                    comments=[comment("octocat", "2026-11-03T18:05:00Z", "Five's note.")]),
+           gh_issue(6, "Fix footer", None, body="Footer six.",
+                    comments=[comment("octocat", "2026-11-03T18:06:00Z", "Six's note.")])]
+Linear.store = store = Store()
+env5, _ = fake_gh(world_for(FOOTERS))
+run(env5, plan=plan)
+reopened = [dict(i, state="OPEN") if i["number"] == 3 else i for i in FOOTERS]
+env6, _ = fake_gh(world_for(reopened))
+code, out, err = run(env6, plan=plan)
+bodies = sorted(i["description"] for i in store.issues)
+check("after a reopen, each same-titled issue has exactly one copy",
+      code == 0 and bodies == ["Footer five.", "Footer six.", "Footer three."], out + err + str(bodies))
+check("after a reopen, each copy holds only its own issue's comment",
+      all([c.split("\n\n", 1)[1] for c in comments_on(store, i)] ==
+          ["{}'s note.".format(i["description"].split()[1].capitalize())] for i in store.issues),
+      [(i["description"], comments_on(store, i)) for i in store.issues])
+
 # --- What is copied can be cut to one milestone or to issue numbers.
 
 Linear.store = store = Store()
