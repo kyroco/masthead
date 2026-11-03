@@ -307,10 +307,11 @@ check("read-linear reads issues named by key", code == 0 and "WEB-1" in out and 
 check("read-linear shows where each named issue lands",
       'GitHub project "Website relaunch"' in out and "no project" in out, out)
 
-code, out, err = run(["read-linear", "--key-env", "MY_LINEAR_KEY", "--issues", "WEB-404"],
-                     env=linear_env(MY_LINEAR_KEY=KEY))
 check("an issue named by key gets the same milestone name as its project view",
       'milestone "Website relaunch: 1. Build"' in out, out)
+
+code, out, err = run(["read-linear", "--key-env", "MY_LINEAR_KEY", "--issues", "WEB-404"],
+                     env=linear_env(MY_LINEAR_KEY=KEY))
 check("read-linear refuses a key it cannot find", code != 0 and "WEB-404" in (out + err), out + err)
 
 # --- The plan the person agreed to: the layout and the access, and never the key.
