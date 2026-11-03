@@ -180,7 +180,8 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
-SEND = urllib.request.build_opener(NoRedirect)
+# No proxy: a proxy set in the environment would get the key, in plain text over http.
+SEND = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect)
 
 
 def linear(key, query, variables=None):
