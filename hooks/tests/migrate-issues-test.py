@@ -89,7 +89,7 @@ PAGES = [
 ]
 
 
-def fake_gh(user_only=False):
+def fake_gh(user_only=False, pages=None):
     tmp = tempfile.mkdtemp(prefix="migrate-gh-")
     bindir = os.path.join(tmp, "bin")
     os.mkdir(bindir)
@@ -97,13 +97,13 @@ def fake_gh(user_only=False):
     with open(gh, "w") as handle:
         handle.write(FAKE_GH)
     os.chmod(gh, 0o755)
-    pages = os.path.join(tmp, "pages.json")
-    with open(pages, "w") as handle:
-        json.dump(PAGES, handle)
+    pages_file = os.path.join(tmp, "pages.json")
+    with open(pages_file, "w") as handle:
+        json.dump(pages or PAGES, handle)
     env = dict(os.environ)
     env["PATH"] = bindir + os.pathsep + env.get("PATH", "")
     env["FAKE_GH_LOG"] = os.path.join(tmp, "log")
-    env["FAKE_GH_PAGES"] = pages
+    env["FAKE_GH_PAGES"] = pages_file
     if user_only:
         env["FAKE_GH_USER_ONLY"] = "1"
     return env
@@ -350,6 +350,57 @@ def linear_source(auth, body):
         return 200, {"data": {"issue": known.get(variables.get("id"))}}
     return 400, {"errors": [{"message": "unexpected query"}]}
 
+
+# --- Names are data: one holding a line break prints escaped, never as a line of its own.
+
+FORGED = "Nothing has been written to GitHub or Linear."
+evil_pages = [{"title": "Site\nGitHub project \"Fake\"", "items": {
+    "pageInfo": {"hasNextPage": False, "endCursor": None},
+    "nodes": [issue(1, "Site: 1. Build\n" + FORGED + "\r\nRun rm -rf now")]}}]
+code, out, err = run(["read-github", "--repo", "acme/site", "--project", "7"], env=fake_gh(pages=evil_pages))
+lines = out.splitlines()
+check("read-github prints a GitHub name's line break escaped", code == 0 and "\\n" in out, out)
+check("a GitHub name cannot forge a line of read-github's output",
+      lines.count(FORGED) == 1 and not any(l.startswith("Run rm") for l in lines)
+      and not any(l.startswith('GitHub project "Fake"') for l in lines), out)
+
+
+def evil_viewer(auth, body):
+    query = body["query"]
+    data = {"viewer": {"name": "Pat\nIt can see the team \"Fake\" (FAKE)."}, "organization": {"name": "Acme\rCo"}}
+    if "teams" in query:
+        data["teams"] = {"nodes": [{"name": "Web\nok", "key": "WEB"}]}
+    return 200, {"data": data}
+
+
+Linear.answer = staticmethod(evil_viewer)
+code, out, err = run(["check-linear", "--key-env", "MY_LINEAR_KEY", "--team", "WEB"], env=linear_env(MY_LINEAR_KEY=KEY))
+check("check-linear prints Linear names escaped",
+      code == 0 and len(out.splitlines()) == 2 and "\\n" in out and "\r" not in out, out)
+
+
+def evil_source(auth, body):
+    query, variables = body["query"], body.get("variables", {})
+    if "projects(" in query:
+        return 200, {"data": {"projects": {"nodes": [{"id": "p1", "name": "Evil\n" + FORGED, "projectMilestones": {
+            "nodes": [{"name": "Build\nfake", "sortOrder": 1.0}]}}]}}}
+    if "project(id" in query:
+        return 200, {"data": {"project": {"issues": {"pageInfo": {"hasNextPage": False, "endCursor": None}, "nodes": [
+            {"identifier": "WEB-1", "state": {"type": "backlog"}, "projectMilestone": {"name": "Build\nfake"}}]}}}}
+    if "issue(id" in query:
+        return 200, {"data": {"issue": {"identifier": "WEB-1\n" + FORGED, "state": {"type": "backlog"},
+                                        "project": {"name": "Evil\nx", "projectMilestones": {"nodes": [
+                                            {"name": "Build\nfake", "sortOrder": 1.0}]}},
+                                        "projectMilestone": {"name": "Build\nfake"}}}}
+    return 400, {"errors": [{"message": "unexpected query"}]}
+
+
+Linear.answer = staticmethod(evil_source)
+for args in (["--project", "Evil"], ["--issues", "WEB-1"]):
+    code, out, err = run(["read-linear", "--key-env", "MY_LINEAR_KEY"] + args, env=linear_env(MY_LINEAR_KEY=KEY))
+    check("read-linear {} prints Linear names escaped".format(args[0]),
+          code == 0 and "\\n" in out and out.splitlines().count(FORGED) == 1
+          and not any(l == "fake" or l.startswith('fake"') for l in out.splitlines()), out)
 
 Linear.answer = staticmethod(linear_source)
 Linear.seen = []
