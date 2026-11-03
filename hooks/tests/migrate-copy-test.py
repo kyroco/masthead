@@ -692,7 +692,7 @@ TWO_REPOS = [gh_issue(9, "Apps parent", None, repo="acme/apps", subs=[("acme/sit
 
 
 def copy_in(store, repo, number):
-    found = [i for i in store.issues if "{}#{} ".format(repo, number) in i["description"]]
+    found = [i for i in store.issues if "{}#{} ".format(repo, number).lower() in i["description"].lower()]
     return found[0] if found else {}
 
 
@@ -704,7 +704,9 @@ def run_repo(env, repo):
 
 
 env_two, _ = fake_gh(world_for(TWO_REPOS))
-for first, second in (("acme/site", "acme/apps"), ("acme/apps", "acme/site")):
+# The second order types the other repository as Acme/Apps, so its copies' hidden lines differ in case
+# from the name GitHub's links give.
+for first, second in (("acme/site", "acme/apps"), ("Acme/Apps", "acme/site")):
     Linear.store = store = Store()
     run_repo(env_two, first)
     code, out, err = run_repo(env_two, second)

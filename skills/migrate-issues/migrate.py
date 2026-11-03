@@ -530,6 +530,8 @@ COPIES = """query($team:ID!,$mark:String!,$after:String){
          filter:{team:{id:{eq:$team}}, description:{contains:$mark}}){
     pageInfo{hasNextPage endCursor} nodes{ id description createdAt project{id} } } }"""
 
+OTHER_COPIES = COPIES.replace("description:{contains:$mark}", "description:{containsIgnoreCase:$mark}")
+
 PROJECT_BY_ID = """query($id:String!){ project(id:$id){ id name
   teams{nodes{id}} projectMilestones{nodes{id name sortOrder}} } }"""
 
@@ -605,12 +607,32 @@ def every_page(key, query, variables, path):
         after = page["pageInfo"]["endCursor"]
 
 
-def make_links(key, repo, parents, blocks, copies):
-    """Make each GitHub link between two issues that both have a copy, once: the sub-issue's copy gets
-    the parent's copy as its parent, and the blocker's copy blocks the waiting one's. A copy already
-    under another parent in Linear is left there. Returns the counts made and the lines to print."""
+def copies_of(key, team_id, repo):
+    """Every copy on the team of another repository's issues, by GitHub number: the copies an earlier
+    run of the copy made from that repository. Its name is matched whatever its case, since the
+    person may have typed it differently then. As for this repository, the earliest copy wins."""
+    if not re.match(r"^[a-z0-9_.-]+/[a-z0-9_.-]+$", repo):
+        return {}
+    found = {}
+    for node in sorted(every_page(key, OTHER_COPIES, {"team": team_id, "mark": MARK.format(repo, "")},
+                                  ("issues",)), key=lambda n: n["createdAt"]):
+        number = copied_from(repo, node.get("description"))
+        if number is not None:
+            found.setdefault(number, node["id"])
+    return found
+
+
+def make_links(key, repo, team_id, parents, blocks, copies):
+    """Make each GitHub link between two issues that both have a copy on the team, once: the sub-issue's
+    copy gets the parent's copy as its parent, and the blocker's copy blocks the waiting one's. The
+    other issue may be in another repository copied to the same team. A copy already under another
+    parent in Linear is left there. Returns the lines to print."""
+    found = {repo.lower(): copies}
+
     def copy_of(end):
-        return copies.get(end[1]) if end[0] == repo.lower() else None
+        if end[0] not in found:
+            found[end[0]] = copies_of(key, team_id, end[0])
+        return found[end[0]].get(end[1])
 
     def name(end):
         return "#{}".format(end[1]) if end[0] == repo.lower() else "{}#{}".format(shown(end[0]), end[1])
@@ -649,8 +671,8 @@ def make_links(key, repo, parents, blocks, copies):
     lines = ["Links made now: {} parent link{}, {} blocked-by link{}.".format(
         new_parents, "" if new_parents == 1 else "s", new_blocks, "" if new_blocks == 1 else "s")]
     if missing:
-        lines.append("Links not made, because one side has no copy in Linear (closed, in another repository, "
-                     "or not copied yet): " + "; ".join(missing) + ".")
+        lines.append("Links not made, because one side has no copy on this Linear team (closed, not copied yet, "
+                     "or in another repository not copied here): " + "; ".join(missing) + ".")
     if kept:
         lines.append("Left as it is, because the copy already has another parent in Linear: "
                      + "; ".join(kept) + ".")
@@ -799,7 +821,7 @@ def copy(args):
 
     # Links last, once every chosen issue has its copy; `found` now holds every copy on the team.
     parents, blocks = github_links(args.repo, issues)
-    link_lines = make_links(key, args.repo, parents, blocks, found)
+    link_lines = make_links(key, args.repo, team["id"], parents, blocks, found)
 
     lines = ['Linear project "{}" holds the {} chosen from {}.'.format(shown(title), plural(len(issues)), args.repo)]
     lines.append("Made now: {} project, {}, {} milestone{}, {} comment{}, {} label{}.".format(

@@ -182,12 +182,14 @@ step 2 says, and save the plan again with `--access key` before the yes.
 
 Last, the copy keeps the parent and blocked-by links GitHub holds between
 the issues: a sub-issue's copy gets its parent's copy as its parent, and an
-issue's copy is blocked by the copy of each issue that blocks it. A link is
-made only when both issues have a copy on the team, and only once, so a run
-cut to one milestone makes it later, in the run that copies the other side.
-A link whose other issue has no copy (closed, in another repository, or not
-copied yet) is named in what the copy prints, not made. A copy already given
-another parent in Linear is left where it is, and named.
+issue's copy is blocked by the copy of each issue that blocks it. The other
+issue may be in another repository copied to the same team. A link is made
+only when both issues have a copy on the team, and only once, so a run cut
+to one milestone, or one repository of several, makes it later, in the run
+that copies the other side. A link whose other issue has no copy on the team
+(closed, not copied yet, or in another repository not copied here) is named
+in what the copy prints, not made. A copy already given another parent in
+Linear is left where it is, and named.
 
 Closing the GitHub originals, and **Linear to GitHub**, are not built yet.
 Say so, and stop.
