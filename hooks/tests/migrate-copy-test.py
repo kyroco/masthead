@@ -190,7 +190,7 @@ def answer(store, body):
                                              if m["projectId"] == p["id"]]}}
             for p in store.projects if p["name"] == v["name"]]}}
     if "project(" in query:
-        nodes = [{"id": i["id"], "title": i["title"], "createdAt": i["createdAt"]}
+        nodes = [{"id": i["id"], "title": i["title"], "description": i["description"], "createdAt": i["createdAt"]}
                  for i in store.issues if i["projectId"] == v["id"]]
         start = int(v.get("after") or 0)
         more = start + 2 < len(nodes)
@@ -397,7 +397,7 @@ check("after a reopen, each same-titled issue has exactly one copy",
       code == 0 and bodies == ["Footer five.", "Footer six.", "Footer three."], out + err + str(bodies))
 check("after a reopen, each copy holds only its own issue's comment",
       all([c.split("\n\n", 1)[1] for c in comments_on(store, i)] ==
-          ["{}'s note.".format(i["description"].split()[1].capitalize())] for i in store.issues),
+          ["{}'s note.".format(i["description"].split()[1].rstrip(".").capitalize())] for i in store.issues),
       [(i["description"], comments_on(store, i)) for i in store.issues])
 
 # --- What is copied can be cut to one milestone or to issue numbers.

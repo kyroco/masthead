@@ -470,7 +470,12 @@ PROJECTS = """query($name:String!){ projects(filter:{name:{eq:$name}}){ nodes{ i
   teams{nodes{id}} projectMilestones{nodes{id name}} } } }"""
 
 COPIES = """query($id:String!,$after:String){ project(id:$id){
-  issues(first:100, after:$after){ pageInfo{hasNextPage endCursor} nodes{ id title createdAt } } } }"""
+  issues(first:100, after:$after){ pageInfo{hasNextPage endCursor} nodes{ id title description createdAt } } } }"""
+
+
+def same_text(text):
+    """Text reduced to its letters and digits, so Linear's own reformatting of a body still matches."""
+    return "".join(ch for ch in (text or "").casefold() if ch.isalnum())
 
 COMMENTS = """query($id:String!,$after:String){ issue(id:$id){
   comments(first:100, after:$after){ pageInfo{hasNextPage endCursor} nodes{ body } } } }"""
@@ -573,16 +578,17 @@ def copy(args):
                                       {"projectId": project["id"], "name": name, "sortOrder": float(order)})["id"]
             new_milestones += 1
 
-    # Copies already in the project, oldest first, by title: the n-th GitHub issue with a title
-    # pairs with the n-th Linear issue with it, so a second run makes only what is still missing.
+    # Copies already in the project, oldest first, by title and body together: a GitHub issue pairs
+    # only with a Linear issue holding its own words, so a same-titled issue copied in another run,
+    # or reopened since, is never taken for this one. No link or number ties the two.
     copies = {}
     for node in sorted(every_page(key, COPIES, {"id": project["id"]}, ("project", "issues")),
                        key=lambda n: n["createdAt"]):
-        copies.setdefault(node["title"], []).append(node)
+        copies.setdefault((node["title"], same_text(node.get("description"))), []).append(node)
 
     new_issues = new_comments = new_labels = 0
     for issue in issues:
-        existing = copies.get(issue["title"]) or []
+        existing = copies.get((issue["title"], same_text(issue.get("body")))) or []
         if existing:
             target = existing.pop(0)
             posted = {c["body"] for c in every_page(key, COMMENTS, {"id": target["id"]}, ("issue", "comments"))}
