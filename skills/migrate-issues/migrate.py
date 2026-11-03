@@ -863,7 +863,22 @@ class Images(html.parser.HTMLParser):
             return
         url = attrs.get("data-canonical-src") or attrs.get("src")
         if url:
-            self.found.append(url)
+            self.found.append(lasting(url))
+
+
+UPLOAD = re.compile(r"^https://private-user-images\.githubusercontent\.com/\d+/\d+-"
+                    r"([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.", re.I)
+
+
+def lasting(url):
+    """An uploaded image by the address written in the issue, github.com/user-attachments/assets/<id>.
+    GitHub renders an upload at a private address signed for a few minutes, which is never printed."""
+    upload = UPLOAD.match(url)
+    if upload:
+        return "https://github.com/user-attachments/assets/" + upload.group(1)
+    if urllib.parse.urlparse(url).hostname == "private-user-images.githubusercontent.com":
+        return "a GitHub upload whose address could not be read"
+    return url
 
 
 def images_in(rendered):
