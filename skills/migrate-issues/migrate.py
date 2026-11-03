@@ -42,9 +42,10 @@ the copies, each once; a link whose other side has no copy is named, not made.
 finish runs after copy, under the same saved plan. It counts the chosen open
 issues and their comments on GitHub and on their Linear copies, lists every
 image in their text, then closes on GitHub, as not planned, each issue whose
-copy holds every one of its comments. It posts no comment and deletes nothing,
-so nothing on GitHub names the Linear copy. An issue whose copy is missing or
-short a comment stays open and is named.
+copy holds the same title, body and every one of its comments. It posts no
+comment and deletes nothing, so nothing on GitHub names the Linear copy. An
+issue whose copy is missing, short a comment, or holds another title or body
+stays open and is named.
 
 The Linear key is read from the environment variable the person names, at run
 time. It is never printed, logged or saved: everything Linear sends back is
@@ -889,6 +890,15 @@ def images_in(rendered):
     return reader.found
 
 
+COPY_TEXT = """query($id:String!){ issue(id:$id){ title description } }"""
+
+
+def without_mark(description):
+    """A copy's body without its last non-blank line, the hidden line naming its GitHub issue."""
+    lines = (description or "").rstrip().splitlines()
+    return "\n".join(lines[:-1])
+
+
 def close_not_planned(repo, number):
     """Close one GitHub issue as not planned, with no comment: nothing is deleted and nothing names
     its Linear copy. True when gh closed it."""
@@ -899,7 +909,8 @@ def close_not_planned(repo, number):
 
 def finish(args):
     """Check each chosen GitHub issue against its Linear copy, list every image, then close as not
-    planned each issue whose copy holds every one of its comments. One that does not stays open."""
+    planned each issue whose copy holds the same title, body and every comment. One that does not
+    stays open."""
     if not re.match(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$", args.repo):
         fail("--repo takes <owner>/<repo>, such as acme/site.")
     load_plan(args.plan, args)
@@ -932,8 +943,14 @@ def finish(args):
                 posted[same_text(comment_body(comment))] -= 1
                 matched += 1
         linear_comments += matched
+        text = linear(key, COPY_TEXT, {"id": copies[number]}).get("issue") or {}
         if matched < len(issue["comments"]):
             held.append("#{} has {} of its {} comments in Linear".format(number, matched, len(issue["comments"])))
+        elif same_text(text.get("title")) != same_text(issue["title"]):
+            held.append("#{} has another title in Linear".format(number))
+        elif same_text(without_mark(text.get("description"))) != same_text(
+                without_mark(with_mark(issue.get("body"), args.repo, number))):
+            held.append("#{} has other text in Linear".format(number))
         else:
             ready.append(number)
 
