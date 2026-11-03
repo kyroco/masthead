@@ -49,8 +49,22 @@ what the script printed and stop.
 
 Linear to GitHub keeps the structure as it is: a Linear project becomes a
 GitHub project, a milestone becomes a milestone, and an issue an issue. Say
-so in one line, and read the source once the person has chosen how to reach
-Linear (step 4).
+so in one line. Read the source once the person has chosen how to reach
+Linear (step 4), and show what it becomes on GitHub before the plan:
+
+- With a key, the same way step 4 runs its check (under `op run` for a
+  1Password reference):
+
+      python3 ${CLAUDE_PLUGIN_ROOT}/skills/migrate-issues/migrate.py read-linear --key-env <NAME> --project '<project name>'
+
+  or `--issues <KEY> <KEY> ...` in place of `--project`. Show its output as
+  it is.
+- With the connector, read the project with `get_project` with
+  `includeMilestones` true, then its issues with `list_issues` with `project`
+  the project, calling again with each `cursor` until no page is left. Show
+  the same view the script prints: the GitHub project it becomes, each
+  milestone named `<project>: <n>. <name>` in Linear's order with its count
+  of open issues, and the count with no milestone.
 
 ## 4. Ask how to reach Linear
 
@@ -71,8 +85,9 @@ already in this session's record: do not use it, tell them to revoke it in
 Linear and make a new one, and ask where the new one is kept.
 
 The key is read at run time, by the command that needs it, and never printed,
-written to a file, an issue, a comment or a log. Check that it works, and
-that it can see the team, without ever seeing it:
+written to a file, an issue, a comment or a log. Check that it works, and,
+for GitHub to Linear, that it can see the target team (leave out `--team` for
+Linear to GitHub), without ever seeing it:
 
 - From 1Password, through `op run`, which puts the key in the variable only
   for that one command and hides it in what the command prints:

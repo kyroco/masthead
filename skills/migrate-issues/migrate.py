@@ -4,6 +4,7 @@
 usage:
   migrate.py layouts --repo <owner>/<repo> --project <number>
   migrate.py check-linear --key-env <NAME> [--team <KEY>]
+  migrate.py read-linear --key-env <NAME> (--project <name> | --issues <KEY>...)
   migrate.py plan --direction github-to-linear|linear-to-github
                   --source <what> --target <where>
                   --access key|connector [--key-env <NAME> --kept <where>]
@@ -12,7 +13,8 @@ usage:
 layouts reads one repository's open issues in one of its GitHub projects through
 `gh`, and prints what each layout would make in Linear, from the project's own
 names. Issues the project holds from other repositories are left out. check-linear asks Linear
-who the key belongs to, and whether a team exists. plan saves the choices the
+who the key belongs to, and whether a team exists. read-linear reads a Linear
+project, or issues named by key, and prints what each becomes on GitHub. plan saves the choices the
 person made. None of them writes to GitHub or Linear.
 
 The Linear key is read from the environment variable the person names, at run
@@ -214,6 +216,82 @@ def check_linear(args):
         print(hide('It can see the team "{}" ({}).'.format(teams[0]["name"], teams[0]["key"]), key))
 
 
+OPEN = ("backlog", "unstarted", "started", "triage")
+
+PROJECT_BY_NAME = """query($name:String!){ projects(filter:{name:{eq:$name}}){ nodes{ id name
+  projectMilestones{ nodes{ name sortOrder } } } } }"""
+
+PROJECT_ISSUES = """query($id:String!,$after:String){ project(id:$id){
+  issues(first:100, after:$after){ pageInfo{hasNextPage endCursor}
+    nodes{ identifier state{type} projectMilestone{name} } } } }"""
+
+ONE_ISSUE = """query($id:String!){ issue(id:$id){ identifier state{type}
+  project{name} projectMilestone{name} } }"""
+
+
+def github_milestone(project, milestone, number):
+    """A Linear milestone's name on GitHub: `<project>: <n>. <name>`."""
+    if re.match(r"\s*\d+\.", milestone):
+        return "{}: {}".format(project, milestone.strip())
+    return "{}: {}. {}".format(project, number, milestone)
+
+
+def read_linear(args):
+    key = read_key(args.key_env)
+    lines = []
+    if args.project:
+        found = (linear(key, PROJECT_BY_NAME, {"name": args.project}).get("projects") or {}).get("nodes") or []
+        if not found:
+            fail('No Linear project named "{}" that this key can see.'.format(args.project), 1)
+        if len(found) > 1:
+            fail('{} Linear projects are named "{}"; name the issues by key instead.'.format(len(found), args.project), 1)
+        project = found[0]
+        order = sorted(project["projectMilestones"]["nodes"], key=lambda m: m["sortOrder"])
+        numbers = {m["name"]: n for n, m in enumerate(order, 1)}
+        counts, after, total = {}, None, 0
+        while True:
+            page = (linear(key, PROJECT_ISSUES, {"id": project["id"], "after": after}).get("project") or {}).get("issues")
+            if not page:
+                fail("Linear stopped answering partway through the project; nothing was written.", 1)
+            for node in page["nodes"]:
+                if (node.get("state") or {}).get("type") not in OPEN:
+                    continue
+                total += 1
+                name = (node.get("projectMilestone") or {}).get("name")
+                counts[name] = counts.get(name, 0) + 1
+            if not page["pageInfo"]["hasNextPage"]:
+                break
+            after = page["pageInfo"]["endCursor"]
+        lines.append('Linear project "{}": {} milestone{}, {} open issue{}.'.format(
+            project["name"], len(order), "" if len(order) == 1 else "s", total, "" if total == 1 else "s"))
+        lines.append("")
+        lines.append("On GitHub the structure stays as it is:")
+        lines.append('   GitHub project "{}", with its brief as the project README'.format(project["name"]))
+        for m in order:
+            if counts.get(m["name"]):
+                lines.append('     milestone "{}" ({})'.format(
+                    github_milestone(project["name"], m["name"], numbers[m["name"]]), plural(counts[m["name"]])))
+        if counts.get(None):
+            lines.append("     no milestone ({})".format(plural(counts[None])))
+    else:
+        lines.append("Linear issues named by key, and where each lands on GitHub:")
+        for wanted in args.issues:
+            node = linear(key, ONE_ISSUE, {"id": wanted.upper()}).get("issue")
+            if not node:
+                fail("No Linear issue {} that this key can see.".format(wanted.upper()), 1)
+            project = (node.get("project") or {}).get("name")
+            milestone = (node.get("projectMilestone") or {}).get("name")
+            place = 'GitHub project "{}"'.format(project) if project else "no project"
+            if project and milestone:
+                place += ', milestone "{}: {}"'.format(project, milestone)
+            if (node.get("state") or {}).get("type") not in OPEN:
+                place += " (closed in Linear)"
+            lines.append("   {}: {}".format(node["identifier"], place))
+    lines.append("")
+    lines.append("Nothing has been written to GitHub or Linear.")
+    print(hide("\n".join(lines), key))
+
+
 # ---------------------------------------------------------------- the plan
 
 def default_plan_path():
@@ -260,6 +338,11 @@ def main():
     two = sub.add_parser("check-linear")
     two.add_argument("--key-env", required=True)
     two.add_argument("--team")
+    four = sub.add_parser("read-linear")
+    four.add_argument("--key-env", required=True)
+    which = four.add_mutually_exclusive_group(required=True)
+    which.add_argument("--project")
+    which.add_argument("--issues", nargs="+")
     three = sub.add_parser("plan")
     three.add_argument("--direction", required=True, choices=["github-to-linear", "linear-to-github"])
     three.add_argument("--source", required=True)
@@ -270,7 +353,7 @@ def main():
     three.add_argument("--kept")
     three.add_argument("--out")
     args = parser.parse_args()
-    {"layouts": layouts, "check-linear": check_linear, "plan": plan}[args.command](args)
+    {"layouts": layouts, "check-linear": check_linear, "read-linear": read_linear, "plan": plan}[args.command](args)
 
 
 if __name__ == "__main__":
