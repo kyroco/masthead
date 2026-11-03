@@ -279,6 +279,17 @@ for filler in range(560, 601, 5):
           code != 0 and KEY[8:12] not in (out + err), (out + err)[-80:])
 
 Linear.answer = staticmethod(good_answer)
+proxy = "http://127.0.0.1:{}".format(elsewhere.server_address[1])
+for variable in ("HTTP_PROXY", "http_proxy", "ALL_PROXY"):
+    Linear.seen, Elsewhere.seen = [], []
+    env = linear_env(MY_LINEAR_KEY=KEY, **{variable: proxy})
+    for skip in ("NO_PROXY", "no_proxy"):
+        env.pop(skip, None)
+    code, out, err = run(["check-linear", "--key-env", "MY_LINEAR_KEY"], env=env)
+    check("with {} set the key never reaches the proxy".format(variable), not Elsewhere.seen, str(Elsewhere.seen))
+    check("with {} set the request goes straight to Linear".format(variable),
+          code == 0 and Linear.seen and Linear.seen[-1]["auth"] == KEY, out + err)
+
 for name, broken in (("a line break", KEY + "\nsecond-line"), ("a carriage return", KEY[:20] + "\r" + KEY[20:]),
                      ("a space", KEY[:20] + " " + KEY[20:]), ("only spaces", "    ")):
     Linear.seen = []
