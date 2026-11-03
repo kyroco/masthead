@@ -448,7 +448,6 @@ def chosen_numbers(repo, project, milestone, numbers):
     if found is None:
         fail("gh cannot see project {} of {}. Nothing was written.".format(project, repo.split("/", 1)[0]))
     title, items = found
-    every_milestone = {m for _, m in items if m}
     if milestone is not None:
         items = [(n, m) for n, m in items if m == milestone]
         if not items:
@@ -461,17 +460,25 @@ def chosen_numbers(repo, project, milestone, numbers):
             fail("Not open issues of {} in the project: {}. Nothing was written.".format(
                 repo, ", ".join(str(n) for n in missing)))
         items = [(n, m) for n, m in items if n in set(numbers)]
-    return title, sorted(items, key=lambda item: item[0]), every_milestone
+    return title, sorted(items, key=lambda item: item[0])
 
 
-def place(milestone, every_milestone):
-    """A milestone's sort order, the same in every run however the copy is cut: its own number
-    for `<project>: <n>. <name>`, and after those, its place by name among the project's others."""
-    kind, number, _ = build_order(milestone)
+UNNUMBERED = 1000000.0
+
+
+def place(name, made):
+    """A new milestone's sort order, so it lands in build order among those already made, whatever
+    earlier runs chose. A numbered name takes its own number. A name with no number goes after the
+    numbered ones, halfway between the made milestones just before and just after it by name.
+    `made` maps each milestone already in the project to its sort order."""
+    kind, number, _ = build_order(name)
     if kind == 0:
         return float(number)
-    others = sorted(m for m in every_milestone if build_order(m)[0] == 1)
-    return 1000000.0 + others.index(milestone)
+    before = [order for other, order in made.items() if build_order(other)[0] == 1 and other < name]
+    after = [order for other, order in made.items() if build_order(other)[0] == 1 and other > name]
+    low = max(before + [UNNUMBERED])
+    high = min(after) if after else low + 2.0
+    return (low + high) / 2.0
 
 
 TEAM = """query($key:String!){ teams(filter:{key:{eq:$key}}){ nodes{ id key
@@ -479,7 +486,7 @@ TEAM = """query($key:String!){ teams(filter:{key:{eq:$key}}){ nodes{ id key
   issueLabels(first:250, filter:{team:{null:true}}){nodes{id name}} }"""
 
 PROJECTS = """query($name:String!){ projects(filter:{name:{eq:$name}}){ nodes{ id name
-  teams{nodes{id}} projectMilestones{nodes{id name}} } } }"""
+  teams{nodes{id}} projectMilestones{nodes{id name sortOrder}} } } }"""
 
 COPIES = """query($id:String!,$after:String){ project(id:$id){
   issues(first:100, after:$after){ pageInfo{hasNextPage endCursor} nodes{ id title description createdAt } } } }"""
@@ -550,7 +557,7 @@ def copy(args):
         fail("--repo takes <owner>/<repo>, such as acme/site.")
     load_plan(args.plan, args)
     key = read_key(args.key_env)
-    title, items, every_milestone = chosen_numbers(args.repo, args.project, args.milestone, args.issues)
+    title, items = chosen_numbers(args.repo, args.project, args.milestone, args.issues)
     if not items:
         print("No open issue to copy. Nothing was written.")
         return
@@ -580,15 +587,17 @@ def copy(args):
         fail('{} Linear projects on the team are named "{}". Nothing was written.'.format(len(projects), shown(title)), 1)
     project = projects[0] if projects else create(key, "projectCreate", "project",
                                                    {"name": title, "teamIds": [team["id"]]})
-    milestones = {m["name"]: m["id"] for m in ((project.get("projectMilestones") or {}).get("nodes") or [])}
+    existing = (project.get("projectMilestones") or {}).get("nodes") or []
+    milestones = {m["name"]: m["id"] for m in existing}
+    made = {m["name"]: float(m.get("sortOrder") or 0) for m in existing}
 
     new_milestones = 0
     for github_name in sorted({m for _, m in items if m}, key=build_order):
         name = inside(title, github_name)
         if name not in milestones:
+            made[name] = place(name, made)
             milestones[name] = create(key, "projectMilestoneCreate", "projectMilestone",
-                                      {"projectId": project["id"], "name": name,
-                                       "sortOrder": place(github_name, every_milestone)})["id"]
+                                      {"projectId": project["id"], "name": name, "sortOrder": made[name]})["id"]
             new_milestones += 1
 
     # Copies already in the project, oldest first, by title and body together: a GitHub issue pairs

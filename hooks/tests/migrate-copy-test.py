@@ -186,7 +186,8 @@ def answer(store, body):
     if "projects(" in query:
         return {"projects": {"nodes": [
             {"id": p["id"], "name": p["name"], "teams": {"nodes": [{"id": t} for t in p["teamIds"]]},
-             "projectMilestones": {"nodes": [{"id": m["id"], "name": m["name"]} for m in store.milestones
+             "projectMilestones": {"nodes": [{"id": m["id"], "name": m["name"], "sortOrder": m["sortOrder"]}
+                                             for m in store.milestones
                                              if m["projectId"] == p["id"]]}}
             for p in store.projects if p["name"] == v["name"]]}}
     if "project(" in query:
