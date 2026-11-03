@@ -8,7 +8,7 @@ disable-model-invocation: true
 
 One skill moves issues both ways: GitHub to Linear, and Linear to GitHub. The
 person calls it with a source and a target, such as
-`/masthead:migrate-issues github acme#7 to linear WEB` or
+`/masthead:migrate-issues github acme/site project 7 to linear WEB` or
 `/masthead:migrate-issues linear "Website relaunch" to github acme/site`. Ask
 for whatever is missing, one question at a time, in plain words.
 
@@ -19,10 +19,11 @@ saves the plan; it never writes to either tracker.
 
 ## 1. What moves, and to where
 
-- **GitHub to Linear.** The source is a GitHub project: its owner and number,
-  or its link (`github.com/orgs/<owner>/projects/<number>`, or
-  `github.com/users/<owner>/projects/<number>`). The target is a Linear team,
-  by its key, such as `WEB`.
+- **GitHub to Linear.** The source is a GitHub repository, `<owner>/<repo>`,
+  and the GitHub project whose issues move: its number, or its link
+  (`github.com/orgs/<owner>/projects/<number>`, or
+  `github.com/users/<owner>/projects/<number>`). Only that repository's issues
+  in the project move. The target is a Linear team, by its key, such as `WEB`.
 - **Linear to GitHub.** The source is a Linear project, or a list of issue
   keys. The target is a GitHub repository, `<owner>/<repo>`.
 
@@ -30,7 +31,7 @@ saves the plan; it never writes to either tracker.
 
 Read the project first, so the question uses its own names:
 
-    python3 ${CLAUDE_PLUGIN_ROOT}/skills/migrate-issues/migrate.py layouts --owner <owner> --project <number>
+    python3 ${CLAUDE_PLUGIN_ROOT}/skills/migrate-issues/migrate.py layouts --repo <owner>/<repo> --project <number>
 
 Show its output as it is, then ask which layout they want:
 

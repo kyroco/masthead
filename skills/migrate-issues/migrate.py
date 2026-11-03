@@ -2,15 +2,16 @@
 """The first step of /masthead:migrate-issues: look, ask, and write nothing.
 
 usage:
-  migrate.py layouts --owner <login> --project <number>
+  migrate.py layouts --repo <owner>/<repo> --project <number>
   migrate.py check-linear --key-env <NAME> [--team <KEY>]
   migrate.py plan --direction github-to-linear|linear-to-github
                   --source <what> --target <where>
                   --access key|connector [--key-env <NAME> --kept <where>]
                   [--layout mirror|linear] [--out <file>]
 
-layouts reads one GitHub project through `gh` and prints what each layout
-would make in Linear, from the project's own names. check-linear asks Linear
+layouts reads one repository's open issues in one of its GitHub projects through
+`gh`, and prints what each layout would make in Linear, from the project's own
+names. Issues the project holds from other repositories are left out. check-linear asks Linear
 who the key belongs to, and whether a team exists. plan saves the choices the
 person made. None of them writes to GitHub or Linear.
 
@@ -62,8 +63,9 @@ def gh_project_page(kind, login, number, after):
     return (owner or {}).get("projectV2")
 
 
-def read_project(login, number):
-    """The project's title and its open issues' milestones, or None when gh cannot see it."""
+def read_project(repo, number):
+    """The project's title and the milestones of its open issues in repo, or None when gh cannot see it."""
+    login = repo.split("/", 1)[0]
     for kind in ("organization", "user"):
         page = gh_project_page(kind, login, number, None)
         if page is None:
@@ -73,6 +75,8 @@ def read_project(login, number):
             for node in page["items"]["nodes"]:
                 content = node.get("content") or {}
                 if content.get("__typename") != "Issue" or content.get("state") != "OPEN":
+                    continue
+                if (content.get("repository") or {}).get("nameWithOwner", "").lower() != repo.lower():
                     continue
                 milestones.append((content.get("milestone") or {}).get("title"))
             info = page["items"]["pageInfo"]
@@ -109,10 +113,12 @@ def plural(n):
 
 
 def layouts(args):
-    found = read_project(args.owner, args.project)
+    if not re.match(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$", args.repo):
+        fail("--repo takes <owner>/<repo>, such as acme/site.")
+    found = read_project(args.repo, args.project)
     if found is None:
-        fail("gh cannot see project {} of {}. Check the owner and number, and that `gh auth status` "
-             "has the project scope.".format(args.project, args.owner))
+        fail("gh cannot see project {} of {}. Check the repository and number, and that `gh auth status` "
+             "has the project scope.".format(args.project, args.repo.split("/", 1)[0]))
     title, milestones = found
     counts = {}
     for name in milestones:
@@ -120,8 +126,8 @@ def layouts(args):
     named = sorted((m for m in counts if m), key=build_order)
     loose = counts.get(None, 0)
 
-    lines = ['GitHub project "{}": {} milestone{}, {} open issue{}.'.format(
-        title, len(named), "" if len(named) == 1 else "s", len(milestones), "" if len(milestones) == 1 else "s"), ""]
+    lines = ['GitHub project "{}", issues in {}: {} milestone{}, {} open issue{}.'.format(
+        title, args.repo, len(named), "" if len(named) == 1 else "s", len(milestones), "" if len(milestones) == 1 else "s"), ""]
     lines.append("1. The mirror layout: the GitHub project becomes one Linear project, "
                  "and each milestone a milestone inside it.")
     lines.append('   Linear project "{}"'.format(title))
@@ -249,7 +255,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = parser.add_subparsers(dest="command", required=True)
     one = sub.add_parser("layouts")
-    one.add_argument("--owner", required=True)
+    one.add_argument("--repo", required=True)
     one.add_argument("--project", required=True, type=int)
     two = sub.add_parser("check-linear")
     two.add_argument("--key-env", required=True)
