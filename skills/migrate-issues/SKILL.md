@@ -1,6 +1,6 @@
 ---
 name: migrate-issues
-description: Move a set of issues from GitHub to Linear, or from Linear to GitHub. It reads the source, asks the person how to lay the work out and how to reach Linear, and writes nothing until they say yes to the plan.
+description: Move a set of issues from GitHub to Linear, or from Linear to GitHub. It asks how to reach Linear, reads the source, shows what it becomes on the other side, and writes nothing until the person says yes to the plan.
 disable-model-invocation: true
 ---
 
@@ -17,6 +17,13 @@ plan. Until then every call reads. The script beside this file,
 `${CLAUDE_PLUGIN_ROOT}/skills/migrate-issues/migrate.py`, does the reading and
 saves the plan; it never writes to either tracker.
 
+The structure stays the same on both sides. The GitHub project becomes a
+Linear project with the same name, each GitHub milestone a milestone inside
+it, and issues with no milestone go into the project with no milestone.
+Linear to GitHub keeps the structure as it is the same way: a Linear project
+becomes a GitHub project, a milestone becomes a milestone, and an issue an
+issue. There is nothing to choose about the structure, so do not ask.
+
 ## 1. What moves, and to where
 
 - **GitHub to Linear.** The source is a GitHub repository, `<owner>/<repo>`,
@@ -27,46 +34,7 @@ saves the plan; it never writes to either tracker.
 - **Linear to GitHub.** The source is a Linear project, or a list of issue
   keys. The target is a GitHub repository, `<owner>/<repo>`.
 
-## 2. GitHub to Linear: read the project, then ask the layout
-
-Read the project first, so the question uses its own names:
-
-    python3 ${CLAUDE_PLUGIN_ROOT}/skills/migrate-issues/migrate.py layouts --repo <owner>/<repo> --project <number>
-
-Show its output as it is, then ask which layout they want:
-
-- **the mirror layout**: the GitHub project becomes one Linear project, and
-  each GitHub milestone a milestone inside it.
-- **Linear's layout**: each GitHub milestone becomes its own Linear project,
-  grouped under one Linear initiative named for the GitHub project. In
-  Linear, a project is a body of work and a milestone is a stage inside it,
-  such as build, test and deploy.
-
-Say plainly that the choice is theirs. When `gh` cannot see the project, say
-what the script printed and stop.
-
-## 3. Linear to GitHub: the layout is not asked
-
-Linear to GitHub keeps the structure as it is: a Linear project becomes a
-GitHub project, a milestone becomes a milestone, and an issue an issue. Say
-so in one line. Read the source once the person has chosen how to reach
-Linear (step 4), and show what it becomes on GitHub before the plan:
-
-- With a key, the same way step 4 runs its check (under `op run` for a
-  1Password reference):
-
-      python3 ${CLAUDE_PLUGIN_ROOT}/skills/migrate-issues/migrate.py read-linear --key-env <NAME> --project '<project name>'
-
-  or `--issues <KEY> <KEY> ...` in place of `--project`. Show its output as
-  it is.
-- With the connector, read the project with `get_project` with
-  `includeMilestones` true, then its issues with `list_issues` with `project`
-  the project, calling again with each `cursor` until no page is left. Show
-  the same view the script prints: the GitHub project it becomes, each
-  milestone named `<project>: <n>. <name>` in Linear's order with its count
-  of open issues, and the count with no milestone.
-
-## 4. Ask how to reach Linear
+## 2. Ask how to reach Linear
 
 In both directions, the person chooses an API key or the Linear connector:
 
@@ -76,9 +44,9 @@ In both directions, the person chooses an API key or the Linear connector:
   so and offer the key instead.
 - **A Linear API key**: a personal key made in Linear under Settings,
   Account, Security & Access. A key limited to reading is enough for this
-  step; the copy will need one that can write. Ask where the key is kept: a 1Password reference such
-  as `op://<vault>/<item>/<field>`, or the name of an environment variable
-  already set in their shell.
+  step; the copy will need one that can write. Ask where the key is kept: a
+  1Password reference such as `op://<vault>/<item>/<field>`, or the name of
+  an environment variable already set in their shell.
 
 Never ask for the key itself. When the person pastes one anyway, it is
 already in this session's record: do not use it, tell them to revoke it in
@@ -103,21 +71,48 @@ the key in this session's record. When the check fails, show what it printed
 (the key is hidden in it) and ask the person to fix the key or choose the
 connector.
 
-## 5. The plan, and the person's yes
+## 3. Read the source and show what it becomes
 
-Save what the person chose:
+**GitHub to Linear.** Read the repository's issues in the project:
 
-    python3 ${CLAUDE_PLUGIN_ROOT}/skills/migrate-issues/migrate.py plan --direction github-to-linear --source <source> --target <target> --layout mirror|linear --access key --key-env <NAME> --kept '<where it is kept>'
+    python3 ${CLAUDE_PLUGIN_ROOT}/skills/migrate-issues/migrate.py read-github --repo <owner>/<repo> --project <number>
 
-For Linear to GitHub, use `--direction linear-to-github` and leave out
-`--layout`. For the connector, use `--access connector` and leave out
-`--key-env` and `--kept`. The plan holds where the key is kept, never the key,
-and it refuses a key given as the place.
+Show its output as it is: the Linear project it becomes, each milestone inside
+it with its count of open issues, and the count with no milestone. When `gh`
+cannot see the project, say what the script printed and stop.
 
-Show the plan in a table: the direction, the source, the target, the layout,
-and how Linear is reached. Ask for a yes. Nothing is written until it comes.
+**Linear to GitHub.** Read the source the way the person chose to reach
+Linear:
 
-## 6. After the yes
+- With a key, the same way step 2 runs its check (under `op run` for a
+  1Password reference):
+
+      python3 ${CLAUDE_PLUGIN_ROOT}/skills/migrate-issues/migrate.py read-linear --key-env <NAME> --project '<project name>'
+
+  or `--issues <KEY> <KEY> ...` in place of `--project`. Show its output as
+  it is.
+- With the connector, read the project with `get_project` with
+  `includeMilestones` true, then its issues with `list_issues` with `project`
+  the project, calling again with each `cursor` until no page is left. Show
+  the same view the script prints: the GitHub project it becomes, each
+  milestone named `<project>: <n>. <name>` in Linear's order with its count
+  of open issues, and the count with no milestone.
+
+## 4. The plan, and the person's yes
+
+Save what the person agreed to:
+
+    python3 ${CLAUDE_PLUGIN_ROOT}/skills/migrate-issues/migrate.py plan --direction github-to-linear --source <source> --target <target> --access key --key-env <NAME> --kept '<where it is kept>'
+
+For Linear to GitHub, use `--direction linear-to-github`. For the connector,
+use `--access connector` and leave out `--key-env` and `--kept`. The plan
+holds where the key is kept, never the key, and it refuses a key given as the
+place.
+
+Show the plan in a table: the direction, the source, the target, and how
+Linear is reached. Ask for a yes. Nothing is written until it comes.
+
+## 5. After the yes
 
 The copy itself (issues, comments, links, and closing the originals) is not
 built yet. Say so, give the path of the saved plan, and stop.

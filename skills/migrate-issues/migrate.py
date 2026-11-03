@@ -2,20 +2,21 @@
 """The first step of /masthead:migrate-issues: look, ask, and write nothing.
 
 usage:
-  migrate.py layouts --repo <owner>/<repo> --project <number>
+  migrate.py read-github --repo <owner>/<repo> --project <number>
   migrate.py check-linear --key-env <NAME> [--team <KEY>]
   migrate.py read-linear --key-env <NAME> (--project <name> | --issues <KEY>...)
   migrate.py plan --direction github-to-linear|linear-to-github
                   --source <what> --target <where>
                   --access key|connector [--key-env <NAME> --kept <where>]
-                  [--layout mirror|linear] [--out <file>]
+                  [--out <file>]
 
-layouts reads one repository's open issues in one of its GitHub projects through
-`gh`, and prints what each layout would make in Linear, from the project's own
-names. Issues the project holds from other repositories are left out. check-linear asks Linear
+read-github reads one repository's open issues in one of its GitHub projects
+through `gh`, and prints what they become in Linear: one Linear project with
+the GitHub project's name, each milestone a milestone inside it. Issues the
+project holds from other repositories are left out. check-linear asks Linear
 who the key belongs to, and whether a team exists. read-linear reads a Linear
-project, or issues named by key, and prints what each becomes on GitHub. plan saves the choices the
-person made. None of them writes to GitHub or Linear.
+project, or issues named by key, and prints what each becomes on GitHub. plan
+saves what the person agreed to. None of them writes to GitHub or Linear.
 
 The Linear key is read from the environment variable the person names, at run
 time. It is never printed, logged or saved: everything Linear sends back is
@@ -114,7 +115,7 @@ def plural(n):
     return "{} issue{}".format(n, "" if n == 1 else "s")
 
 
-def layouts(args):
+def read_github(args):
     if not re.match(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$", args.repo):
         fail("--repo takes <owner>/<repo>, such as acme/site.")
     found = read_project(args.repo, args.project)
@@ -130,21 +131,12 @@ def layouts(args):
 
     lines = ['GitHub project "{}", issues in {}: {} milestone{}, {} open issue{}.'.format(
         title, args.repo, len(named), "" if len(named) == 1 else "s", len(milestones), "" if len(milestones) == 1 else "s"), ""]
-    lines.append("1. The mirror layout: the GitHub project becomes one Linear project, "
-                 "and each milestone a milestone inside it.")
+    lines.append("In Linear it becomes one project with the same name, each milestone a milestone inside it:")
     lines.append('   Linear project "{}"'.format(title))
     for name in named:
         lines.append('     milestone "{}" ({})'.format(inside(title, name), plural(counts[name])))
     if loose:
         lines.append("     no milestone ({})".format(plural(loose)))
-    lines.append("")
-    lines.append("2. Linear's layout: each milestone becomes its own Linear project, "
-                 "grouped under one initiative named for the GitHub project.")
-    lines.append('   Linear initiative "{}"'.format(title))
-    for name in named:
-        lines.append('     project "{}" ({})'.format(name, plural(counts[name])))
-    if loose:
-        lines.append('     project "{}": no milestone ({})'.format(title, plural(loose)))
     lines.append("")
     lines.append("Nothing has been written to GitHub or Linear.")
     print("\n".join(lines))
@@ -304,10 +296,6 @@ def default_plan_path():
 
 
 def plan(args):
-    if args.direction == "github-to-linear" and not args.layout:
-        fail("GitHub to Linear needs the layout the person chose: --layout mirror or --layout linear.")
-    if args.direction == "linear-to-github" and args.layout not in (None, "mirror"):
-        fail("Linear to GitHub keeps the structure as it is, so its only layout is mirror.")
     access = {"kind": args.access}
     if args.access == "connector":
         if args.key_env or args.kept:
@@ -320,8 +308,7 @@ def plan(args):
             fail("--kept holds a key, not the place it is kept. Nothing was saved. Ask where the key lives, "
                  "such as a 1Password reference, and never for the key itself.")
         access.update({"key_env": args.key_env, "kept": args.kept})
-    record = {"direction": args.direction, "source": args.source, "target": args.target,
-              "layout": args.layout or "mirror", "access": access}
+    record = {"direction": args.direction, "source": args.source, "target": args.target, "access": access}
     path = args.out or default_plan_path()
     os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
     handle = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
@@ -335,28 +322,28 @@ def plan(args):
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = parser.add_subparsers(dest="command", required=True)
-    one = sub.add_parser("layouts")
-    one.add_argument("--repo", required=True)
-    one.add_argument("--project", required=True, type=int)
-    two = sub.add_parser("check-linear")
-    two.add_argument("--key-env", required=True)
-    two.add_argument("--team")
-    four = sub.add_parser("read-linear")
-    four.add_argument("--key-env", required=True)
-    which = four.add_mutually_exclusive_group(required=True)
+    github = sub.add_parser("read-github")
+    github.add_argument("--repo", required=True)
+    github.add_argument("--project", required=True, type=int)
+    check = sub.add_parser("check-linear")
+    check.add_argument("--key-env", required=True)
+    check.add_argument("--team")
+    source = sub.add_parser("read-linear")
+    source.add_argument("--key-env", required=True)
+    which = source.add_mutually_exclusive_group(required=True)
     which.add_argument("--project")
     which.add_argument("--issues", nargs="+")
-    three = sub.add_parser("plan")
-    three.add_argument("--direction", required=True, choices=["github-to-linear", "linear-to-github"])
-    three.add_argument("--source", required=True)
-    three.add_argument("--target", required=True)
-    three.add_argument("--access", required=True, choices=["key", "connector"])
-    three.add_argument("--layout", choices=["mirror", "linear"])
-    three.add_argument("--key-env")
-    three.add_argument("--kept")
-    three.add_argument("--out")
+    saved = sub.add_parser("plan")
+    saved.add_argument("--direction", required=True, choices=["github-to-linear", "linear-to-github"])
+    saved.add_argument("--source", required=True)
+    saved.add_argument("--target", required=True)
+    saved.add_argument("--access", required=True, choices=["key", "connector"])
+    saved.add_argument("--key-env")
+    saved.add_argument("--kept")
+    saved.add_argument("--out")
     args = parser.parse_args()
-    {"layouts": layouts, "check-linear": check_linear, "read-linear": read_linear, "plan": plan}[args.command](args)
+    {"read-github": read_github, "check-linear": check_linear, "read-linear": read_linear,
+     "plan": plan}[args.command](args)
 
 
 if __name__ == "__main__":
