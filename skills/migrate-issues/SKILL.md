@@ -180,6 +180,14 @@ When the person chose the connector in step 2, do not copy through the
 Linear tools: say the copy needs a key, ask where it is kept, check it as
 step 2 says, and save the plan again with `--access key` before the yes.
 
-Links between the copies (parent, sub-issue and blocked-by), closing the
-GitHub originals, and **Linear to GitHub** are not built yet. Say so, and
-stop.
+Last, the copy keeps the parent and blocked-by links GitHub holds between
+the issues: a sub-issue's copy gets its parent's copy as its parent, and an
+issue's copy is blocked by the copy of each issue that blocks it. A link is
+made only when both issues have a copy on the team, and only once, so a run
+cut to one milestone makes it later, in the run that copies the other side.
+A link whose other issue has no copy (closed, in another repository, or not
+copied yet) is named in what the copy prints, not made. A copy already given
+another parent in Linear is left where it is, and named.
+
+Closing the GitHub originals, and **Linear to GitHub**, are not built yet.
+Say so, and stop.
