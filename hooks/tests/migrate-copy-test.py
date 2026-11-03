@@ -48,6 +48,16 @@ import json, os, sys
 args = sys.argv[1:]
 with open(os.environ["FAKE_GH_LOG"], "a") as log:
     log.write(json.dumps(args) + "\n")
+if args[:2] == ["issue", "close"]:
+    world = json.load(open(os.environ["FAKE_GH_WORLD"]))
+    if args[2] in world.get("close_refused", []):
+        sys.exit(1)
+    for node in world["project"]["items"]["nodes"]:
+        if node["content"].get("number") == int(args[2]):
+            node["content"]["state"] = "CLOSED"
+    world["issues"][args[2]]["state"] = "CLOSED"
+    json.dump(world, open(os.environ["FAKE_GH_WORLD"], "w"))
+    sys.exit(0)
 if args[:2] != ["api", "graphql"]:
     sys.exit(3)
 fields = {}
@@ -237,6 +247,9 @@ def answer(store, body):
         more = start + 2 < len(nodes)
         return {"project": {"issues": {"pageInfo": {"hasNextPage": more, "endCursor": str(start + 2)},
                                        "nodes": nodes[start:start + 2]}}}
+    if "issue(" in query and "title description" in query:
+        found = [i for i in store.issues if i["id"] == v["id"]]
+        return {"issue": {"title": found[0]["title"], "description": found[0]["description"]} if found else None}
     if "issue(" in query and "parent{" in query:
         found = [i for i in store.issues if i["id"] == v["id"]]
         parent = found[0].get("parentId") if found else None
@@ -813,6 +826,185 @@ code, out, err = run(env, plan=save_plan(tmp))
 check("a team with no Needs Human status is refused before any write",
       code != 0 and not store.writes and "Needs Human" in err, out + err)
 
+# --- MAST-17: when the migration finishes, each migrated GitHub issue is closed as not planned, nothing is
+# deleted, and nothing ties it to its Linear copy; the check counts issues and comments on both sides and
+# lists every image.
+
+def finish(env, *extra, plan=None):
+    args = [sys.executable, SCRIPT, "finish", "--repo", "acme/site", "--project", "7", "--team", "WEB",
+            "--key-env", "MY_LINEAR_KEY", "--plan", plan] + list(extra)
+    result = subprocess.run(args, env=env, capture_output=True, text=True, timeout=60)
+    return result.returncode, result.stdout, result.stderr
+
+
+def gh_log(env):
+    return [json.loads(line) for line in open(env["FAKE_GH_LOG"])] if os.path.exists(env["FAKE_GH_LOG"]) else []
+
+
+def closes(env):
+    return [c for c in gh_log(env) if c[:2] != ["api", "graphql"]]
+
+
+def closed_numbers(env):
+    return sorted(int(c[2]) for c in closes(env))
+
+
+WITH_IMAGES = [dict(i) for i in ISSUES]
+WITH_IMAGES[4] = gh_issue(5, "Fix footer", "Website relaunch: 1. Build",
+                          body="See ![the footer](https://github.com/user-attachments/assets/foot.png) here.",
+                          comments=[comment("octocat", "2026-11-03T18:27:00Z",
+                                            'Also <img width="200" src="https://example.com/after.png">.')])
+# GitHub's own rendering of that text, which is what finish reads the images from.
+WITH_IMAGES[4]["bodyHTML"] = ('<p>See <a href="https://github.com/user-attachments/assets/foot.png"><img '
+                              'src="https://github.com/user-attachments/assets/foot.png" alt="the footer"></a> here.</p>')
+WITH_IMAGES[4]["all_comments"][0]["bodyHTML"] = (
+    '<p>Also <img width="200" src="https://camo.githubusercontent.com/abc" '
+    'data-canonical-src="https://example.com/after.png">.</p>')
+
+# Images written every way GitHub shows them: an address with parentheses, brackets in the alt text, a lazy
+# data-src beside the real src, a ">" inside a quoted alt, a reference-style image. GitHub renders each as
+# an <img>; an emoji GitHub draws as an image is not an image of the issue.
+TRICKY = gh_issue(7, "Pictures", None, body=(
+    "![chart](https://upload.wikimedia.org/w/Graph_(2020).png)\n"
+    "![shot [1]](https://ex.test/nested.png)\n"
+    '<img data-src="https://cdn.ex.test/lazy.png" src="https://cdn.ex.test/real.png">\n'
+    '<img alt="a > b" src="https://ex.test/gt.png">\n'
+    "![ref][1] :shipit:\n\n[1]: https://ex.test/ref.png"))
+TRICKY["bodyHTML"] = (
+    '<p><img src="https://camo.githubusercontent.com/1" data-canonical-src="https://upload.wikimedia.org/w/Graph_(2020).png" alt="chart">\n'
+    '<img src="https://camo.githubusercontent.com/2" data-canonical-src="https://ex.test/nested.png" alt="shot [1]">\n'
+    '<img data-src="https://cdn.ex.test/lazy.png" src="https://camo.githubusercontent.com/3" data-canonical-src="https://cdn.ex.test/real.png">\n'
+    '<img alt="a &gt; b" src="https://camo.githubusercontent.com/4" data-canonical-src="https://ex.test/gt.png">\n'
+    '<img src="https://camo.githubusercontent.com/5" data-canonical-src="https://ex.test/ref.png" alt="ref"> '
+    '<img class="emoji" title=":shipit:" alt=":shipit:" src="https://github.githubassets.com/images/icons/emoji/shipit.png">\n'
+    # An upload, as GitHub renders it: a private address signed for five minutes, not the address written.
+    '<a href="https://private-user-images.githubusercontent.com/181685648/604055368-25addea2-357a-42c0-a1c8-fba0163382cc.png'
+    '?jwt=eyJSIGNED.TOKEN"><img alt="Image" src="https://private-user-images.githubusercontent.com/181685648/'
+    '604055368-25addea2-357a-42c0-a1c8-fba0163382cc.png?jwt=eyJSIGNED.TOKEN"></a></p>')
+
+Linear.store = store = Store()
+envf, tmpf = fake_gh(world_for(WITH_IMAGES))
+planf = save_plan(tmpf)
+code, out, err = run(envf, plan=planf)
+check("the copy runs before the finish", code == 0, out + err)
+open(envf["FAKE_GH_LOG"], "w").close()
+writes_before = list(store.writes)
+code, out, err = finish(envf, plan=planf)
+check("finish runs", code == 0, out + err)
+check("each migrated open issue is closed on GitHub", closed_numbers(envf) == [1, 2, 3, 5, 6], closes(envf))
+check("each is closed as not planned, with nothing else said",
+      all(c == ["issue", "close", c[2], "--repo", "acme/site", "--reason", "not planned"] for c in closes(envf)),
+      closes(envf))
+check("the closed issue and the other repository's issue are not touched",
+      not any(c[2] in ("4", "9") for c in closes(envf)), closes(envf))
+everything = json.dumps(gh_log(envf)).lower()
+check("nothing on GitHub is deleted", "delete" not in everything and "transfer" not in everything, gh_log(envf))
+check("no comment is posted on GitHub", "--comment" not in everything and "addcomment" not in everything
+      and not any(a.startswith("query=mutation") for c in gh_log(envf) for a in c), gh_log(envf))
+check("no Linear link or key reaches GitHub", "linear" not in everything and "web-" not in everything, gh_log(envf))
+check("finish writes nothing to Linear", store.writes == writes_before, store.writes)
+check("the issue counts match on both sides", "GitHub: 5 issues, 4 comments." in out
+      and "Linear: 5 of them copied, 4 of those comments." in out, out)
+check("an image in a body is listed", "#5: https://github.com/user-attachments/assets/foot.png" in out, out)
+check("an image in a comment is listed", "#5: https://example.com/after.png" in out, out)
+check("finish says nothing was deleted", "Nothing on GitHub was deleted" in out, out)
+check("the key never appears in what finish prints", KEY not in out and KEY not in err)
+
+Linear.store = store = Store()
+envt, _ = fake_gh(world_for([TRICKY]))
+run(envt, plan=planf)
+code, out, err = finish(envt, plan=planf)
+pictures = [line.strip() for line in out.splitlines() if line.strip().startswith("#7: ")]
+check("every image GitHub shows is listed once, by the address it shows",
+      sorted(pictures) == sorted("#7: " + url for url in (
+          "https://upload.wikimedia.org/w/Graph_(2020).png", "https://ex.test/nested.png",
+          "https://cdn.ex.test/real.png", "https://ex.test/gt.png", "https://ex.test/ref.png",
+          "https://github.com/user-attachments/assets/25addea2-357a-42c0-a1c8-fba0163382cc")), out)
+check("an upload's short-lived signed address is never printed", "jwt" not in out and "SIGNED" not in out, out)
+check("an emoji is not listed as an image", "shipit" not in out, out)
+
+code, out, err = finish(envf, plan=planf)
+check("a second finish finds nothing left open and closes nothing",
+      code == 0 and "No open issue left" in out and not closes(envf)[5:], out + err)
+
+# A copy short a comment, or with no copy at all, stays open and is named.
+Linear.store = store = Store()
+envf, tmpf = fake_gh(world_for(WITH_IMAGES))
+code, out, err = run(envf, "--issues", "1", "5", plan=planf)
+store.comments = [c for c in store.comments if not c["body"].endswith("Summer note.")]
+open(envf["FAKE_GH_LOG"], "w").close()
+code, out, err = finish(envf, plan=planf)
+check("finish fails when a copy does not match", code != 0, out + err)
+check("only the issue whose copy matches is closed", closed_numbers(envf) == [5], closes(envf))
+check("the copy short a comment is named", "#1 has 2 of its 3 comments in Linear" in out, out)
+check("an issue with no copy is named", "#2 has no copy on the team" in out, out)
+check("the counts show the gap", "GitHub: 5 issues, 4 comments." in out
+      and "Linear: 2 of them copied, 3 of those comments." in out, out)
+
+# Closed only when the copy holds the same title and body too, so closing never loses text (Robert,
+# November 3, on MAST-17: "yes this is good enough"). Issue 3 has no comments, so only its text can tell.
+Linear.store = store = Store()
+envx, _ = fake_gh(world_for(WITH_IMAGES))
+run(envx, plan=planf)
+copy_of = {int(i["description"].rsplit("#", 1)[1].split()[0]): i for i in store.issues}
+copy_of[2]["title"] = "Build the header, renamed in Linear"
+copy_of[3]["description"] = "Not the GitHub text.\n\n<!-- copied from GitHub acme/site#3 -->"
+open(envx["FAKE_GH_LOG"], "w").close()
+code, out, err = finish(envx, plan=planf)
+check("a copy whose title or body differs keeps its GitHub issue open",
+      code != 0 and closed_numbers(envx) == [1, 5, 6], out + err + str(closes(envx)))
+check("a copy whose title differs is named", "#2 has another title in Linear" in out, out)
+check("a copy whose body differs is named", "#3 has other text in Linear" in out, out)
+
+# A change in symbols alone is a change: "x > 5" and "x < 5" are not the same text. Spacing is not, and
+# neither is Linear wrapping a link's address in <>. The way out of a text difference is a hand edit,
+# since the copy never rewrites a copy it finds.
+SYMBOLS = [gh_issue(21, "Limit is x > 5", None, body="Ship if x > 5. Docs: [here](https://ex.test/a-b)."),
+           gh_issue(22, "Second", None, body="Plain.", comments=[comment("octocat", "2026-11-03T18:27:00Z", "Use -5.")]),
+           gh_issue(23, "Third", None, body="Plain  text.\n\nSee [docs](https://ex.test/d).")]
+Linear.store = store = Store()
+envs, _ = fake_gh(world_for(SYMBOLS))
+run(envs, plan=planf)
+copy_of = {int(i["description"].rsplit("#", 1)[1].split()[0]): i for i in store.issues}
+copy_of[21]["description"] = copy_of[21]["description"].replace("x > 5", "x < 5")
+for c in store.comments:
+    c["body"] = c["body"].replace("Use -5.", "Use 5.")
+copy_of[23]["description"] = copy_of[23]["description"].replace("Plain  text.", "Plain text.").replace(
+    "(https://ex.test/d)", "(<https://ex.test/d>)")
+open(envs["FAKE_GH_LOG"], "w").close()
+code, out, err = finish(envs, plan=planf)
+check("a body that differs only in symbols keeps its GitHub issue open", "#21 has other text in Linear" in out, out)
+check("a comment that differs only in symbols keeps its GitHub issue open, named as text that differs, "
+      "since the copy counts it as posted and running it again cannot help",
+      "#22 has a comment whose text differs in Linear" in out and "#22 has 0 of" not in out, out)
+check("spacing and Linear's <> around a link address are not a difference", closed_numbers(envs) == [23],
+      out + str(closes(envs)))
+check("a text difference is fixed by hand, not by running the copy again",
+      "make the Linear copy match GitHub by hand" in out, out)
+store.issues[0]["title"] = "Limit is x < 5"
+copy_of[21]["description"] = copy_of[21]["description"].replace("x < 5", "x > 5")
+code, out, err = finish(envs, "--issues", "21", plan=planf)
+check("a title that differs only in symbols keeps its GitHub issue open", "#21 has another title in Linear" in out, out)
+
+# GitHub refusing to close one is named, and the run fails.
+broken = world_for(WITH_IMAGES)
+broken["close_refused"] = ["5"]
+envr, _ = fake_gh(broken)
+Linear.store = store = Store()
+run(envr, "--issues", "5", plan=planf)
+code, out, err = finish(envr, "--issues", "5", plan=planf)
+check("a close GitHub refuses is named and fails the run",
+      code != 0 and "GitHub refused to close: #5" in out, out + err)
+
+# Nothing closes without the person's yes to this migration.
+for name, plan_path in (
+        ("no saved plan", os.path.join(tmpf, "missing.json")),
+        ("a plan for another team", save_plan(tmpf, target="OPS")),
+        ("a plan for another project", save_plan(tmpf, source="acme/site#8"))):
+    open(envf["FAKE_GH_LOG"], "w").close()
+    code, out, err = finish(envf, plan=plan_path)
+    check("finish refuses {} and closes nothing".format(name), code != 0 and not closes(envf), out + err)
+
 # --- The skill says how to run the copy, by key and by connector.
 
 text = open(SKILL).read() if os.path.exists(SKILL) else ""
@@ -834,6 +1026,9 @@ check("SKILL.md no longer says the copy is not built", "is not built yet" not in
 check("SKILL.md no longer says the links are not built", "Links between the copies" not in text)
 says("parent and blocked-by links")
 says("another repository copied to the same team")
+says("migrate.py finish --repo <owner>/<repo> --project <number> --team <KEY> --key-env")
+says("as not planned")
+check("SKILL.md no longer says closing the originals is not built", "Closing the GitHub originals, and" not in text)
 
 for path in sorted(os.listdir(SKILL_DIR)):
     body = open(os.path.join(SKILL_DIR, path)).read()
