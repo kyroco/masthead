@@ -160,13 +160,17 @@ def hide(text, key):
 
 
 def read_key(name):
-    key = os.environ.get(name, "")
+    """The key in the variable, trimmed. Refused, never printed, when it is empty or not one plain word."""
+    key = os.environ.get(name, "").strip()
     if not key:
         fail("{} is not set, so there is no key to read. Nothing was sent.".format(name))
     if key.startswith("op://"):
         fail("{} holds a 1Password reference, not the key. Run this under `op run --` so 1Password puts "
              "the key in its place. Nothing was sent.".format(name))
-    return key.strip()
+    if any(ch.isspace() or not ch.isprintable() for ch in key):
+        fail("{} holds a space, a line break or another hidden character, so it is not one Linear key. "
+             "Check the field it comes from. Nothing was sent.".format(name))
+    return key
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -195,6 +199,8 @@ def linear(key, query, variables=None):
         fail("Linear refused the request ({}): {}".format(error.code, hide(body[:600], key)), 1)
     except (urllib.error.URLError, OSError) as error:
         fail("Linear could not be reached: {}".format(hide(str(error), key)), 1)
+    except Exception as error:  # anything else could carry the key in its text; never let it print raw
+        fail("The request to Linear failed: {}".format(hide("{}: {}".format(type(error).__name__, error), key)), 1)
     try:
         answer = json.loads(body)
     except ValueError:
