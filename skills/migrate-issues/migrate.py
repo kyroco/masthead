@@ -525,12 +525,11 @@ TEAM = """query($key:String!){ teams(filter:{key:{eq:$key}}){ nodes{ id key
 PROJECTS = """query($name:String!){ projects(filter:{name:{eq:$name}}){ nodes{ id name
   teams{nodes{id}} projectMilestones{nodes{id name sortOrder}} } } }"""
 
+# Matched whatever the case: the hidden line holds the repository as the person typed it on that run.
 COPIES = """query($team:ID!,$mark:String!,$after:String){
   issues(first:100, after:$after, includeArchived:true,
-         filter:{team:{id:{eq:$team}}, description:{contains:$mark}}){
+         filter:{team:{id:{eq:$team}}, description:{containsIgnoreCase:$mark}}){
     pageInfo{hasNextPage endCursor} nodes{ id description createdAt project{id} } } }"""
-
-OTHER_COPIES = COPIES.replace("description:{contains:$mark}", "description:{containsIgnoreCase:$mark}")
 
 PROJECT_BY_ID = """query($id:String!){ project(id:$id){ id name
   teams{nodes{id}} projectMilestones{nodes{id name sortOrder}} } }"""
@@ -609,12 +608,12 @@ def every_page(key, query, variables, path):
 
 def copies_of(key, team_id, repo):
     """Every copy on the team of another repository's issues, by GitHub number: the copies an earlier
-    run of the copy made from that repository. Its name is matched whatever its case, since the
-    person may have typed it differently then. As for this repository, the earliest copy wins."""
+    run of the copy made from that repository, whatever case its name was typed in then. As for this
+    repository, the earliest copy wins."""
     if not re.match(r"^[a-z0-9_.-]+/[a-z0-9_.-]+$", repo):
         return {}
     found = {}
-    for node in sorted(every_page(key, OTHER_COPIES, {"team": team_id, "mark": MARK.format(repo, "")},
+    for node in sorted(every_page(key, COPIES, {"team": team_id, "mark": MARK.format(repo, "")},
                                   ("issues",)), key=lambda n: n["createdAt"]):
         number = copied_from(repo, node.get("description"))
         if number is not None:
