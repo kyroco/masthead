@@ -1,0 +1,322 @@
+#!/usr/bin/env python3
+"""Linear issue MAST-14: the migration skill asks before anything is written.
+
+/masthead:migrate-issues moves issues GitHub to Linear and Linear to GitHub.
+Its first step, checked here: it reads the GitHub project and shows what each
+layout would make from the person's own names, it lets the person reach Linear
+with an API key or the Linear connector, and a key is read at run time from
+where the person keeps it and never shows in output or in a file. Nothing in
+the skill names one company's repositories or milestones.
+
+Runs the real migrate.py against a fake `gh` on PATH and a fake Linear on
+127.0.0.1. Run from anywhere: python3 hooks/tests/migrate-issues-test.py
+"""
+import http.server
+import json
+import os
+import re
+import stat
+import subprocess
+import sys
+import tempfile
+import threading
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(os.path.dirname(HERE))
+SKILL_DIR = os.path.join(ROOT, "skills", "migrate-issues")
+SCRIPT = os.path.join(SKILL_DIR, "migrate.py")
+SKILL = os.path.join(SKILL_DIR, "SKILL.md")
+
+KEY = "lin_api_TESTKEY0123456789abcdefSECRET"
+
+passed = 0
+failed = 0
+
+
+def check(name, ok, detail=""):
+    global passed, failed
+    if ok:
+        passed += 1
+    else:
+        failed += 1
+        print("FAIL {}{}".format(name, (": " + detail) if detail else ""))
+
+
+# A fake gh. It answers `gh api graphql` from canned pages, logs every call,
+# and fails the organization lookup when FAKE_GH_USER_ONLY is set, the way
+# GitHub does for a project owned by a person.
+FAKE_GH = r'''#!/usr/bin/env python3
+import json, os, sys
+args = sys.argv[1:]
+with open(os.environ["FAKE_GH_LOG"], "a") as log:
+    log.write(json.dumps(args) + "\n")
+if args[:2] != ["api", "graphql"]:
+    sys.exit(3)
+query = next(a.split("=", 1)[1] for a in args if a.startswith("query="))
+after = next((a.split("=", 1)[1] for a in args if a.startswith("after=")), None)
+if query.lstrip().startswith("mutation"):
+    sys.exit(4)
+owner = "organization" if "organization(" in query else "user"
+if owner == "organization" and os.environ.get("FAKE_GH_USER_ONLY"):
+    print(json.dumps({"data": {"organization": None},
+                      "errors": [{"type": "NOT_FOUND", "message": "Could not resolve to an Organization"}]}))
+    sys.exit(1)
+pages = json.load(open(os.environ["FAKE_GH_PAGES"]))
+page = pages[1] if after else pages[0]
+print(json.dumps({"data": {owner: {"projectV2": page}}}))
+'''
+
+
+def issue(number, milestone, state="OPEN", kind="Issue"):
+    if kind != "Issue":
+        return {"content": {"__typename": kind}}
+    return {"content": {"__typename": "Issue", "number": number, "state": state,
+                        "repository": {"nameWithOwner": "acme/site"},
+                        "milestone": {"title": milestone} if milestone else None}}
+
+
+PAGES = [
+    {"title": "Website relaunch", "items": {
+        "pageInfo": {"hasNextPage": True, "endCursor": "CUR1"},
+        "nodes": [issue(1, "Website relaunch: 2. Launch"), issue(2, "Website relaunch: 1. Build"),
+                  issue(3, "Website relaunch: 1. Build"), issue(4, None),
+                  issue(5, "Website relaunch: 3. Retire old site", state="CLOSED"),
+                  issue(0, None, kind="DraftIssue")]}},
+    {"title": "Website relaunch", "items": {
+        "pageInfo": {"hasNextPage": False, "endCursor": None},
+        "nodes": [issue(6, "Website relaunch: 10. Follow up"), issue(7, "Website relaunch: 1. Build")]}},
+]
+
+
+def fake_gh(user_only=False):
+    tmp = tempfile.mkdtemp(prefix="migrate-gh-")
+    bindir = os.path.join(tmp, "bin")
+    os.mkdir(bindir)
+    gh = os.path.join(bindir, "gh")
+    with open(gh, "w") as handle:
+        handle.write(FAKE_GH)
+    os.chmod(gh, 0o755)
+    pages = os.path.join(tmp, "pages.json")
+    with open(pages, "w") as handle:
+        json.dump(PAGES, handle)
+    env = dict(os.environ)
+    env["PATH"] = bindir + os.pathsep + env.get("PATH", "")
+    env["FAKE_GH_LOG"] = os.path.join(tmp, "log")
+    env["FAKE_GH_PAGES"] = pages
+    if user_only:
+        env["FAKE_GH_USER_ONLY"] = "1"
+    return env
+
+
+def run(args, env=None, cwd=None):
+    result = subprocess.run([sys.executable, SCRIPT] + args, env=env or dict(os.environ),
+                            cwd=cwd, capture_output=True, text=True, timeout=30)
+    return result.returncode, result.stdout, result.stderr
+
+
+# A fake Linear. Each test sets what it answers; it records the requests.
+class Linear(http.server.BaseHTTPRequestHandler):
+    answer = None
+    seen = []
+
+    def do_POST(self):
+        body = self.rfile.read(int(self.headers.get("Content-Length", 0)))
+        Linear.seen.append({"auth": self.headers.get("Authorization"), "body": json.loads(body)})
+        status, payload = Linear.answer(self.headers.get("Authorization"), json.loads(body))
+        data = payload.encode() if isinstance(payload, str) else json.dumps(payload).encode()
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
+    def log_message(self, *args):
+        pass
+
+
+server = http.server.HTTPServer(("127.0.0.1", 0), Linear)
+threading.Thread(target=server.serve_forever, daemon=True).start()
+LINEAR_URL = "http://127.0.0.1:{}/graphql".format(server.server_address[1])
+
+
+def linear_env(**extra):
+    env = dict(os.environ)
+    env["MASTHEAD_LINEAR_URL"] = LINEAR_URL
+    env.update(extra)
+    return env
+
+
+def good_answer(auth, body):
+    query = body["query"]
+    data = {"viewer": {"name": "Pat Doe"}, "organization": {"name": "Acme", "urlKey": "acme"}}
+    if "teams" in query:
+        key = body.get("variables", {}).get("key")
+        data["teams"] = {"nodes": [{"name": "Web", "key": "WEB"}] if key == "WEB" else []}
+    return 200, {"data": data}
+
+
+def no_key(out, err):
+    return KEY not in out and KEY not in err
+
+
+# --- Scenario 1: the layouts, from the person's own names, before anything is written.
+
+env = fake_gh()
+code, out, err = run(["layouts", "--owner", "acme", "--project", "7"], env=env)
+check("layouts runs", code == 0, err)
+check("layouts names the project", 'GitHub project "Website relaunch"' in out, out)
+check("layouts counts only open issues", "6 open issues" in out, out)
+check("mirror: one Linear project named for the GitHub project", 'Linear project "Website relaunch"' in out, out)
+check("mirror: milestone keeps its own name inside the project", 'milestone "1. Build" (3 issues)' in out, out)
+check("mirror: milestones in build order, 2 before 10",
+      out.find('milestone "2. Launch"') < out.find('milestone "10. Follow up"'), out)
+check("linear layout: an initiative named for the GitHub project",
+      'Linear initiative "Website relaunch"' in out, out)
+check("linear layout: each milestone its own project",
+      'project "Website relaunch: 1. Build" (3 issues)' in out, out)
+check("a closed issue's milestone is not shown", "Retire old site" not in out, out)
+check("issues with no milestone are counted", "no milestone (1 issue)" in out, out)
+check("layouts says nothing is written yet", "Nothing has been written" in out, out)
+calls = [json.loads(line) for line in open(env["FAKE_GH_LOG"])] if os.path.exists(env["FAKE_GH_LOG"]) else []
+check("layouts reads both pages", any(any(a == "after=CUR1" for a in c) for c in calls), str(calls))
+check("layouts only reads GitHub", calls and all(c[:2] == ["api", "graphql"] for c in calls)
+      and not any("mutation" in a for c in calls for a in c), str(calls))
+
+env = fake_gh(user_only=True)
+code, out, err = run(["layouts", "--owner", "pat", "--project", "7"], env=env)
+check("layouts reads a project a person owns", code == 0 and 'GitHub project "Website relaunch"' in out, out + err)
+
+# --- Scenarios 3 and 4: a key read at run time, never shown.
+
+Linear.answer = staticmethod(good_answer)
+Linear.seen = []
+code, out, err = run(["check-linear", "--key-env", "MY_LINEAR_KEY", "--team", "WEB"],
+                     env=linear_env(MY_LINEAR_KEY=KEY))
+check("check-linear reaches Linear with the key", code == 0 and "Pat Doe" in out and "Acme" in out, out + err)
+check("check-linear finds the team", 'team "Web" (WEB)' in out, out)
+check("the key is sent to Linear", Linear.seen and Linear.seen[-1]["auth"] == KEY, str(Linear.seen))
+check("the key is not in the output", no_key(out, err))
+check("check-linear only reads Linear",
+      all(not s["body"]["query"].lstrip().startswith("mutation") for s in Linear.seen), str(Linear.seen))
+
+Linear.seen = []
+code, out, err = run(["check-linear", "--key-env", "MY_LINEAR_KEY", "--team", "NOPE"],
+                     env=linear_env(MY_LINEAR_KEY=KEY))
+check("a missing team is refused", code != 0 and 'No Linear team with the key "NOPE"' in (out + err), out + err)
+
+
+def echo_key(auth, body):
+    return 401, {"errors": [{"message": "Authentication failed for key " + auth}]}
+
+
+Linear.answer = staticmethod(echo_key)
+code, out, err = run(["check-linear", "--key-env", "MY_LINEAR_KEY"], env=linear_env(MY_LINEAR_KEY=KEY))
+check("a refused key fails", code != 0, out + err)
+check("Linear's error is shown with the key hidden", "[key hidden]" in (out + err) and no_key(out, err), out + err)
+
+
+def echo_key_plain(auth, body):
+    return 500, "upstream said: " + auth
+
+
+Linear.answer = staticmethod(echo_key_plain)
+code, out, err = run(["check-linear", "--key-env", "MY_LINEAR_KEY"], env=linear_env(MY_LINEAR_KEY=KEY))
+check("a non-JSON error is shown with the key hidden", code != 0 and no_key(out, err), out + err)
+
+Linear.answer = staticmethod(good_answer)
+Linear.seen = []
+code, out, err = run(["check-linear", "--key-env", "MY_LINEAR_KEY"],
+                     env=linear_env(MY_LINEAR_KEY="op://Private/Linear/credential"))
+check("a 1Password reference not resolved by op run is refused",
+      code != 0 and "op run" in (out + err) and not Linear.seen, out + err)
+
+env = linear_env()
+env.pop("MY_LINEAR_KEY", None)
+code, out, err = run(["check-linear", "--key-env", "MY_LINEAR_KEY"], env=env)
+check("an unset variable is refused", code != 0 and "MY_LINEAR_KEY is not set" in (out + err) and not Linear.seen,
+      out + err)
+
+Linear.seen = []
+code, out, err = run(["check-linear", "--key-env", "MY_LINEAR_KEY"],
+                     env=dict(linear_env(MY_LINEAR_KEY=KEY), MASTHEAD_LINEAR_URL="https://example.test/graphql"))
+check("the key is never sent anywhere but Linear or this machine", code != 0 and not Linear.seen, out + err)
+
+# --- The plan the person agreed to: the layout and the access, and never the key.
+
+work = tempfile.mkdtemp(prefix="migrate-plan-")
+plan_path = os.path.join(work, "plan.json")
+base = ["plan", "--out", plan_path, "--direction", "github-to-linear",
+        "--source", "github:acme#7", "--target", "linear:WEB"]
+
+code, out, err = run(base + ["--access", "connector"])
+check("github to linear needs a layout", code != 0 and "layout" in (out + err) and not os.path.exists(plan_path),
+      out + err)
+
+code, out, err = run(base + ["--layout", "linear", "--access", "key", "--key-env", "MY_LINEAR_KEY",
+                             "--kept", "op://Private/Linear/credential"], env=dict(os.environ, MY_LINEAR_KEY=KEY))
+check("a plan with a key reference is saved", code == 0 and os.path.exists(plan_path), out + err)
+if os.path.exists(plan_path):
+    text = open(plan_path).read()
+    saved = json.loads(text)
+    check("the plan holds the layout", saved.get("layout") == "linear", text)
+    check("the plan holds where the key is kept", saved.get("access", {}).get("kept") == "op://Private/Linear/credential", text)
+    check("the plan never holds the key", KEY not in text, text)
+    check("the plan is private to the person", stat.S_IMODE(os.stat(plan_path).st_mode) == 0o600)
+    os.remove(plan_path)
+
+code, out, err = run(base + ["--layout", "mirror", "--access", "key", "--key-env", "MY_LINEAR_KEY", "--kept", KEY])
+check("a pasted key is refused as the place it is kept", code != 0 and not os.path.exists(plan_path)
+      and no_key(out, err), out + err)
+
+code, out, err = run(base + ["--layout", "mirror", "--access", "key", "--key-env", "MY_LINEAR_KEY",
+                             "--kept", "my key is xyzzy-1234567890"], env=dict(os.environ, MY_LINEAR_KEY="xyzzy-1234567890"))
+check("a place that holds the key's own value is refused", code != 0 and not os.path.exists(plan_path)
+      and "xyzzy-1234567890" not in (out + err), out + err)
+
+code, out, err = run(base + ["--layout", "mirror", "--access", "connector", "--key-env", "MY_LINEAR_KEY"])
+check("the connector takes no key", code != 0 and not os.path.exists(plan_path), out + err)
+
+code, out, err = run(base + ["--layout", "mirror", "--access", "key", "--key-env", "MY_LINEAR_KEY"])
+check("a key needs a place it is kept", code != 0 and not os.path.exists(plan_path), out + err)
+
+back = ["plan", "--out", plan_path, "--direction", "linear-to-github",
+        "--source", "linear:Website relaunch", "--target", "github:acme/site", "--access", "connector"]
+code, out, err = run(back + ["--layout", "linear"])
+check("linear to github keeps the structure, so no other layout", code != 0 and not os.path.exists(plan_path),
+      out + err)
+code, out, err = run(back)
+check("linear to github with the connector is saved as a mirror",
+      code == 0 and json.load(open(plan_path)).get("layout") == "mirror", out + err)
+
+# --- Scenarios 5 to 7: one skill both ways, nothing tied to one company.
+
+skill = re.sub(r"\s+", " ", open(SKILL).read()) if os.path.exists(SKILL) else ""
+
+
+def says(text):
+    check("SKILL.md says: " + text, text.lower() in skill.lower())
+
+
+says("disable-model-invocation: true")
+says("One skill moves issues both ways: GitHub to Linear, and Linear to GitHub")
+says("Nothing is written to GitHub or Linear until the person has said yes to the plan")
+says("migrate.py layouts --owner <owner> --project <number>")
+says("Show its output as it is")
+says("the mirror layout")
+says("Linear's layout")
+says("Linear to GitHub keeps the structure as it is")
+says("an API key or the Linear connector")
+says("Never ask for the key itself")
+says("op run -- python3")
+says("check-linear --key-env")
+says("never `op read`")
+says("migrate.py plan")
+
+for path in sorted(os.listdir(SKILL_DIR)) if os.path.isdir(SKILL_DIR) else []:
+    text = open(os.path.join(SKILL_DIR, path)).read()
+    for word in ("kyroco", "flyer", "korium", "KYR-", "MAST-"):
+        check("{} names no one company's work ({})".format(path, word), word.lower() not in text.lower())
+
+server.shutdown()
+print("{} passed, {} failed".format(passed, failed))
+sys.exit(1 if failed else 0)
