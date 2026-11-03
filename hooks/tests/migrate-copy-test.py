@@ -400,6 +400,18 @@ check("after a reopen, each copy holds only its own issue's comment",
           ["{}'s note.".format(i["description"].split()[1].rstrip(".").capitalize())] for i in store.issues),
       [(i["description"], comments_on(store, i)) for i in store.issues])
 
+# Two comments by one person, with the same text, in the same minute: both are copied, once each, run after run.
+DOUBLE = [gh_issue(21, "Vote", None, comments=[comment("carol", "2026-11-03T15:00:05Z", "+1"),
+                                               comment("carol", "2026-11-03T15:00:40Z", "+1")])]
+Linear.store = store = Store()
+env7, _ = fake_gh(world_for(DOUBLE))
+code, out, err = run(env7, plan=plan)
+vote = by_title(store, "Vote")
+check("two same-minute comments with the same text are both copied",
+      code == 0 and vote and len(comments_on(store, vote[0])) == 2, out + err + str(store.comments))
+run(env7, plan=plan)
+check("and a second run adds neither again", vote and len(comments_on(store, vote[0])) == 2, store.comments)
+
 # --- What is copied can be cut to one milestone or to issue numbers.
 
 Linear.store = store = Store()
