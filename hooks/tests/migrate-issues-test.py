@@ -67,11 +67,11 @@ print(json.dumps({"data": {owner: {"projectV2": page}}}))
 '''
 
 
-def issue(number, milestone, state="OPEN", kind="Issue"):
+def issue(number, milestone, state="OPEN", kind="Issue", repo="acme/site"):
     if kind != "Issue":
         return {"content": {"__typename": kind}}
     return {"content": {"__typename": "Issue", "number": number, "state": state,
-                        "repository": {"nameWithOwner": "acme/site"},
+                        "repository": {"nameWithOwner": repo},
                         "milestone": {"title": milestone} if milestone else None}}
 
 
@@ -81,7 +81,8 @@ PAGES = [
         "nodes": [issue(1, "Website relaunch: 2. Launch"), issue(2, "Website relaunch: 1. Build"),
                   issue(3, "Website relaunch: 1. Build"), issue(4, None),
                   issue(5, "Website relaunch: 3. Retire old site", state="CLOSED"),
-                  issue(0, None, kind="DraftIssue")]}},
+                  issue(0, None, kind="DraftIssue"),
+                  issue(8, "Apps: 1. Store listing", repo="acme/apps")]}},
     {"title": "Website relaunch", "items": {
         "pageInfo": {"hasNextPage": False, "endCursor": None},
         "nodes": [issue(6, "Relaunch: 10. Follow up"), issue(7, "Website relaunch: 1. Build")]}},
@@ -162,7 +163,7 @@ def no_key(out, err):
 # --- Scenario 1: the layouts, from the person's own names, before anything is written.
 
 env = fake_gh()
-code, out, err = run(["layouts", "--owner", "acme", "--project", "7"], env=env)
+code, out, err = run(["layouts", "--repo", "acme/site", "--project", "7"], env=env)
 check("layouts runs", code == 0, err)
 check("layouts names the project", 'GitHub project "Website relaunch"' in out, out)
 check("layouts counts only open issues", "6 open issues" in out, out)
@@ -176,6 +177,9 @@ check("mirror: a shorter project prefix on a milestone is dropped too",
       'milestone "10. Follow up" (1 issue)' in out, out)
 check("linear layout: each milestone its own project",
       'project "Website relaunch: 1. Build" (3 issues)' in out, out)
+check("an issue from another repository in the project is left out",
+      "Store listing" not in out, out)
+check("layouts names the repository", "acme/site" in out, out)
 check("a closed issue's milestone is not shown", "Retire old site" not in out, out)
 check("issues with no milestone are counted", "no milestone (1 issue)" in out, out)
 check("layouts says nothing is written yet", "Nothing has been written" in out, out)
@@ -185,7 +189,7 @@ check("layouts only reads GitHub", calls and all(c[:2] == ["api", "graphql"] for
       and not any("mutation" in a for c in calls for a in c), str(calls))
 
 env = fake_gh(user_only=True)
-code, out, err = run(["layouts", "--owner", "pat", "--project", "7"], env=env)
+code, out, err = run(["layouts", "--repo", "pat/site", "--project", "7"], env=env)
 check("layouts reads a project a person owns", code == 0 and 'GitHub project "Website relaunch"' in out, out + err)
 
 # --- Scenarios 3 and 4: a key read at run time, never shown.
@@ -302,7 +306,7 @@ def says(text):
 says("disable-model-invocation: true")
 says("One skill moves issues both ways: GitHub to Linear, and Linear to GitHub")
 says("Nothing is written to GitHub or Linear until the person has said yes to the plan")
-says("migrate.py layouts --owner <owner> --project <number>")
+says("migrate.py layouts --repo <owner>/<repo> --project <number>")
 says("Show its output as it is")
 says("the mirror layout")
 says("Linear's layout")
