@@ -218,3 +218,55 @@ desktop app, archive them, which also removes their worktrees), capture one
 Korium handoff (what merged, what parked and why, and the person's answers,
 verbatim), and tell the person: one line per issue with its outcome, what each
 parked issue needs, and the two counts.
+
+## On Linear
+
+When `python3 ${CLAUDE_PLUGIN_ROOT}/hooks/project_fact.py --tracker` prints
+`linear`, the project and its issues live in Linear, and every issue, project
+and status call goes through the Linear connector, as the `linear-issues`
+skill says. Pull requests, CI, the merge queue and the decision records stay
+on GitHub. Every section above holds, with these changes, shown for KOR-12:
+
+- **Naming.** Say "KOR-12", never a `#` number.
+- **Understand the work.** Read the project description with `get_project`
+  with `query` the project name, in place of the project README: it is the
+  brief. Find the issues with `list_issues` with `project` the project name,
+  then each issue with `get_issue` with `id` the key and `includeRelations`
+  true, and `list_comments` with `issueId` the key, reading every comment.
+  Both lists come a page at a time: while the answer says `hasNextPage`
+  true, call again with its `cursor` until no page is left.
+  Order them by `relations.blockedBy`, the Linear blocked-by links. An issue
+  in `Needs Human` is not ready, and no worker starts on it: it waits on a
+  question or a decision, in place of the `needs-decision` label.
+- **Start a worker.** Set the status with `save_issue` with `id` the key and
+  `state` `In Progress`, never `set-status.sh`, which knows only GitHub
+  projects. The worker's prompt says `/work-on KOR-12 dispatched`, and in the
+  terminal its session takes `--name "KOR-12-issue"`.
+- **A worker's question.** The worker puts the answer on the issue and sets
+  it back to `In Progress` itself (`worker.md`, On Linear), so the `haiku`
+  agent that writes the answer down captures it in Korium and takes the
+  question out of the body with `save_issue` and `patch` after reading it
+  with `get_issue`, and posts no comment and changes no status. A question
+  answered before its issue has a worker (Agree the run) goes on the issue as
+  a comment with `save_comment`, in the person's words, the answered
+  `[NEEDS CLARIFICATION]` line is taken out of the body with `save_issue` and
+  `patch` after reading it with `get_issue`, and the issue moves to `Todo`
+  with `save_issue` once no `[NEEDS CLARIFICATION]` line is left.
+- **A worker's report.** A worker's report quotes a line from the project
+  description, in place of the project README.
+- **Park.** A second failure sets the issue's status to `Needs Human` with
+  `save_issue` and adds one comment saying what happened, never a `parked`
+  label.
+- **Fix later.** File the follow-up with `save_issue` with no `id`, `team`
+  the team key, the same `project`, `state` `Backlog` and `blockedBy` the key
+  of the issue whose review found it, with the person's words quoted and the
+  adjudicator's `file:line`, trigger and wrong result. It is still the only
+  issue a foreman files.
+- **Queue.** Queuing the PR is unchanged: it goes to GitHub's merge queue
+  with the `enqueuePullRequest` mutation, as above.
+- **Once it merges.** Set the merged issue to `Done` with `save_issue` if the
+  `Fixes` line did not, then each parent up the chain with no open sub-issue
+  left, and list what it blocked from `get_issue` with `includeRelations`
+  true, its `relations.blocks`.
+
+On a repository whose issues live on GitHub, none of this section applies.
