@@ -36,6 +36,7 @@ time. It is never printed, logged or saved: everything Linear sends back is
 shown with the key hidden, and the plan file holds only where the key is kept.
 """
 import argparse
+import collections
 import datetime
 import json
 import os
@@ -591,7 +592,8 @@ def copy(args):
         existing = copies.get((issue["title"], same_text(issue.get("body")))) or []
         if existing:
             target = existing.pop(0)
-            posted = {c["body"] for c in every_page(key, COMMENTS, {"id": target["id"]}, ("issue", "comments"))}
+            posted = collections.Counter(same_text(c["body"]) for c in every_page(
+                key, COMMENTS, {"id": target["id"]}, ("issue", "comments")))
         else:
             label_ids, held = [], False
             for label in issue["labels"]["nodes"]:
@@ -614,13 +616,16 @@ def copy(args):
                 fields["stateId"] = needs_human
             target = create(key, "issueCreate", "issue", fields)
             new_issues += 1
-            posted = set()
+            posted = collections.Counter()
+        # Counted, not just looked up: two comments with the same words are two comments, and each
+        # one already on the copy stands for one of them.
         for comment in issue["comments"]:
             body = comment_body(comment)
-            if body not in posted:
-                create(key, "commentCreate", "comment", {"issueId": target["id"], "body": body})
-                posted.add(body)
-                new_comments += 1
+            if posted[same_text(body)] > 0:
+                posted[same_text(body)] -= 1
+                continue
+            create(key, "commentCreate", "comment", {"issueId": target["id"], "body": body})
+            new_comments += 1
 
     lines = ['Linear project "{}" holds the {} chosen from {}.'.format(shown(title), plural(len(issues)), args.repo)]
     lines.append("Made now: {} project, {}, {} milestone{}, {} comment{}, {} label{}.".format(
