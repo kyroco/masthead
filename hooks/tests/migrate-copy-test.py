@@ -247,6 +247,9 @@ def answer(store, body):
         more = start + 2 < len(nodes)
         return {"project": {"issues": {"pageInfo": {"hasNextPage": more, "endCursor": str(start + 2)},
                                        "nodes": nodes[start:start + 2]}}}
+    if "issue(" in query and "title description" in query:
+        found = [i for i in store.issues if i["id"] == v["id"]]
+        return {"issue": {"title": found[0]["title"], "description": found[0]["description"]} if found else None}
     if "issue(" in query and "parent{" in query:
         found = [i for i in store.issues if i["id"] == v["id"]]
         parent = found[0].get("parentId") if found else None
@@ -937,6 +940,21 @@ check("the copy short a comment is named", "#1 has 2 of its 3 comments in Linear
 check("an issue with no copy is named", "#2 has no copy on the team" in out, out)
 check("the counts show the gap", "GitHub: 5 issues, 4 comments." in out
       and "Linear: 2 of them copied, 3 of those comments." in out, out)
+
+# Closed only when the copy holds the same title and body too, so closing never loses text (Robert,
+# November 3, on MAST-17: "yes this is good enough"). Issue 3 has no comments, so only its text can tell.
+Linear.store = store = Store()
+envx, _ = fake_gh(world_for(WITH_IMAGES))
+run(envx, plan=planf)
+copy_of = {int(i["description"].rsplit("#", 1)[1].split()[0]): i for i in store.issues}
+copy_of[2]["title"] = "Build the header, renamed in Linear"
+copy_of[3]["description"] = "Not the GitHub text.\n\n<!-- copied from GitHub acme/site#3 -->"
+open(envx["FAKE_GH_LOG"], "w").close()
+code, out, err = finish(envx, plan=planf)
+check("a copy whose title or body differs keeps its GitHub issue open",
+      code != 0 and closed_numbers(envx) == [1, 5, 6], out + err + str(closes(envx)))
+check("a copy whose title differs is named", "#2 has another title in Linear" in out, out)
+check("a copy whose body differs is named", "#3 has other text in Linear" in out, out)
 
 # GitHub refusing to close one is named, and the run fails.
 broken = world_for(WITH_IMAGES)
