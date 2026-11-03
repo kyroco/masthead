@@ -14,8 +14,9 @@ for whatever is missing, one question at a time, in plain words.
 
 Nothing is written to GitHub or Linear until the person has said yes to the
 plan. Until then every call reads. The script beside this file,
-`${CLAUDE_PLUGIN_ROOT}/skills/migrate-issues/migrate.py`, does the reading and
-saves the plan; it never writes to either tracker.
+`${CLAUDE_PLUGIN_ROOT}/skills/migrate-issues/migrate.py`, does the reading,
+saves the plan, and after the yes makes the copy in Linear. It never writes
+to GitHub, and its copy refuses to run without a saved plan that matches.
 
 The structure stays the same on both sides. The GitHub project becomes a
 Linear project with the same name, each GitHub milestone a milestone inside
@@ -36,7 +37,9 @@ issue. There is nothing to choose about the structure, so do not ask.
 
 ## 2. Ask how to reach Linear
 
-In both directions, the person chooses an API key or the Linear connector:
+In both directions, the person chooses an API key or the Linear connector for
+reading and planning. The copy into Linear (step 5) runs only with a key, never
+the connector, so for GitHub to Linear say so when you ask:
 
 - **The Linear connector**: the Linear tools already connected to this
   session. Nothing to set up. Check it by reading the target team (or the
@@ -108,6 +111,10 @@ Save what the person agreed to:
 
     python3 ${CLAUDE_PLUGIN_ROOT}/skills/migrate-issues/migrate.py plan --direction github-to-linear --source <source> --target <target> --access key --key-env <NAME> --kept '<where it is kept>'
 
+For GitHub to Linear, `--source` is the repository and project as
+`<owner>/<repo>#<project>`, such as `acme/site#7`, and `--target` is the
+Linear team's key, such as `WEB`; the copy refuses any other repository,
+project or team, and a plan through the connector.
 For Linear to GitHub, use `--direction linear-to-github`. For the connector,
 use `--access connector` and leave out `--key-env` and `--kept`. The plan
 holds where the key is kept, never the key, and it refuses a key given as the
@@ -118,5 +125,61 @@ Linear is reached. Ask for a yes. Nothing is written until it comes.
 
 ## 5. After the yes
 
-The copy itself (issues, comments, links, and closing the originals) is not
-built yet. Say so, give the path of the saved plan, and stop.
+**GitHub to Linear** copies each open issue of the repository in the project
+into Linear, and writes nothing to GitHub:
+
+- One Linear project with the GitHub project's name, on the target team,
+  made when the team has none by that name.
+- Each GitHub milestone a milestone inside it, named as step 3 showed, in
+  build order. An issue lands in the milestone its GitHub milestone maps to;
+  an issue with no milestone lands in the project with no milestone.
+- Each issue with the same title, body and labels. A label the team does not
+  have yet is made on the team. `needs-decision` and `parked` are not copied
+  as labels: the issue lands as Needs Human instead.
+- Every comment, oldest first, each starting with a line naming who wrote it
+  on GitHub and when, in Eastern, because the copy is posted as the person
+  running the move:
+
+      Written on GitHub by octocat, November 3, 2026, 1:27 PM Eastern.
+
+The person may cut what moves to one GitHub milestone (its full GitHub name)
+or to issue numbers; say which before running.
+
+Each copy's body ends with a hidden line, which Linear does not show, naming
+the GitHub issue it came from:
+
+    <!-- copied from GitHub acme/site#5 -->
+
+Run it again and nothing is copied twice: an issue whose copy carries that
+line, anywhere on the team, is not made again, however its title or text
+changed since, and even when the Linear project was renamed or the copy moved
+to another project; new issues then land in the project the copies sit in.
+Only the last line of a copy's body counts, and a line like it written into
+the GitHub text is changed so it never counts. A
+comment already on its copy is not posted again; two comments with the same
+words are two comments, and each is posted once. A copy whose hidden line
+was removed is not found, so its issue is copied a second time; nothing else
+can tell which issue a copy came from. So when a run stops partway, run it
+again.
+
+The copy runs only through this script, with a key, never through the
+Linear connector: GitHub issue text is written by anyone who can file an
+issue, and the script never reads it as instructions. Run it the same way
+step 2 ran its check (under `op run` for a 1Password reference). It refuses
+to write unless the saved plan is for GitHub to Linear, from this
+repository and project, by this key's variable, to this team:
+
+    python3 ${CLAUDE_PLUGIN_ROOT}/skills/migrate-issues/migrate.py copy --repo <owner>/<repo> --project <number> --team <KEY> --key-env <NAME>
+
+Add `--milestone '<GitHub milestone>'` or `--issues <n> <n> ...` to cut what
+moves. Show what it prints as it is. When it stops, show what it said; when it
+names a missing Needs Human status, the person adds it to the team in Linear
+and runs it again.
+
+When the person chose the connector in step 2, do not copy through the
+Linear tools: say the copy needs a key, ask where it is kept, check it as
+step 2 says, and save the plan again with `--access key` before the yes.
+
+Links between the copies (parent, sub-issue and blocked-by), closing the
+GitHub originals, and **Linear to GitHub** are not built yet. Say so, and
+stop.

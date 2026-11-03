@@ -59,6 +59,7 @@ run "tool output incident"   python3 "$here/tests/incident-shape-probe.py"
 run "instruction rules"      bash "$here/tests/instruction-rules-test.sh"
 run "issue tracker fact"     python3 "$here/tests/tracker-fact-test.py"
 run "migrate issues"         python3 "$here/tests/migrate-issues-test.py"
+run "migrate copy"           python3 "$here/tests/migrate-copy-test.py"
 run "pictures fit"           python3 "$here/../scripts/svgcheck.py" "$here"/../docs/images/*.svg
 run "issue edit gate"        python3 "$here/tests/issue-edit-gate-test.py"
 run "connector commit gate"  python3 "$here/tests/connector-commit-gate-test.py"
