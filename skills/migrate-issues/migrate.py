@@ -53,6 +53,7 @@ shown with the key hidden, and the plan file holds only where the key is kept.
 import argparse
 import collections
 import datetime
+import html.parser
 import json
 import os
 import re
@@ -394,14 +395,14 @@ def plan(args):
 # ---------------------------------------------------------------- the copy
 
 ISSUE_QUERY = """query($owner:String!,$name:String!,$number:Int!,$after:String){
-  repository(owner:$owner,name:$name){ issue(number:$number){ number title body state
+  repository(owner:$owner,name:$name){ issue(number:$number){ number title body bodyHTML state
     milestone{title} labels(first:100){nodes{name}}
     parent{ number repository{nameWithOwner} }
     subIssues(first:100){ pageInfo{hasNextPage} nodes{ number repository{nameWithOwner} } }
     blockedBy(first:100){ pageInfo{hasNextPage} nodes{ number repository{nameWithOwner} } }
     blocking(first:100){ pageInfo{hasNextPage} nodes{ number repository{nameWithOwner} } }
     comments(first:100, after:$after){ pageInfo{hasNextPage endCursor}
-      nodes{ author{login} createdAt body } } } } }"""
+      nodes{ author{login} createdAt body bodyHTML } } } } }"""
 
 # The GitHub links between issues that the copy keeps, and how a refusal names them.
 LINK_FIELDS = {"subIssues": "sub-issues", "blockedBy": "issues blocking it", "blocking": "issues it blocks"}
@@ -845,16 +846,32 @@ def copy(args):
 
 # ---------------------------------------------------------------- the finish
 
-IMAGES = (re.compile(r"!\[[^\]]*\]\(\s*<?([^)\s>]+)"),
-          re.compile(r"<img\b[^>]*?\bsrc\s*=\s*[\"']?([^\"'\s>]+)", re.I))
+class Images(html.parser.HTMLParser):
+    """The <img> tags of GitHub's own rendering of a body, so the list is what GitHub shows, however the
+    text was written. An image GitHub serves through its proxy is named by its own address, and an emoji
+    GitHub draws as an image is left out."""
+
+    def __init__(self):
+        super().__init__()
+        self.found = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag != "img":
+            return
+        attrs = dict(attrs)
+        if "emoji" in (attrs.get("class") or "").split():
+            return
+        url = attrs.get("data-canonical-src") or attrs.get("src")
+        if url:
+            self.found.append(url)
 
 
-def images_in(text):
-    """Every image a GitHub body or comment shows, by its address, in the order written."""
-    found = []
-    for pattern in IMAGES:
-        found += [(m.start(), m.group(1)) for m in pattern.finditer(text or "")]
-    return [url for _, url in sorted(found)]
+def images_in(rendered):
+    """Every image GitHub shows in a body or comment, by its address, in the order shown."""
+    reader = Images()
+    reader.feed(rendered or "")
+    reader.close()
+    return reader.found
 
 
 def close_not_planned(repo, number):
@@ -886,7 +903,7 @@ def finish(args):
     ready, held, images = [], [], []
     for issue in issues:
         number = issue["number"]
-        for text in [issue.get("body")] + [c.get("body") for c in issue["comments"]]:
+        for text in [issue.get("bodyHTML")] + [c.get("bodyHTML") for c in issue["comments"]]:
             images += ["#{}: {}".format(number, shown(url)) for url in images_in(text)]
         github_comments += len(issue["comments"])
         if number not in copies:
