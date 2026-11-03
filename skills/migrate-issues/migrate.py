@@ -115,6 +115,17 @@ def plural(n):
     return "{} issue{}".format(n, "" if n == 1 else "s")
 
 
+ESCAPES = {"\n": "\\n", "\r": "\\r", "\t": "\\t"}
+
+
+def shown(name):
+    """A name from GitHub or Linear, ready to print: a line break or other hidden character is
+    written out (`\\n`, `\\x07`), so a name can never print a line of its own."""
+    return "".join(ch if ch.isprintable() else ESCAPES.get(ch, "\\x{:02x}".format(ord(ch)) if ord(ch) < 256
+                                                            else "\\u{:04x}".format(ord(ch)))
+                   for ch in str(name))
+
+
 def read_github(args):
     if not re.match(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$", args.repo):
         fail("--repo takes <owner>/<repo>, such as acme/site.")
@@ -130,11 +141,12 @@ def read_github(args):
     loose = counts.get(None, 0)
 
     lines = ['GitHub project "{}", issues in {}: {} milestone{}, {} open issue{}.'.format(
-        title, args.repo, len(named), "" if len(named) == 1 else "s", len(milestones), "" if len(milestones) == 1 else "s"), ""]
+        shown(title), args.repo, len(named), "" if len(named) == 1 else "s", len(milestones),
+        "" if len(milestones) == 1 else "s"), ""]
     lines.append("In Linear it becomes one project with the same name, each milestone a milestone inside it:")
-    lines.append('   Linear project "{}"'.format(title))
+    lines.append('   Linear project "{}"'.format(shown(title)))
     for name in named:
-        lines.append('     milestone "{}" ({})'.format(inside(title, name), plural(counts[name])))
+        lines.append('     milestone "{}" ({})'.format(shown(inside(title, name)), plural(counts[name])))
     if loose:
         lines.append("     no milestone ({})".format(plural(loose)))
     lines.append("")
@@ -220,12 +232,13 @@ def check_linear(args):
         data = linear(key, "{ viewer{name} organization{name urlKey} }")
     viewer = (data.get("viewer") or {}).get("name", "-")
     org = data.get("organization") or {}
-    print(hide('Linear answers: the key belongs to {} in the workspace "{}".'.format(viewer, org.get("name", "-")), key))
+    print(hide('Linear answers: the key belongs to {} in the workspace "{}".'.format(
+        shown(viewer), shown(org.get("name", "-"))), key))
     if args.team:
         teams = (data.get("teams") or {}).get("nodes") or []
         if not teams:
             fail('No Linear team with the key "{}" in that workspace.'.format(args.team.upper()), 1)
-        print(hide('It can see the team "{}" ({}).'.format(teams[0]["name"], teams[0]["key"]), key))
+        print(hide('It can see the team "{}" ({}).'.format(shown(teams[0]["name"]), shown(teams[0]["key"])), key))
 
 
 OPEN = ("backlog", "unstarted", "started", "triage")
@@ -275,14 +288,14 @@ def read_linear(args):
                 break
             after = page["pageInfo"]["endCursor"]
         lines.append('Linear project "{}": {} milestone{}, {} open issue{}.'.format(
-            project["name"], len(order), "" if len(order) == 1 else "s", total, "" if total == 1 else "s"))
+            shown(project["name"]), len(order), "" if len(order) == 1 else "s", total, "" if total == 1 else "s"))
         lines.append("")
         lines.append("On GitHub the structure stays as it is:")
-        lines.append('   GitHub project "{}", with its brief as the project README'.format(project["name"]))
+        lines.append('   GitHub project "{}", with its brief as the project README'.format(shown(project["name"])))
         for m in order:
             if counts.get(m["name"]):
                 lines.append('     milestone "{}" ({})'.format(
-                    github_milestone(project["name"], m["name"], numbers[m["name"]]), plural(counts[m["name"]])))
+                    shown(github_milestone(project["name"], m["name"], numbers[m["name"]])), plural(counts[m["name"]])))
         if counts.get(None):
             lines.append("     no milestone ({})".format(plural(counts[None])))
     else:
@@ -293,15 +306,15 @@ def read_linear(args):
                 fail("No Linear issue {} that this key can see.".format(wanted.upper()), 1)
             project = (node.get("project") or {}).get("name")
             milestone = (node.get("projectMilestone") or {}).get("name")
-            place = 'GitHub project "{}"'.format(project) if project else "no project"
+            place = 'GitHub project "{}"'.format(shown(project)) if project else "no project"
             if project and milestone:
                 order = sorted(((node.get("project") or {}).get("projectMilestones") or {}).get("nodes") or [],
                                key=lambda m: m["sortOrder"])
                 numbers = {m["name"]: n for n, m in enumerate(order, 1)}
-                place += ', milestone "{}"'.format(github_milestone(project, milestone, numbers.get(milestone, 0)))
+                place += ', milestone "{}"'.format(shown(github_milestone(project, milestone, numbers.get(milestone, 0))))
             if (node.get("state") or {}).get("type") not in OPEN:
                 place += " (closed in Linear)"
-            lines.append("   {}: {}".format(node["identifier"], place))
+            lines.append("   {}: {}".format(shown(node["identifier"]), place))
     lines.append("")
     lines.append("Nothing has been written to GitHub or Linear.")
     print(hide("\n".join(lines), key))
