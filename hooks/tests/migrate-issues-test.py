@@ -268,6 +268,17 @@ for status in (301, 302, 303, 307, 308):
     check("a {} redirect keeps the key out of the output".format(status), no_key(out, err))
 
 Linear.answer = staticmethod(good_answer)
+for name, broken in (("a line break", KEY + "\nsecond-line"), ("a carriage return", KEY[:20] + "\r" + KEY[20:]),
+                     ("a space", KEY[:20] + " " + KEY[20:]), ("only spaces", "    ")):
+    Linear.seen = []
+    code, out, err = run(["check-linear", "--key-env", "MY_LINEAR_KEY"], env=linear_env(MY_LINEAR_KEY=broken))
+    check("a key with {} inside is refused before anything is sent".format(name),
+          code != 0 and not Linear.seen, out + err + str(Linear.seen))
+    check("a key with {} inside shows no part of the key".format(name),
+          "TESTKEY0123" not in (out + err) and "SECRET" not in (out + err) and "second-line" not in (out + err),
+          out + err)
+    check("a key with {} inside prints no crash trace".format(name), "Traceback" not in err, err)
+
 Linear.seen = []
 code, out, err = run(["check-linear", "--key-env", "MY_LINEAR_KEY"],
                      env=linear_env(MY_LINEAR_KEY="op://Private/Linear/credential"))
