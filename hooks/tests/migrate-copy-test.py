@@ -956,10 +956,41 @@ check("a copy whose title or body differs keeps its GitHub issue open",
 check("a copy whose title differs is named", "#2 has another title in Linear" in out, out)
 check("a copy whose body differs is named", "#3 has other text in Linear" in out, out)
 
+# A change in symbols alone is a change: "x > 5" and "x < 5" are not the same text. Spacing is not, and
+# neither is Linear wrapping a link's address in <>. The way out of a text difference is a hand edit,
+# since the copy never rewrites a copy it finds.
+SYMBOLS = [gh_issue(21, "Limit is x > 5", None, body="Ship if x > 5. Docs: [here](https://ex.test/a-b)."),
+           gh_issue(22, "Second", None, body="Plain.", comments=[comment("octocat", "2026-11-03T18:27:00Z", "Use -5.")]),
+           gh_issue(23, "Third", None, body="Plain  text.\n\nSee [docs](https://ex.test/d).")]
+Linear.store = store = Store()
+envs, _ = fake_gh(world_for(SYMBOLS))
+run(envs, plan=planf)
+copy_of = {int(i["description"].rsplit("#", 1)[1].split()[0]): i for i in store.issues}
+copy_of[21]["description"] = copy_of[21]["description"].replace("x > 5", "x < 5")
+for c in store.comments:
+    c["body"] = c["body"].replace("Use -5.", "Use 5.")
+copy_of[23]["description"] = copy_of[23]["description"].replace("Plain  text.", "Plain text.").replace(
+    "(https://ex.test/d)", "(<https://ex.test/d>)")
+open(envs["FAKE_GH_LOG"], "w").close()
+code, out, err = finish(envs, plan=planf)
+check("a body that differs only in symbols keeps its GitHub issue open", "#21 has other text in Linear" in out, out)
+check("a comment that differs only in symbols keeps its GitHub issue open",
+      "#22 has 0 of its 1 comments in Linear" in out, out)
+check("spacing and Linear's <> around a link address are not a difference", closed_numbers(envs) == [23],
+      out + str(closes(envs)))
+check("a text difference is fixed by hand, not by running the copy again",
+      "make the Linear copy match GitHub by hand" in out, out)
+store.issues[0]["title"] = "Limit is x < 5"
+copy_of[21]["description"] = copy_of[21]["description"].replace("x < 5", "x > 5")
+code, out, err = finish(envs, "--issues", "21", plan=planf)
+check("a title that differs only in symbols keeps its GitHub issue open", "#21 has another title in Linear" in out, out)
+
 # GitHub refusing to close one is named, and the run fails.
 broken = world_for(WITH_IMAGES)
 broken["close_refused"] = ["5"]
 envr, _ = fake_gh(broken)
+Linear.store = store = Store()
+run(envr, "--issues", "5", plan=planf)
 code, out, err = finish(envr, "--issues", "5", plan=planf)
 check("a close GitHub refuses is named and fails the run",
       code != 0 and "GitHub refused to close: #5" in out, out + err)
