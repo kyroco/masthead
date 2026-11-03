@@ -423,6 +423,28 @@ order = [m["name"] for m in sorted(store.milestones, key=lambda m: m["sortOrder"
 check("milestones made across a cut run and a full run stay in build order",
       code == 0 and order == ["1. Build", "2. Test", "3. Deploy"], [(m["name"], m["sortOrder"]) for m in store.milestones])
 
+# Milestones with no number, made across runs while others empty out, still sort by name.
+NAMED = [gh_issue(41, "a", "Alpha"), gh_issue(42, "b", "Ant"), gh_issue(43, "c", "Beta"), gh_issue(44, "d", "Gamma")]
+Linear.store = store = Store()
+env9, _ = fake_gh(world_for(NAMED))
+run(env9, "--milestone", "Beta", plan=plan)
+emptied = [dict(i, state="CLOSED") if i["number"] in (41, 42) else i for i in NAMED]
+env10, _ = fake_gh(world_for(emptied))
+code, out, err = run(env10, plan=plan)
+orders = {m["name"]: m["sortOrder"] for m in store.milestones}
+check("unnumbered milestones made across runs, as others empty, sort by name with no tie",
+      code == 0 and orders.get("Beta", 0) < orders.get("Gamma", 0), (out + err, orders))
+emptied = [dict(i, state="CLOSED") if i["number"] == 41 else i for i in NAMED]
+Linear.store = store = Store()
+env11, _ = fake_gh(world_for([i for i in NAMED if i["number"] != 43]))
+run(env11, "--milestone", "Gamma", plan=plan)
+env12, _ = fake_gh(world_for(emptied))
+run(env12, plan=plan)
+orders = [m["name"] for m in sorted(store.milestones, key=lambda m: m["sortOrder"])]
+check("and a milestone made later between two others lands between them",
+      orders == ["Ant", "Beta", "Gamma"] and len({m["sortOrder"] for m in store.milestones}) == 3,
+      [(m["name"], m["sortOrder"]) for m in store.milestones])
+
 # --- What is copied can be cut to one milestone or to issue numbers.
 
 Linear.store = store = Store()
