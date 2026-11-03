@@ -78,10 +78,23 @@ print(json.dumps({"data": {"repository": {"issue": issue}}}))
 '''
 
 
-def gh_issue(number, title, milestone, labels=(), comments=(), state="OPEN", repo="acme/site", body=None):
+def link(item):
+    """Another GitHub issue as a link names it: a number in acme/site, or (repository, number)."""
+    repo, number = item if isinstance(item, tuple) else ("acme/site", item)
+    return {"number": number, "repository": {"nameWithOwner": repo}}
+
+
+def links(items, more=False):
+    return {"pageInfo": {"hasNextPage": more}, "nodes": [link(i) for i in items]}
+
+
+def gh_issue(number, title, milestone, labels=(), comments=(), state="OPEN", repo="acme/site", body=None,
+             parent=None, subs=(), blocked_by=(), blocking=(), more_links=False):
     return {"number": number, "title": title, "body": body if body is not None else "Body of {}.".format(number),
             "state": state, "repository": repo, "milestone": {"title": milestone} if milestone else None,
-            "labels": {"nodes": [{"name": n} for n in labels]}, "all_comments": list(comments)}
+            "labels": {"nodes": [{"name": n} for n in labels]}, "all_comments": list(comments),
+            "parent": link(parent) if parent else None, "subIssues": links(subs, more_links),
+            "blockedBy": links(blocked_by), "blocking": links(blocking)}
 
 
 def comment(login, when, body):
@@ -147,6 +160,7 @@ class Store:
         self.milestones = []
         self.issues = []
         self.comments = []
+        self.relations = []
         self.writes = []
 
     def next(self, prefix):
@@ -159,6 +173,14 @@ def answer(store, body):
     if query.lstrip().startswith("mutation"):
         store.writes.append(query.split("{", 2)[1].split("(")[0].strip())
         data = v["input"]
+        if "issueUpdate" in query:
+            found = [i for i in store.issues if i["id"] == v["id"]]
+            found[0].update(data)
+            return {"issueUpdate": {"success": True, "issue": {"id": v["id"]}}}
+        if "issueRelationCreate" in query:
+            r = dict(data, id=store.next("rel"))
+            store.relations.append(r)
+            return {"issueRelationCreate": {"success": True, "issueRelation": {"id": r["id"]}}}
         if "projectCreate" in query:
             p = {"id": store.next("pr"), "name": data["name"], "teamIds": data["teamIds"]}
             store.projects.append(p)
@@ -214,6 +236,17 @@ def answer(store, body):
         more = start + 2 < len(nodes)
         return {"project": {"issues": {"pageInfo": {"hasNextPage": more, "endCursor": str(start + 2)},
                                        "nodes": nodes[start:start + 2]}}}
+    if "issue(" in query and "parent{" in query:
+        found = [i for i in store.issues if i["id"] == v["id"]]
+        parent = found[0].get("parentId") if found else None
+        return {"issue": {"parent": {"id": parent} if parent else None}}
+    if "issue(" in query and "relations(" in query:
+        nodes = [{"type": r["type"], "relatedIssue": {"id": r["relatedIssueId"]}}
+                 for r in store.relations if r["issueId"] == v["id"]]
+        start = int(v.get("after") or 0)
+        more = start + 2 < len(nodes)
+        return {"issue": {"relations": {"pageInfo": {"hasNextPage": more, "endCursor": str(start + 2)},
+                                        "nodes": nodes[start:start + 2]}}}
     if "issue(" in query:
         nodes = [{"body": c["body"]} for c in store.comments if c["issueId"] == v["id"]]
         start = int(v.get("after") or 0)
@@ -579,6 +612,84 @@ check("and its comment lands on its own copy, never on the quoting issue's",
       and all(comments_on(store, s) == [] for s in by_title(store, "Sneaky")),
       [(i["title"], comments_on(store, i)) for i in store.issues])
 
+# --- MAST-16: parent, sub-issue and blocked-by links between the copies hold as on GitHub
+# (Project description, Rule 3: "A wait on another issue is Linear's blocked-by link, not a status").
+
+LINKED = [
+    gh_issue(60, "Old prerequisite", None, state="CLOSED", blocking=[64]),
+    gh_issue(61, "Parent work", None, subs=[62]),
+    gh_issue(62, "Child work", None, parent=61, blocking=[63]),
+    gh_issue(63, "Waits on child", None, blocked_by=[62]),
+    gh_issue(64, "Waits on closed", None, blocked_by=[60]),
+    gh_issue(65, "Split from apps", None, parent=("acme/apps", 9)),
+]
+
+
+def copy_of(store, number):
+    found = [i for i in store.issues if "acme/site#{} ".format(number) in i["description"]]
+    return found[0] if found else {}
+
+
+def blocks_between(store, blocker, blocked):
+    return sum(1 for r in store.relations if r["type"] == "blocks"
+               and r["issueId"] == copy_of(store, blocker).get("id")
+               and r["relatedIssueId"] == copy_of(store, blocked).get("id"))
+
+
+Linear.store = store = Store()
+env_links, _ = fake_gh(world_for(LINKED))
+code, out, err = run(env_links, plan=plan)
+check("a copy of linked issues runs", code == 0, out + err)
+check("a sub-issue's copy has its parent's copy as its parent",
+      copy_of(store, 62).get("parentId") == copy_of(store, 61).get("id") is not None,
+      [(i["title"], i.get("parentId")) for i in store.issues])
+check("a blocked-by link holds between the copies, the blocker blocking the one that waits",
+      blocks_between(store, 62, 63) == 1, store.relations)
+check("only that one blocked-by link is made, never the other way round",
+      len(store.relations) == 1 and blocks_between(store, 63, 62) == 0, store.relations)
+check("a copy with no GitHub parent gets none",
+      all("parentId" not in copy_of(store, n) for n in (61, 63, 64, 65)), [(i["title"], i.get("parentId")) for i in store.issues])
+check("a link to a closed issue that was not copied is named in what copy prints", "#60 blocks #64" in out, out)
+check("a link to another repository's issue is named in what copy prints",
+      "#65 is a sub-issue of acme/apps#9" in out, out)
+check("copy counts the links it made", "Links made now: 1 parent link, 1 blocked-by link." in out, out)
+writes = len(store.writes)
+code, out, err = run(env_links, plan=plan)
+check("a second run makes no link twice",
+      code == 0 and store.writes[writes:] == [] and len(store.relations) == 1
+      and "Links made now: 0 parent links, 0 blocked-by links." in out, out + err + str(store.writes[writes:]))
+
+# Copied one part at a time: the link is made by the run that copies its second side, from either side.
+Linear.store = store = Store()
+code, out, err = run(env_links, "--issues", "62", "63", plan=plan)
+check("a link whose other side has no copy yet is named, not made",
+      code == 0 and "parentId" not in copy_of(store, 62) and "#62 is a sub-issue of #61" in out, out + err)
+code, out, err = run(env_links, "--issues", "61", plan=plan)
+check("the later run that copies the parent makes the sub-issue link from the parent's side",
+      code == 0 and copy_of(store, 62).get("parentId") == copy_of(store, 61).get("id"), out + err)
+Linear.store = store = Store()
+run(env_links, "--issues", "63", plan=plan)
+code, out, err = run(env_links, "--issues", "62", plan=plan)
+check("the later run that copies the blocker makes the blocked-by link from the blocker's side",
+      code == 0 and blocks_between(store, 62, 63) == 1 and len(store.relations) == 1, out + err + str(store.relations))
+
+# A copy given another parent in Linear after the move is left as it is, and copy says so.
+Linear.store = store = Store()
+run(env_links, plan=plan)
+copy_of(store, 62)["parentId"] = "is-elsewhere"
+code, out, err = run(env_links, plan=plan)
+check("a copy already under another parent in Linear is left there, and copy says so",
+      code == 0 and copy_of(store, 62)["parentId"] == "is-elsewhere" and "already has another parent in Linear" in out,
+      out + err)
+
+# More links than one page holds: the copy stops before writing, never drops a link without a word.
+Linear.store = store = Store()
+env_crowded, _ = fake_gh(world_for([gh_issue(70, "Big parent", None, subs=[71], more_links=True),
+                                    gh_issue(71, "One child", None, parent=70)]))
+code, out, err = run(env_crowded, plan=plan)
+check("an issue with more links than one read holds stops the copy before any write",
+      code != 0 and not store.writes, out + err)
+
 # The copy refuses a repository or project other than the one in the plan (Robert, November 3: "yes").
 Linear.store = store = Store()
 for name, extra in (("another repository", ["--repo", "acme/apps"]), ("another project", ["--project", "8"])):
@@ -664,6 +775,8 @@ says("`<owner>/<repo>#<project>`")
 check("SKILL.md holds no connector copy steps", "save_issue" not in text and "save_comment" not in text)
 says("nothing is copied twice")
 check("SKILL.md no longer says the copy is not built", "is not built yet" not in text)
+check("SKILL.md no longer says the links are not built", "Links between the copies" not in text)
+says("parent and blocked-by links")
 
 for path in sorted(os.listdir(SKILL_DIR)):
     body = open(os.path.join(SKILL_DIR, path)).read()
