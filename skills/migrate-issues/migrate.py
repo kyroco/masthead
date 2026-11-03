@@ -226,7 +226,7 @@ PROJECT_ISSUES = """query($id:String!,$after:String){ project(id:$id){
     nodes{ identifier state{type} projectMilestone{name} } } } }"""
 
 ONE_ISSUE = """query($id:String!){ issue(id:$id){ identifier state{type}
-  project{name} projectMilestone{name} } }"""
+  project{ name projectMilestones{ nodes{ name sortOrder } } } projectMilestone{name} } }"""
 
 
 def github_milestone(project, milestone, number):
@@ -283,7 +283,10 @@ def read_linear(args):
             milestone = (node.get("projectMilestone") or {}).get("name")
             place = 'GitHub project "{}"'.format(project) if project else "no project"
             if project and milestone:
-                place += ', milestone "{}: {}"'.format(project, milestone)
+                order = sorted(((node.get("project") or {}).get("projectMilestones") or {}).get("nodes") or [],
+                               key=lambda m: m["sortOrder"])
+                numbers = {m["name"]: n for n, m in enumerate(order, 1)}
+                place += ', milestone "{}"'.format(github_milestone(project, milestone, numbers.get(milestone, 0)))
             if (node.get("state") or {}).get("type") not in OPEN:
                 place += " (closed in Linear)"
             lines.append("   {}: {}".format(node["identifier"], place))
