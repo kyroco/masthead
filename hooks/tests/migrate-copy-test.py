@@ -213,10 +213,11 @@ def answer(store, body):
                                              for m in store.milestones
                                              if m["projectId"] == p["id"]]}}
             for p in store.projects if p["name"] == v["name"]]}}
-    if "description:{contains:$mark}" in query:
+    if "description:{contains:$mark}" in query or "description:{containsIgnoreCase:$mark}" in query:
+        fold = (lambda s: s.lower()) if "IgnoreCase" in query else (lambda s: s)
         nodes = [{"id": i["id"], "description": i["description"], "createdAt": i["createdAt"],
                   "project": {"id": i["projectId"]} if i.get("projectId") else None}
-                 for i in store.issues if i["teamId"] == v["team"] and v["mark"] in i["description"]]
+                 for i in store.issues if i["teamId"] == v["team"] and fold(v["mark"]) in fold(i["description"])]
         start = int(v.get("after") or 0)
         more = start + 2 < len(nodes)
         return {"issues": {"pageInfo": {"hasNextPage": more, "endCursor": str(start + 2)},
@@ -682,6 +683,42 @@ check("a copy already under another parent in Linear is left there, and copy say
       code == 0 and copy_of(store, 62)["parentId"] == "is-elsewhere" and "already has another parent in Linear" in out,
       out + err)
 
+# Two repositories copied to one team: a link between their issues holds too, made by whichever run
+# copies its second side (review finding F1).
+TWO_REPOS = [gh_issue(9, "Apps parent", None, repo="acme/apps", subs=[("acme/site", 65)]),
+             gh_issue(8, "Apps blocker", None, repo="acme/apps", blocking=[("acme/site", 66)]),
+             gh_issue(65, "Split from apps", None, parent=("acme/apps", 9)),
+             gh_issue(66, "Waits on apps", None, blocked_by=[("Acme/Apps", 8)])]
+
+
+def copy_in(store, repo, number):
+    found = [i for i in store.issues if "{}#{} ".format(repo, number) in i["description"]]
+    return found[0] if found else {}
+
+
+def run_repo(env, repo):
+    args = [sys.executable, SCRIPT, "copy", "--repo", repo, "--project", "7", "--team", "WEB",
+            "--key-env", "MY_LINEAR_KEY", "--plan", save_plan(tmp, source="{} project 7".format(repo))]
+    result = subprocess.run(args, env=env, capture_output=True, text=True, timeout=60)
+    return result.returncode, result.stdout, result.stderr
+
+
+env_two, _ = fake_gh(world_for(TWO_REPOS))
+for first, second in (("acme/site", "acme/apps"), ("acme/apps", "acme/site")):
+    Linear.store = store = Store()
+    run_repo(env_two, first)
+    code, out, err = run_repo(env_two, second)
+    sub, parent = copy_in(store, "acme/site", 65), copy_in(store, "acme/apps", 9)
+    blocker, waits = copy_in(store, "acme/apps", 8), copy_in(store, "acme/site", 66)
+    check("copied {} then {}, a sub-issue's copy has its parent's copy from the other repository".format(first, second),
+          code == 0 and parent.get("id") and sub.get("parentId") == parent.get("id"), out + err)
+    check("copied {} then {}, a blocked-by link across the two repositories holds".format(first, second),
+          code == 0 and any(r["issueId"] == blocker.get("id") and r["relatedIssueId"] == waits.get("id")
+                            and r["type"] == "blocks" for r in store.relations) and len(store.relations) == 1,
+          out + err + str(store.relations))
+    check("copied {} then {}, no link across the repositories is named as not made".format(first, second),
+          "Links not made" not in out, out)
+
 # More links than one page holds: the copy stops before writing, never drops a link without a word.
 Linear.store = store = Store()
 env_crowded, _ = fake_gh(world_for([gh_issue(70, "Big parent", None, subs=[71], more_links=True),
@@ -777,6 +814,7 @@ says("nothing is copied twice")
 check("SKILL.md no longer says the copy is not built", "is not built yet" not in text)
 check("SKILL.md no longer says the links are not built", "Links between the copies" not in text)
 says("parent and blocked-by links")
+says("another repository copied to the same team")
 
 for path in sorted(os.listdir(SKILL_DIR)):
     body = open(os.path.join(SKILL_DIR, path)).read()
