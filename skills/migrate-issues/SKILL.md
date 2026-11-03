@@ -14,8 +14,9 @@ for whatever is missing, one question at a time, in plain words.
 
 Nothing is written to GitHub or Linear until the person has said yes to the
 plan. Until then every call reads. The script beside this file,
-`${CLAUDE_PLUGIN_ROOT}/skills/migrate-issues/migrate.py`, does the reading and
-saves the plan; it never writes to either tracker.
+`${CLAUDE_PLUGIN_ROOT}/skills/migrate-issues/migrate.py`, does the reading,
+saves the plan, and after the yes makes the copy in Linear. It never writes
+to GitHub, and its copy refuses to run without a saved plan that matches.
 
 The structure stays the same on both sides. The GitHub project becomes a
 Linear project with the same name, each GitHub milestone a milestone inside
@@ -108,6 +109,7 @@ Save what the person agreed to:
 
     python3 ${CLAUDE_PLUGIN_ROOT}/skills/migrate-issues/migrate.py plan --direction github-to-linear --source <source> --target <target> --access key --key-env <NAME> --kept '<where it is kept>'
 
+For GitHub to Linear, `--target` is the Linear team's key, such as `WEB`.
 For Linear to GitHub, use `--direction linear-to-github`. For the connector,
 use `--access connector` and leave out `--key-env` and `--kept`. The plan
 holds where the key is kept, never the key, and it refuses a key given as the
@@ -118,5 +120,65 @@ Linear is reached. Ask for a yes. Nothing is written until it comes.
 
 ## 5. After the yes
 
-The copy itself (issues, comments, links, and closing the originals) is not
-built yet. Say so, give the path of the saved plan, and stop.
+**GitHub to Linear** copies each open issue of the repository in the project
+into Linear, and writes nothing to GitHub:
+
+- One Linear project with the GitHub project's name, on the target team,
+  made when the team has none by that name.
+- Each GitHub milestone a milestone inside it, named as step 3 showed, in
+  build order. An issue lands in the milestone its GitHub milestone maps to;
+  an issue with no milestone lands in the project with no milestone.
+- Each issue with the same title, body and labels. A label the team does not
+  have yet is made on the team. `needs-decision` and `parked` are not copied
+  as labels: the issue lands as Needs Human instead.
+- Every comment, oldest first, each starting with a line naming who wrote it
+  on GitHub and when, in Eastern, because the copy is posted as the person
+  running the move:
+
+      Written on GitHub by octocat, November 3, 2026, 1:27 PM Eastern.
+
+The person may cut what moves to one GitHub milestone (its full GitHub name)
+or to issue numbers; say which before running.
+
+Run it again and nothing is copied twice: an issue already in the Linear
+project with the same title is not made again (two GitHub issues with one
+title pair with two Linear issues with it, oldest first), and a comment
+already on its copy is not posted again. So when a run stops partway, run it
+again.
+
+With a key, run the copy the same way step 2 ran its check (under `op run`
+for a 1Password reference). It refuses to write unless the saved plan is for
+GitHub to Linear, by this key's variable, to this team:
+
+    python3 ${CLAUDE_PLUGIN_ROOT}/skills/migrate-issues/migrate.py copy --repo <owner>/<repo> --project <number> --team <KEY> --key-env <NAME>
+
+Add `--milestone '<GitHub milestone>'` or `--issues <n> <n> ...` to cut what
+moves. Show what it prints as it is. When it stops, show what it said; when it
+names a missing Needs Human status, the person adds it to the team in Linear
+and runs it again.
+
+With the connector, make the same copy through the Linear tools, after
+reading each issue with `gh issue view <n> --repo <owner>/<repo> --json
+title,body,labels,milestone,comments`:
+
+1. `list_projects` with the project's name and the team; when none is on the
+   team, `save_project` with `name`, `addTeams` the team and `state`
+   `Backlog`.
+2. `list_milestones` for the project; for each milestone missing,
+   `save_milestone` with the project and its name.
+3. `list_issues` with `project` the project, every page, to find the copies
+   already made, by title as above.
+4. For each issue not yet copied, `save_issue` with `team`, `title`,
+   `description` the body, `project`, `milestone` where it has one, `labels`
+   its labels without `needs-decision` and `parked`, and `state`
+   `Needs Human` when it had either.
+5. `list_comments` on each copy, then `save_comment` with `issueId` the copy
+   and `body` the first line above, a blank line, and the comment's text, for
+   each comment not already there.
+
+Then count: the issues chosen against the copies in the project, and say
+both numbers.
+
+Links between the copies (parent, sub-issue and blocked-by), closing the
+GitHub originals, and **Linear to GitHub** are not built yet. Say so, and
+stop.

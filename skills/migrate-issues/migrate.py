@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The first step of /masthead:migrate-issues: look, ask, and write nothing.
+"""/masthead:migrate-issues: look, ask, save the plan, then copy GitHub issues into Linear.
 
 usage:
   migrate.py read-github --repo <owner>/<repo> --project <number>
@@ -9,6 +9,9 @@ usage:
                   --source <what> --target <where>
                   --access key|connector [--key-env <NAME> --kept <where>]
                   [--out <file>]
+  migrate.py copy --repo <owner>/<repo> --project <number> --team <KEY>
+                  --key-env <NAME> [--milestone <title> | --issues <n>...]
+                  [--plan <file>]
 
 read-github reads one repository's open issues in one of its GitHub projects
 through `gh`, and prints what they become in Linear: one Linear project with
@@ -16,13 +19,24 @@ the GitHub project's name, each milestone a milestone inside it. Issues the
 project holds from other repositories are left out. check-linear asks Linear
 who the key belongs to, and whether a team exists. read-linear reads a Linear
 project, or issues named by key, and prints what each becomes on GitHub. plan
-saves what the person agreed to. None of them writes to GitHub or Linear.
+saves what the person agreed to. None of those writes to GitHub or Linear.
+
+copy writes, and only to Linear, and only when the saved plan says the person
+agreed to GitHub to Linear through a key for that team. It copies each open
+issue of the repository in the project (or the milestone, or the numbers named)
+into one Linear project with the GitHub project's name, each GitHub milestone a
+milestone inside it, with the same title, body, labels and every comment. Each
+comment starts with a line naming its GitHub author and its time in Eastern. An
+issue labelled needs-decision or parked lands as Needs Human. Run it again and
+nothing is copied twice: an issue already in the Linear project under the same
+title is not made again, and a comment already on it is not posted again.
 
 The Linear key is read from the environment variable the person names, at run
 time. It is never printed, logged or saved: everything Linear sends back is
 shown with the key hidden, and the plan file holds only where the key is kept.
 """
 import argparse
+import datetime
 import json
 import os
 import re
@@ -66,8 +80,10 @@ def gh_project_page(kind, login, number, after):
     return (owner or {}).get("projectV2")
 
 
-def read_project(repo, number):
-    """The project's title and the milestones of its open issues in repo, or None when gh cannot see it."""
+def read_project(repo, number, numbers=False):
+    """The project's title and the milestones of its open issues in repo, or None when gh cannot see it.
+
+    With numbers, each item is (issue number, milestone) in place of the milestone alone."""
     login = repo.split("/", 1)[0]
     for kind in ("organization", "user"):
         page = gh_project_page(kind, login, number, None)
@@ -81,7 +97,8 @@ def read_project(repo, number):
                     continue
                 if (content.get("repository") or {}).get("nameWithOwner", "").lower() != repo.lower():
                     continue
-                milestones.append((content.get("milestone") or {}).get("title"))
+                milestone = (content.get("milestone") or {}).get("title")
+                milestones.append((content.get("number"), milestone) if numbers else milestone)
             info = page["items"]["pageInfo"]
             if not info["hasNextPage"]:
                 return title, milestones
@@ -197,7 +214,7 @@ SEND = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect)
 
 
 def linear(key, query, variables=None):
-    """Send one read to Linear. Returns its data, or stops with its error, the key hidden."""
+    """Send one request to Linear. Returns its data, or stops with its error, the key hidden."""
     request = urllib.request.Request(
         linear_url(), data=json.dumps({"query": query, "variables": variables or {}}).encode(),
         headers={"Authorization": key, "Content-Type": "application/json"}, method="POST")
@@ -358,6 +375,257 @@ def plan(args):
     print("Saved the plan to {}. Nothing has been written to GitHub or Linear.".format(path))
 
 
+# ---------------------------------------------------------------- the copy
+
+ISSUE_QUERY = """query($owner:String!,$name:String!,$number:Int!,$after:String){
+  repository(owner:$owner,name:$name){ issue(number:$number){ number title body state
+    milestone{title} labels(first:100){nodes{name}}
+    comments(first:100, after:$after){ pageInfo{hasNextPage endCursor}
+      nodes{ author{login} createdAt body } } } } }"""
+
+# On Linear these two labels are a status, Needs Human, not a label.
+NEEDS_HUMAN_LABELS = ("needs-decision", "parked")
+NEEDS_HUMAN = "Needs Human"
+
+MONTHS = ("January", "February", "March", "April", "May", "June", "July", "August",
+          "September", "October", "November", "December")
+
+
+def eastern(stamp):
+    """A GitHub time, such as 2026-11-03T18:27:00Z, as `November 3, 2026, 1:27 PM Eastern`."""
+    from zoneinfo import ZoneInfo
+    when = datetime.datetime.strptime(stamp, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=datetime.timezone.utc)
+    local = when.astimezone(ZoneInfo("America/New_York"))
+    hour = local.hour % 12 or 12
+    return "{} {}, {}, {}:{:02d} {} Eastern".format(MONTHS[local.month - 1], local.day, local.year, hour,
+                                                    local.minute, "AM" if local.hour < 12 else "PM")
+
+
+def comment_body(comment):
+    """A GitHub comment as it lands in Linear: a first line naming who wrote it on GitHub, and when."""
+    login = (comment.get("author") or {}).get("login") or "a deleted GitHub account"
+    return "Written on GitHub by {}, {}.\n\n{}".format(login, eastern(comment["createdAt"]), comment.get("body") or "")
+
+
+def gh_graphql(query, **fields):
+    args = ["gh", "api", "graphql", "-f", "query=" + query]
+    for name, value in fields.items():
+        if value is None:
+            continue
+        args += ["-F" if isinstance(value, int) else "-f", "{}={}".format(name, value)]
+    result = subprocess.run(args, capture_output=True, text=True)
+    if result.returncode != 0:
+        return None
+    try:
+        return json.loads(result.stdout)["data"]
+    except (ValueError, KeyError, TypeError):
+        return None
+
+
+def read_issue(repo, number):
+    """One GitHub issue with every comment, or stop: a half-read issue is never copied."""
+    owner, name = repo.split("/", 1)
+    issue, comments, after = None, [], None
+    while True:
+        data = gh_graphql(ISSUE_QUERY, owner=owner, name=name, number=number, after=after)
+        page = ((data or {}).get("repository") or {}).get("issue")
+        if not page:
+            fail("GitHub did not answer for issue {} of {}. Nothing was written.".format(number, repo), 1)
+        issue = issue or page
+        comments += page["comments"]["nodes"]
+        if not page["comments"]["pageInfo"]["hasNextPage"]:
+            break
+        after = page["comments"]["pageInfo"]["endCursor"]
+    issue = dict(issue)
+    issue["comments"] = comments
+    return issue
+
+
+def chosen_numbers(repo, project, milestone, numbers):
+    """The open issue numbers of repo in the project, cut to one milestone or to the numbers named."""
+    found = read_project(repo, project, numbers=True)
+    if found is None:
+        fail("gh cannot see project {} of {}. Nothing was written.".format(project, repo.split("/", 1)[0]))
+    title, items = found
+    if milestone is not None:
+        items = [(n, m) for n, m in items if m == milestone]
+        if not items:
+            fail('No open issue of {} in the project has the milestone "{}". Nothing was written.'.format(
+                repo, shown(milestone)))
+    if numbers:
+        held = {n for n, _ in items}
+        missing = [n for n in numbers if n not in held]
+        if missing:
+            fail("Not open issues of {} in the project: {}. Nothing was written.".format(
+                repo, ", ".join(str(n) for n in missing)))
+        items = [(n, m) for n, m in items if n in set(numbers)]
+    return title, sorted(items, key=lambda item: item[0])
+
+
+TEAM = """query($key:String!){ teams(filter:{key:{eq:$key}}){ nodes{ id key
+  states(first:100){nodes{id name}} labels(first:250){nodes{id name}} } }
+  issueLabels(first:250, filter:{team:{null:true}}){nodes{id name}} }"""
+
+PROJECTS = """query($name:String!){ projects(filter:{name:{eq:$name}}){ nodes{ id name
+  teams{nodes{id}} projectMilestones{nodes{id name}} } } }"""
+
+COPIES = """query($id:String!,$after:String){ project(id:$id){
+  issues(first:100, after:$after){ pageInfo{hasNextPage endCursor} nodes{ id title createdAt } } } }"""
+
+COMMENTS = """query($id:String!,$after:String){ issue(id:$id){
+  comments(first:100, after:$after){ pageInfo{hasNextPage endCursor} nodes{ body } } } }"""
+
+
+def made(answer, field, inner):
+    """What a create call made, or stop when Linear says it did not."""
+    result = answer.get(field) or {}
+    if not result.get("success") or not result.get(inner):
+        fail("Linear did not make the {}. Stopped here; run the copy again and nothing is copied twice.".format(
+            inner), 1)
+    return result[inner]
+
+
+def create(key, mutation, kind, fields):
+    """Make one thing in Linear through its `<mutation>(input:)` call and return what it made."""
+    query = "mutation($input:{}Input!){{ {}(input:$input){{ success {}{{ id }} }} }}".format(
+        mutation[0].upper() + mutation[1:], mutation, kind)
+    return made(linear(key, query, {"input": fields}), mutation, kind)
+
+
+def every_page(key, query, variables, path):
+    """Every node of a paged Linear list, `path` naming the steps down to the list."""
+    nodes, after = [], None
+    while True:
+        page = linear(key, query, dict(variables, after=after))
+        for step in path:
+            page = (page or {}).get(step)
+        if not page:
+            fail("Linear stopped answering partway through a list. Run the copy again; nothing is copied twice.", 1)
+        nodes += page["nodes"]
+        if not page["pageInfo"]["hasNextPage"]:
+            return nodes
+        after = page["pageInfo"]["endCursor"]
+
+
+def load_plan(path, args):
+    """Stop unless the saved plan is the person's yes to this copy: GitHub to Linear, by this key, to this team."""
+    path = path or default_plan_path()
+    try:
+        with open(path) as handle:
+            record = json.load(handle)
+    except (OSError, ValueError):
+        fail("There is no saved plan at {}. Show the plan and get a yes first. Nothing was written.".format(path))
+    access = record.get("access") or {}
+    if record.get("direction") != "github-to-linear":
+        fail("The saved plan is not for GitHub to Linear. Nothing was written.")
+    if access.get("kind") != "key":
+        fail("The saved plan reaches Linear through the connector, so the copy is made through the connector, "
+             "not this script. Nothing was written.")
+    if access.get("key_env") != args.key_env:
+        fail("The saved plan reads the key from another variable than {}. Nothing was written.".format(args.key_env))
+    if str(record.get("target", "")).strip().upper() != args.team.upper():
+        fail('The saved plan copies to "{}", not to the team {}. Nothing was written.'.format(
+            shown(record.get("target")), args.team.upper()))
+
+
+def copy(args):
+    if not re.match(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$", args.repo):
+        fail("--repo takes <owner>/<repo>, such as acme/site.")
+    load_plan(args.plan, args)
+    key = read_key(args.key_env)
+    title, items = chosen_numbers(args.repo, args.project, args.milestone, args.issues)
+    if not items:
+        print("No open issue to copy. Nothing was written.")
+        return
+
+    found = linear(key, TEAM, {"key": args.team.upper()})
+    teams = (found.get("teams") or {}).get("nodes") or []
+    if not teams:
+        fail('No Linear team with the key "{}" that this key can see. Nothing was written.'.format(args.team.upper()), 1)
+    team = teams[0]
+    needs_human = {s["name"].lower(): s["id"] for s in team["states"]["nodes"]}.get(NEEDS_HUMAN.lower())
+    labels = {}
+    for label in ((found.get("issueLabels") or {}).get("nodes") or []) + team["labels"]["nodes"]:
+        labels[label["name"].lower()] = label["id"]
+
+    # Read every chosen issue before writing anything, so a GitHub failure writes nothing.
+    issues = [read_issue(args.repo, number) for number, _ in items]
+    held_back = [i["number"] for i in issues
+                 if any(l["name"].lower() in NEEDS_HUMAN_LABELS for l in i["labels"]["nodes"])]
+    if held_back and not needs_human:
+        fail('Issues {} need the status "{}", and the team {} has none. Add it in Linear, then run the copy '
+             'again. Nothing was written.'.format(", ".join(map(str, held_back)), NEEDS_HUMAN, shown(team["key"])), 1)
+
+    # The project: found by name on this team, or made.
+    projects = [p for p in ((linear(key, PROJECTS, {"name": title}).get("projects") or {}).get("nodes") or [])
+                if any(t["id"] == team["id"] for t in p["teams"]["nodes"])]
+    if len(projects) > 1:
+        fail('{} Linear projects on the team are named "{}". Nothing was written.'.format(len(projects), shown(title)), 1)
+    project = projects[0] if projects else create(key, "projectCreate", "project",
+                                                   {"name": title, "teamIds": [team["id"]]})
+    milestones = {m["name"]: m["id"] for m in ((project.get("projectMilestones") or {}).get("nodes") or [])}
+
+    new_milestones = 0
+    for order, github_name in enumerate(sorted({m for _, m in items if m}, key=build_order)):
+        name = inside(title, github_name)
+        if name not in milestones:
+            milestones[name] = create(key, "projectMilestoneCreate", "projectMilestone",
+                                      {"projectId": project["id"], "name": name, "sortOrder": float(order)})["id"]
+            new_milestones += 1
+
+    # Copies already in the project, oldest first, by title: the n-th GitHub issue with a title
+    # pairs with the n-th Linear issue with it, so a second run makes only what is still missing.
+    copies = {}
+    for node in sorted(every_page(key, COPIES, {"id": project["id"]}, ("project", "issues")),
+                       key=lambda n: n["createdAt"]):
+        copies.setdefault(node["title"], []).append(node)
+
+    new_issues = new_comments = new_labels = 0
+    for issue in issues:
+        existing = copies.get(issue["title"]) or []
+        if existing:
+            target = existing.pop(0)
+            posted = {c["body"] for c in every_page(key, COMMENTS, {"id": target["id"]}, ("issue", "comments"))}
+        else:
+            label_ids, held = [], False
+            for label in issue["labels"]["nodes"]:
+                name = label["name"]
+                if name.lower() in NEEDS_HUMAN_LABELS:
+                    held = True
+                    continue
+                if name.lower() not in labels:
+                    labels[name.lower()] = create(key, "issueLabelCreate", "issueLabel",
+                                                  {"name": name, "teamId": team["id"]})["id"]
+                    new_labels += 1
+                label_ids.append(labels[name.lower()])
+            fields = {"teamId": team["id"], "title": issue["title"], "description": issue.get("body") or "",
+                      "projectId": project["id"]}
+            if issue.get("milestone"):
+                fields["projectMilestoneId"] = milestones[inside(title, issue["milestone"]["title"])]
+            if label_ids:
+                fields["labelIds"] = label_ids
+            if held:
+                fields["stateId"] = needs_human
+            target = create(key, "issueCreate", "issue", fields)
+            new_issues += 1
+            posted = set()
+        for comment in issue["comments"]:
+            body = comment_body(comment)
+            if body not in posted:
+                create(key, "commentCreate", "comment", {"issueId": target["id"], "body": body})
+                posted.add(body)
+                new_comments += 1
+
+    lines = ['Linear project "{}" holds the {} chosen from {}.'.format(shown(title), plural(len(issues)), args.repo)]
+    lines.append("Made now: {} project, {}, {} milestone{}, {} comment{}, {} label{}.".format(
+        0 if projects else 1, plural(new_issues), new_milestones, "" if new_milestones == 1 else "s",
+        new_comments, "" if new_comments == 1 else "s", new_labels, "" if new_labels == 1 else "s"))
+    if len(issues) > new_issues:
+        lines.append("Already in Linear, so not made again: {}.".format(plural(len(issues) - new_issues)))
+    lines.append("Nothing was written to GitHub.")
+    print(hide("\n".join(lines), key))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = parser.add_subparsers(dest="command", required=True)
@@ -380,9 +648,18 @@ def main():
     saved.add_argument("--key-env")
     saved.add_argument("--kept")
     saved.add_argument("--out")
+    copied = sub.add_parser("copy")
+    copied.add_argument("--repo", required=True)
+    copied.add_argument("--project", required=True, type=int)
+    copied.add_argument("--team", required=True)
+    copied.add_argument("--key-env", required=True)
+    chosen = copied.add_mutually_exclusive_group()
+    chosen.add_argument("--milestone")
+    chosen.add_argument("--issues", nargs="+", type=int)
+    copied.add_argument("--plan")
     args = parser.parse_args()
     {"read-github": read_github, "check-linear": check_linear, "read-linear": read_linear,
-     "plan": plan}[args.command](args)
+     "plan": plan, "copy": copy}[args.command](args)
 
 
 if __name__ == "__main__":
