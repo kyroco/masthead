@@ -267,6 +267,17 @@ for status in (301, 302, 303, 307, 308):
     check("a {} redirect reaches nowhere else at all".format(status), not Elsewhere.seen, str(Elsewhere.seen))
     check("a {} redirect keeps the key out of the output".format(status), no_key(out, err))
 
+for filler in range(560, 601, 5):
+    Linear.answer = staticmethod(lambda auth, body, filler=filler: (401, "x" * filler + auth))
+    code, out, err = run(["check-linear", "--key-env", "MY_LINEAR_KEY"], env=linear_env(MY_LINEAR_KEY=KEY))
+    check("a key echoed at character {} shows no piece of it".format(filler),
+          code != 0 and KEY[8:12] not in (out + err), (out + err)[-80:])
+    Linear.answer = staticmethod(lambda auth, body, filler=filler: (
+        200, {"errors": [{"message": "y" * (filler - 16) + auth}]}))
+    code, out, err = run(["check-linear", "--key-env", "MY_LINEAR_KEY"], env=linear_env(MY_LINEAR_KEY=KEY))
+    check("a key echoed in Linear's errors at character {} shows no piece of it".format(filler),
+          code != 0 and KEY[8:12] not in (out + err), (out + err)[-80:])
+
 Linear.answer = staticmethod(good_answer)
 for name, broken in (("a line break", KEY + "\nsecond-line"), ("a carriage return", KEY[:20] + "\r" + KEY[20:]),
                      ("a space", KEY[:20] + " " + KEY[20:]), ("only spaces", "    ")):
