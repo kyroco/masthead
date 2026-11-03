@@ -84,7 +84,7 @@ PAGES = [
                   issue(0, None, kind="DraftIssue")]}},
     {"title": "Website relaunch", "items": {
         "pageInfo": {"hasNextPage": False, "endCursor": None},
-        "nodes": [issue(6, "Website relaunch: 10. Follow up"), issue(7, "Website relaunch: 1. Build")]}},
+        "nodes": [issue(6, "Relaunch: 10. Follow up"), issue(7, "Website relaunch: 1. Build")]}},
 ]
 
 
@@ -172,6 +172,8 @@ check("mirror: milestones in build order, 2 before 10",
       out.find('milestone "2. Launch"') < out.find('milestone "10. Follow up"'), out)
 check("linear layout: an initiative named for the GitHub project",
       'Linear initiative "Website relaunch"' in out, out)
+check("mirror: a shorter project prefix on a milestone is dropped too",
+      'milestone "10. Follow up" (1 issue)' in out, out)
 check("linear layout: each milestone its own project",
       'project "Website relaunch: 1. Build" (3 issues)' in out, out)
 check("a closed issue's milestone is not shown", "Retire old site" not in out, out)
