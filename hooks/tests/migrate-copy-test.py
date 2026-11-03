@@ -851,6 +851,29 @@ WITH_IMAGES[4] = gh_issue(5, "Fix footer", "Website relaunch: 1. Build",
                           body="See ![the footer](https://github.com/user-attachments/assets/foot.png) here.",
                           comments=[comment("octocat", "2026-11-03T18:27:00Z",
                                             'Also <img width="200" src="https://example.com/after.png">.')])
+# GitHub's own rendering of that text, which is what finish reads the images from.
+WITH_IMAGES[4]["bodyHTML"] = ('<p>See <a href="https://github.com/user-attachments/assets/foot.png"><img '
+                              'src="https://github.com/user-attachments/assets/foot.png" alt="the footer"></a> here.</p>')
+WITH_IMAGES[4]["all_comments"][0]["bodyHTML"] = (
+    '<p>Also <img width="200" src="https://camo.githubusercontent.com/abc" '
+    'data-canonical-src="https://example.com/after.png">.</p>')
+
+# Images written every way GitHub shows them: an address with parentheses, brackets in the alt text, a lazy
+# data-src beside the real src, a ">" inside a quoted alt, a reference-style image. GitHub renders each as
+# an <img>; an emoji GitHub draws as an image is not an image of the issue.
+TRICKY = gh_issue(7, "Pictures", None, body=(
+    "![chart](https://upload.wikimedia.org/w/Graph_(2020).png)\n"
+    "![shot [1]](https://ex.test/nested.png)\n"
+    '<img data-src="https://cdn.ex.test/lazy.png" src="https://cdn.ex.test/real.png">\n'
+    '<img alt="a > b" src="https://ex.test/gt.png">\n'
+    "![ref][1] :shipit:\n\n[1]: https://ex.test/ref.png"))
+TRICKY["bodyHTML"] = (
+    '<p><img src="https://camo.githubusercontent.com/1" data-canonical-src="https://upload.wikimedia.org/w/Graph_(2020).png" alt="chart">\n'
+    '<img src="https://camo.githubusercontent.com/2" data-canonical-src="https://ex.test/nested.png" alt="shot [1]">\n'
+    '<img data-src="https://cdn.ex.test/lazy.png" src="https://camo.githubusercontent.com/3" data-canonical-src="https://cdn.ex.test/real.png">\n'
+    '<img alt="a &gt; b" src="https://camo.githubusercontent.com/4" data-canonical-src="https://ex.test/gt.png">\n'
+    '<img src="https://camo.githubusercontent.com/5" data-canonical-src="https://ex.test/ref.png" alt="ref"> '
+    '<img class="emoji" title=":shipit:" alt=":shipit:" src="https://github.githubassets.com/images/icons/emoji/shipit.png"></p>')
 
 Linear.store = store = Store()
 envf, tmpf = fake_gh(world_for(WITH_IMAGES))
@@ -879,6 +902,17 @@ check("an image in a body is listed", "#5: https://github.com/user-attachments/a
 check("an image in a comment is listed", "#5: https://example.com/after.png" in out, out)
 check("finish says nothing was deleted", "Nothing on GitHub was deleted" in out, out)
 check("the key never appears in what finish prints", KEY not in out and KEY not in err)
+
+Linear.store = store = Store()
+envt, _ = fake_gh(world_for([TRICKY]))
+run(envt, plan=planf)
+code, out, err = finish(envt, plan=planf)
+pictures = [line.strip() for line in out.splitlines() if line.strip().startswith("#7: ")]
+check("every image GitHub shows is listed once, by the address it shows",
+      sorted(pictures) == sorted("#7: " + url for url in (
+          "https://upload.wikimedia.org/w/Graph_(2020).png", "https://ex.test/nested.png",
+          "https://cdn.ex.test/real.png", "https://ex.test/gt.png", "https://ex.test/ref.png")), out)
+check("an emoji is not listed as an image", "shipit" not in out, out)
 
 code, out, err = finish(envf, plan=planf)
 check("a second finish finds nothing left open and closes nothing",
