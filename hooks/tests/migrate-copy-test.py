@@ -446,6 +446,31 @@ check("and a milestone made later between two others lands between them",
       orders == ["Ant", "Beta", "Gamma"] and len({m["sortOrder"] for m in store.milestones}) == 3,
       [(m["name"], m["sortOrder"]) for m in store.milestones])
 
+# A GitHub body edited between two runs: the rerun still finds the copy and makes nothing twice.
+LOGIN = [gh_issue(51, "Fix login", "Website relaunch: 1. Build", body="Login fails.",
+                  comments=[comment("octocat", "2026-11-03T18:00:00Z", "Seen it.")])]
+Linear.store = store = Store()
+env13, _ = fake_gh(world_for(LOGIN))
+run(env13, plan=plan)
+env14, _ = fake_gh(world_for([dict(LOGIN[0], body="Login fails on Safari.")]))
+code, out, err = run(env14, plan=plan)
+check("a rerun after the GitHub body was edited makes no second copy",
+      code == 0 and len(by_title(store, "Fix login")) == 1 and len(store.comments) == 1, out + err)
+
+# Same, among same-titled issues: the edited one finds its own copy, never another issue's.
+PAIR = [gh_issue(5, "Fix footer", None, body="Footer five.",
+                 comments=[comment("octocat", "2026-11-03T18:05:00Z", "Five's note.")]),
+        gh_issue(6, "Fix footer", None, body="Footer six.",
+                 comments=[comment("octocat", "2026-11-03T18:06:00Z", "Six's note.")])]
+Linear.store = store = Store()
+env15, _ = fake_gh(world_for(PAIR))
+run(env15, plan=plan)
+env16, _ = fake_gh(world_for([PAIR[0], dict(PAIR[1], body="Footer six, edited.")]))
+code, out, err = run(env16, "--issues", "6", plan=plan)
+check("an edited same-titled issue finds its own copy and posts nothing on the other's",
+      code == 0 and len(store.issues) == 2 and len(store.comments) == 2,
+      out + err + str([(i["description"], comments_on(store, i)) for i in store.issues]))
+
 # --- What is copied can be cut to one milestone or to issue numbers.
 
 Linear.store = store = Store()
