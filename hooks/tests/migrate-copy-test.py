@@ -412,6 +412,17 @@ check("two same-minute comments with the same text are both copied",
 run(env7, plan=plan)
 check("and a second run adds neither again", vote and len(comments_on(store, vote[0])) == 2, store.comments)
 
+# A cut run makes a later milestone first; the full run after it still leaves the milestones in build order.
+STAGES = [gh_issue(31, "Build it", "Website relaunch: 1. Build"), gh_issue(32, "Test it", "Website relaunch: 2. Test"),
+          gh_issue(33, "Deploy it", "Website relaunch: 3. Deploy")]
+Linear.store = store = Store()
+env8, _ = fake_gh(world_for(STAGES))
+run(env8, "--milestone", "Website relaunch: 3. Deploy", plan=plan)
+code, out, err = run(env8, plan=plan)
+order = [m["name"] for m in sorted(store.milestones, key=lambda m: m["sortOrder"])]
+check("milestones made across a cut run and a full run stay in build order",
+      code == 0 and order == ["1. Build", "2. Test", "3. Deploy"], [(m["name"], m["sortOrder"]) for m in store.milestones])
+
 # --- What is copied can be cut to one milestone or to issue numbers.
 
 Linear.store = store = Store()
