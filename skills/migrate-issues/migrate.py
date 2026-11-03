@@ -331,11 +331,17 @@ def plan(args):
     record = {"direction": args.direction, "source": args.source, "target": args.target, "access": access}
     path = args.out or default_plan_path()
     os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
-    handle = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    # Never through a link: a repository could ship one that points at another of the person's files.
+    if os.path.islink(path):
+        fail("{} is a link, so the plan was not saved: it would overwrite the file the link points to.".format(path))
+    try:
+        handle = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
+    except OSError as error:
+        fail("The plan could not be saved to {}: {}".format(path, error.strerror))
+    os.fchmod(handle, 0o600)
     with os.fdopen(handle, "w") as out:
         json.dump(record, out, indent=2)
         out.write("\n")
-    os.chmod(path, 0o600)
     print("Saved the plan to {}. Nothing has been written to GitHub or Linear.".format(path))
 
 
