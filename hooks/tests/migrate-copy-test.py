@@ -974,8 +974,9 @@ copy_of[23]["description"] = copy_of[23]["description"].replace("Plain  text.", 
 open(envs["FAKE_GH_LOG"], "w").close()
 code, out, err = finish(envs, plan=planf)
 check("a body that differs only in symbols keeps its GitHub issue open", "#21 has other text in Linear" in out, out)
-check("a comment that differs only in symbols keeps its GitHub issue open",
-      "#22 has 0 of its 1 comments in Linear" in out, out)
+check("a comment that differs only in symbols keeps its GitHub issue open, named as text that differs, "
+      "since the copy counts it as posted and running it again cannot help",
+      "#22 has a comment whose text differs in Linear" in out and "#22 has 0 of" not in out, out)
 check("spacing and Linear's <> around a link address are not a difference", closed_numbers(envs) == [23],
       out + str(closes(envs)))
 check("a text difference is fixed by hand, not by running the copy again",
