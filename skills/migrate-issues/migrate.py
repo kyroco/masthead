@@ -169,15 +169,28 @@ def read_key(name):
     return key.strip()
 
 
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Refuse every redirect. urllib would follow one and copy the key's header to the new address."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+SEND = urllib.request.build_opener(NoRedirect)
+
+
 def linear(key, query, variables=None):
     """Send one read to Linear. Returns its data, or stops with its error, the key hidden."""
     request = urllib.request.Request(
         linear_url(), data=json.dumps({"query": query, "variables": variables or {}}).encode(),
         headers={"Authorization": key, "Content-Type": "application/json"}, method="POST")
     try:
-        with urllib.request.urlopen(request, timeout=30) as response:
+        with SEND.open(request, timeout=30) as response:
             body = response.read().decode("utf-8", "replace")
     except urllib.error.HTTPError as error:
+        if 300 <= error.code < 400:
+            fail("Linear answered with a redirect ({}). It was not followed, so the key went nowhere else; "
+                 "nothing was written.".format(error.code), 1)
         body = error.read().decode("utf-8", "replace")
         fail("Linear refused the request ({}): {}".format(error.code, hide(body[:600], key)), 1)
     except (urllib.error.URLError, OSError) as error:
