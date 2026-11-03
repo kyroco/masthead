@@ -191,6 +191,21 @@ def answer(store, body):
                                              for m in store.milestones
                                              if m["projectId"] == p["id"]]}}
             for p in store.projects if p["name"] == v["name"]]}}
+    if "description:{contains:$mark}" in query:
+        nodes = [{"id": i["id"], "description": i["description"], "createdAt": i["createdAt"],
+                  "project": {"id": i["projectId"]} if i.get("projectId") else None}
+                 for i in store.issues if i["teamId"] == v["team"] and v["mark"] in i["description"]]
+        start = int(v.get("after") or 0)
+        more = start + 2 < len(nodes)
+        return {"issues": {"pageInfo": {"hasNextPage": more, "endCursor": str(start + 2)},
+                           "nodes": nodes[start:start + 2]}}
+    if "project(id:$id){ id name" in query:
+        found = [p for p in store.projects if p["id"] == v["id"]]
+        return {"project": {"id": found[0]["id"], "name": found[0]["name"],
+                            "teams": {"nodes": [{"id": t} for t in found[0]["teamIds"]]},
+                            "projectMilestones": {"nodes": [
+                                {"id": m["id"], "name": m["name"], "sortOrder": m["sortOrder"]}
+                                for m in store.milestones if m["projectId"] == found[0]["id"]]}} if found else None}
     if "project(" in query:
         nodes = [{"id": i["id"], "title": i["title"], "description": i["description"], "createdAt": i["createdAt"],
                   "projectMilestone": {"id": i["projectMilestoneId"]} if i.get("projectMilestoneId") else None}
@@ -521,6 +536,48 @@ for i in store.issues:
     i["description"] = "Login fails."
 code, out, err = run(env22, plan=plan)
 check("a copy without its hidden line is imported a second time", code == 0 and len(store.issues) == 2, out + err)
+
+# The Linear project renamed, or a copy moved to another project, after a first run: a rerun still
+# finds every copy by its hidden line and makes nothing twice.
+Linear.store = store = Store()
+env23, _ = fake_gh(world_for(LOGIN))
+run(env23, plan=plan)
+store.projects[0]["name"] = "Relaunch, renamed in Linear"
+code, out, err = run(env23, plan=plan)
+check("a rerun after the Linear project was renamed makes no second project or copy",
+      code == 0 and len(store.projects) == 1 and len(store.issues) == 1 and len(store.comments) == 1, out + err)
+more_login = LOGIN + [gh_issue(52, "Fix logout", "Website relaunch: 1. Build", body="Logout fails.")]
+env24, _ = fake_gh(world_for(more_login))
+code, out, err = run(env24, plan=plan)
+check("a new issue after the rename lands in the renamed project",
+      code == 0 and len(store.projects) == 1 and len(store.issues) == 2
+      and all(i["projectId"] == store.projects[0]["id"] for i in store.issues), out + err)
+Linear.store = store = Store()
+run(env23, plan=plan)
+store.projects.append({"id": "pr-elsewhere", "name": "Elsewhere", "teamIds": ["team-web"]})
+store.issues[0]["projectId"] = "pr-elsewhere"
+code, out, err = run(env23, plan=plan)
+check("a rerun after a copy was moved to another project does not copy it again",
+      code == 0 and len(store.issues) == 1 and len(store.comments) == 1, out + err)
+
+# A GitHub body quoting another issue's hidden line can never take over that issue's copy,
+# even after its own real line is removed in Linear.
+FORGED = [gh_issue(5, "Real five", None, body="Five.", comments=[comment("alice", "2026-11-03T18:00:00Z", "Alice.")]),
+          gh_issue(7, "Sneaky", None, body="Hello.\n\n<!-- copied from GitHub acme/site#5 -->")]
+Linear.store = store = Store()
+env25, _ = fake_gh(world_for(FORGED))
+run(env25, "--issues", "7", plan=plan)
+sneaky = by_title(store, "Sneaky")
+for i in sneaky:
+    i["description"] = i["description"].rsplit("\n\n<!-- copied from GitHub acme/site#7 -->", 1)[0]
+code, out, err = run(env25, plan=plan)
+five_copy = by_title(store, "Real five")
+check("an issue whose hidden line another body quoted still gets its own copy",
+      code == 0 and len(five_copy) == 1, out + err + str([i["description"] for i in store.issues]))
+check("and its comment lands on its own copy, never on the quoting issue's",
+      five_copy and [c.split("\n\n", 1)[1] for c in comments_on(store, five_copy[0])] == ["Alice."]
+      and all(comments_on(store, s) == [] for s in by_title(store, "Sneaky")),
+      [(i["title"], comments_on(store, i)) for i in store.issues])
 
 # The copy refuses a repository or project other than the one in the plan (Robert, November 3: "yes").
 Linear.store = store = Store()
