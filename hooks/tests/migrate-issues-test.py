@@ -419,6 +419,18 @@ check("the connector takes no key", code != 0 and not os.path.exists(plan_path),
 code, out, err = run(base + ["--access", "key", "--key-env", "MY_LINEAR_KEY"])
 check("a key needs a place it is kept", code != 0 and not os.path.exists(plan_path), out + err)
 
+victim = os.path.join(work, "victim.txt")
+with open(victim, "w") as handle:
+    handle.write("victim content\n")
+os.chmod(victim, 0o644)
+link = os.path.join(work, "linked-plan.json")
+os.symlink(victim, link)
+code, out, err = run(["plan", "--out", link, "--direction", "github-to-linear", "--source", "github:acme#7",
+                      "--target", "linear:WEB", "--access", "connector"])
+check("a plan path that is a link is refused", code != 0 and "link" in (out + err).lower(), out + err)
+check("the file a plan link points to is left as it was", open(victim).read() == "victim content\n"
+      and stat.S_IMODE(os.stat(victim).st_mode) == 0o644, open(victim).read())
+
 back = ["plan", "--out", plan_path, "--direction", "linear-to-github",
         "--source", "linear:Website relaunch", "--target", "github:acme/site", "--access", "connector"]
 code, out, err = run(back)
