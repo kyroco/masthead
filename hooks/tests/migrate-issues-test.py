@@ -123,9 +123,11 @@ class Linear(http.server.BaseHTTPRequestHandler):
     def do_POST(self):
         body = self.rfile.read(int(self.headers.get("Content-Length", 0)))
         Linear.seen.append({"auth": self.headers.get("Authorization"), "body": json.loads(body)})
-        status, payload = Linear.answer(self.headers.get("Authorization"), json.loads(body))
+        status, payload, *extra = Linear.answer(self.headers.get("Authorization"), json.loads(body))
         data = payload.encode() if isinstance(payload, str) else json.dumps(payload).encode()
         self.send_response(status)
+        for name, value in (extra[0] if extra else {}).items():
+            self.send_header(name, value)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
@@ -138,6 +140,35 @@ class Linear(http.server.BaseHTTPRequestHandler):
 server = http.server.HTTPServer(("127.0.0.1", 0), Linear)
 threading.Thread(target=server.serve_forever, daemon=True).start()
 LINEAR_URL = "http://127.0.0.1:{}/graphql".format(server.server_address[1])
+
+
+# Somewhere else: a second address a redirect could point at. It records what reaches it.
+class Elsewhere(http.server.BaseHTTPRequestHandler):
+    seen = []
+
+    def do_POST(self):
+        self.rfile.read(int(self.headers.get("Content-Length", 0)))
+        Elsewhere.seen.append(self.headers.get("Authorization"))
+        data = json.dumps({"data": {"viewer": {"name": "Not Linear"}, "organization": {"name": "Elsewhere"}}}).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
+    def do_GET(self):
+        Elsewhere.seen.append(self.headers.get("Authorization"))
+        self.send_response(200)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def log_message(self, *args):
+        pass
+
+
+elsewhere = http.server.HTTPServer(("127.0.0.1", 0), Elsewhere)
+threading.Thread(target=elsewhere.serve_forever, daemon=True).start()
+ELSEWHERE_URL = "http://127.0.0.1:{}/steal".format(elsewhere.server_address[1])
 
 
 def linear_env(**extra):
@@ -226,6 +257,15 @@ def echo_key_plain(auth, body):
 Linear.answer = staticmethod(echo_key_plain)
 code, out, err = run(["check-linear", "--key-env", "MY_LINEAR_KEY"], env=linear_env(MY_LINEAR_KEY=KEY))
 check("a non-JSON error is shown with the key hidden", code != 0 and no_key(out, err), out + err)
+
+for status in (301, 302, 303, 307, 308):
+    Linear.answer = staticmethod(lambda auth, body, status=status: (status, "", {"Location": ELSEWHERE_URL}))
+    Elsewhere.seen = []
+    code, out, err = run(["check-linear", "--key-env", "MY_LINEAR_KEY"], env=linear_env(MY_LINEAR_KEY=KEY))
+    check("a {} redirect is refused, not followed".format(status), code != 0 and "redirect" in (out + err).lower(),
+          out + err)
+    check("a {} redirect reaches nowhere else at all".format(status), not Elsewhere.seen, str(Elsewhere.seen))
+    check("a {} redirect keeps the key out of the output".format(status), no_key(out, err))
 
 Linear.answer = staticmethod(good_answer)
 Linear.seen = []
