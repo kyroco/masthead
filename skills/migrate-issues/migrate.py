@@ -22,14 +22,17 @@ project, or issues named by key, and prints what each becomes on GitHub. plan
 saves what the person agreed to. None of those writes to GitHub or Linear.
 
 copy writes, and only to Linear, and only when the saved plan says the person
-agreed to GitHub to Linear through a key for that team. It copies each open
+agreed to GitHub to Linear, from this repository and project, through a key,
+for that team. It never runs through the connector. It copies each open
 issue of the repository in the project (or the milestone, or the numbers named)
 into one Linear project with the GitHub project's name, each GitHub milestone a
 milestone inside it, with the same title, body, labels and every comment. Each
 comment starts with a line naming its GitHub author and its time in Eastern. An
-issue labelled needs-decision or parked lands as Needs Human. Run it again and
-nothing is copied twice: an issue already in the Linear project under the same
-title is not made again, and a comment already on it is not posted again.
+issue labelled needs-decision or parked lands as Needs Human. Each copy's body
+ends with a hidden line naming its GitHub issue. Run it again and nothing is
+copied twice: an issue whose copy carries that line is not made again, and a
+comment already on it is not posted again. A copy whose line was removed is
+not found, and the issue is copied again.
 
 The Linear key is read from the environment variable the person names, at run
 time. It is never printed, logged or saved: everything Linear sends back is
@@ -62,7 +65,7 @@ def fail(message, code=2):
 PROJECT_QUERY = """query($login:String!,$number:Int!,$after:String){
   %s(login:$login){ projectV2(number:$number){ title
     items(first:100, after:$after){ pageInfo{hasNextPage endCursor}
-      nodes{ content{ __typename ... on Issue{ number state title body
+      nodes{ content{ __typename ... on Issue{ number state
         repository{nameWithOwner} milestone{title} } } } } } } }"""
 
 
@@ -84,7 +87,7 @@ def gh_project_page(kind, login, number, after):
 def read_project(repo, number, numbers=False):
     """The project's title and the milestones of its open issues in repo, or None when gh cannot see it.
 
-    With numbers, each item is (issue number, milestone, title, body) in place of the milestone alone."""
+    With numbers, each item is (issue number, milestone) in place of the milestone alone."""
     login = repo.split("/", 1)[0]
     for kind in ("organization", "user"):
         page = gh_project_page(kind, login, number, None)
@@ -99,8 +102,7 @@ def read_project(repo, number, numbers=False):
                 if (content.get("repository") or {}).get("nameWithOwner", "").lower() != repo.lower():
                     continue
                 milestone = (content.get("milestone") or {}).get("title")
-                milestones.append((content.get("number"), milestone, content.get("title"), content.get("body"))
-                                  if numbers else milestone)
+                milestones.append((content.get("number"), milestone) if numbers else milestone)
             info = page["items"]["pageInfo"]
             if not info["hasNextPage"]:
                 return title, milestones
@@ -444,14 +446,11 @@ def read_issue(repo, number):
 
 
 def chosen_numbers(repo, project, milestone, numbers):
-    """The open issue numbers of repo in the project, cut to one milestone or to the numbers named,
-    and the words (title and body) of every open issue of repo in the project, cut or not."""
+    """The open issue numbers of repo in the project, cut to one milestone or to the numbers named."""
     found = read_project(repo, project, numbers=True)
     if found is None:
         fail("gh cannot see project {} of {}. Nothing was written.".format(project, repo.split("/", 1)[0]))
-    title, every = found
-    claimed = {(t, same_text(b)) for _, _, t, b in every}
-    items = [(n, m) for n, m, _, _ in every]
+    title, items = found
     if milestone is not None:
         items = [(n, m) for n, m in items if m == milestone]
         if not items:
@@ -464,7 +463,7 @@ def chosen_numbers(repo, project, milestone, numbers):
             fail("Not open issues of {} in the project: {}. Nothing was written.".format(
                 repo, ", ".join(str(n) for n in missing)))
         items = [(n, m) for n, m in items if n in set(numbers)]
-    return title, sorted(items, key=lambda item: item[0]), claimed
+    return title, sorted(items, key=lambda item: item[0])
 
 
 UNNUMBERED = 1000000.0
@@ -493,11 +492,28 @@ PROJECTS = """query($name:String!){ projects(filter:{name:{eq:$name}}){ nodes{ i
   teams{nodes{id}} projectMilestones{nodes{id name sortOrder}} } } }"""
 
 COPIES = """query($id:String!,$after:String){ project(id:$id){
-  issues(first:100, after:$after){ pageInfo{hasNextPage endCursor} nodes{ id title description createdAt projectMilestone{id} } } } }"""
+  issues(first:100, after:$after){ pageInfo{hasNextPage endCursor} nodes{ id description createdAt } } } }"""
+
+
+def with_mark(body, repo, number):
+    """An issue's body as its Linear copy holds it: the GitHub text, then a hidden line naming the
+    GitHub issue, which Linear does not show and a later run reads to find the copy."""
+    mark = "<!-- copied from GitHub {}#{} -->".format(repo, number)
+    body = (body or "").rstrip()
+    return "{}\n\n{}".format(body, mark) if body else mark
+
+
+def copied_from(repo, description):
+    """The GitHub issue number a copy's hidden line names for repo, or None when the line is gone.
+    The last such line counts, so a line quoted inside the GitHub text cannot decide it."""
+    found = re.findall(r"<!-- copied from GitHub ([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)#(\d+) -->", description or "")
+    if not found or found[-1][0].lower() != repo.lower():
+        return None
+    return int(found[-1][1])
 
 
 def same_text(text):
-    """Text reduced to its letters and digits, so Linear's own reformatting of a body still matches."""
+    """Text reduced to its letters and digits, so Linear's own reformatting of a comment still matches."""
     return "".join(ch for ch in (text or "").casefold() if ch.isalnum())
 
 COMMENTS = """query($id:String!,$after:String){ issue(id:$id){
@@ -535,8 +551,13 @@ def every_page(key, query, variables, path):
         after = page["pageInfo"]["endCursor"]
 
 
+PLAN_SOURCE = re.compile(r"^(?:github:)?([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)(?:#|\s+project\s+)(\d+)$", re.I)
+PLAN_TARGET = re.compile(r"^(?:linear:)?([A-Za-z0-9]+)$", re.I)
+
+
 def load_plan(path, args):
-    """Stop unless the saved plan is the person's yes to this copy: GitHub to Linear, by this key, to this team."""
+    """Stop unless the saved plan is the person's yes to this copy: GitHub to Linear, from this
+    repository and project, by a key in this variable, to this team."""
     path = path or default_plan_path()
     try:
         with open(path) as handle:
@@ -547,13 +568,22 @@ def load_plan(path, args):
     if record.get("direction") != "github-to-linear":
         fail("The saved plan is not for GitHub to Linear. Nothing was written.")
     if access.get("kind") != "key":
-        fail("The saved plan reaches Linear through the connector, so the copy is made through the connector, "
-             "not this script. Nothing was written.")
+        fail("The copy into Linear is made only with a Linear API key, never the connector, and the saved plan "
+             "chose the connector. Ask where the key is kept, save the plan again with --access key, and get "
+             "the yes again. Nothing was written.")
     if access.get("key_env") != args.key_env:
         fail("The saved plan reads the key from another variable than {}. Nothing was written.".format(args.key_env))
-    if str(record.get("target", "")).strip().upper() != args.team.upper():
+    source = PLAN_SOURCE.match(str(record.get("source", "")).strip())
+    if not source:
+        fail('The saved plan\'s source "{}" does not name a repository and project as <owner>/<repo>#<project>. '
+             "Save the plan again. Nothing was written.".format(shown(record.get("source"))))
+    if source.group(1).lower() != args.repo.lower() or int(source.group(2)) != args.project:
+        fail("The saved plan is for {} project {}, not {} project {}. Nothing was written.".format(
+            source.group(1), source.group(2), args.repo, args.project))
+    target = PLAN_TARGET.match(str(record.get("target", "")).strip())
+    if not target or target.group(1).upper() != args.team.upper():
         fail('The saved plan copies to "{}", not to the team {}. Nothing was written.'.format(
-            shown(record.get("target")), args.team.upper()))
+            shown(record.get("target")), shown(args.team.upper())))
 
 
 def copy(args):
@@ -561,7 +591,7 @@ def copy(args):
         fail("--repo takes <owner>/<repo>, such as acme/site.")
     load_plan(args.plan, args)
     key = read_key(args.key_env)
-    title, items, claimed = chosen_numbers(args.repo, args.project, args.milestone, args.issues)
+    title, items = chosen_numbers(args.repo, args.project, args.milestone, args.issues)
     if not items:
         print("No open issue to copy. Nothing was written.")
         return
@@ -604,31 +634,15 @@ def copy(args):
                                       {"projectId": project["id"], "name": name, "sortOrder": made[name]})["id"]
             new_milestones += 1
 
-    # Find each issue's copy already in the project, oldest first, with no link or number between them.
-    # First by title and body together, so a same-titled issue copied in another run, or reopened
-    # since, is never taken for this one. Then, for an issue whose body was edited since, by title and
-    # milestone, but only a copy whose words belong to no open GitHub issue in the project, so it can
-    # never be another issue's copy.
-    every_copy = sorted(every_page(key, COPIES, {"id": project["id"]}, ("project", "issues")),
-                        key=lambda n: n["createdAt"])
-    words = lambda t, b: (t, same_text(b))
+    # Each copy's body ends with a hidden line naming its GitHub issue, and a copy is found only by
+    # that line: never by title or words. A copy whose line is gone is not found, and the issue is
+    # copied again; nothing else can tell which issue it came from.
     found = {}
-    for issue in issues:
-        for node in every_copy:
-            if node["id"] not in found.values() and words(node["title"], node.get("description")) == \
-                    words(issue["title"], issue.get("body")):
-                found[issue["number"]] = node["id"]
-                break
-    for issue in issues:
-        if issue["number"] in found:
-            continue
-        milestone = milestones[inside(title, issue["milestone"]["title"])] if issue.get("milestone") else None
-        for node in every_copy:
-            if (node["id"] not in found.values() and node["title"] == issue["title"]
-                    and (node.get("projectMilestone") or {}).get("id") == milestone
-                    and words(node["title"], node.get("description")) not in claimed):
-                found[issue["number"]] = node["id"]
-                break
+    for node in sorted(every_page(key, COPIES, {"id": project["id"]}, ("project", "issues")),
+                       key=lambda n: n["createdAt"]):
+        number = copied_from(args.repo, node.get("description"))
+        if number is not None:
+            found.setdefault(number, node["id"])
 
     new_issues = new_comments = new_labels = 0
     for issue in issues:
@@ -648,7 +662,8 @@ def copy(args):
                                                   {"name": name, "teamId": team["id"]})["id"]
                     new_labels += 1
                 label_ids.append(labels[name.lower()])
-            fields = {"teamId": team["id"], "title": issue["title"], "description": issue.get("body") or "",
+            fields = {"teamId": team["id"], "title": issue["title"],
+                      "description": with_mark(issue.get("body"), args.repo, issue["number"]),
                       "projectId": project["id"]}
             if issue.get("milestone"):
                 fields["projectMilestoneId"] = milestones[inside(title, issue["milestone"]["title"])]

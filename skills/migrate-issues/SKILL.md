@@ -37,7 +37,9 @@ issue. There is nothing to choose about the structure, so do not ask.
 
 ## 2. Ask how to reach Linear
 
-In both directions, the person chooses an API key or the Linear connector:
+In both directions, the person chooses an API key or the Linear connector for
+reading and planning. The copy into Linear (step 5) runs only with a key, never
+the connector, so for GitHub to Linear say so when you ask:
 
 - **The Linear connector**: the Linear tools already connected to this
   session. Nothing to set up. Check it by reading the target team (or the
@@ -109,7 +111,10 @@ Save what the person agreed to:
 
     python3 ${CLAUDE_PLUGIN_ROOT}/skills/migrate-issues/migrate.py plan --direction github-to-linear --source <source> --target <target> --access key --key-env <NAME> --kept '<where it is kept>'
 
-For GitHub to Linear, `--target` is the Linear team's key, such as `WEB`.
+For GitHub to Linear, `--source` is the repository and project as
+`<owner>/<repo>#<project>`, such as `acme/site#7`, and `--target` is the
+Linear team's key, such as `WEB`; the copy refuses any other repository,
+project or team, and a plan through the connector.
 For Linear to GitHub, use `--direction linear-to-github`. For the connector,
 use `--access connector` and leave out `--key-env` and `--kept`. The plan
 holds where the key is kept, never the key, and it refuses a key given as the
@@ -140,19 +145,25 @@ into Linear, and writes nothing to GitHub:
 The person may cut what moves to one GitHub milestone (its full GitHub name)
 or to issue numbers; say which before running.
 
-Run it again and nothing is copied twice: an issue already in the Linear
-project with the same title and the same body (compared by their letters and
-digits only, so Linear's own reformatting still matches) is not made again,
-and a comment already on its copy is not posted again; two comments with the
-same words are two comments, and each is posted once. Same-titled issues with
-different bodies each get their own copy, whichever run copies them. An issue
-whose body was edited since its copy was made still finds that copy: one with
-its title, in its milestone, whose words belong to no open GitHub issue in
-the project. So when a run stops partway, run it again.
+Each copy's body ends with a hidden line, which Linear does not show, naming
+the GitHub issue it came from:
 
-With a key, run the copy the same way step 2 ran its check (under `op run`
-for a 1Password reference). It refuses to write unless the saved plan is for
-GitHub to Linear, by this key's variable, to this team:
+    <!-- copied from GitHub acme/site#5 -->
+
+Run it again and nothing is copied twice: an issue whose copy carries that
+line is not made again, however its title or text changed since, and a
+comment already on its copy is not posted again; two comments with the same
+words are two comments, and each is posted once. A copy whose hidden line
+was removed is not found, so its issue is copied a second time; nothing else
+can tell which issue a copy came from. So when a run stops partway, run it
+again.
+
+The copy runs only through this script, with a key, never through the
+Linear connector: GitHub issue text is written by anyone who can file an
+issue, and the script never reads it as instructions. Run it the same way
+step 2 ran its check (under `op run` for a 1Password reference). It refuses
+to write unless the saved plan is for GitHub to Linear, from this
+repository and project, by this key's variable, to this team:
 
     python3 ${CLAUDE_PLUGIN_ROOT}/skills/migrate-issues/migrate.py copy --repo <owner>/<repo> --project <number> --team <KEY> --key-env <NAME>
 
@@ -161,30 +172,9 @@ moves. Show what it prints as it is. When it stops, show what it said; when it
 names a missing Needs Human status, the person adds it to the team in Linear
 and runs it again.
 
-With the connector, make the same copy through the Linear tools, after
-reading each issue with `gh issue view <n> --repo <owner>/<repo> --json
-title,body,labels,milestone,comments`:
-
-1. `list_projects` with the project's name and the team; when none is on the
-   team, `save_project` with `name`, `addTeams` the team and `state`
-   `Backlog`.
-2. `list_milestones` for the project; for each milestone missing,
-   `save_milestone` with the project and its name.
-3. `list_issues` with `project` the project, every page, to find the copies
-   already made, by title and body together as above, then for an edited
-   issue by title and milestone among copies no open issue's words match,
-   never by title alone.
-4. For each issue not yet copied, `save_issue` with `team`, `title`,
-   `description` the body, `project`, `milestone` where it has one, `labels`
-   its labels without `needs-decision` and `parked`, and `state`
-   `Needs Human` when it had either.
-5. `list_comments` on each copy, then `save_comment` with `issueId` the copy
-   and `body` the first line above, a blank line, and the comment's text, for
-   each comment not already there, counting: when GitHub holds a comment
-   twice, the copy holds it twice.
-
-Then count: the issues chosen against the copies in the project, and say
-both numbers.
+When the person chose the connector in step 2, do not copy through the
+Linear tools: say the copy needs a key, ask where it is kept, check it as
+step 2 says, and save the plan again with `--access key` before the yes.
 
 Links between the copies (parent, sub-issue and blocked-by), closing the
 GitHub originals, and **Linear to GitHub** are not built yet. Say so, and

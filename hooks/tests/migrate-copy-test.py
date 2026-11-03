@@ -256,6 +256,11 @@ def by_title(store, title):
     return [i for i in store.issues if i["title"] == title]
 
 
+def body(issue):
+    """A copy's body without the hidden line naming its GitHub issue."""
+    return issue["description"].split("\n\n<!-- copied from GitHub")[0]
+
+
 def comments_on(store, issue):
     return [c["body"] for c in store.comments if c["issueId"] == issue["id"]]
 
@@ -297,13 +302,13 @@ check("an issue with no milestone is in the project with no milestone", "project
 
 # --- Scenario 3: same title, body, labels and every comment; each comment names its GitHub author and time in Eastern.
 
-check("the title and body are the same", launch["description"] == "Body of 1.", launch)
+check("the title and body are the same", body(launch) == "Body of 1.", launch)
 check("an existing team label is used, not made again", launch.get("labelIds") == ["lb-feature"], launch)
 header = by_title(store, "Build the header")[0]
 check("a workspace label matches whatever its case", "lb-bug" in header.get("labelIds", []), header)
 footers = by_title(store, "Fix footer")
 check("two issues with the same title are both copied, each with its own body",
-      sorted(f["description"] for f in footers) == ["A second issue with the same title.", "Body of 5."], footers)
+      sorted(body(f) for f in footers) == ["A second issue with the same title.", "Body of 5."], footers)
 said = comments_on(store, launch)
 check("every comment is copied, across pages", len(said) == 3, said)
 check("a comment starts with its GitHub author and its time in Eastern (EST)",
@@ -367,18 +372,18 @@ env4, _ = fake_gh(world_for(SAME_TITLE))
 run(env4, "--milestone", "Website relaunch: 1. Build", plan=plan)
 code, out, err = run(env4, "--milestone", "Website relaunch: 2. Launch", plan=plan)
 milestone_id = {m["name"]: m["id"] for m in store.milestones}
-launch_copy = [i for i in store.issues if i["description"] == "Tests for the launch."]
+launch_copy = [i for i in store.issues if body(i) == "Tests for the launch."]
 check("a same-titled issue in another milestone, copied in a later run, gets its own copy",
       code == 0 and len(launch_copy) == 1, out + err + str([i["description"] for i in store.issues]))
 check("that copy is in its own milestone, with its own labels and comment",
       launch_copy and launch_copy[0].get("projectMilestoneId") == milestone_id.get("2. Launch")
       and launch_copy[0].get("labelIds") == ["lb-bug"]
       and [c.endswith("Launch tests note.") for c in comments_on(store, launch_copy[0])] == [True], launch_copy)
-build_copy = [i for i in store.issues if i["description"] == "Tests for the build."]
+build_copy = [i for i in store.issues if body(i) == "Tests for the build."]
 check("the earlier copy gets no comment of the later issue",
       build_copy and comments_on(store, build_copy[0]) == [], [comments_on(store, b) for b in build_copy])
 code, out, err = run(env4, "--issues", "13", plan=plan)
-loose_copy = [i for i in store.issues if i["description"] == "Tests with no milestone."]
+loose_copy = [i for i in store.issues if body(i) == "Tests with no milestone."]
 check("a same-titled issue with no milestone, copied in a later run, lands with no milestone",
       code == 0 and len(loose_copy) == 1 and "projectMilestoneId" not in loose_copy[0], out + err)
 
@@ -395,12 +400,12 @@ run(env5, plan=plan)
 reopened = [dict(i, state="OPEN") if i["number"] == 3 else i for i in FOOTERS]
 env6, _ = fake_gh(world_for(reopened))
 code, out, err = run(env6, plan=plan)
-bodies = sorted(i["description"] for i in store.issues)
+bodies = sorted(body(i) for i in store.issues)
 check("after a reopen, each same-titled issue has exactly one copy",
       code == 0 and bodies == ["Footer five.", "Footer six.", "Footer three."], out + err + str(bodies))
 check("after a reopen, each copy holds only its own issue's comment",
       all([c.split("\n\n", 1)[1] for c in comments_on(store, i)] ==
-          ["{}'s note.".format(i["description"].split()[1].rstrip(".").capitalize())] for i in store.issues),
+          ["{}'s note.".format(body(i).split()[1].rstrip(".").capitalize())] for i in store.issues),
       [(i["description"], comments_on(store, i)) for i in store.issues])
 
 # Two comments by one person, with the same text, in the same minute: both are copied, once each, run after run.
@@ -596,8 +601,10 @@ def says(phrase):
 says("migrate.py copy --repo <owner>/<repo> --project <number> --team <KEY> --key-env")
 says("Written on GitHub by")
 says("Needs Human")
-says("save_issue")
-says("save_comment")
+says("never through the\nLinear connector")
+says("<!-- copied from GitHub acme/site#5 -->")
+says("`<owner>/<repo>#<project>`")
+check("SKILL.md holds no connector copy steps", "save_issue" not in text and "save_comment" not in text)
 says("nothing is copied twice")
 check("SKILL.md no longer says the copy is not built", "is not built yet" not in text)
 
