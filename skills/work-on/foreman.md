@@ -248,8 +248,10 @@ on GitHub. Every section above holds, with these changes, shown for KOR-12:
   question out of the body with `save_issue` and `patch` after reading it
   with `get_issue`, and posts no comment and changes no status. A question
   answered before its issue has a worker (Agree the run) goes on the issue as
-  a comment with `save_comment`, in the person's words, and the issue moves
-  to `Todo` with `save_issue` once no `[NEEDS CLARIFICATION]` line is left.
+  a comment with `save_comment`, in the person's words, the answered
+  `[NEEDS CLARIFICATION]` line is taken out of the body with `save_issue` and
+  `patch` after reading it with `get_issue`, and the issue moves to `Todo`
+  with `save_issue` once no `[NEEDS CLARIFICATION]` line is left.
 - **A worker's report.** A worker's report quotes a line from the project
   description, in place of the project README.
 - **Park.** A second failure sets the issue's status to `Needs Human` with
