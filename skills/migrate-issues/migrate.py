@@ -196,7 +196,7 @@ def linear(key, query, variables=None):
             fail("Linear answered with a redirect ({}). It was not followed, so the key went nowhere else; "
                  "nothing was written.".format(error.code), 1)
         body = error.read().decode("utf-8", "replace")
-        fail("Linear refused the request ({}): {}".format(error.code, hide(body[:600], key)), 1)
+        fail("Linear refused the request ({}): {}".format(error.code, hide(body, key)[:600]), 1)
     except (urllib.error.URLError, OSError) as error:
         fail("Linear could not be reached: {}".format(hide(str(error), key)), 1)
     except Exception as error:  # anything else could carry the key in its text; never let it print raw
@@ -204,9 +204,9 @@ def linear(key, query, variables=None):
     try:
         answer = json.loads(body)
     except ValueError:
-        fail("Linear answered with something other than JSON: {}".format(hide(body[:600], key)), 1)
+        fail("Linear answered with something other than JSON: {}".format(hide(body, key)[:600]), 1)
     if answer.get("errors"):
-        fail("Linear refused the request: {}".format(hide(json.dumps(answer["errors"])[:600], key)), 1)
+        fail("Linear refused the request: {}".format(hide(json.dumps(answer["errors"]), key)[:600]), 1)
     return answer.get("data") or {}
 
 
