@@ -91,7 +91,15 @@ def build_order(title):
 
 
 def inside(project, milestone):
-    """A milestone's name inside its own project: the `<project>: ` prefix is dropped."""
+    """A milestone's name inside its own project: the `<project>: ` prefix is dropped.
+
+    GitHub milestones are named `<project>: <n>. <name>`, and the project part is
+    often shorter than the GitHub project's title, so any prefix before a
+    numbered name goes. A name with no number keeps everything but the full title.
+    """
+    numbered = re.match(r"^[^:]+:\s*(\d+\..*)$", milestone)
+    if numbered:
+        return numbered.group(1).strip()
     prefix = project + ":"
     return milestone[len(prefix):].strip() if milestone.startswith(prefix) else milestone
 
