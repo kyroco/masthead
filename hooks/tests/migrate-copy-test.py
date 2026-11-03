@@ -873,7 +873,11 @@ TRICKY["bodyHTML"] = (
     '<img data-src="https://cdn.ex.test/lazy.png" src="https://camo.githubusercontent.com/3" data-canonical-src="https://cdn.ex.test/real.png">\n'
     '<img alt="a &gt; b" src="https://camo.githubusercontent.com/4" data-canonical-src="https://ex.test/gt.png">\n'
     '<img src="https://camo.githubusercontent.com/5" data-canonical-src="https://ex.test/ref.png" alt="ref"> '
-    '<img class="emoji" title=":shipit:" alt=":shipit:" src="https://github.githubassets.com/images/icons/emoji/shipit.png"></p>')
+    '<img class="emoji" title=":shipit:" alt=":shipit:" src="https://github.githubassets.com/images/icons/emoji/shipit.png">\n'
+    # An upload, as GitHub renders it: a private address signed for five minutes, not the address written.
+    '<a href="https://private-user-images.githubusercontent.com/181685648/604055368-25addea2-357a-42c0-a1c8-fba0163382cc.png'
+    '?jwt=eyJSIGNED.TOKEN"><img alt="Image" src="https://private-user-images.githubusercontent.com/181685648/'
+    '604055368-25addea2-357a-42c0-a1c8-fba0163382cc.png?jwt=eyJSIGNED.TOKEN"></a></p>')
 
 Linear.store = store = Store()
 envf, tmpf = fake_gh(world_for(WITH_IMAGES))
@@ -911,7 +915,9 @@ pictures = [line.strip() for line in out.splitlines() if line.strip().startswith
 check("every image GitHub shows is listed once, by the address it shows",
       sorted(pictures) == sorted("#7: " + url for url in (
           "https://upload.wikimedia.org/w/Graph_(2020).png", "https://ex.test/nested.png",
-          "https://cdn.ex.test/real.png", "https://ex.test/gt.png", "https://ex.test/ref.png")), out)
+          "https://cdn.ex.test/real.png", "https://ex.test/gt.png", "https://ex.test/ref.png",
+          "https://github.com/user-attachments/assets/25addea2-357a-42c0-a1c8-fba0163382cc")), out)
+check("an upload's short-lived signed address is never printed", "jwt" not in out and "SIGNED" not in out, out)
 check("an emoji is not listed as an image", "shipit" not in out, out)
 
 code, out, err = finish(envf, plan=planf)
