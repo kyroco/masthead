@@ -271,7 +271,9 @@ def linear_source(auth, body):
         return 200, {"data": {"project": {"issues": {"pageInfo": info, "nodes": nodes}}}}
     if "issue(id" in query:
         known = {"WEB-1": {"identifier": "WEB-1", "state": {"type": "backlog"},
-                           "project": {"name": "Website relaunch"}, "projectMilestone": {"name": "Build"}},
+                           "project": {"name": "Website relaunch", "projectMilestones": {"nodes": [
+                               {"name": "Launch", "sortOrder": 2.0}, {"name": "Build", "sortOrder": 1.0}]}},
+                           "projectMilestone": {"name": "Build"}},
                  "WEB-9": {"identifier": "WEB-9", "state": {"type": "started"}, "project": None,
                            "projectMilestone": None}}
         return 200, {"data": {"issue": known.get(variables.get("id"))}}
@@ -307,6 +309,8 @@ check("read-linear shows where each named issue lands",
 
 code, out, err = run(["read-linear", "--key-env", "MY_LINEAR_KEY", "--issues", "WEB-404"],
                      env=linear_env(MY_LINEAR_KEY=KEY))
+check("an issue named by key gets the same milestone name as its project view",
+      'milestone "Website relaunch: 1. Build"' in out, out)
 check("read-linear refuses a key it cannot find", code != 0 and "WEB-404" in (out + err), out + err)
 
 # --- The plan the person agreed to: the layout and the access, and never the key.
