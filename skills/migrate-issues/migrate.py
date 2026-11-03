@@ -507,17 +507,21 @@ def with_mark(body, repo, number):
     """An issue's body as its Linear copy holds it: the GitHub text, then a hidden line naming the
     GitHub issue, which Linear does not show and a later run reads to find the copy."""
     mark = MARK.format(repo, number) + " -->"
-    body = (body or "").rstrip()
+    # A hidden line written into the GitHub text by its author is turned into one no run reads, so
+    # it can never pass for this or another issue's line. Linear shows neither, so the text looks the same.
+    body = re.sub(r"<!--(\s*)copied from GitHub", r"<!--\1quoted from GitHub", (body or ""), flags=re.I).rstrip()
     return "{}\n\n{}".format(body, mark) if body else mark
 
 
 def copied_from(repo, description):
     """The GitHub issue number a copy's hidden line names for repo, or None when the line is gone.
-    The last such line counts, so a line quoted inside the GitHub text cannot decide it."""
-    found = re.findall(r"<!-- copied from GitHub ([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)#(\d+) -->", description or "")
-    if not found or found[-1][0].lower() != repo.lower():
+    Only the description's last non-blank line counts, where the copy put it."""
+    lines = [line for line in (description or "").splitlines() if line.strip()]
+    found = re.fullmatch(r"\s*<!-- copied from GitHub ([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)#(\d+) -->\s*",
+                         lines[-1]) if lines else None
+    if not found or found.group(1).lower() != repo.lower():
         return None
-    return int(found[-1][1])
+    return int(found.group(2))
 
 
 def same_text(text):

@@ -151,7 +151,11 @@ the GitHub issue it came from:
     <!-- copied from GitHub acme/site#5 -->
 
 Run it again and nothing is copied twice: an issue whose copy carries that
-line is not made again, however its title or text changed since, and a
+line, anywhere on the team, is not made again, however its title or text
+changed since, and even when the Linear project was renamed or the copy moved
+to another project; new issues then land in the project the copies sit in.
+Only the last line of a copy's body counts, and a line like it written into
+the GitHub text is changed so it never counts. A
 comment already on its copy is not posted again; two comments with the same
 words are two comments, and each is posted once. A copy whose hidden line
 was removed is not found, so its issue is copied a second time; nothing else
