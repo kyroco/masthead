@@ -247,6 +247,68 @@ code, out, err = run(["check-linear", "--key-env", "MY_LINEAR_KEY"],
                      env=dict(linear_env(MY_LINEAR_KEY=KEY), MASTHEAD_LINEAR_URL="https://example.test/graphql"))
 check("the key is never sent anywhere but Linear or this machine", code != 0 and not Linear.seen, out + err)
 
+# --- Scenario 6: Linear to GitHub reads the Linear source, through the key, and shows what it becomes.
+
+
+def linear_source(auth, body):
+    query, variables = body["query"], body.get("variables", {})
+    if "projects(" in query:
+        nodes = []
+        if variables.get("name") == "Website relaunch":
+            nodes = [{"id": "p1", "name": "Website relaunch", "projectMilestones": {"nodes": [
+                {"name": "Launch", "sortOrder": 2.0}, {"name": "Build", "sortOrder": 1.0}]}}]
+        return 200, {"data": {"projects": {"nodes": nodes}}}
+    if "project(id" in query:
+        if variables.get("after"):
+            nodes = [{"identifier": "WEB-4", "state": {"type": "started"}, "projectMilestone": None},
+                     {"identifier": "WEB-5", "state": {"type": "canceled"}, "projectMilestone": {"name": "Build"}}]
+            info = {"hasNextPage": False, "endCursor": None}
+        else:
+            nodes = [{"identifier": "WEB-1", "state": {"type": "backlog"}, "projectMilestone": {"name": "Build"}},
+                     {"identifier": "WEB-2", "state": {"type": "unstarted"}, "projectMilestone": {"name": "Launch"}},
+                     {"identifier": "WEB-3", "state": {"type": "completed"}, "projectMilestone": {"name": "Launch"}}]
+            info = {"hasNextPage": True, "endCursor": "C1"}
+        return 200, {"data": {"project": {"issues": {"pageInfo": info, "nodes": nodes}}}}
+    if "issue(id" in query:
+        known = {"WEB-1": {"identifier": "WEB-1", "state": {"type": "backlog"},
+                           "project": {"name": "Website relaunch"}, "projectMilestone": {"name": "Build"}},
+                 "WEB-9": {"identifier": "WEB-9", "state": {"type": "started"}, "project": None,
+                           "projectMilestone": None}}
+        return 200, {"data": {"issue": known.get(variables.get("id"))}}
+    return 400, {"errors": [{"message": "unexpected query"}]}
+
+
+Linear.answer = staticmethod(linear_source)
+Linear.seen = []
+code, out, err = run(["read-linear", "--key-env", "MY_LINEAR_KEY", "--project", "Website relaunch"],
+                     env=linear_env(MY_LINEAR_KEY=KEY))
+check("read-linear reads a Linear project", code == 0 and 'Linear project "Website relaunch"' in out, out + err)
+check("read-linear counts only open issues, across every page", "3 open issues" in out, out)
+check("read-linear shows the GitHub project it becomes", 'GitHub project "Website relaunch"' in out, out)
+check("read-linear names milestones <project>: <n>. <name> in Linear's order",
+      'milestone "Website relaunch: 1. Build" (1 issue)' in out
+      and 'milestone "Website relaunch: 2. Launch" (1 issue)' in out, out)
+check("read-linear shows issues with no milestone", "no milestone (1 issue)" in out, out)
+check("read-linear says nothing is written", "Nothing has been written" in out, out)
+check("read-linear keeps the key out of the output", no_key(out, err))
+check("read-linear only reads Linear",
+      Linear.seen and all(not q["body"]["query"].lstrip().startswith("mutation") for q in Linear.seen), str(Linear.seen))
+
+code, out, err = run(["read-linear", "--key-env", "MY_LINEAR_KEY", "--project", "Nope"],
+                     env=linear_env(MY_LINEAR_KEY=KEY))
+check("read-linear refuses a project it cannot find", code != 0 and 'No Linear project named "Nope"' in (out + err),
+      out + err)
+
+code, out, err = run(["read-linear", "--key-env", "MY_LINEAR_KEY", "--issues", "WEB-1", "WEB-9"],
+                     env=linear_env(MY_LINEAR_KEY=KEY))
+check("read-linear reads issues named by key", code == 0 and "WEB-1" in out and "WEB-9" in out, out + err)
+check("read-linear shows where each named issue lands",
+      'GitHub project "Website relaunch"' in out and "no project" in out, out)
+
+code, out, err = run(["read-linear", "--key-env", "MY_LINEAR_KEY", "--issues", "WEB-404"],
+                     env=linear_env(MY_LINEAR_KEY=KEY))
+check("read-linear refuses a key it cannot find", code != 0 and "WEB-404" in (out + err), out + err)
+
 # --- The plan the person agreed to: the layout and the access, and never the key.
 
 work = tempfile.mkdtemp(prefix="migrate-plan-")
@@ -317,6 +379,8 @@ says("op run -- python3")
 says("check-linear --key-env")
 says("never `op read`")
 says("migrate.py plan")
+says("read-linear --key-env")
+says("get_project")
 
 for path in sorted(os.listdir(SKILL_DIR)) if os.path.isdir(SKILL_DIR) else []:
     text = open(os.path.join(SKILL_DIR, path)).read()
