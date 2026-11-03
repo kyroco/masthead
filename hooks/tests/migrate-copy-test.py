@@ -696,9 +696,9 @@ def copy_in(store, repo, number):
     return found[0] if found else {}
 
 
-def run_repo(env, repo):
+def run_repo(env, repo, *extra):
     args = [sys.executable, SCRIPT, "copy", "--repo", repo, "--project", "7", "--team", "WEB",
-            "--key-env", "MY_LINEAR_KEY", "--plan", save_plan(tmp, source="{} project 7".format(repo))]
+            "--key-env", "MY_LINEAR_KEY", "--plan", save_plan(tmp, source="{} project 7".format(repo))] + list(extra)
     result = subprocess.run(args, env=env, capture_output=True, text=True, timeout=60)
     return result.returncode, result.stdout, result.stderr
 
@@ -720,6 +720,23 @@ for first, second in (("acme/site", "acme/apps"), ("Acme/Apps", "acme/site")):
           out + err + str(store.relations))
     check("copied {} then {}, no link across the repositories is named as not made".format(first, second),
           "Links not made" not in out, out)
+
+# A repository typed in another case on a later run still finds its own copies: nothing is copied or
+# linked twice, and no copy is taken for another parent (review finding R1).
+writes = len(store.writes)
+code, out, err = run_repo(env_two, "acme/apps")
+check("a rerun typing the repository in another case copies and links nothing twice",
+      code == 0 and store.writes[writes:] == [] and len(store.issues) == 4 and len(store.relations) == 1
+      and "Left as it is" not in out, out + err + str(store.writes[writes:]))
+CASED = [gh_issue(81, "Blocker", None, repo="acme/apps", blocking=[("acme/apps", 82)]),
+         gh_issue(82, "Waits", None, repo="acme/apps", blocked_by=[("acme/apps", 81)])]
+Linear.store = store = Store()
+env_cased, _ = fake_gh(world_for(CASED))
+run_repo(env_cased, "Acme/Apps", "--issues", "81")
+code, out, err = run_repo(env_cased, "acme/apps", "--issues", "82")
+check("a link inside one repository is made when its two sides were copied with the name typed in two cases",
+      code == 0 and len(store.issues) == 2 and len(store.relations) == 1 and "Links not made" not in out,
+      out + err + str(store.relations))
 
 # More links than one page holds: the copy stops before writing, never drops a link without a word.
 Linear.store = store = Store()
