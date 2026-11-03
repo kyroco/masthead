@@ -473,6 +473,72 @@ check("an edited same-titled issue finds its own copy and posts nothing on the o
       code == 0 and len(store.issues) == 2 and len(store.comments) == 2,
       out + err + str([(i["description"], comments_on(store, i)) for i in store.issues]))
 
+# Each copy carries its GitHub issue number in a hidden line, and a rerun finds copies only by it
+# (Robert, November 3: "yeah I think putting the issue number is really simple, that's fine").
+Linear.store = store = Store()
+env17, _ = fake_gh(world_for(LOGIN))
+run(env17, plan=plan)
+login = by_title(store, "Fix login")
+check("a copy's body ends with a hidden line naming its GitHub issue",
+      login and login[0]["description"] == "Login fails.\n\n<!-- copied from GitHub acme/site#51 -->",
+      login and login[0]["description"])
+
+# The round-2 cases: same-titled issues edited or closed between runs keep their own copies and comments.
+Linear.store = store = Store()
+env18, _ = fake_gh(world_for(PAIR))
+run(env18, "--issues", "5", plan=plan)
+env19, _ = fake_gh(world_for([dict(PAIR[0], body="Footer five, edited."), PAIR[1]]))
+code, out, err = run(env19, "--issues", "6", plan=plan)
+six = [i for i in store.issues if "acme/site#6 " in i["description"]]
+five = [i for i in store.issues if "acme/site#5 " in i["description"]]
+check("an issue copied after its same-titled neighbor was edited gets its own copy",
+      code == 0 and len(six) == 1 and len(five) == 1, out + err + str([i["description"] for i in store.issues]))
+check("and its comment is on its own copy only",
+      five and six and [c.split("\n\n", 1)[1] for c in comments_on(store, five[0])] == ["Five's note."]
+      and [c.split("\n\n", 1)[1] for c in comments_on(store, six[0])] == ["Six's note."],
+      [(i["description"], comments_on(store, i)) for i in store.issues])
+Linear.store = store = Store()
+env20, _ = fake_gh(world_for(PAIR))
+run(env20, plan=plan)
+env21, _ = fake_gh(world_for([dict(PAIR[0], state="CLOSED"), dict(PAIR[1], body="Footer six, edited.")]))
+code, out, err = run(env21, plan=plan)
+check("closing one same-titled issue and editing the other leaves each copy and comment where it was",
+      code == 0 and len(store.issues) == 2 and len(store.comments) == 2
+      and all(len(comments_on(store, i)) == 1 for i in store.issues),
+      [(i["description"], comments_on(store, i)) for i in store.issues])
+
+# A copy whose hidden line is gone is not matched: the issue is imported a second time
+# (Robert, November 3: "if the issue number is not there just import a second time").
+Linear.store = store = Store()
+env22, _ = fake_gh(world_for(LOGIN))
+run(env22, plan=plan)
+for i in store.issues:
+    i["description"] = "Login fails."
+code, out, err = run(env22, plan=plan)
+check("a copy without its hidden line is imported a second time", code == 0 and len(store.issues) == 2, out + err)
+
+# The copy refuses a repository or project other than the one in the plan (Robert, November 3: "yes").
+Linear.store = store = Store()
+for name, extra in (("another repository", ["--repo", "acme/apps"]), ("another project", ["--project", "8"])):
+    args = [sys.executable, SCRIPT, "copy", "--repo", "acme/site", "--project", "7", "--team", "WEB",
+            "--key-env", "MY_LINEAR_KEY", "--plan", save_plan(tmp)]
+    where = args.index(extra[0])
+    args[where + 1] = extra[1]
+    result = subprocess.run(args, env=env, capture_output=True, text=True, timeout=60)
+    check("copy refuses {} than the plan names, before any read or write".format(name),
+          result.returncode != 0 and not store.writes and "plan" in result.stderr, result.stdout + result.stderr)
+code, out, err = run(env, plan=save_plan(tmp, source="acme/site"))
+check("copy refuses a plan whose source names no project", code != 0 and not store.writes, out + err)
+code, out, err = run(env, plan=save_plan(tmp, source="github:acme/site#7", target="linear:WEB"))
+check("copy reads a plan written as github:<owner>/<repo>#<project> and linear:<TEAM>", code == 0, out + err)
+
+# The copy needs a key: a plan through the connector is refused and says so (Robert, November 3:
+# "don't use a connector for this, require a key").
+code, out, err = run(env, plan=save_plan(tmp, access={"kind": "connector"}))
+check("a connector plan is refused for the copy, saying a key is needed",
+      code != 0 and "API key" in err, out + err)
+plan = save_plan(tmp)
+
 # --- What is copied can be cut to one milestone or to issue numbers.
 
 Linear.store = store = Store()
