@@ -344,9 +344,14 @@ def linear_project(key, name):
 def name_from(path):
     """A Linear project's name, from the file the session wrote it to with its file tool. The name is
     written by whoever can edit the Linear project, so it is never typed into a shell command, where a
-    quote or a semicolon in it would run as a command. Only the line end the file ends with is dropped."""
+    quote or a semicolon in it would run as a command. Only the line end the file ends with is dropped.
+    Never through a link: a repository could ship one at the name file's path that points at another of
+    the person's files, whose text would then go to Linear and into the plan."""
+    if os.path.islink(path):
+        fail("The name file {} is a link, so it was not read. Remove it, write the Linear project's name "
+             "there with your file tool, and run this again. Nothing was written.".format(path))
     try:
-        with open(path, encoding="utf-8") as handle:
+        with os.fdopen(os.open(path, os.O_RDONLY | os.O_NOFOLLOW), encoding="utf-8") as handle:
             name = handle.read(4096)
     except (OSError, UnicodeDecodeError) as error:
         fail("The name file {} could not be read ({}). Nothing was written.".format(

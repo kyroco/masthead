@@ -96,7 +96,9 @@ typed into one. So never type the name into a command, and never use
 `--project` or `--source` for it: whichever way the person reaches Linear,
 write the name, exactly as Linear shows it, on one line of
 `.claude/state/migration-project.txt` with your file tool, never the shell.
-Steps 3, 4 and 7 pass that file as `<file>`. When the person names issues by
+When that path is already a link, do not write through it: tell the person,
+who removes it first. Steps 3, 4 and 7 pass that file as `<file>`, and the
+script refuses one that is a link. When the person names issues by
 key instead, there is no name to write.
 
 Then read the source the way the person chose to reach Linear:
