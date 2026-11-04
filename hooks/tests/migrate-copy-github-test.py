@@ -209,6 +209,8 @@ ISSUES = {i["identifier"]: i for i in [
     issue("WEB-8", "Triage", "triage", "Build", WEB_REF),
     issue("FL-1", "Backlog", "backlog", None, FLAT_REF),
     issue("FL-2", "In Progress", "started", None, FLAT_REF),
+    issue("NP-1", "Todo", "unstarted", None, None),
+    issue("NP-2", "Needs Human", "started", None, None),
 ]}
 
 
@@ -388,6 +390,14 @@ env, tmp = fake_gh()
 code, out, err = run(env, save_plan(tmp, source="WEB-2 WEB-4"), issues=["WEB-2", "web-4"])
 check("issues named by key are copied, and only those",
       code == 0 and sorted(by_title(env)) == ["Do WEB-2", "Do WEB-4"], out + err)
+env, tmp = fake_gh()
+code, out, err = run(env, save_plan(tmp, source="NP-1 NP-2"), issues=["NP-1", "NP-2"])
+check("an issue in no Linear project is said to have no Status, never one it was not given (round 1 fix s3-F1)",
+      code == 0 and "NP-1 became #100: no project, no milestone, Status empty" in out
+      and "NP-2 became #101: no project, no milestone, Status empty, needs-decision" in out
+      and world(env)["statuses"] == [], out + err)
+check("a Needs Human issue in no project still carries the needs-decision label",
+      [i.get("labels") for i in world(env)["issues"]] == [None, ["needs-decision"]], world(env)["issues"])
 env, tmp = fake_gh()
 code, out, err = run(env, save_plan(tmp, source="WEB-2"), issues=["WEB-2", "web-2"])
 check("a key named twice, in any case, is copied once (round 1 fix s1-F2)",
