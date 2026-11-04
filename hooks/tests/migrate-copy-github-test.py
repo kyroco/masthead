@@ -76,10 +76,41 @@ if args[:2] == ["project", "field-list"]:
 if args[:2] == ["api", "graphql"]:
     fields = dict(a.split("=", 1) for a in args if "=" in a and not a.startswith("-"))
     if "addProjectV2ItemById" in fields["query"]:
-        item = "ITEM_{}".format(len(world["items"]) + 1)
-        world["items"].append({"id": item, "project": fields["project"], "content": fields["content"]})
-        save()
-        print(json.dumps({"data": {"addProjectV2ItemById": {"item": {"id": item}}}}))
+        # GitHub hands back the item already there when the issue is in the project.
+        same = [i for i in world["items"] if i["project"] == fields["project"] and i["content"] == fields["content"]]
+        if same:
+            item = same[0]["id"]
+        else:
+            item = "ITEM_{}".format(len(world["items"]) + 1)
+            world["items"].append({"id": item, "project": fields["project"], "content": fields["content"]})
+            save()
+        status = [s["option"] for s in world["statuses"] if s["item"] == item]
+        print(json.dumps({"data": {"addProjectV2ItemById": {"item": {
+            "id": item, "fieldValueByName": {"name": status[-1]} if status else None}}}}))
+        sys.exit(0)
+    if "issues(first" in fields["query"]:
+        nodes = [{"number": i["number"], "databaseId": 5000 + i["number"], "id": i["node_id"], "body": i.get("body"),
+                  "author": {"login": i.get("author", "robert-runner")} if i.get("author", "robert-runner") else None}
+                 for i in world["issues"]]
+        print(json.dumps({"data": {"repository": {"issues": {
+            "pageInfo": {"hasNextPage": False, "endCursor": None}, "nodes": nodes}}}}))
+        sys.exit(0)
+    if "issue(number" in fields["query"]:
+        number = int(fields["number"])
+        found = [i for i in world["issues"] if i["number"] == number]
+        if not found:
+            print(json.dumps({"data": {"repository": {"issue": None}}}))
+            sys.exit(0)
+        i = found[0]
+        parent = world["parents"].get(str(number))
+        print(json.dumps({"data": {"repository": {"issue": {
+            "title": i.get("title"), "body": i.get("body"),
+            "parent": {"number": parent, "repository": {"nameWithOwner": "acme/site"}} if parent else None,
+            "blockedBy": {"pageInfo": {"hasNextPage": False}, "nodes": [
+                {"number": b, "repository": {"nameWithOwner": "acme/site"}}
+                for b, w in world["blocked"] if w == number]},
+            "comments": {"pageInfo": {"hasNextPage": False, "endCursor": None},
+                         "nodes": [{"body": c} for c in i["comments"]]}}}}}))
         sys.exit(0)
     if "updateProjectV2ItemFieldValue" in fields["query"]:
         world["statuses"].append({k: fields[k] for k in ("project", "item", "field", "option")})
@@ -87,6 +118,9 @@ if args[:2] == ["api", "graphql"]:
         print(json.dumps({"data": {"updateProjectV2ItemFieldValue": {"projectV2Item": {"id": fields["item"]}}}}))
         sys.exit(0)
     sys.exit(4)
+if args[:2] == ["api", "user"]:
+    print(json.dumps({"login": "Robert-Runner"}))
+    sys.exit(0)
 if args[:1] == ["api"] and args[1].startswith("repos/"):
     where = args[1].split("?")[0]
     post = "POST" in args
@@ -107,7 +141,17 @@ if args[:1] == ["api"] and args[1].startswith("repos/"):
         number = 100 + len(world["issues"])
         world["issues"].append(dict(sent, number=number, node_id="I_{}".format(number), comments=[]))
         save()
-        print(json.dumps({"number": number, "node_id": "I_{}".format(number)}))
+        print(json.dumps({"number": number, "node_id": "I_{}".format(number), "id": 5000 + number}))
+        sys.exit(0)
+    if where.endswith("/sub_issues") and post:
+        world["parents"][str(sent["sub_issue_id"] - 5000)] = int(where.split("/")[-2])
+        save()
+        print(json.dumps({"id": 1}))
+        sys.exit(0)
+    if where.endswith("/dependencies/blocked_by") and post:
+        world["blocked"].append([sent["issue_id"] - 5000, int(where.split("/")[-3])])
+        save()
+        print(json.dumps({"id": 1}))
         sys.exit(0)
     if where.endswith("/comments") and post:
         number = int(where.split("/")[-2])
@@ -151,7 +195,8 @@ def fake_gh(milestones=MILESTONES, fields=None, refuse=(), project_list=None):
         json.dump({"projects": projects() if project_list is None else project_list,
                    "fields": fields or {"3": status_field(), "4": status_field()},
                    "milestones": list(milestones), "labels": [{"name": "bug", "color": "d73a4a"}],
-                   "issues": [], "items": [], "statuses": [], "refuse": list(refuse)}, handle)
+                   "issues": [], "items": [], "statuses": [], "parents": {}, "blocked": [],
+                   "refuse": list(refuse)}, handle)
     env = dict(os.environ)
     env["PATH"] = bindir + os.pathsep + env.get("PATH", "")
     env["FAKE_GH_LOG"] = os.path.join(tmp, "log")
@@ -178,8 +223,17 @@ def ms(name, order):
     return {"name": name, "sortOrder": order, "description": ""}
 
 
-def issue(identifier, state, kind, milestone, project, title=None, description="", labels=(), comments=()):
-    return {"identifier": identifier, "title": title or "Do " + identifier, "description": description,
+def issue(identifier, state, kind, milestone, project, title=None, description="", labels=(), comments=(),
+          parent=None, children=(), blocks=(), blocked_by=(), related=()):
+    def page(nodes):
+        return {"pageInfo": {"hasNextPage": False}, "nodes": list(nodes)}
+    return {"id": "uuid-" + identifier, "team": {"id": "team-" + identifier.split("-")[0]},
+            "parent": {"identifier": parent} if parent else None,
+            "children": page({"identifier": c} for c in children),
+            "relations": page([{"type": "blocks", "relatedIssue": {"identifier": k}} for k in blocks]
+                              + [{"type": "related", "relatedIssue": {"identifier": k}} for k in related]),
+            "inverseRelations": page({"type": "blocks", "issue": {"identifier": k}} for k in blocked_by),
+            "identifier": identifier, "title": title or "Do " + identifier, "description": description,
             "state": {"name": state, "type": kind}, "labels": {"nodes": [{"name": n, "color": c} for n, c in labels]},
             "projectMilestone": {"name": milestone} if milestone else None, "project": project,
             "comments": list(comments)}
@@ -200,11 +254,12 @@ ISSUES = {i["identifier"]: i for i in [
           labels=[("Bug", "#eb5757"), ("Feature", "#bb87fc")],
           comments=[comment("Second thought.", "2026-11-03T18:27:00.000Z", user="Robert Sfeir"),
                     comment("First thought.", "2026-11-03T12:10:15.715Z", user="Robert Sfeir"),
-                    comment("Linked a pull request.", "2026-11-03T19:00:00.000Z", bot="GitHub")]),
-    issue("WEB-2", "Todo", "unstarted", "Launch", WEB_REF),
-    issue("WEB-3", "Done", "completed", "Launch", WEB_REF),
-    issue("WEB-4", "In Progress", "started", None, WEB_REF),
-    issue("WEB-6", "In Review", "started", "3. Polish", WEB_REF),
+                    comment("Linked a pull request.", "2026-11-03T19:00:00.000Z", bot="GitHub")],
+          children=["WEB-2"], related=["WEB-7"]),
+    issue("WEB-2", "Todo", "unstarted", "Launch", WEB_REF, parent="WEB-1"),
+    issue("WEB-3", "Done", "completed", "Launch", WEB_REF, blocks=["WEB-6"]),
+    issue("WEB-4", "In Progress", "started", None, WEB_REF, blocks=["WEB-6"]),
+    issue("WEB-6", "In Review", "started", "3. Polish", WEB_REF, blocked_by=["WEB-4", "WEB-3"]),
     issue("WEB-7", "Needs Human", "started", "Build", WEB_REF),
     issue("WEB-8", "Triage", "triage", "Build", WEB_REF),
     issue("FL-1", "Backlog", "backlog", None, FLAT_REF),
@@ -223,13 +278,24 @@ class Linear(http.server.BaseHTTPRequestHandler):
     projects = [linear_project("Website relaunch", WEB_REF, ["WEB-1", "WEB-2", "WEB-3", "WEB-4", "WEB-6", "WEB-7", "WEB-8"]),
                 linear_project("Flat work", FLAT_REF, ["FL-1", "FL-2"])]
     seen = []
+    updates = []
+    states = {"team-WEB": [{"id": "st-todo", "name": "Todo", "type": "unstarted"},
+                           {"id": "st-dup", "name": "Duplicate", "type": "canceled"},
+                           {"id": "st-cancel", "name": "Canceled", "type": "canceled"}],
+              "team-FL": [{"id": "st-fl-cancel", "name": "Canceled", "type": "canceled"}],
+              "team-NP": [{"id": "st-np-todo", "name": "Todo", "type": "unstarted"}]}
 
     def do_POST(self):
         body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
         Linear.seen.append(body["query"])
         query, v = body["query"], body.get("variables") or {}
-        if query.lstrip().startswith("mutation"):
-            payload = {"errors": [{"message": "no writes to Linear"}]}
+        if query.lstrip().startswith("mutation") and "issueUpdate" in query:
+            Linear.updates.append(v)
+            payload = {"data": {"issueUpdate": {"success": True, "issue": {"id": v["id"]}}}}
+        elif query.lstrip().startswith("mutation"):
+            payload = {"errors": [{"message": "no other writes to Linear"}]}
+        elif "team(id" in query:
+            payload = {"data": {"team": {"states": {"nodes": Linear.states.get(v["id"], [])}}}}
         elif "projects(" in query:
             payload = {"data": {"projects": {"nodes": [
                 {k: val for k, val in p.items() if k != "keys"} for p in Linear.projects if p["name"] == v["name"]]}}}
@@ -435,7 +501,8 @@ env, tmp = fake_gh(refuse=["addProjectV2ItemById"])
 code, out, err = run(env, save_plan(tmp))
 check("a refusal partway stops the copy and names what it made",
       code != 0 and "WEB-1 as #100" in err and len(world(env)["issues"]) == 1, out + err)
-check("a refusal partway says a second run would copy those again", "second time" in err, err)
+check("a refusal partway says to run it again, since nothing is copied twice",
+      "nothing is copied twice" in err and "second time" not in err, err)
 
 # --- Nothing is written without the person's yes to this move.
 
@@ -451,6 +518,234 @@ for name, plan_path in (
     open(env["FAKE_GH_LOG"], "w").close()
     code, out, err = run(env, plan_path)
     check("copy-to-github refuses {} and writes nothing".format(name), code != 0 and writes(env) == [], out + err)
+
+# ---------------------------------------------------------------- MAST-13
+
+def finish(env, plan, project="Website relaunch", repo="acme/site", issues=None):
+    args = [sys.executable, SCRIPT, "finish-to-github", "--repo", repo, "--key-env", "MY_LINEAR_KEY", "--plan", plan]
+    if issues:
+        args += ["--issues"] + list(issues)
+    else:
+        name_file = os.path.join(os.path.dirname(plan), "project-name.txt")
+        with open(name_file, "w") as handle:
+            handle.write(project + "\n")
+        args += ["--project-file", name_file]
+    result = subprocess.run(args, env=env, capture_output=True, text=True, timeout=60)
+    return result.returncode, result.stdout, result.stderr
+
+
+def number_of(env, key):
+    found = [i["number"] for i in world(env)["issues"]
+             if (i.get("body") or "").splitlines()[-1:] == ["<!-- copied from Linear {} -->".format(key)]]
+    return found[0] if len(found) == 1 else found
+
+
+def link_writes(env):
+    return [a for a in writes(env) if any(x.endswith(("/sub_issues", "/blocked_by")) for x in a)]
+
+
+def linear_writes():
+    return [q for q in Linear.seen if q.lstrip().startswith("mutation")]
+
+
+def edit_world(env, change):
+    w = world(env)
+    change(w)
+    json.dump(w, open(env["FAKE_GH_WORLD"], "w"))
+
+
+def copy_of(w, number):
+    return [i for i in w["issues"] if i["number"] == number][0]
+
+
+# --- MAST-13 scenario 1: parent and sub-issue, and blocked-by, links hold between the new GitHub issues.
+
+env, tmp = fake_gh()
+code, out, err = run(env, save_plan(tmp))
+check("links: the copy runs", code == 0, out + err)
+check("a Linear sub-issue's copy is a sub-issue of its parent's copy on GitHub",
+      world(env)["parents"] == {str(number_of(env, "WEB-2")): number_of(env, "WEB-1")}, world(env)["parents"])
+check("a Linear blocked-by link holds between the GitHub copies",
+      world(env)["blocked"] == [[number_of(env, "WEB-4"), number_of(env, "WEB-6")]], world(env)["blocked"])
+check("each link is made once, though both of its issues name it", len(link_writes(env)) == 2, link_writes(env))
+check("a link whose other side was not copied is named, not made",
+      "WEB-3 blocks WEB-6" in out and "Links made now: 1 parent link, 1 blocked-by link." in out, out)
+check("a related link, which GitHub does not hold, is not made",
+      "WEB-7" not in json.dumps(link_writes(env)), link_writes(env))
+
+# A link to an issue an earlier run copied is made once its other side is copied.
+env, tmp = fake_gh()
+run(env, save_plan(tmp, source="WEB-2"), issues=["WEB-2"])
+check("a run that copies only the sub-issue makes no parent link", world(env)["parents"] == {}, world(env)["parents"])
+code, out, err = run(env, save_plan(tmp, source="WEB-1"), issues=["WEB-1"])
+check("copying the parent later links it to the copy an earlier run made",
+      code == 0 and world(env)["parents"] == {str(number_of(env, "WEB-2")): number_of(env, "WEB-1")},
+      out + err + json.dumps(world(env)["parents"]))
+
+# --- MAST-13 scenario 3: the same migration run twice copies no issue twice.
+
+env, tmp = fake_gh()
+plan = save_plan(tmp)
+run(env, plan)
+first = world(env)
+web1 = number_of(env, "WEB-1")
+item = [i for i in first["items"] if i["content"] == "I_{}".format(web1)][0]
+edit_world(env, lambda w: w["statuses"].append(
+    {"project": "PVT_web", "item": item["id"], "field": "FIELD_STATUS", "option": "OPT_Done"}))
+open(env["FAKE_GH_LOG"], "w").close()
+code, out, err = run(env, plan)
+again = world(env)
+check("a second run succeeds", code == 0, out + err)
+check("a second run copies no issue twice", len(again["issues"]) == 6, [i["title"] for i in again["issues"]])
+check("a second run posts no comment twice",
+      copy_of(again, web1)["comments"] == copy_of(first, web1)["comments"], copy_of(again, web1))
+check("a second run makes no label, issue, comment or link", [a for a in writes(env) if "POST" in a] == [],
+      writes(env))
+check("a second run leaves alone a Status the person changed on GitHub",
+      [s["option"] for s in again["statuses"] if s["item"] == item["id"]][-1] == "OPT_Done", again["statuses"])
+check("a second run says what it found already on GitHub",
+      "Already on GitHub, so not made again: 6 issues." in out and "WEB-1 was already #{}".format(web1) in out, out)
+
+# A run stopped partway is finished by the next run, and nothing is made twice.
+env, tmp = fake_gh(refuse=["addProjectV2ItemById"])
+plan = save_plan(tmp)
+run(env, plan)
+edit_world(env, lambda w: w.update(refuse=[]))
+code, out, err = run(env, plan)
+made = by_title(env)
+check("the run after a stop copies the rest and nothing twice", code == 0 and len(world(env)["issues"]) == 6, out + err)
+check("the issue made before the stop joins the project, with its Status, on the next run",
+      item_of(env, made["Build the home page"]) and status_of(env, made["Build the home page"]) == "OPT_Backlog",
+      world(env))
+
+# A comment missing from an earlier copy is posted, once; the others are not posted again.
+env, tmp = fake_gh()
+plan = save_plan(tmp)
+run(env, plan)
+web1 = number_of(env, "WEB-1")
+edit_world(env, lambda w: copy_of(w, web1).update(comments=copy_of(w, web1)["comments"][:1]))
+code, out, err = run(env, plan)
+comments = copy_of(world(env), web1)["comments"]
+check("a comment missing from an earlier copy is posted once, and no other again",
+      code == 0 and len(comments) == 3 and len(set(comments)) == 3, comments)
+check("the Linear text's own hidden line (KOR-9) is never taken for a copy", number_of(env, "KOR-9") == [],
+      world(env)["issues"])
+
+# Text added below a copy's hidden line on GitHub, as /work-on's design sheet does, still finds the copy
+# (round 1 fix rerun-F1).
+env, tmp = fake_gh()
+plan = save_plan(tmp)
+run(env, plan)
+web2 = number_of(env, "WEB-2")
+edit_world(env, lambda w: copy_of(w, web2).update(body=copy_of(w, web2)["body"] + "\n\n## Sheet\n\nThe plan."))
+code, out, err = run(env, plan)
+check("a copy with text added below its hidden line is found, and not copied again (round 1 fix rerun-F1)",
+      code == 0 and len(world(env)["issues"]) == 6 and "WEB-2 was already #{}".format(web2) in out, out + err)
+
+# A hidden line on an issue another account wrote is never taken for a copy: the run stops before any
+# write and names it (Robert, November 4: "yes", round 1 fix sec-F1).
+PLANTED = {"number": 77, "node_id": "I_77", "title": "Do WEB-2", "comments": [], "author": "stranger",
+           "body": "Looks like a copy.\n\n<!-- copied from Linear WEB-2 -->"}
+for who, planted in (("another account", PLANTED), ("a deleted account", dict(PLANTED, author=None))):
+    env, tmp = fake_gh()
+    plan = save_plan(tmp)
+    edit_world(env, lambda w: w["issues"].append(dict(planted)))
+    Linear.updates = []
+    code, out, err = run(env, plan)
+    check("a hidden line on an issue by {} stops the copy before any write, naming it (round 1 fix sec-F1)".format(who),
+          code != 0 and writes(env) == [] and "#77" in err and "WEB-2" in err, out + err)
+    code, out, err = finish(env, plan)
+    check("a hidden line on an issue by {} stops finish before it cancels anything (round 1 fix sec-F1)".format(who),
+          code != 0 and Linear.updates == [] and "#77" in err, out + err)
+env, tmp = fake_gh()
+plan = save_plan(tmp)
+run(env, plan)
+code, out, err = run(env, plan)
+check("copies written by the account running the move are found, whatever the case of its login (round 1 fix sec-F1)",
+      code == 0 and len(world(env)["issues"]) == 6, out + err)
+
+# --- MAST-13 scenario 2: a finished migration is checked; each copied Linear issue is canceled,
+# nothing in Linear is deleted, and nothing ties it to its GitHub copy.
+
+env, tmp = fake_gh()
+plan = save_plan(tmp)
+run(env, plan)
+open(env["FAKE_GH_LOG"], "w").close()
+Linear.seen, Linear.updates = [], []
+code, out, err = finish(env, plan)
+check("finish runs", code == 0, out + err)
+check("finish prints the counts on both sides, and that they match",
+      "Linear: 6 issues, 3 comments." in out and "GitHub: 6 of them copied, 3 of those comments." in out
+      and "The counts match." in out, out)
+check("each copied Linear issue is canceled",
+      sorted(u["id"] for u in Linear.updates)
+      == sorted("uuid-" + k for k in ("WEB-1", "WEB-2", "WEB-4", "WEB-6", "WEB-7", "WEB-8"))
+      and all(u["input"] == {"stateId": "st-cancel"} for u in Linear.updates), Linear.updates)
+check("finish deletes nothing in Linear and posts nothing there: its only writes are the cancels",
+      len(linear_writes()) == 6 and all("issueUpdate" in q and "Delete" not in q and "Archive" not in q
+                                        and "comment" not in q.lower() for q in linear_writes()), linear_writes())
+check("finish writes nothing to GitHub", writes(env) == [], writes(env))
+check("finish says nothing was deleted and nothing in Linear names its copy",
+      "Nothing in Linear was deleted, and nothing in Linear names its GitHub copy." in out, out)
+check("finish keeps the key out of what it prints", KEY not in out + err)
+
+# An issue whose copy does not match stays open in Linear and is named.
+env, tmp = fake_gh()
+plan = save_plan(tmp)
+run(env, plan)
+numbers = {k: number_of(env, k) for k in ("WEB-1", "WEB-2", "WEB-4")}
+
+
+def spoil(w):
+    copy_of(w, numbers["WEB-1"])["comments"] = copy_of(w, numbers["WEB-1"])["comments"][:2]
+    copy_of(w, numbers["WEB-2"])["title"] = "Renamed on GitHub"
+    copy_of(w, numbers["WEB-4"])["body"] = "Other words.\n\n<!-- copied from Linear WEB-4 -->"
+
+
+edit_world(env, spoil)
+Linear.updates = []
+code, out, err = finish(env, plan)
+canceled = sorted(u["id"] for u in Linear.updates)
+check("finish fails while a copy does not match", code != 0, out + err)
+check("an issue whose copy is short a comment, renamed or reworded is not canceled",
+      canceled == ["uuid-WEB-6", "uuid-WEB-7", "uuid-WEB-8"], canceled)
+check("each one left open is named with why",
+      "WEB-1 has 2 of its 3 comments on GitHub" in out and "WEB-2 has another title on GitHub" in out
+      and "WEB-4 has other text on GitHub" in out and "The counts do not match yet." in out, out)
+
+# An issue with no copy stays open and is named.
+env, tmp = fake_gh()
+run(env, save_plan(tmp, source="WEB-2"), issues=["WEB-2"])
+Linear.updates = []
+code, out, err = finish(env, save_plan(tmp))
+check("an issue with no GitHub copy is not canceled, and is named",
+      code != 0 and [u["id"] for u in Linear.updates] == ["uuid-WEB-2"] and "WEB-1 has no copy on GitHub" in out,
+      out + err)
+
+# A team with no Canceled status stops finish before any write.
+env, tmp = fake_gh()
+plan = save_plan(tmp, source="NP-1 NP-2")
+run(env, plan, issues=["NP-1", "NP-2"])
+Linear.updates = []
+code, out, err = finish(env, plan, issues=["NP-1", "NP-2"])
+check("a team with no Canceled status stops finish before any write",
+      code != 0 and Linear.updates == [] and "Canceled" in err, out + err)
+
+# finish needs the person's yes to this move.
+env, tmp = fake_gh()
+run(env, save_plan(tmp))
+for name, plan_path in (("no saved plan", os.path.join(tmp, "missing.json")),
+                        ("a plan for GitHub to Linear", save_plan(tmp, direction="github-to-linear")),
+                        ("a plan for another repository", save_plan(tmp, target="acme/other"))):
+    Linear.updates = []
+    code, out, err = finish(env, plan_path)
+    check("finish refuses {} and cancels nothing".format(name), code != 0 and Linear.updates == [], out + err)
+
+text = open(SKILL).read() if os.path.exists(SKILL) else ""
+check("SKILL.md says how to finish a Linear to GitHub move",
+      "migrate.py finish-to-github --repo <owner>/<repo> --project-file <file> --key-env" in text)
+check("SKILL.md no longer says linking and finishing have not been built",
+      "have not been built yet" not in text and "copies every issue again" not in text)
 
 # --- The skill says how to run it.
 

@@ -19,6 +19,8 @@ usage:
                        [--plan <file>]
   migrate.py copy-to-github (--project-file <file> | --project <name> | --issues <KEY>...)
                             --repo <owner>/<repo> --key-env <NAME> [--plan <file>]
+  migrate.py finish-to-github (--project-file <file> | --project <name> | --issues <KEY>...)
+                              --repo <owner>/<repo> --key-env <NAME> [--plan <file>]
 
 read-github reads one repository's open issues in one of its GitHub projects
 through `gh`, and prints what they become in Linear: one Linear project with
@@ -69,7 +71,19 @@ and its time in Eastern. Each lands in its `<project>: <n>. <name>` milestone an
 in the GitHub project, with the same Status; Needs Human becomes the
 needs-decision label and Status Todo. Each copy's body ends with a hidden line
 naming its Linear key. It reads everything first and writes nothing when a
-GitHub project, milestone or Status option is missing.
+GitHub project, milestone or Status option is missing. Run it again and nothing
+is copied twice: an issue whose copy carries that line is not made again, only
+the comments the copy lacks are posted, and a Status already set is kept. Last,
+the parent and blocked-by links Linear holds between two issues that both have
+a copy are made between the copies, each once; a link whose other side has no
+copy is named, not made.
+
+finish-to-github runs after copy-to-github, under the same plan. It counts the
+chosen open Linear issues and their comments and their GitHub copies, then
+cancels in Linear each issue whose copy holds the same title, body and every
+comment. It posts no comment, deletes nothing and writes nothing to GitHub, so
+nothing in Linear names the GitHub copy. An issue whose copy is missing or does
+not match stays open and is named.
 
 A Linear project's name is written by whoever can edit the project, so the
 skill passes it in a file (--project-file, --source-file), never typed into a
@@ -1238,16 +1252,25 @@ def structure(args):
 
 # ---------------------------------------------------------------- Linear to GitHub: the issues
 
-ISSUE_FULL = """query($id:String!){ issue(id:$id){ identifier title description state{name type}
+ISSUE_FULL = """query($id:String!){ issue(id:$id){ id identifier title description state{name type} team{id}
   labels(first:100){nodes{name color}} projectMilestone{name}
-  project{ name projectMilestones{ nodes{ name sortOrder } } } } }"""
+  project{ name projectMilestones{ nodes{ name sortOrder } } }
+  parent{ identifier }
+  children(first:100){ pageInfo{hasNextPage} nodes{ identifier } }
+  relations(first:100){ pageInfo{hasNextPage} nodes{ type relatedIssue{ identifier } } }
+  inverseRelations(first:100){ pageInfo{hasNextPage} nodes{ type issue{ identifier } } } } }"""
+
+LINEAR_LINK_FIELDS = {"children": "sub-issues", "relations": "links from it", "inverseRelations": "links to it"}
 
 ISSUE_COMMENTS = """query($id:String!,$after:String){ issue(id:$id){
   comments(first:100, after:$after){ pageInfo{hasNextPage endCursor}
     nodes{ body createdAt user{name} botActor{name} } } } }"""
 
+# GitHub hands back the item already there when the issue is in the project, with its Status, so a
+# second run adds nothing and leaves a Status the person changed as it is.
 ADD_ITEM = """mutation($project:ID!,$content:ID!){
-  addProjectV2ItemById(input:{projectId:$project, contentId:$content}){ item{ id } } }"""
+  addProjectV2ItemById(input:{projectId:$project, contentId:$content}){ item{ id
+    fieldValueByName(name:"Status"){ ... on ProjectV2ItemFieldSingleSelectValue{ name } } } } }"""
 
 SET_STATUS = """mutation($project:ID!,$item:ID!,$field:ID!,$option:String!){
   updateProjectV2ItemFieldValue(input:{projectId:$project, itemId:$item, fieldId:$field,
@@ -1282,6 +1305,10 @@ def read_linear_issue(key, wanted):
     node = linear(key, ISSUE_FULL, {"id": wanted}).get("issue")
     if not node:
         fail("No Linear issue {} that this key can see. Nothing was written.".format(shown(wanted)), 1)
+    for field, name in LINEAR_LINK_FIELDS.items():
+        if ((node.get(field) or {}).get("pageInfo") or {}).get("hasNextPage"):
+            fail("Linear issue {} has more than 100 {}, more than one read holds, so a link would be lost. "
+                 "Nothing was written.".format(shown(node["identifier"]), name), 1)
     node = dict(node)
     node["comments"] = sorted(every_page(key, ISSUE_COMMENTS, {"id": node["identifier"]}, ("issue", "comments")),
                               key=lambda c: c["createdAt"])
@@ -1312,9 +1339,170 @@ def label_color(color):
     return color.lower() if re.fullmatch(r"[0-9A-Fa-f]{6}", color) else "ededed"
 
 
-def copy_to_github(args):
-    """Copy each open Linear issue to GitHub: one issue each, with its title, body, labels and every comment,
-    in its milestone and GitHub project with the same Status. Writes nothing to Linear."""
+GH_COPIES = """query($owner:String!,$name:String!,$after:String){ repository(owner:$owner,name:$name){
+  issues(first:100, after:$after, states:[OPEN,CLOSED], orderBy:{field:CREATED_AT, direction:ASC}){
+    pageInfo{hasNextPage endCursor} nodes{ number databaseId id body author{ login } } } } }"""
+
+GH_ISSUE = """query($owner:String!,$name:String!,$number:Int!,$after:String){ repository(owner:$owner,name:$name){
+  issue(number:$number){ title body parent{ number repository{nameWithOwner} }
+    blockedBy(first:100){ pageInfo{hasNextPage} nodes{ number repository{nameWithOwner} } }
+    comments(first:100, after:$after){ pageInfo{hasNextPage endCursor} nodes{ body } } } } }"""
+
+
+def copied_from_linear(body):
+    """The Linear key a GitHub copy's hidden line names, or None when the line is gone. The line counts on
+    any line of its own, since text is often added below it on GitHub (a design sheet, a person's note);
+    the copy turned every such line in the Linear text into one no run reads, so only its own is found.
+    When there are several, the last one counts."""
+    found = re.findall(r"^\s*<!-- copied from Linear ([A-Za-z][A-Za-z0-9]*-\d+) -->\s*$", body or "", re.M)
+    return found[-1].upper() if found else None
+
+
+def github_copies(repo):
+    """Every issue of repo, open or closed, that a copy from Linear made, by its Linear key: found by its
+    hidden line, on an issue the account running this move wrote, the earliest winning. Or stop, since a
+    copy not found would be made again. Anyone who can file an issue can write the hidden line, so one on
+    an issue any other account wrote (Robert, November 4: "yes") stops the run before any write, named:
+    taken for the copy, it would get the Linear comments, and finish would cancel the Linear issue."""
+    owner, name = repo.split("/", 1)
+    me = ((gh_json("api", "user") or {}).get("login") or "").lower()
+    if not me:
+        fail("gh cannot say which GitHub account is running this, so the copies it made cannot be told from "
+             "others. Check `gh auth status`. Nothing was written.", 1)
+    found, strangers, after = {}, [], None
+    while True:
+        page = ((gh_graphql(GH_COPIES, owner=owner, name=name, after=after) or {}).get("repository")
+                or {}).get("issues")
+        if not page:
+            fail("gh cannot read the issues of {}, so the copies an earlier run made cannot be found. "
+                 "Nothing was written.".format(repo), 1)
+        for node in page["nodes"]:
+            key = copied_from_linear(node.get("body"))
+            if not key:
+                continue
+            author = ((node.get("author") or {}).get("login") or "")
+            if author.lower() != me:
+                strangers.append("#{} (names {}, written by {})".format(
+                    node["number"], shown(key), shown(author) if author else "a deleted account"))
+            elif key not in found:
+                found[key] = {"number": node["number"], "databaseId": node.get("databaseId"), "id": node.get("id")}
+        if not page["pageInfo"]["hasNextPage"]:
+            break
+        after = page["pageInfo"]["endCursor"]
+    if strangers:
+        fail("These issues of {} carry the hidden line a copy from Linear carries, but another account than {}, "
+             "which is running this move, wrote them: {}. Anyone who can file an issue can write that line, so "
+             "they are not taken for copies. Check each on GitHub: remove the line from one that is not a copy, "
+             "or run the move from the account that made it. Nothing was written.".format(
+                 repo, shown(me), "; ".join(strangers)), 1)
+    return found
+
+
+def github_issue(repo, number):
+    """One GitHub issue's title, body, parent, blocked-by links and every comment's text, or None."""
+    owner, name = repo.split("/", 1)
+    issue, comments, after = None, [], None
+    while True:
+        page = ((gh_graphql(GH_ISSUE, owner=owner, name=name, number=number, after=after) or {}).get("repository")
+                or {}).get("issue")
+        if not page:
+            return None
+        issue = issue or page
+        comments += [c.get("body") or "" for c in page["comments"]["nodes"]]
+        if not page["comments"]["pageInfo"]["hasNextPage"]:
+            break
+        after = page["comments"]["pageInfo"]["endCursor"]
+    issue = dict(issue)
+    issue["comments"] = comments
+    return issue
+
+
+def linear_links(issues):
+    """The parent and blocked-by links Linear holds for these issues, by key: parents as (sub-issue,
+    parent), blocks as (blocker, the issue that waits). Read from both ends, so a link is found whichever
+    of its two issues a run copies. A related or duplicate link is not one GitHub holds, and is left."""
+    def nodes(issue, field):
+        return (issue.get(field) or {}).get("nodes") or []
+
+    parents, blocks = set(), set()
+    for issue in issues:
+        me = issue["identifier"].upper()
+        if issue.get("parent"):
+            parents.add((me, issue["parent"]["identifier"].upper()))
+        parents.update((child["identifier"].upper(), me) for child in nodes(issue, "children"))
+        blocks.update((me, r["relatedIssue"]["identifier"].upper()) for r in nodes(issue, "relations")
+                      if r.get("type") == "blocks")
+        blocks.update((r["issue"]["identifier"].upper(), me) for r in nodes(issue, "inverseRelations")
+                      if r.get("type") == "blocks")
+    return parents, blocks
+
+
+def make_github_links(repo, parents, blocks, copies, send):
+    """Make each Linear link between two issues that both have a copy in repo, once: the sub-issue's copy
+    becomes a sub-issue of the parent's copy, and the blocker's copy blocks the waiting one's. The copy may
+    come from an earlier run. A copy already under another parent on GitHub is left there. Returns the
+    lines to print."""
+    read = {}
+
+    def issue_at(number):
+        if number not in read:
+            read[number] = github_issue(repo, number)
+            if read[number] is None:
+                fail("gh cannot read #{} of {}, so its links were not checked. Run the copy again; nothing is "
+                     "copied twice.".format(number, repo), 1)
+        return read[number]
+
+    def here(node, number):
+        return (((node or {}).get("repository") or {}).get("nameWithOwner") or "").lower() == repo.lower() \
+            and node.get("number") == number
+
+    new_parents = new_blocks = 0
+    missing, kept = [], []
+    for child, parent in sorted(parents):
+        said = "{} is a sub-issue of {}".format(shown(child), shown(parent))
+        if child not in copies or parent not in copies:
+            missing.append(said)
+            continue
+        low, high = copies[child]["number"], copies[parent]["number"]
+        now = issue_at(low).get("parent")
+        if here(now, high):
+            continue
+        if now:
+            kept.append(said)
+            continue
+        send("make #{} a sub-issue of #{}".format(low, high),
+             ["api", "repos/{}/issues/{}/sub_issues".format(repo, high), "-X", "POST"],
+             {"sub_issue_id": copies[child]["databaseId"]})
+        read[low]["parent"] = {"number": high, "repository": {"nameWithOwner": repo}}
+        new_parents += 1
+    for blocker, waits in sorted(blocks):
+        if blocker not in copies or waits not in copies:
+            missing.append("{} blocks {}".format(shown(blocker), shown(waits)))
+            continue
+        first, then = copies[blocker]["number"], copies[waits]["number"]
+        held = issue_at(then)
+        nodes = (held.get("blockedBy") or {}).get("nodes") or []
+        if any(here(node, first) for node in nodes):
+            continue
+        send("mark #{} as blocked by #{}".format(then, first),
+             ["api", "repos/{}/issues/{}/dependencies/blocked_by".format(repo, then), "-X", "POST"],
+             {"issue_id": copies[blocker]["databaseId"]})
+        held["blockedBy"] = {"nodes": nodes + [{"number": first, "repository": {"nameWithOwner": repo}}]}
+        new_blocks += 1
+
+    lines = ["Links made now: {} parent link{}, {} blocked-by link{}.".format(
+        new_parents, "" if new_parents == 1 else "s", new_blocks, "" if new_blocks == 1 else "s")]
+    if missing:
+        lines.append("Links not made, because one side has no copy on GitHub (closed in Linear, or not copied "
+                     "yet): " + "; ".join(missing) + ".")
+    if kept:
+        lines.append("Left as it is, because the copy already has another parent on GitHub: " + "; ".join(kept) + ".")
+    return lines
+
+
+def chosen_linear(args):
+    """Check the arguments and the saved plan, then read every chosen Linear issue: (key, the open ones,
+    each with where it lands, and the keys of the closed ones)."""
     if not REPO.match(args.repo):
         fail("--repo takes <owner>/<repo>, such as acme/site.")
     if args.issues:
@@ -1328,9 +1516,6 @@ def copy_to_github(args):
         project_name(args)
     load_linear_plan(args.plan, args)
     key = read_key(args.key_env)
-    owner = args.repo.split("/", 1)[0]
-
-    # Read all of Linear first, then all of GitHub, so a refusal or a gap writes nothing.
     if args.issues:
         wanted, closed = args.issues, []
     else:
@@ -1344,11 +1529,21 @@ def copy_to_github(args):
             continue
         issue["landing"] = landing(issue)
         issues.append(issue)
+    return key, issues, closed
+
+
+def copy_to_github(args):
+    """Copy each open Linear issue to GitHub: one issue each, with its title, body, labels and every comment,
+    in its milestone and GitHub project with the same Status, then the links between them. Writes nothing to
+    Linear. Run it again and nothing is copied twice."""
+    key, issues, closed = chosen_linear(args)
+    owner = args.repo.split("/", 1)[0]
     if not issues:
         print(hide("No open Linear issue to copy{}. Nothing was written.".format(
             ", closed in Linear: " + ", ".join(shown(k) for k in closed) if closed else ""), key))
         return
 
+    # Read all of GitHub before writing, so a refusal or a gap writes nothing.
     listed = gh_json("project", "list", "--owner", owner, "--format", "json", "--limit", "1000")
     if listed is None:
         fail("gh cannot list the projects of {}. Check `gh auth status` has the project scope. "
@@ -1385,12 +1580,13 @@ def copy_to_github(args):
     if pages is None:
         fail("gh cannot read the labels of {}. Nothing was written.".format(args.repo), 1)
     labels = {l["name"].lower(): l["name"] for page in pages for l in page}
+    # Copies an earlier run made, open or closed, found by their hidden line only.
+    copies = github_copies(args.repo)
 
-    made, new_comments, new_labels = [], 0, 0
+    made, before, new_comments, new_labels = [], {}, 0, 0
 
     def send(what, gh_args, payload):
-        """One gh write, with payload as JSON on stdin; what GitHub sends back. Stops on a refusal,
-        naming what this run already made, since a second run copies those again."""
+        """One gh write, with payload as JSON on stdin; what GitHub sends back. Stops on a refusal."""
         result = subprocess.run(["gh"] + gh_args + ["--input", "-"], input=json.dumps(payload),
                                 capture_output=True, text=True)
         try:
@@ -1403,59 +1599,86 @@ def copy_to_github(args):
 
     def stopped(what):
         done = ", ".join("{} as #{}".format(shown(k), n) for k, n in made) or "nothing"
-        fail(hide("GitHub refused to {}. Made on GitHub before it stopped: {}. Check those on GitHub before running "
-                  "this again: a second run copies them a second time.".format(what, done), key), 1)
+        fail(hide("GitHub refused to {}. Made on GitHub before it stopped: {}. Run this again once GitHub takes "
+                  "the write: each copy is found by its hidden line, so nothing is copied twice.".format(what, done),
+                  key), 1)
 
     for issue in issues:
         ident = issue["identifier"]
         project, milestone, status, held = issue["landing"]
-        names = [l["name"] for l in (issue.get("labels") or {}).get("nodes") or []]
-        colors = {l["name"]: l.get("color") for l in (issue.get("labels") or {}).get("nodes") or []}
-        if held:
-            names.append(NEEDS_DECISION)
-        chosen = []
-        for name in names:
-            if name.lower() not in labels:
-                send('make the label "{}"'.format(shown(name)), ["api", "repos/{}/labels".format(args.repo), "-X", "POST"],
-                     {"name": name, "color": label_color(colors.get(name))})
-                labels[name.lower()] = name
-                new_labels += 1
-            if labels[name.lower()] not in chosen:
-                chosen.append(labels[name.lower()])
-        payload = {"title": issue.get("title") or "", "body": with_linear_mark(issue.get("description"), ident)}
-        if chosen:
-            payload["labels"] = chosen
-        if milestone:
-            payload["milestone"] = milestones[milestone]
-        new = send("make the GitHub issue for {}".format(shown(ident)),
-                   ["api", "repos/{}/issues".format(args.repo), "-X", "POST"], payload)
-        if not new.get("number") or not new.get("node_id"):
-            stopped("make the GitHub issue for {}".format(shown(ident)))
-        made.append((ident, new["number"]))
+        if ident in copies:
+            # Copied by an earlier run: post only the comments it is missing, and leave the rest as it is.
+            number, node_id = copies[ident]["number"], copies[ident]["id"]
+            have = github_issue(args.repo, number)
+            if have is None:
+                stopped("show #{}, the copy of {} an earlier run made".format(number, shown(ident)))
+            before[ident] = number
+            posted = collections.Counter(same_text(body) for body in have["comments"])
+        else:
+            names = [l["name"] for l in (issue.get("labels") or {}).get("nodes") or []]
+            colors = {l["name"]: l.get("color") for l in (issue.get("labels") or {}).get("nodes") or []}
+            if held:
+                names.append(NEEDS_DECISION)
+            chosen = []
+            for name in names:
+                if name.lower() not in labels:
+                    send('make the label "{}"'.format(shown(name)),
+                         ["api", "repos/{}/labels".format(args.repo), "-X", "POST"],
+                         {"name": name, "color": label_color(colors.get(name))})
+                    labels[name.lower()] = name
+                    new_labels += 1
+                if labels[name.lower()] not in chosen:
+                    chosen.append(labels[name.lower()])
+            payload = {"title": issue.get("title") or "", "body": with_linear_mark(issue.get("description"), ident)}
+            if chosen:
+                payload["labels"] = chosen
+            if milestone:
+                payload["milestone"] = milestones[milestone]
+            new = send("make the GitHub issue for {}".format(shown(ident)),
+                       ["api", "repos/{}/issues".format(args.repo), "-X", "POST"], payload)
+            if not new.get("number") or not new.get("node_id") or not new.get("id"):
+                stopped("make the GitHub issue for {}".format(shown(ident)))
+            number, node_id = new["number"], new["node_id"]
+            made.append((ident, number))
+            copies[ident] = {"number": number, "databaseId": new["id"], "id": node_id}
+            posted = collections.Counter()
+        # Counted, not just looked up: two comments with the same words are two comments, and each one
+        # already on the copy stands for one of them.
         for comment in issue["comments"]:
-            send("post a comment on #{}".format(new["number"]),
-                 ["api", "repos/{}/issues/{}/comments".format(args.repo, new["number"]), "-X", "POST"],
-                 {"body": linear_comment_body(comment)})
+            body = linear_comment_body(comment)
+            if posted[same_text(body)] > 0:
+                posted[same_text(body)] -= 1
+                continue
+            send("post a comment on #{}".format(number),
+                 ["api", "repos/{}/issues/{}/comments".format(args.repo, number), "-X", "POST"], {"body": body})
             new_comments += 1
         if project:
             where = projects[project]
-            item = ((gh_graphql(ADD_ITEM, project=where["id"], content=new["node_id"]) or {})
+            item = ((gh_graphql(ADD_ITEM, project=where["id"], content=node_id) or {})
                     .get("addProjectV2ItemById") or {}).get("item")
             if not item:
-                stopped('add #{} to the GitHub project "{}"'.format(new["number"], shown(project)))
-            if status:
+                stopped('add #{} to the GitHub project "{}"'.format(number, shown(project)))
+            if status and not (item.get("fieldValueByName") or {}).get("name"):
                 done = gh_graphql(SET_STATUS, project=where["id"], item=item["id"], field=where["field"],
                                   option=where["options"][status.lower()])
                 if not (done or {}).get("updateProjectV2ItemFieldValue"):
-                    stopped("set the Status of #{}".format(new["number"]))
+                    stopped("set the Status of #{}".format(number))
+
+    # Links last, once every chosen issue has its copy; `copies` now holds every copy in the repository.
+    parents, blocks = linear_links(issues)
+    link_lines = make_github_links(args.repo, parents, blocks, copies, send)
 
     lines = ["Copied to GitHub {}: {}, {} comment{}, {} label{} made.".format(
         args.repo, plural(len(made)), new_comments, "" if new_comments == 1 else "s", new_labels,
         "" if new_labels == 1 else "s")]
-    for issue, (ident, number) in zip(issues, made):
+    if before:
+        lines.append("Already on GitHub, so not made again: {}.".format(plural(len(before))))
+    for issue in issues:
+        ident = issue["identifier"]
         project, milestone, status, held = issue["landing"]
-        lines.append("   {} became #{}: {}, {}, Status {}{}".format(
-            shown(ident), number, 'project "{}"'.format(shown(project)) if project else "no project",
+        lines.append("   {} {} #{}: {}, {}, Status {}{}".format(
+            shown(ident), "was already" if ident in before else "became", copies[ident]["number"],
+            'project "{}"'.format(shown(project)) if project else "no project",
             'milestone "{}"'.format(shown(milestone)) if milestone else "no milestone", status or "empty",
             ", needs-decision" if held else ""))
     if closed:
@@ -1467,8 +1690,117 @@ def copy_to_github(args):
     loose = [shown(i["identifier"]) for i in issues if not i["landing"][0]]
     if loose:
         lines.append("In no Linear project, so in no GitHub project and with no Status: {}.".format(", ".join(loose)))
+    lines += link_lines
     lines.append("Nothing was written to Linear.")
     print(hide("\n".join(lines), key))
+
+
+# ---------------------------------------------------------------- Linear to GitHub: the finish
+
+TEAM_STATES = """query($id:String!){ team(id:$id){ states(first:100){ nodes{ id name type } } } }"""
+
+CANCEL = """mutation($id:String!,$input:IssueUpdateInput!){
+  issueUpdate(id:$id, input:$input){ success issue{ id } } }"""
+
+
+def canceled_state(states):
+    """A team's status for work that will not be done: the canceled one named Canceled, else any canceled
+    one but Duplicate, which says something else. None when the team has neither."""
+    gone = [s for s in states if s.get("type") == "canceled"]
+    named = [s for s in gone if (s.get("name") or "").strip().lower() in ("canceled", "cancelled")]
+    rest = [s for s in gone if (s.get("name") or "").strip().lower() != "duplicate"]
+    return (named or rest or [None])[0]
+
+
+def matched_count(wanted, bodies, rule):
+    """How many of the wanted comments are among bodies, each body standing for one, compared by rule."""
+    posted, count = collections.Counter(rule(b) for b in bodies), 0
+    for body in wanted:
+        if posted[rule(body)] > 0:
+            posted[rule(body)] -= 1
+            count += 1
+    return count
+
+
+def finish_to_github(args):
+    """Check each chosen Linear issue against its GitHub copy, print the counts on both sides, then cancel
+    in Linear each issue whose copy holds the same title, body and every comment. Posts nothing to Linear,
+    deletes nothing, and writes nothing to GitHub. One whose copy does not match stays open, and is named."""
+    key, issues, closed = chosen_linear(args)
+    if not issues:
+        print(hide("No open Linear issue left to finish{}. Nothing was written.".format(
+            ", closed in Linear: " + ", ".join(shown(k) for k in closed) if closed else ""), key))
+        return
+    copies = github_copies(args.repo)
+
+    # Each team's Canceled status, found before anything is written.
+    cancel = {}
+    for issue in issues:
+        team = (issue.get("team") or {}).get("id")
+        if team not in cancel:
+            states = ((linear(key, TEAM_STATES, {"id": team}).get("team") or {}).get("states") or {}).get(
+                "nodes") or [] if team else []
+            cancel[team] = (canceled_state(states) or {}).get("id")
+    lacking = [shown(i["identifier"]) for i in issues if not cancel[(i.get("team") or {}).get("id")]]
+    if lacking:
+        fail("The Linear team of {} has no Canceled status, so those issues cannot be canceled. Add one in "
+             "Linear, then finish again. Nothing was written.".format(", ".join(lacking)), 1)
+
+    linear_comments = sum(len(i["comments"]) for i in issues)
+    github_comments, ready, held = 0, [], []
+    for issue in issues:
+        ident = issue["identifier"]
+        if ident not in copies:
+            held.append("{} has no copy on GitHub".format(shown(ident)))
+            continue
+        have = github_issue(args.repo, copies[ident]["number"])
+        if have is None:
+            fail("gh cannot read #{}, the copy of {}. Nothing was canceled.".format(
+                copies[ident]["number"], shown(ident)), 1)
+        wanted = [linear_comment_body(c) for c in issue["comments"]]
+        matched = matched_count(wanted, have["comments"], as_written)
+        github_comments += matched
+        if matched < len(wanted) and matched_count(wanted, have["comments"], same_text) == len(wanted):
+            # Every comment is there by the copy's own rule, so running the copy again posts nothing:
+            # the text differs, and only a hand edit mends it.
+            held.append("{} has a comment whose text differs on GitHub".format(shown(ident)))
+        elif matched < len(wanted):
+            held.append("{} has {} of its {} comments on GitHub".format(shown(ident), matched, len(wanted)))
+        elif as_written(have.get("title")) != as_written(issue.get("title")):
+            held.append("{} has another title on GitHub".format(shown(ident)))
+        elif as_written(without_mark(have.get("body"))) != as_written(
+                without_mark(with_linear_mark(issue.get("description"), ident))):
+            held.append("{} has other text on GitHub".format(shown(ident)))
+        else:
+            ready.append(issue)
+
+    copied = sum(1 for i in issues if i["identifier"] in copies)
+    lines = ["Linear: {}, {} comment{}.".format(plural(len(issues)), linear_comments,
+                                                "" if linear_comments == 1 else "s"),
+             "GitHub: {} of them copied, {} of those comments.".format(copied, github_comments),
+             "The counts match." if copied == len(issues) and github_comments == linear_comments
+             else "The counts do not match yet."]
+    if held:
+        lines.append("Left open in Linear, because the GitHub copy does not match yet: " + "; ".join(held)
+                     + ". Run copy-to-github again for a missing copy or comment; where the text differs, make the "
+                     "GitHub copy match Linear by hand, since the copy never rewrites one it finds. Then finish "
+                     "again.")
+    canceled, refused = [], []
+    for issue in ready:
+        answer = linear(key, CANCEL, {"id": issue["id"],
+                                      "input": {"stateId": cancel[(issue.get("team") or {}).get("id")]}})
+        (canceled if (answer.get("issueUpdate") or {}).get("success") else refused).append(shown(issue["identifier"]))
+    if canceled:
+        lines.append("Canceled in Linear: {}.".format(", ".join(canceled)))
+    if refused:
+        lines.append("Linear refused to cancel: {}. Finish again.".format(", ".join(refused)))
+    if closed:
+        lines.append("Not checked, closed in Linear already: {}.".format(", ".join(shown(k) for k in closed)))
+    lines.append("Nothing in Linear was deleted, and nothing in Linear names its GitHub copy.")
+    lines.append("Nothing was written to GitHub.")
+    print(hide("\n".join(lines), key))
+    if held or refused:
+        sys.exit(1)
 
 
 def main():
@@ -1529,10 +1861,18 @@ def main():
     back.add_argument("--repo", required=True)
     back.add_argument("--key-env", required=True)
     back.add_argument("--plan")
+    ended = sub.add_parser("finish-to-github")
+    whom = ended.add_mutually_exclusive_group(required=True)
+    whom.add_argument("--project")
+    whom.add_argument("--project-file")
+    whom.add_argument("--issues", nargs="+")
+    ended.add_argument("--repo", required=True)
+    ended.add_argument("--key-env", required=True)
+    ended.add_argument("--plan")
     args = parser.parse_args()
     {"read-github": read_github, "check-linear": check_linear, "read-linear": read_linear,
      "plan": plan, "copy": copy, "finish": finish, "structure": structure,
-     "copy-to-github": copy_to_github}[args.command](args)
+     "copy-to-github": copy_to_github, "finish-to-github": finish_to_github}[args.command](args)
 
 
 if __name__ == "__main__":

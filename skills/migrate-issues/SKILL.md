@@ -17,7 +17,8 @@ plan. Until then every call reads. The script beside this file,
 `${CLAUDE_PLUGIN_ROOT}/skills/migrate-issues/migrate.py`, does the reading,
 saves the plan, and after the yes makes the copy in Linear, then closes the
 GitHub originals as not planned. For Linear to GitHub it makes the GitHub
-project and milestones, then copies the issues into them. Every step that
+project and milestones, copies the issues into them with their links, then
+cancels the Linear originals. Every step that
 writes refuses to run without a saved plan that matches.
 
 The structure stays the same on both sides. The GitHub project becomes a
@@ -144,8 +145,11 @@ use `--access connector` and leave out `--key-env` and `--kept`. The plan
 holds where the key is kept, never the key, and it refuses a key given as the
 place.
 
-Show the plan in a table: the direction, the source, the target, and how
-Linear is reached. Ask for a yes. Nothing is written until it comes.
+Show the plan in a table: the direction, the source, the target, how Linear
+is reached, and what happens to the originals at the end: closed on GitHub
+as not planned (GitHub to Linear) or canceled in Linear (Linear to GitHub),
+each once its copy matches, with nothing deleted. Ask for a yes. Nothing is
+written until it comes.
 
 ## 5. After the yes
 
@@ -311,8 +315,51 @@ For each open Linear issue it makes one GitHub issue:
 Issues closed in Linear are not copied, and are named. Show what it prints as
 it is: each Linear key and the GitHub number it became.
 
-Running it a second time copies every issue again; nothing yet finds the
-copies an earlier run made. When GitHub refuses a write partway, it stops and
-names what it already made: check those on GitHub before anything is run
-again. Linking the copies to each other, checking the finished move and
-closing the Linear originals have not been built yet. Say so, and stop.
+Last, it makes the links Linear holds between two issues that both have a
+copy in the repository: a sub-issue's copy becomes a sub-issue of its
+parent's copy, and a blocked-by link holds between the copies. The other copy
+may come from an earlier run. Each link is made once. A link whose other side
+has no copy (closed in Linear, or not copied yet) is named, not made. A copy
+that already has another parent on GitHub keeps it, and is named. Related and
+duplicate links in Linear are not links GitHub holds, and are left.
+
+Run it again and nothing is copied twice. Each copy is found by its hidden
+line, open or closed, whatever its title is now, and even when text was added
+below the line on GitHub. Only an issue the GitHub account running the move
+wrote counts as a copy: anyone who can file an issue can write the line. When
+an issue another account wrote carries it, the run stops before writing
+anything and names the issue and who wrote it; the person removes the line
+from an issue that is not a copy, or runs the move from the account that made
+the copies. `finish-to-github` stops the same way. The check is on who filed
+the issue, not who last edited it: someone with write access to the
+repository who adds the line to an issue the running account filed makes it
+pass for a copy. For an issue already
+copied, only the comments the copy is missing are posted. The copy joins
+the GitHub project if it is not in it, and gets its Status only when its
+Status is empty, so a Status the person changed on GitHub stays. A copy whose
+hidden line was removed is not found, and its issue is copied again. When
+GitHub refuses a write partway, it stops and names what it made; run it again
+once GitHub takes the write.
+
+## 9. Linear to GitHub: finish
+
+Once the copy has run, finish the move, with the same cut and the same key:
+
+    python3 ${CLAUDE_PLUGIN_ROOT}/skills/migrate-issues/migrate.py finish-to-github --repo <owner>/<repo> --project-file <file> --key-env <NAME>
+
+or `--issues <KEY> <KEY> ...` in place of `--project-file`, matching the plan.
+
+It writes nothing to GitHub. It prints the count of open Linear issues and
+their comments, the count copied to GitHub and their comments, and whether
+the counts match. Then it cancels in Linear, with the team's Canceled status,
+each issue whose GitHub copy holds the same title, body and every comment,
+symbol for symbol; only spacing, and Linear writing a link's address inside
+`<>`, are let go. It posts no comment in Linear and
+deletes and archives nothing, so nothing in Linear names its GitHub copy, and
+the copy names its Linear issue only in its hidden line. An issue whose copy
+is missing, short a comment, or holds another title, body or comment text
+stays open and is named. For a missing copy or comment, run `copy-to-github`
+again. For text that differs, the person makes the GitHub copy match Linear
+by hand, since the copy never rewrites one it finds. Then finish again. When
+the team has no Canceled status, it stops before canceling anything: the
+person adds one in Linear. Show what it prints as it is.
