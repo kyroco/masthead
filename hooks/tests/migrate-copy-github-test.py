@@ -316,6 +316,8 @@ check("each open Linear issue becomes one GitHub issue",
       sorted(made) == sorted(ISSUES[k]["title"] for k in ("WEB-1", "WEB-2", "WEB-4", "WEB-6", "WEB-7", "WEB-8"))
       and len(world(env)["issues"]) == 6, sorted(made))
 check("a closed Linear issue is not copied", "Do WEB-3" not in made, sorted(made))
+check("a project run names the closed Linear issue it left behind (round 1 fix s1-F1)",
+      "Not copied, closed in Linear: WEB-3." in out, out)
 web1 = made.get("Build the home page", {})
 body = web1.get("body", "")
 check("the GitHub issue holds the Linear description", body.startswith("Make the home page."), body)
