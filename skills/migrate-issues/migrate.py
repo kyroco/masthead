@@ -303,8 +303,9 @@ ONE_ISSUE = """query($id:String!){ issue(id:$id){ identifier state{type}
 
 
 def github_milestone(project, milestone, number):
-    """A Linear milestone's name on GitHub: `<project>: <n>. <name>`."""
-    if re.match(r"\s*\d+\.", milestone):
+    """A Linear milestone's name on GitHub: `<project>: <n>. <name>`. A name that already starts with
+    its number, `3. Polish`, keeps it; a version such as `2.0 Launch` is a name, not a number."""
+    if re.match(r"\s*\d+\.(?:\s|$)", milestone):
         return "{}: {}".format(project, milestone.strip())
     return "{}: {}. {}".format(project, number, milestone)
 
