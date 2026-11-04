@@ -389,6 +389,10 @@ code, out, err = run(env, save_plan(tmp, source="WEB-2 WEB-4"), issues=["WEB-2",
 check("issues named by key are copied, and only those",
       code == 0 and sorted(by_title(env)) == ["Do WEB-2", "Do WEB-4"], out + err)
 env, tmp = fake_gh()
+code, out, err = run(env, save_plan(tmp, source="WEB-2"), issues=["WEB-2", "web-2"])
+check("a key named twice, in any case, is copied once (round 1 fix s1-F2)",
+      code == 0 and len(world(env)["issues"]) == 1, out + err)
+env, tmp = fake_gh()
 code, out, err = run(env, save_plan(tmp, source="WEB-2 WEB-3"), issues=["WEB-2", "WEB-3"])
 check("a closed issue named by key is not copied, and is named",
       code == 0 and sorted(by_title(env)) == ["Do WEB-2"] and "WEB-3" in out, out + err)
