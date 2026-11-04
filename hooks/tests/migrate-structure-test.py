@@ -279,6 +279,17 @@ check("only the missing milestones are made",
       code == 0 and sorted(titles) == ["Website relaunch: 1. Build", "Website relaunch: 2. Launch",
                                        "Website relaunch: 3. Polish"], titles)
 
+# A Linear name that starts with a version number, not a place number, still gets its place (round 1 fix S2-1).
+Linear.projects.append(linear_project("Shop", [ms("Alpha", 1.0), ms("2.0 Launch", 2.0), ms("1.5 Beta", 3.0)],
+                                      [li("SH-1", "backlog", "Alpha"), li("SH-2", "backlog", "2.0 Launch"),
+                                       li("SH-3", "backlog", "1.5 Beta")]))
+env, tmp = fake_gh()
+code, out, err = run(env, save_plan(tmp, source="Shop"), project="Shop")
+titles = [m["title"] for m in world(env)["milestones"]]
+check("a Linear milestone named like a version keeps its place number",
+      code == 0 and titles == ["Shop: 1. Alpha", "Shop: 2. 2.0 Launch", "Shop: 3. 1.5 Beta"], out + err + str(titles))
+Linear.projects.pop()
+
 # --- Scenario 3: a Linear project with no milestones gets the project and no milestone.
 
 env, tmp = fake_gh()
