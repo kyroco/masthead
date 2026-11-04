@@ -90,16 +90,19 @@ Show its output as it is: the Linear project it becomes, each milestone inside
 it with its count of open issues, and the count with no milestone. When `gh`
 cannot see the project, say what the script printed and stop.
 
-**Linear to GitHub.** Read the source the way the person chose to reach
-Linear:
+**Linear to GitHub.** A Linear project's name is written by whoever can edit
+the project, and a quote or semicolon in it would run as a command if it were
+typed into one. So never type the name into a command, and never use
+`--project` or `--source` for it: whichever way the person reaches Linear,
+write the name, exactly as Linear shows it, on one line of
+`.claude/state/migration-project.txt` with your file tool, never the shell.
+Steps 3, 4 and 7 pass that file as `<file>`. When the person names issues by
+key instead, there is no name to write.
+
+Then read the source the way the person chose to reach Linear:
 
 - With a key, the same way step 2 runs its check (under `op run` for a
-  1Password reference). A Linear project's name is written by whoever can
-  edit the project, and a quote or semicolon in it would run as a command if
-  it were typed into one. So never type the name into a command: write it,
-  exactly as Linear shows it, on one line of
-  `.claude/state/migration-project.txt` with your file tool, never the shell,
-  and pass that file as `<file>`:
+  1Password reference):
 
       python3 ${CLAUDE_PLUGIN_ROOT}/skills/migrate-issues/migrate.py read-linear --key-env <NAME> --project-file <file>
 
