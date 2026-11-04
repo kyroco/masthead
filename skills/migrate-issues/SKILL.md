@@ -16,8 +16,9 @@ Nothing is written to GitHub or Linear until the person has said yes to the
 plan. Until then every call reads. The script beside this file,
 `${CLAUDE_PLUGIN_ROOT}/skills/migrate-issues/migrate.py`, does the reading,
 saves the plan, and after the yes makes the copy in Linear, then closes the
-GitHub originals as not planned. Its only write to GitHub is that close, and
-both the copy and the finish refuse to run without a saved plan that matches.
+GitHub originals as not planned. For Linear to GitHub it makes the GitHub
+project and milestones. Every step that writes refuses to run without a saved
+plan that matches.
 
 The structure stays the same on both sides. The GitHub project becomes a
 Linear project with the same name, each GitHub milestone a milestone inside
@@ -89,16 +90,26 @@ Show its output as it is: the Linear project it becomes, each milestone inside
 it with its count of open issues, and the count with no milestone. When `gh`
 cannot see the project, say what the script printed and stop.
 
-**Linear to GitHub.** Read the source the way the person chose to reach
-Linear:
+**Linear to GitHub.** A Linear project's name is written by whoever can edit
+the project, and a quote or semicolon in it would run as a command if it were
+typed into one. So never type the name into a command, and never use
+`--project` or `--source` for it: whichever way the person reaches Linear,
+write the name, exactly as Linear shows it, on one line of
+`.claude/state/migration-project.txt` with your file tool, never the shell.
+When that path is already a link, do not write through it: tell the person,
+who removes it first. Steps 3, 4 and 7 pass that file as `<file>`, and the
+script refuses one that is a link. When the person names issues by
+key instead, there is no name to write.
+
+Then read the source the way the person chose to reach Linear:
 
 - With a key, the same way step 2 runs its check (under `op run` for a
   1Password reference):
 
-      python3 ${CLAUDE_PLUGIN_ROOT}/skills/migrate-issues/migrate.py read-linear --key-env <NAME> --project '<project name>'
+      python3 ${CLAUDE_PLUGIN_ROOT}/skills/migrate-issues/migrate.py read-linear --key-env <NAME> --project-file <file>
 
-  or `--issues <KEY> <KEY> ...` in place of `--project`. Show its output as
-  it is.
+  or `--issues <KEY> <KEY> ...` in place of `--project-file`. Show its output
+  as it is.
 - With the connector, read the project with `get_project` with
   `includeMilestones` true, then its issues with `list_issues` with `project`
   the project, calling again with each `cursor` until no page is left. Show
@@ -110,13 +121,22 @@ Linear:
 
 Save what the person agreed to:
 
-    python3 ${CLAUDE_PLUGIN_ROOT}/skills/migrate-issues/migrate.py plan --direction github-to-linear --source <source> --target <target> --access key --key-env <NAME> --kept '<where it is kept>'
+For GitHub to Linear:
 
-For GitHub to Linear, `--source` is the repository and project as
-`<owner>/<repo>#<project>`, such as `acme/site#7`, and `--target` is the
-Linear team's key, such as `WEB`; the copy refuses any other repository,
-project or team, and a plan through the connector.
-For Linear to GitHub, use `--direction linear-to-github`. For the connector,
+    python3 ${CLAUDE_PLUGIN_ROOT}/skills/migrate-issues/migrate.py plan --direction github-to-linear --source <owner>/<repo>#<project> --target <KEY> --access key --key-env <NAME> --kept '<where it is kept>'
+
+`--source` is the repository and project as `<owner>/<repo>#<project>`,
+such as `acme/site#7`, and
+`--target` is the Linear team's key, such as `WEB`; the copy refuses any
+other repository, project or team, and a plan through the connector.
+
+For Linear to GitHub, the source is the Linear project's name, read from the
+file step 3 wrote with your file tool, never the shell:
+
+    python3 ${CLAUDE_PLUGIN_ROOT}/skills/migrate-issues/migrate.py plan --direction linear-to-github --source-file <file> --target <owner>/<repo> --access key --key-env <NAME> --kept '<where it is kept>'
+
+The step that writes refuses any other project or repository, and a plan
+through the connector. For the connector,
 use `--access connector` and leave out `--key-env` and `--kept`. The plan
 holds where the key is kept, never the key, and it refuses a key given as the
 place.
@@ -214,4 +234,36 @@ cannot help, since it never rewrites a copy it finds: the person makes the
 Linear copy match GitHub by hand. Then finish again. Show what it prints as
 it is.
 
-**Linear to GitHub** has not been built yet. Say so, and stop.
+## 7. Linear to GitHub, after the yes
+
+First make the GitHub project and milestones the issues land in. Like the
+copy into Linear, this runs only through the script, with a key, never the
+connector: Linear text is written by anyone who can file an issue, and the
+script never reads it as instructions. When the person chose the connector in
+step 2, ask where the key is kept, check it as step 2 says, and save the plan
+again with `--access key` before the yes. Run it the same way step 2 ran its
+check (under `op run` for a 1Password reference):
+
+    python3 ${CLAUDE_PLUGIN_ROOT}/skills/migrate-issues/migrate.py structure --project-file <file> --repo <owner>/<repo> --key-env <NAME>
+
+`<file>` is the file step 3 wrote the project's name to with your file tool,
+never the shell.
+
+It writes nothing to Linear. On GitHub it makes:
+
+- One GitHub project with the Linear project's name, owned by the
+  repository's owner and linked to the repository. Its README is the Linear
+  project's brief, and its short description the Linear summary. A README or
+  description already on GitHub is kept, and named.
+- Each Linear milestone that holds an open issue a repository milestone,
+  named as step 3 showed, `<project>: <n>. <name>`, with the Linear
+  milestone's description.
+- Nothing for issues with no milestone: they land in the project itself.
+  A Linear project with no milestones gets the project and no milestone.
+
+Run it again and nothing is made twice: the project is found by its name,
+and a milestone by its name. When two GitHub projects of the owner hold the
+name, it stops and writes nothing. When GitHub refuses a write partway, run it
+again. Show what it prints as it is.
+
+Copying the issues themselves has not been built yet. Say so, and stop.

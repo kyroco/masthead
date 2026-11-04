@@ -4,9 +4,9 @@
 usage:
   migrate.py read-github --repo <owner>/<repo> --project <number>
   migrate.py check-linear --key-env <NAME> [--team <KEY>]
-  migrate.py read-linear --key-env <NAME> (--project <name> | --issues <KEY>...)
+  migrate.py read-linear --key-env <NAME> (--project-file <file> | --project <name> | --issues <KEY>...)
   migrate.py plan --direction github-to-linear|linear-to-github
-                  --source <what> --target <where>
+                  (--source <what> | --source-file <file>) --target <where>
                   --access key|connector [--key-env <NAME> --kept <where>]
                   [--out <file>]
   migrate.py copy --repo <owner>/<repo> --project <number> --team <KEY>
@@ -15,6 +15,8 @@ usage:
   migrate.py finish --repo <owner>/<repo> --project <number> --team <KEY>
                     --key-env <NAME> [--milestone <title> | --issues <n>...]
                     [--plan <file>]
+  migrate.py structure (--project-file <file> | --project <name>) --repo <owner>/<repo> --key-env <NAME>
+                       [--plan <file>]
 
 read-github reads one repository's open issues in one of its GitHub projects
 through `gh`, and prints what they become in Linear: one Linear project with
@@ -46,6 +48,20 @@ copy holds the same title, body and every one of its comments. It posts no
 comment and deletes nothing, so nothing on GitHub names the Linear copy. An
 issue whose copy is missing, short a comment, or holds another title or body
 stays open and is named.
+
+structure is the first write of Linear to GitHub, under a saved plan for Linear
+to GitHub, from this Linear project, by a key, to this repository. It writes
+only to GitHub: one GitHub project with the Linear project's name, owned by the
+repository's owner and linked to the repository, with the Linear brief as its
+README and the Linear summary as its short description, and each Linear
+milestone that holds an open issue a repository milestone named
+`<project>: <n>. <name>`. A README or description already on GitHub is kept.
+Run it again and nothing is made twice: the project is found by its name and a
+milestone by its title.
+
+A Linear project's name is written by whoever can edit the project, so the
+skill passes it in a file (--project-file, --source-file), never typed into a
+shell command where a quote or semicolon in it would run.
 
 The Linear key is read from the environment variable the person names, at run
 time. It is never printed, logged or saved: everything Linear sends back is
@@ -278,8 +294,9 @@ def check_linear(args):
 
 OPEN = ("backlog", "unstarted", "started", "triage")
 
-PROJECT_BY_NAME = """query($name:String!){ projects(filter:{name:{eq:$name}}){ nodes{ id name
-  projectMilestones{ nodes{ name sortOrder } } } } }"""
+# description is the project's short summary in Linear, content its brief.
+PROJECT_BY_NAME = """query($name:String!){ projects(filter:{name:{eq:$name}}){ nodes{ id name description content
+  projectMilestones{ nodes{ name description sortOrder } } } } }"""
 
 PROJECT_ISSUES = """query($id:String!,$after:String){ project(id:$id){
   issues(first:100, after:$after){ pageInfo{hasNextPage endCursor}
@@ -290,38 +307,74 @@ ONE_ISSUE = """query($id:String!){ issue(id:$id){ identifier state{type}
 
 
 def github_milestone(project, milestone, number):
-    """A Linear milestone's name on GitHub: `<project>: <n>. <name>`."""
-    if re.match(r"\s*\d+\.", milestone):
+    """A Linear milestone's name on GitHub: `<project>: <n>. <name>`. A name that already starts with
+    its number, `3. Polish`, keeps it; a version such as `2.0 Launch` is a name, not a number."""
+    if re.match(r"\s*\d+\.(?:\s|$)", milestone):
         return "{}: {}".format(project, milestone.strip())
     return "{}: {}. {}".format(project, number, milestone)
+
+
+def linear_project(key, name):
+    """The one Linear project with this name, its milestones in Linear's order, its open issues counted
+    by milestone name (None for no milestone), and their total. Stops when there is not exactly one."""
+    found = (linear(key, PROJECT_BY_NAME, {"name": name}).get("projects") or {}).get("nodes") or []
+    if not found:
+        fail('No Linear project named "{}" that this key can see. Nothing was written.'.format(shown(name)), 1)
+    if len(found) > 1:
+        fail('{} Linear projects are named "{}"; name the issues by key instead. Nothing was written.'.format(
+            len(found), shown(name)), 1)
+    project = found[0]
+    order = sorted(project["projectMilestones"]["nodes"], key=lambda m: m["sortOrder"])
+    counts, after, total = {}, None, 0
+    while True:
+        page = (linear(key, PROJECT_ISSUES, {"id": project["id"], "after": after}).get("project") or {}).get("issues")
+        if not page:
+            fail("Linear stopped answering partway through the project; nothing was written.", 1)
+        for node in page["nodes"]:
+            if (node.get("state") or {}).get("type") not in OPEN:
+                continue
+            total += 1
+            milestone = (node.get("projectMilestone") or {}).get("name")
+            counts[milestone] = counts.get(milestone, 0) + 1
+        if not page["pageInfo"]["hasNextPage"]:
+            return project, order, counts, total
+        after = page["pageInfo"]["endCursor"]
+
+
+def name_from(path):
+    """A Linear project's name, from the file the session wrote it to with its file tool. The name is
+    written by whoever can edit the Linear project, so it is never typed into a shell command, where a
+    quote or a semicolon in it would run as a command. Only the line end the file ends with is dropped.
+    Never through a link: a repository could ship one at the name file's path that points at another of
+    the person's files, whose text would then go to Linear and into the plan."""
+    if os.path.islink(path):
+        fail("The name file {} is a link, so it was not read. Remove it, write the Linear project's name "
+             "there with your file tool, and run this again. Nothing was written.".format(path))
+    try:
+        with os.fdopen(os.open(path, os.O_RDONLY | os.O_NOFOLLOW), encoding="utf-8") as handle:
+            name = handle.read(4096)
+    except (OSError, UnicodeDecodeError) as error:
+        fail("The name file {} could not be read ({}). Nothing was written.".format(
+            path, getattr(error, "strerror", None) or error))
+    name = name.rstrip("\r\n")
+    if not name.strip():
+        fail("The name file {} is empty. Write the Linear project's name into it. Nothing was written.".format(path))
+    return name
+
+
+def project_name(args):
+    """The Linear project's name, from --project-file when given, else --project."""
+    if getattr(args, "project_file", None):
+        args.project = name_from(args.project_file)
+    return args.project
 
 
 def read_linear(args):
     key = read_key(args.key_env)
     lines = []
-    if args.project:
-        found = (linear(key, PROJECT_BY_NAME, {"name": args.project}).get("projects") or {}).get("nodes") or []
-        if not found:
-            fail('No Linear project named "{}" that this key can see.'.format(args.project), 1)
-        if len(found) > 1:
-            fail('{} Linear projects are named "{}"; name the issues by key instead.'.format(len(found), args.project), 1)
-        project = found[0]
-        order = sorted(project["projectMilestones"]["nodes"], key=lambda m: m["sortOrder"])
+    if project_name(args):
+        project, order, counts, total = linear_project(key, args.project)
         numbers = {m["name"]: n for n, m in enumerate(order, 1)}
-        counts, after, total = {}, None, 0
-        while True:
-            page = (linear(key, PROJECT_ISSUES, {"id": project["id"], "after": after}).get("project") or {}).get("issues")
-            if not page:
-                fail("Linear stopped answering partway through the project; nothing was written.", 1)
-            for node in page["nodes"]:
-                if (node.get("state") or {}).get("type") not in OPEN:
-                    continue
-                total += 1
-                name = (node.get("projectMilestone") or {}).get("name")
-                counts[name] = counts.get(name, 0) + 1
-            if not page["pageInfo"]["hasNextPage"]:
-                break
-            after = page["pageInfo"]["endCursor"]
         lines.append('Linear project "{}": {} milestone{}, {} open issue{}.'.format(
             shown(project["name"]), len(order), "" if len(order) == 1 else "s", total, "" if total == 1 else "s"))
         lines.append("")
@@ -376,7 +429,8 @@ def plan(args):
             fail("--kept holds a key, not the place it is kept. Nothing was saved. Ask where the key lives, "
                  "such as a 1Password reference, and never for the key itself.")
         access.update({"key_env": args.key_env, "kept": args.kept})
-    record = {"direction": args.direction, "source": args.source, "target": args.target, "access": access}
+    source = name_from(args.source_file) if args.source_file else args.source
+    record = {"direction": args.direction, "source": source, "target": args.target, "access": access}
     path = args.out or default_plan_path()
     os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
     # Never through a link: a repository could ship one that points at another of the person's files.
@@ -694,9 +748,11 @@ PLAN_SOURCE = re.compile(r"^(?:github:)?([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)(?:#|\s
 PLAN_TARGET = re.compile(r"^(?:linear:)?([A-Za-z0-9]+)$", re.I)
 
 
-def load_plan(path, args):
-    """Stop unless the saved plan is the person's yes to this copy: GitHub to Linear, from this
-    repository and project, by a key in this variable, to this team."""
+DIRECTIONS = {"github-to-linear": "GitHub to Linear", "linear-to-github": "Linear to GitHub"}
+
+
+def saved_plan(path, direction, args):
+    """The saved plan, or stop unless it is for this direction, by a key in this variable."""
     path = path or default_plan_path()
     try:
         with open(path) as handle:
@@ -704,14 +760,21 @@ def load_plan(path, args):
     except (OSError, ValueError):
         fail("There is no saved plan at {}. Show the plan and get a yes first. Nothing was written.".format(path))
     access = record.get("access") or {}
-    if record.get("direction") != "github-to-linear":
-        fail("The saved plan is not for GitHub to Linear. Nothing was written.")
+    if record.get("direction") != direction:
+        fail("The saved plan is not for {}. Nothing was written.".format(DIRECTIONS[direction]))
     if access.get("kind") != "key":
-        fail("The copy into Linear is made only with a Linear API key, never the connector, and the saved plan "
-             "chose the connector. Ask where the key is kept, save the plan again with --access key, and get "
-             "the yes again. Nothing was written.")
+        fail("This step runs only with a Linear API key, never the connector, and the saved plan chose the "
+             "connector. Ask where the key is kept, save the plan again with --access key, and get the yes "
+             "again. Nothing was written.")
     if access.get("key_env") != args.key_env:
         fail("The saved plan reads the key from another variable than {}. Nothing was written.".format(args.key_env))
+    return record
+
+
+def load_plan(path, args):
+    """Stop unless the saved plan is the person's yes to this copy: GitHub to Linear, from this
+    repository and project, by a key in this variable, to this team."""
+    record = saved_plan(path, "github-to-linear", args)
     source = PLAN_SOURCE.match(str(record.get("source", "")).strip())
     if not source:
         fail('The saved plan\'s source "{}" does not name a repository and project as <owner>/<repo>#<project>. '
@@ -999,6 +1062,158 @@ def finish(args):
         sys.exit(1)
 
 
+# ---------------------------------------------------------------- Linear to GitHub: the structure
+
+REPO = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
+PLAN_REPO = re.compile(r"^(?:github:)?([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)$", re.I)
+
+REPO_PROJECTS = """query($owner:String!,$name:String!,$after:String){ repository(owner:$owner,name:$name){
+  projectsV2(first:100, after:$after){ pageInfo{hasNextPage endCursor} nodes{ number } } } }"""
+
+
+def load_linear_plan(path, args):
+    """Stop unless the saved plan is the person's yes to this move: Linear to GitHub, from this
+    Linear project, by a key in this variable, to this repository."""
+    record = saved_plan(path, "linear-to-github", args)
+    source = str(record.get("source", ""))
+    if source[:7].lower() == "linear:":
+        source = source[7:]
+    if source.strip() != args.project.strip():
+        fail('The saved plan moves the Linear project "{}", not "{}". Nothing was written.'.format(
+            shown(source.strip()), shown(args.project)))
+    target = PLAN_REPO.match(str(record.get("target", "")).strip())
+    if not target or target.group(1).lower() != args.repo.lower():
+        fail('The saved plan moves to "{}", not to {}. Nothing was written.'.format(
+            shown(record.get("target")), args.repo))
+
+
+def gh_json(*args):
+    """What a gh command prints, read as JSON, or None when gh fails."""
+    result = subprocess.run(["gh"] + list(args), capture_output=True, text=True)
+    if result.returncode != 0:
+        return None
+    try:
+        return json.loads(result.stdout or "null")
+    except ValueError:
+        return None
+
+
+def gh_write(what, *args):
+    """Run one gh command that writes to GitHub, or stop and say so."""
+    if subprocess.run(["gh"] + list(args), capture_output=True, text=True).returncode != 0:
+        fail("GitHub refused to {}. Check `gh auth status` has the project and repo scopes, then run it again; "
+             "nothing is made twice.".format(what), 1)
+
+
+def linked_projects(repo):
+    """The numbers of the GitHub projects linked to repo, or stop."""
+    owner, name = repo.split("/", 1)
+    numbers, after = set(), None
+    while True:
+        page = ((gh_graphql(REPO_PROJECTS, owner=owner, name=name, after=after) or {}).get("repository")
+                or {}).get("projectsV2")
+        if not page:
+            fail("gh cannot read the projects linked to {}. Nothing more was written.".format(repo), 1)
+        numbers.update(node["number"] for node in page["nodes"])
+        if not page["pageInfo"]["hasNextPage"]:
+            return numbers
+        after = page["pageInfo"]["endCursor"]
+
+
+def structure(args):
+    """Make, on GitHub, the project and milestones a Linear project becomes. Writes nothing to Linear."""
+    if not REPO.match(args.repo):
+        fail("--repo takes <owner>/<repo>, such as acme/site.")
+    project_name(args)
+    load_linear_plan(args.plan, args)
+    key = read_key(args.key_env)
+    project, order, counts, total = linear_project(key, args.project)
+    title = project["name"]
+    owner = args.repo.split("/", 1)[0]
+    # Each Linear milestone holding an open issue, numbered by its place among all of them, as read-linear shows.
+    wanted = [(github_milestone(title, m["name"], n), m.get("description") or "", counts[m["name"]])
+              for n, m in enumerate(order, 1) if counts.get(m["name"])]
+
+    # Read GitHub before writing anything, so a refusal there writes nothing.
+    listed = gh_json("project", "list", "--owner", owner, "--format", "json", "--limit", "1000")
+    if listed is None:
+        fail("gh cannot list the projects of {}. Check `gh auth status` has the project scope. "
+             "Nothing was written.".format(owner), 1)
+    same = [p for p in listed.get("projects") or [] if p.get("title") == title]
+    if len(same) > 1:
+        fail('{} GitHub projects of {} are named "{}". Nothing was written.'.format(len(same), owner, shown(title)), 1)
+    pages = gh_json("api", "repos/{}/milestones?state=all&per_page=100".format(args.repo), "--paginate", "--slurp")
+    if pages is None:
+        fail("gh cannot read the milestones of {}. Nothing was written.".format(args.repo), 1)
+    have = {m.get("title") for page in pages for m in page}
+
+    if same:
+        github, made_project = same[0], False
+    else:
+        github = gh_json("project", "create", "--owner", owner, "--title", title, "--format", "json")
+        if not github or not github.get("number"):
+            fail("GitHub refused to make the project. Check `gh auth status` has the project scope, then run it "
+                 "again; nothing is made twice.", 1)
+        made_project = True
+    number = str(github["number"])
+
+    brief, summary = project.get("content") or "", project.get("description") or ""
+    edit = []
+    if brief and not github.get("readme"):
+        edit += ["--readme", brief]
+    if summary and not github.get("shortDescription"):
+        edit += ["--description", summary]
+    if edit:
+        gh_write("set the project's README and description", "project", "edit", number, "--owner", owner, *edit)
+    linked = int(number) in linked_projects(args.repo)
+    if not linked:
+        gh_write("link the project to {}".format(args.repo), "project", "link", number, "--owner", owner,
+                 "--repo", args.repo)
+
+    new, kept = [], []
+    for name, description, _ in wanted:
+        if name in have:
+            kept.append(name)
+            continue
+        fields = ["-f", "title=" + name] + (["-f", "description=" + description] if description else [])
+        gh_write('make the milestone "{}"'.format(shown(name)), "api", "repos/{}/milestones".format(args.repo),
+                 "-X", "POST", *fields)
+        new.append(name)
+
+    lines = ['GitHub project "{}" of {} (number {}): {}.'.format(
+        shown(title), owner, number, "made now" if made_project else "already there"),
+        "Linked to {}: {}.".format(args.repo, "already" if linked else "now")]
+    if "--readme" in edit:
+        lines.append("README: set from the Linear project's brief.")
+    elif not brief:
+        lines.append("README: the Linear project has no brief, so none was set.")
+    elif github.get("readme") == brief:
+        lines.append("README: already the Linear project's brief.")
+    else:
+        lines.append("README: GitHub already holds one, so it was left as it is.")
+    if "--description" in edit:
+        lines.append("Short description: set from the Linear project's summary.")
+    elif not summary:
+        lines.append("Short description: the Linear project has no summary, so none was set.")
+    elif github.get("shortDescription") == summary:
+        lines.append("Short description: already the Linear project's summary.")
+    else:
+        lines.append("Short description: GitHub already holds one, so it was left as it is.")
+    lines.append("Milestones made now: {}.".format(
+        "none" if not new else ", ".join('"{}"'.format(shown(n)) for n in new)))
+    for name, _, count in wanted:
+        lines.append('   milestone "{}" ({}){}'.format(shown(name), plural(count),
+                                                      ", already there" if name in kept else ""))
+    if not order:
+        lines.append("The Linear project has no milestones, so none was made.")
+    if counts.get(None):
+        lines.append("   no milestone ({}): these land in the project itself, with no milestone.".format(
+            plural(counts[None])))
+    lines.append("Not copied yet: the {} open in Linear.".format(plural(total)))
+    lines.append("Nothing was written to Linear.")
+    print(hide("\n".join(lines), key))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = parser.add_subparsers(dest="command", required=True)
@@ -1012,10 +1227,13 @@ def main():
     source.add_argument("--key-env", required=True)
     which = source.add_mutually_exclusive_group(required=True)
     which.add_argument("--project")
+    which.add_argument("--project-file")
     which.add_argument("--issues", nargs="+")
     saved = sub.add_parser("plan")
     saved.add_argument("--direction", required=True, choices=["github-to-linear", "linear-to-github"])
-    saved.add_argument("--source", required=True)
+    whence = saved.add_mutually_exclusive_group(required=True)
+    whence.add_argument("--source")
+    whence.add_argument("--source-file")
     saved.add_argument("--target", required=True)
     saved.add_argument("--access", required=True, choices=["key", "connector"])
     saved.add_argument("--key-env")
@@ -1039,9 +1257,16 @@ def main():
     cut.add_argument("--milestone")
     cut.add_argument("--issues", nargs="+", type=int)
     done.add_argument("--plan")
+    shape = sub.add_parser("structure")
+    named = shape.add_mutually_exclusive_group(required=True)
+    named.add_argument("--project")
+    named.add_argument("--project-file")
+    shape.add_argument("--repo", required=True)
+    shape.add_argument("--key-env", required=True)
+    shape.add_argument("--plan")
     args = parser.parse_args()
     {"read-github": read_github, "check-linear": check_linear, "read-linear": read_linear,
-     "plan": plan, "copy": copy, "finish": finish}[args.command](args)
+     "plan": plan, "copy": copy, "finish": finish, "structure": structure}[args.command](args)
 
 
 if __name__ == "__main__":
