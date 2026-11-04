@@ -145,8 +145,11 @@ use `--access connector` and leave out `--key-env` and `--kept`. The plan
 holds where the key is kept, never the key, and it refuses a key given as the
 place.
 
-Show the plan in a table: the direction, the source, the target, and how
-Linear is reached. Ask for a yes. Nothing is written until it comes.
+Show the plan in a table: the direction, the source, the target, how Linear
+is reached, and what happens to the originals at the end: closed on GitHub
+as not planned (GitHub to Linear) or canceled in Linear (Linear to GitHub),
+each once its copy matches, with nothing deleted. Ask for a yes. Nothing is
+written until it comes.
 
 ## 5. After the yes
 
