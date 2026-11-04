@@ -1350,11 +1350,12 @@ GH_ISSUE = """query($owner:String!,$name:String!,$number:Int!,$after:String){ re
 
 
 def copied_from_linear(body):
-    """The Linear key a GitHub copy's hidden line names, or None when the line is gone. Only the body's
-    last non-blank line counts, where the copy put it."""
-    lines = [line for line in (body or "").splitlines() if line.strip()]
-    found = re.fullmatch(r"\s*<!-- copied from Linear ([A-Za-z][A-Za-z0-9]*-\d+) -->\s*", lines[-1]) if lines else None
-    return found.group(1).upper() if found else None
+    """The Linear key a GitHub copy's hidden line names, or None when the line is gone. The line counts on
+    any line of its own, since text is often added below it on GitHub (a design sheet, a person's note);
+    the copy turned every such line in the Linear text into one no run reads, so only its own is found.
+    When there are several, the last one counts."""
+    found = re.findall(r"^\s*<!-- copied from Linear ([A-Za-z][A-Za-z0-9]*-\d+) -->\s*$", body or "", re.M)
+    return found[-1].upper() if found else None
 
 
 def github_copies(repo):
