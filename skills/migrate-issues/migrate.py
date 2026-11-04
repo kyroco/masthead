@@ -329,14 +329,14 @@ def github_milestone(project, milestone, number):
 def linear_project(key, name):
     """The one Linear project with this name, its milestones in Linear's order, its open issues counted
     by milestone name (None for no milestone), and their total. The project's "open" holds the keys of
-    those open issues. Stops when there is not exactly one."""
+    those open issues, and its "closed" the keys of the rest. Stops when there is not exactly one."""
     found = (linear(key, PROJECT_BY_NAME, {"name": name}).get("projects") or {}).get("nodes") or []
     if not found:
         fail('No Linear project named "{}" that this key can see. Nothing was written.'.format(shown(name)), 1)
     if len(found) > 1:
         fail('{} Linear projects are named "{}"; name the issues by key instead. Nothing was written.'.format(
             len(found), shown(name)), 1)
-    project = dict(found[0], open=[])
+    project = dict(found[0], open=[], closed=[])
     order = sorted(project["projectMilestones"]["nodes"], key=lambda m: m["sortOrder"])
     counts, after, total = {}, None, 0
     while True:
@@ -345,6 +345,7 @@ def linear_project(key, name):
             fail("Linear stopped answering partway through the project; nothing was written.", 1)
         for node in page["nodes"]:
             if (node.get("state") or {}).get("type") not in OPEN:
+                project["closed"].append(node["identifier"])
                 continue
             total += 1
             project["open"].append(node["identifier"])
@@ -1328,8 +1329,12 @@ def copy_to_github(args):
     owner = args.repo.split("/", 1)[0]
 
     # Read all of Linear first, then all of GitHub, so a refusal or a gap writes nothing.
-    wanted = args.issues or linear_project(key, args.project)[0]["open"]
-    issues, closed = [], []
+    if args.issues:
+        wanted, closed = args.issues, []
+    else:
+        source = linear_project(key, args.project)[0]
+        wanted, closed = source["open"], list(source["closed"])
+    issues = []
     for wanted_key in wanted:
         issue = read_linear_issue(key, wanted_key)
         if (issue.get("state") or {}).get("type") not in OPEN:
