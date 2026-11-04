@@ -61,6 +61,7 @@ run "issue tracker fact"     python3 "$here/tests/tracker-fact-test.py"
 run "migrate issues"         python3 "$here/tests/migrate-issues-test.py"
 run "migrate copy"           python3 "$here/tests/migrate-copy-test.py"
 run "migrate structure"      python3 "$here/tests/migrate-structure-test.py"
+run "migrate copy to github" python3 "$here/tests/migrate-copy-github-test.py"
 run "pictures fit"           python3 "$here/../scripts/svgcheck.py" "$here"/../docs/images/*.svg
 run "issue edit gate"        python3 "$here/tests/issue-edit-gate-test.py"
 run "connector commit gate"  python3 "$here/tests/connector-commit-gate-test.py"

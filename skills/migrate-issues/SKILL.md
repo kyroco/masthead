@@ -17,8 +17,8 @@ plan. Until then every call reads. The script beside this file,
 `${CLAUDE_PLUGIN_ROOT}/skills/migrate-issues/migrate.py`, does the reading,
 saves the plan, and after the yes makes the copy in Linear, then closes the
 GitHub originals as not planned. For Linear to GitHub it makes the GitHub
-project and milestones. Every step that writes refuses to run without a saved
-plan that matches.
+project and milestones, then copies the issues into them. Every step that
+writes refuses to run without a saved plan that matches.
 
 The structure stays the same on both sides. The GitHub project becomes a
 Linear project with the same name, each GitHub milestone a milestone inside
@@ -135,8 +135,11 @@ file step 3 wrote with your file tool, never the shell:
 
     python3 ${CLAUDE_PLUGIN_ROOT}/skills/migrate-issues/migrate.py plan --direction linear-to-github --source-file <file> --target <owner>/<repo> --access key --key-env <NAME> --kept '<where it is kept>'
 
-The step that writes refuses any other project or repository, and a plan
-through the connector. For the connector,
+When the person named issues by key, the source is the keys in place of the
+file: `--source '<KEY> <KEY> ...'`, such as `--source 'WEB-1 WEB-4'`.
+
+The step that writes refuses any other project, issues or repository, and a
+plan through the connector. For the connector,
 use `--access connector` and leave out `--key-env` and `--kept`. The plan
 holds where the key is kept, never the key, and it refuses a key given as the
 place.
@@ -266,4 +269,50 @@ and a milestone by its name. When two GitHub projects of the owner hold the
 name, it stops and writes nothing. When GitHub refuses a write partway, run it
 again. Show what it prints as it is.
 
-Copying the issues themselves has not been built yet. Say so, and stop.
+When the person named issues by key, run `structure` first for each Linear
+project those issues sit in, each under its own plan, so their GitHub project
+and milestones exist; then save the plan for the keys as step 4 says.
+
+## 8. Linear to GitHub: copy the issues
+
+Then copy the issues, the same way, with a key, never the connector:
+
+    python3 ${CLAUDE_PLUGIN_ROOT}/skills/migrate-issues/migrate.py copy-to-github --repo <owner>/<repo> --project-file <file> --key-env <NAME>
+
+or `--issues <KEY> <KEY> ...` in place of `--project-file`, matching the plan.
+
+It writes nothing to Linear. It reads every issue and all of GitHub first, and
+writes nothing when the GitHub project, a milestone, or a Status the issues
+need is missing: it names what is missing. For a missing project or
+milestone, run `structure` (step 7). For a missing Status, the person adds it
+to the GitHub project's Status field on GitHub, then runs this again.
+
+For each open Linear issue it makes one GitHub issue:
+
+- The same title, body and labels. A label the repository does not have yet
+  is made, in its Linear color.
+- Every comment, oldest first, each starting with a line naming who wrote it
+  in Linear and when, in Eastern, because the copy is posted as the person
+  running the move:
+
+      Written in Linear by Robert Sfeir, November 3, 2026, 1:27 PM Eastern.
+
+- In the milestone its Linear milestone became, `<project>: <n>. <name>`, and
+  in the GitHub project. An issue with no milestone is in the project with no
+  milestone.
+- The same Status in the GitHub project: Backlog, Todo, In Progress or In
+  Review. Needs Human becomes the `needs-decision` label with Status Todo. A
+  Linear status GitHub has no match for leaves the Status empty, and is named.
+- A body that ends with a hidden line, which GitHub does not show, naming the
+  Linear issue it came from:
+
+      <!-- copied from Linear WEB-1 -->
+
+Issues closed in Linear are not copied, and are named. Show what it prints as
+it is: each Linear key and the GitHub number it became.
+
+Running it a second time copies every issue again; nothing yet finds the
+copies an earlier run made. When GitHub refuses a write partway, it stops and
+names what it already made: check those on GitHub before anything is run
+again. Linking the copies to each other, checking the finished move and
+closing the Linear originals have not been built yet. Say so, and stop.
