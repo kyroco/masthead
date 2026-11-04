@@ -420,6 +420,27 @@ for name, content in (("a missing name file", None), ("an empty name file", "\n"
           result.returncode != 0 and writes(env) == [] and "Nothing was written" in result.stderr,
           result.stdout + result.stderr)
 
+# A name file that is a link is refused, never read through: a repository could ship one pointing at
+# another of the person's files (round 2 fix F1, Robert: "yes").
+target = os.path.join(tmp, "private.txt")
+with open(target, "w") as handle:
+    handle.write("PRIVATE-CONTENTS")
+linked = os.path.join(tmp, "linked-name.txt")
+os.symlink(target, linked)
+for name, cmd in (("plan", ["plan", "--direction", "linear-to-github", "--source-file", linked, "--target",
+                            "acme/site", "--access", "key", "--key-env", "MY_LINEAR_KEY", "--kept",
+                            "op://Private/Linear/credential", "--out", os.path.join(tmp, "linked-plan.json")]),
+                  ("structure", ["structure", "--project-file", linked, "--repo", "acme/site", "--key-env",
+                                 "MY_LINEAR_KEY", "--plan", os.path.join(tmp, "plan.json")]),
+                  ("read-linear", ["read-linear", "--key-env", "MY_LINEAR_KEY", "--project-file", linked])):
+    open(env["FAKE_GH_LOG"], "w").close()
+    Linear.seen = []
+    result = subprocess.run([sys.executable, SCRIPT] + cmd, env=env, capture_output=True, text=True, timeout=60)
+    check("{} refuses a name file that is a link, reading nothing through it".format(name),
+          result.returncode != 0 and "is a link" in result.stderr and "PRIVATE" not in result.stdout + result.stderr
+          and writes(env) == [] and Linear.seen == [] and not os.path.exists(os.path.join(tmp, "linked-plan.json")),
+          result.stdout + result.stderr)
+
 # --- The skill says how to run it.
 
 text = open(SKILL).read() if os.path.exists(SKILL) else ""
