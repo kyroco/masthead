@@ -303,6 +303,17 @@ check("a README already on GitHub is left as it is", mine[0]["readme"] == "Writt
 check("structure says the README was left", "left as it is" in out, out)
 check("the empty short description is filled from Linear", mine[0]["shortDescription"] == "Relaunch the website.", mine)
 check("the existing project is linked", world(env)["links"] == [["acme", 7, "acme/site"]], world(env)["links"])
+check("structure says the empty description was set from the Linear summary",
+      "Short description: set from the Linear project's summary." in out, out)
+
+# A short description already on GitHub is kept, and named (round 1 fix S1-1).
+env, tmp = fake_gh(projects=[dict(existing, shortDescription="GitHub summary")])
+code, out, err = run(env, save_plan(tmp))
+mine = [p for p in world(env)["projects"] if p["title"] == "Website relaunch"]
+check("a short description already on GitHub is kept", code == 0 and mine[0]["shortDescription"] == "GitHub summary",
+      out + err + str(mine))
+check("structure names the kept short description",
+      "Short description: GitHub already holds one, so it was left as it is." in out, out)
 
 # Two GitHub projects with the name: refuse, write nothing.
 env, tmp = fake_gh(projects=[existing, dict(existing, number=9)])
