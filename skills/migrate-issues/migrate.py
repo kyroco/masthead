@@ -1321,7 +1321,8 @@ def copy_to_github(args):
         if bad:
             fail("Not Linear issue keys, such as WEB-12: {}. Nothing was written.".format(
                 ", ".join(shown(k) for k in bad)))
-        args.issues = [k.upper() for k in args.issues]
+        # Each key once, whatever its case, so one Linear issue never becomes two GitHub issues.
+        args.issues = list(dict.fromkeys(k.upper() for k in args.issues))
     else:
         project_name(args)
     load_linear_plan(args.plan, args)
