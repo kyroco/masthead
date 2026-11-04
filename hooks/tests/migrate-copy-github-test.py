@@ -89,7 +89,8 @@ if args[:2] == ["api", "graphql"]:
             "id": item, "fieldValueByName": {"name": status[-1]} if status else None}}}}))
         sys.exit(0)
     if "issues(first" in fields["query"]:
-        nodes = [{"number": i["number"], "databaseId": 5000 + i["number"], "id": i["node_id"], "body": i.get("body")}
+        nodes = [{"number": i["number"], "databaseId": 5000 + i["number"], "id": i["node_id"], "body": i.get("body"),
+                  "author": {"login": i.get("author", "robert-runner")} if i.get("author", "robert-runner") else None}
                  for i in world["issues"]]
         print(json.dumps({"data": {"repository": {"issues": {
             "pageInfo": {"hasNextPage": False, "endCursor": None}, "nodes": nodes}}}}))
@@ -117,6 +118,9 @@ if args[:2] == ["api", "graphql"]:
         print(json.dumps({"data": {"updateProjectV2ItemFieldValue": {"projectV2Item": {"id": fields["item"]}}}}))
         sys.exit(0)
     sys.exit(4)
+if args[:2] == ["api", "user"]:
+    print(json.dumps({"login": "Robert-Runner"}))
+    sys.exit(0)
 if args[:1] == ["api"] and args[1].startswith("repos/"):
     where = args[1].split("?")[0]
     post = "POST" in args
@@ -637,6 +641,28 @@ edit_world(env, lambda w: copy_of(w, web2).update(body=copy_of(w, web2)["body"] 
 code, out, err = run(env, plan)
 check("a copy with text added below its hidden line is found, and not copied again (round 1 fix rerun-F1)",
       code == 0 and len(world(env)["issues"]) == 6 and "WEB-2 was already #{}".format(web2) in out, out + err)
+
+# A hidden line on an issue another account wrote is never taken for a copy: the run stops before any
+# write and names it (Robert, November 4: "yes", round 1 fix sec-F1).
+PLANTED = {"number": 77, "node_id": "I_77", "title": "Do WEB-2", "comments": [], "author": "stranger",
+           "body": "Looks like a copy.\n\n<!-- copied from Linear WEB-2 -->"}
+for who, planted in (("another account", PLANTED), ("a deleted account", dict(PLANTED, author=None))):
+    env, tmp = fake_gh()
+    plan = save_plan(tmp)
+    edit_world(env, lambda w: w["issues"].append(dict(planted)))
+    Linear.updates = []
+    code, out, err = run(env, plan)
+    check("a hidden line on an issue by {} stops the copy before any write, naming it (round 1 fix sec-F1)".format(who),
+          code != 0 and writes(env) == [] and "#77" in err and "WEB-2" in err, out + err)
+    code, out, err = finish(env, plan)
+    check("a hidden line on an issue by {} stops finish before it cancels anything (round 1 fix sec-F1)".format(who),
+          code != 0 and Linear.updates == [] and "#77" in err, out + err)
+env, tmp = fake_gh()
+plan = save_plan(tmp)
+run(env, plan)
+code, out, err = run(env, plan)
+check("copies written by the account running the move are found, whatever the case of its login (round 1 fix sec-F1)",
+      code == 0 and len(world(env)["issues"]) == 6, out + err)
 
 # --- MAST-13 scenario 2: a finished migration is checked; each copied Linear issue is canceled,
 # nothing in Linear is deleted, and nothing ties it to its GitHub copy.
