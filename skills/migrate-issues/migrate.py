@@ -1290,7 +1290,8 @@ def read_linear_issue(key, wanted):
 
 def landing(issue):
     """Where a Linear issue lands on GitHub: (GitHub project title or None, milestone title or None,
-    GitHub Status or None, needs a decision)."""
+    GitHub Status or None, needs a decision). A Status lives on a GitHub project, so an issue in no
+    Linear project has none."""
     project = issue.get("project") or {}
     name = project.get("name")
     milestone = (issue.get("projectMilestone") or {}).get("name")
@@ -1301,8 +1302,8 @@ def landing(issue):
         title = github_milestone(name, milestone, numbers.get(milestone, 0))
     state = ((issue.get("state") or {}).get("name") or "").strip().lower()
     if state == NEEDS_HUMAN.lower():
-        return name, title, "Todo", True
-    return name, title, next((s for s in GITHUB_STATUSES if s.lower() == state), None), False
+        return name, title, "Todo" if name else None, True
+    return name, title, next((s for s in GITHUB_STATUSES if s.lower() == state), None) if name else None, False
 
 
 def label_color(color):
