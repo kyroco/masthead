@@ -322,7 +322,12 @@ duplicate links in Linear are not links GitHub holds, and are left.
 
 Run it again and nothing is copied twice. Each copy is found by its hidden
 line, open or closed, whatever its title is now, and even when text was added
-below the line on GitHub. For an issue already
+below the line on GitHub. Only an issue the GitHub account running the move
+wrote counts as a copy: anyone who can file an issue can write the line. When
+an issue another account wrote carries it, the run stops before writing
+anything and names the issue and who wrote it; the person removes the line
+from an issue that is not a copy, or runs the move from the account that made
+the copies. `finish-to-github` stops the same way. For an issue already
 copied, only the comments the copy is missing are posted. The copy joins
 the GitHub project if it is not in it, and gets its Status only when its
 Status is empty, so a Status the person changed on GitHub stays. A copy whose

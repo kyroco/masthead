@@ -1341,7 +1341,7 @@ def label_color(color):
 
 GH_COPIES = """query($owner:String!,$name:String!,$after:String){ repository(owner:$owner,name:$name){
   issues(first:100, after:$after, states:[OPEN,CLOSED], orderBy:{field:CREATED_AT, direction:ASC}){
-    pageInfo{hasNextPage endCursor} nodes{ number databaseId id body } } } }"""
+    pageInfo{hasNextPage endCursor} nodes{ number databaseId id body author{ login } } } } }"""
 
 GH_ISSUE = """query($owner:String!,$name:String!,$number:Int!,$after:String){ repository(owner:$owner,name:$name){
   issue(number:$number){ title body parent{ number repository{nameWithOwner} }
@@ -1360,9 +1360,16 @@ def copied_from_linear(body):
 
 def github_copies(repo):
     """Every issue of repo, open or closed, that a copy from Linear made, by its Linear key: found by its
-    hidden line only, the earliest winning. Or stop, since a copy not found would be made again."""
+    hidden line, on an issue the account running this move wrote, the earliest winning. Or stop, since a
+    copy not found would be made again. Anyone who can file an issue can write the hidden line, so one on
+    an issue any other account wrote (Robert, November 4: "yes") stops the run before any write, named:
+    taken for the copy, it would get the Linear comments, and finish would cancel the Linear issue."""
     owner, name = repo.split("/", 1)
-    found, after = {}, None
+    me = ((gh_json("api", "user") or {}).get("login") or "").lower()
+    if not me:
+        fail("gh cannot say which GitHub account is running this, so the copies it made cannot be told from "
+             "others. Check `gh auth status`. Nothing was written.", 1)
+    found, strangers, after = {}, [], None
     while True:
         page = ((gh_graphql(GH_COPIES, owner=owner, name=name, after=after) or {}).get("repository")
                 or {}).get("issues")
@@ -1371,11 +1378,24 @@ def github_copies(repo):
                  "Nothing was written.".format(repo), 1)
         for node in page["nodes"]:
             key = copied_from_linear(node.get("body"))
-            if key and key not in found:
+            if not key:
+                continue
+            author = ((node.get("author") or {}).get("login") or "")
+            if author.lower() != me:
+                strangers.append("#{} (names {}, written by {})".format(
+                    node["number"], shown(key), shown(author) if author else "a deleted account"))
+            elif key not in found:
                 found[key] = {"number": node["number"], "databaseId": node.get("databaseId"), "id": node.get("id")}
         if not page["pageInfo"]["hasNextPage"]:
-            return found
+            break
         after = page["pageInfo"]["endCursor"]
+    if strangers:
+        fail("These issues of {} carry the hidden line a copy from Linear carries, but another account than {}, "
+             "which is running this move, wrote them: {}. Anyone who can file an issue can write that line, so "
+             "they are not taken for copies. Check each on GitHub: remove the line from one that is not a copy, "
+             "or run the move from the account that made it. Nothing was written.".format(
+                 repo, shown(me), "; ".join(strangers)), 1)
+    return found
 
 
 def github_issue(repo, number):
