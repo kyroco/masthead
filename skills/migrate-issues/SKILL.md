@@ -94,12 +94,17 @@ cannot see the project, say what the script printed and stop.
 Linear:
 
 - With a key, the same way step 2 runs its check (under `op run` for a
-  1Password reference):
+  1Password reference). A Linear project's name is written by whoever can
+  edit the project, and a quote or semicolon in it would run as a command if
+  it were typed into one. So never type the name into a command: write it,
+  exactly as Linear shows it, on one line of
+  `.claude/state/migration-project.txt` with your file tool, never the shell,
+  and pass that file as `<file>`:
 
-      python3 ${CLAUDE_PLUGIN_ROOT}/skills/migrate-issues/migrate.py read-linear --key-env <NAME> --project '<project name>'
+      python3 ${CLAUDE_PLUGIN_ROOT}/skills/migrate-issues/migrate.py read-linear --key-env <NAME> --project-file <file>
 
-  or `--issues <KEY> <KEY> ...` in place of `--project`. Show its output as
-  it is.
+  or `--issues <KEY> <KEY> ...` in place of `--project-file`. Show its output
+  as it is.
 - With the connector, read the project with `get_project` with
   `includeMilestones` true, then its issues with `list_issues` with `project`
   the project, calling again with each `cursor` until no page is left. Show
@@ -111,16 +116,22 @@ Linear:
 
 Save what the person agreed to:
 
-    python3 ${CLAUDE_PLUGIN_ROOT}/skills/migrate-issues/migrate.py plan --direction github-to-linear --source <source> --target <target> --access key --key-env <NAME> --kept '<where it is kept>'
+For GitHub to Linear:
 
-For GitHub to Linear, `--source` is the repository and project as
-`<owner>/<repo>#<project>`, such as `acme/site#7`, and `--target` is the
-Linear team's key, such as `WEB`; the copy refuses any other repository,
-project or team, and a plan through the connector.
-For Linear to GitHub, use `--direction linear-to-github`, `--source` the
-Linear project's name, and `--target` the repository, `<owner>/<repo>`; the
-step that writes refuses any other project or repository, and a plan through
-the connector. For the connector,
+    python3 ${CLAUDE_PLUGIN_ROOT}/skills/migrate-issues/migrate.py plan --direction github-to-linear --source <owner>/<repo>#<project> --target <KEY> --access key --key-env <NAME> --kept '<where it is kept>'
+
+`--source` is the repository and project as `<owner>/<repo>#<project>`,
+such as `acme/site#7`, and
+`--target` is the Linear team's key, such as `WEB`; the copy refuses any
+other repository, project or team, and a plan through the connector.
+
+For Linear to GitHub, the source is the Linear project's name, read from the
+file step 3 wrote with your file tool, never the shell:
+
+    python3 ${CLAUDE_PLUGIN_ROOT}/skills/migrate-issues/migrate.py plan --direction linear-to-github --source-file <file> --target <owner>/<repo> --access key --key-env <NAME> --kept '<where it is kept>'
+
+The step that writes refuses any other project or repository, and a plan
+through the connector. For the connector,
 use `--access connector` and leave out `--key-env` and `--kept`. The plan
 holds where the key is kept, never the key, and it refuses a key given as the
 place.
@@ -228,7 +239,10 @@ step 2, ask where the key is kept, check it as step 2 says, and save the plan
 again with `--access key` before the yes. Run it the same way step 2 ran its
 check (under `op run` for a 1Password reference):
 
-    python3 ${CLAUDE_PLUGIN_ROOT}/skills/migrate-issues/migrate.py structure --project '<project name>' --repo <owner>/<repo> --key-env <NAME>
+    python3 ${CLAUDE_PLUGIN_ROOT}/skills/migrate-issues/migrate.py structure --project-file <file> --repo <owner>/<repo> --key-env <NAME>
+
+`<file>` is the file step 3 wrote the project's name to with your file tool,
+never the shell.
 
 It writes nothing to Linear. On GitHub it makes:
 

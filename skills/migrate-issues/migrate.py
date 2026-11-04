@@ -4,9 +4,9 @@
 usage:
   migrate.py read-github --repo <owner>/<repo> --project <number>
   migrate.py check-linear --key-env <NAME> [--team <KEY>]
-  migrate.py read-linear --key-env <NAME> (--project <name> | --issues <KEY>...)
+  migrate.py read-linear --key-env <NAME> (--project-file <file> | --project <name> | --issues <KEY>...)
   migrate.py plan --direction github-to-linear|linear-to-github
-                  --source <what> --target <where>
+                  (--source <what> | --source-file <file>) --target <where>
                   --access key|connector [--key-env <NAME> --kept <where>]
                   [--out <file>]
   migrate.py copy --repo <owner>/<repo> --project <number> --team <KEY>
@@ -15,7 +15,7 @@ usage:
   migrate.py finish --repo <owner>/<repo> --project <number> --team <KEY>
                     --key-env <NAME> [--milestone <title> | --issues <n>...]
                     [--plan <file>]
-  migrate.py structure --project <name> --repo <owner>/<repo> --key-env <NAME>
+  migrate.py structure (--project-file <file> | --project <name>) --repo <owner>/<repo> --key-env <NAME>
                        [--plan <file>]
 
 read-github reads one repository's open issues in one of its GitHub projects
@@ -58,6 +58,10 @@ milestone that holds an open issue a repository milestone named
 `<project>: <n>. <name>`. A README or description already on GitHub is kept.
 Run it again and nothing is made twice: the project is found by its name and a
 milestone by its title.
+
+A Linear project's name is written by whoever can edit the project, so the
+skill passes it in a file (--project-file, --source-file), never typed into a
+shell command where a quote or semicolon in it would run.
 
 The Linear key is read from the environment variable the person names, at run
 time. It is never printed, logged or saved: everything Linear sends back is
@@ -337,10 +341,33 @@ def linear_project(key, name):
         after = page["pageInfo"]["endCursor"]
 
 
+def name_from(path):
+    """A Linear project's name, from the file the session wrote it to with its file tool. The name is
+    written by whoever can edit the Linear project, so it is never typed into a shell command, where a
+    quote or a semicolon in it would run as a command. Only the line end the file ends with is dropped."""
+    try:
+        with open(path, encoding="utf-8") as handle:
+            name = handle.read(4096)
+    except (OSError, UnicodeDecodeError) as error:
+        fail("The name file {} could not be read ({}). Nothing was written.".format(
+            path, getattr(error, "strerror", None) or error))
+    name = name.rstrip("\r\n")
+    if not name.strip():
+        fail("The name file {} is empty. Write the Linear project's name into it. Nothing was written.".format(path))
+    return name
+
+
+def project_name(args):
+    """The Linear project's name, from --project-file when given, else --project."""
+    if getattr(args, "project_file", None):
+        args.project = name_from(args.project_file)
+    return args.project
+
+
 def read_linear(args):
     key = read_key(args.key_env)
     lines = []
-    if args.project:
+    if project_name(args):
         project, order, counts, total = linear_project(key, args.project)
         numbers = {m["name"]: n for n, m in enumerate(order, 1)}
         lines.append('Linear project "{}": {} milestone{}, {} open issue{}.'.format(
@@ -397,7 +424,8 @@ def plan(args):
             fail("--kept holds a key, not the place it is kept. Nothing was saved. Ask where the key lives, "
                  "such as a 1Password reference, and never for the key itself.")
         access.update({"key_env": args.key_env, "kept": args.kept})
-    record = {"direction": args.direction, "source": args.source, "target": args.target, "access": access}
+    source = name_from(args.source_file) if args.source_file else args.source
+    record = {"direction": args.direction, "source": source, "target": args.target, "access": access}
     path = args.out or default_plan_path()
     os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
     # Never through a link: a repository could ship one that points at another of the person's files.
@@ -1091,6 +1119,7 @@ def structure(args):
     """Make, on GitHub, the project and milestones a Linear project becomes. Writes nothing to Linear."""
     if not REPO.match(args.repo):
         fail("--repo takes <owner>/<repo>, such as acme/site.")
+    project_name(args)
     load_linear_plan(args.plan, args)
     key = read_key(args.key_env)
     project, order, counts, total = linear_project(key, args.project)
@@ -1193,10 +1222,13 @@ def main():
     source.add_argument("--key-env", required=True)
     which = source.add_mutually_exclusive_group(required=True)
     which.add_argument("--project")
+    which.add_argument("--project-file")
     which.add_argument("--issues", nargs="+")
     saved = sub.add_parser("plan")
     saved.add_argument("--direction", required=True, choices=["github-to-linear", "linear-to-github"])
-    saved.add_argument("--source", required=True)
+    whence = saved.add_mutually_exclusive_group(required=True)
+    whence.add_argument("--source")
+    whence.add_argument("--source-file")
     saved.add_argument("--target", required=True)
     saved.add_argument("--access", required=True, choices=["key", "connector"])
     saved.add_argument("--key-env")
@@ -1221,7 +1253,9 @@ def main():
     cut.add_argument("--issues", nargs="+", type=int)
     done.add_argument("--plan")
     shape = sub.add_parser("structure")
-    shape.add_argument("--project", required=True)
+    named = shape.add_mutually_exclusive_group(required=True)
+    named.add_argument("--project")
+    named.add_argument("--project-file")
     shape.add_argument("--repo", required=True)
     shape.add_argument("--key-env", required=True)
     shape.add_argument("--plan")
