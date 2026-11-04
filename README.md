@@ -189,8 +189,11 @@ reads first and shows you what each project, milestone and issue becomes on
 the other side, and what happens to the originals at the end, and writes
 nothing until you say yes. A project stays a project and a milestone stays a
 milestone. Each issue keeps its title, text, labels, every comment (each
-naming who wrote it and when) and its sub-issue and blocked-by links; Linear
-to GitHub keeps its status too. A last step counts the issues and comments on
+naming who wrote it and when) and its sub-issue and blocked-by links. A
+GitHub issue labelled `needs-decision` or `parked` lands in Linear as Needs
+Human, and a Needs Human issue lands on GitHub with the `needs-decision`
+label. Linear to GitHub also keeps the status when it is Backlog, Todo, In
+Progress or In Review, and names each issue whose status it left empty. A last step counts the issues and comments on
 both sides, then closes each original on GitHub as not planned, or cancels it
 in Linear, once its copy matches. Nothing is deleted. Run any step again and
 nothing is copied twice. Linear is reached with an API key read when the step
