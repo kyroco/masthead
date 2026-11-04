@@ -433,6 +433,10 @@ says("migrate.py structure --project-file <file> --repo <owner>/<repo> --key-env
 says("migrate.py read-linear --key-env <NAME> --project-file <file>")
 says("--source-file <file>")
 says("with your file tool, never the shell")
+step3 = text[text.find("**Linear to GitHub.** Read the source"):text.find("## 4.")]
+check("step 3 says to write the name file before choosing key or connector, so both ways have it (round 2 fix SEC-1a)",
+      0 <= step3.find(".claude/state/migration-project.txt") < step3.find("- With a key")
+      and step3.find("- With the connector") > 0, step3[:600])
 commands = [line for line in text.splitlines() if "migrate.py" in line]
 check("no command in SKILL.md takes a Linear project's name typed into it",
       commands and not any("<project name>" in line or "<source>" in line for line in commands), commands)
