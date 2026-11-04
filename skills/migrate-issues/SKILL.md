@@ -321,7 +321,8 @@ that already has another parent on GitHub keeps it, and is named. Related and
 duplicate links in Linear are not links GitHub holds, and are left.
 
 Run it again and nothing is copied twice. Each copy is found by its hidden
-line, open or closed, whatever its title is now. For an issue already
+line, open or closed, whatever its title is now, and even when text was added
+below the line on GitHub. For an issue already
 copied, only the comments the copy is missing are posted. The copy joins
 the GitHub project if it is not in it, and gets its Status only when its
 Status is empty, so a Status the person changed on GitHub stays. A copy whose
@@ -341,7 +342,8 @@ It writes nothing to GitHub. It prints the count of open Linear issues and
 their comments, the count copied to GitHub and their comments, and whether
 the counts match. Then it cancels in Linear, with the team's Canceled status,
 each issue whose GitHub copy holds the same title, body and every comment,
-symbol for symbol; only spacing is let go. It posts no comment in Linear and
+symbol for symbol; only spacing, and Linear writing a link's address inside
+`<>`, are let go. It posts no comment in Linear and
 deletes and archives nothing, so nothing in Linear names its GitHub copy, and
 the copy names its Linear issue only in its hidden line. An issue whose copy
 is missing, short a comment, or holds another title, body or comment text
