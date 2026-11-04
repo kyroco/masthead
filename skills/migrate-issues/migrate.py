@@ -1156,6 +1156,14 @@ def structure(args):
         lines.append("README: already the Linear project's brief.")
     else:
         lines.append("README: GitHub already holds one, so it was left as it is.")
+    if "--description" in edit:
+        lines.append("Short description: set from the Linear project's summary.")
+    elif not summary:
+        lines.append("Short description: the Linear project has no summary, so none was set.")
+    elif github.get("shortDescription") == summary:
+        lines.append("Short description: already the Linear project's summary.")
+    else:
+        lines.append("Short description: GitHub already holds one, so it was left as it is.")
     lines.append("Milestones made now: {}.".format(
         "none" if not new else ", ".join('"{}"'.format(shown(n)) for n in new)))
     for name, _, count in wanted:
