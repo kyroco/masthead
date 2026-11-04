@@ -289,7 +289,7 @@ check("a project with no milestones gets no milestone", world(env)["milestones"]
 check("its issues land in the project with no milestone",
       "no milestone (2 issues)" in out and "in the project itself" in out, out)
 check("an empty Linear summary leaves the short description alone",
-      world(env)["projects"][0]["shortDescription"] == "", world(env)["projects"])
+      [p["shortDescription"] for p in world(env)["projects"]] == [""], world(env)["projects"])
 
 # --- A GitHub project that already exists is used, and what a person wrote on it is kept.
 
