@@ -627,6 +627,17 @@ check("a comment missing from an earlier copy is posted once, and no other again
 check("the Linear text's own hidden line (KOR-9) is never taken for a copy", number_of(env, "KOR-9") == [],
       world(env)["issues"])
 
+# Text added below a copy's hidden line on GitHub, as /work-on's design sheet does, still finds the copy
+# (round 1 fix rerun-F1).
+env, tmp = fake_gh()
+plan = save_plan(tmp)
+run(env, plan)
+web2 = number_of(env, "WEB-2")
+edit_world(env, lambda w: copy_of(w, web2).update(body=copy_of(w, web2)["body"] + "\n\n## Sheet\n\nThe plan."))
+code, out, err = run(env, plan)
+check("a copy with text added below its hidden line is found, and not copied again (round 1 fix rerun-F1)",
+      code == 0 and len(world(env)["issues"]) == 6 and "WEB-2 was already #{}".format(web2) in out, out + err)
+
 # --- MAST-13 scenario 2: a finished migration is checked; each copied Linear issue is canceled,
 # nothing in Linear is deleted, and nothing ties it to its GitHub copy.
 
