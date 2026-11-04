@@ -379,6 +379,47 @@ check("a Linear name cannot forge a line of structure's output",
 check("the GitHub project gets the Linear name as it is",
       [p["title"] for p in world(env)["projects"]] == ["Evil\n" + FORGED], world(env)["projects"])
 
+# --- The Linear project's name is read from a file the session writes, never typed into a shell command
+# (Robert, November 4: "yeah fix that", security finding SEC-1).
+
+Linear.projects = [WEBSITE, FLAT, linear_project("Robert's site; touch PWNED", [], [li("RS-1", "backlog", None)])]
+NAME = "Robert's site; touch PWNED"
+env, tmp = fake_gh()
+name_file = os.path.join(tmp, "project-name.txt")
+with open(name_file, "w") as handle:
+    handle.write(NAME + "\n")
+saved = subprocess.run([sys.executable, SCRIPT, "plan", "--direction", "linear-to-github", "--source-file", name_file,
+                        "--target", "acme/site", "--access", "key", "--key-env", "MY_LINEAR_KEY",
+                        "--kept", "op://Private/Linear/credential", "--out", os.path.join(tmp, "plan.json")],
+                       env=env, capture_output=True, text=True, timeout=60)
+record = json.load(open(os.path.join(tmp, "plan.json"))) if saved.returncode == 0 else {}
+check("plan --source-file saves the name the file holds, without its line end",
+      record.get("source") == NAME, saved.stdout + saved.stderr + str(record))
+result = subprocess.run([sys.executable, SCRIPT, "structure", "--project-file", name_file, "--repo", "acme/site",
+                         "--key-env", "MY_LINEAR_KEY", "--plan", os.path.join(tmp, "plan.json")],
+                        env=env, capture_output=True, text=True, timeout=60, cwd=tmp)
+check("structure --project-file makes the project named in the file, quote and semicolon as they are",
+      result.returncode == 0 and [p["title"] for p in world(env)["projects"]] == [NAME],
+      result.stdout + result.stderr + str(world(env)["projects"]))
+check("nothing in the name ran", not os.path.exists(os.path.join(tmp, "PWNED")))
+result = subprocess.run([sys.executable, SCRIPT, "read-linear", "--key-env", "MY_LINEAR_KEY", "--project-file",
+                         name_file], env=env, capture_output=True, text=True, timeout=60)
+check("read-linear --project-file reads the project named in the file",
+      result.returncode == 0 and 'Linear project "Robert\'s site; touch PWNED"' in result.stdout,
+      result.stdout + result.stderr)
+for name, content in (("a missing name file", None), ("an empty name file", "\n")):
+    path = os.path.join(tmp, "name-{}.txt".format(content is None))
+    if content is not None:
+        with open(path, "w") as handle:
+            handle.write(content)
+    open(env["FAKE_GH_LOG"], "w").close()
+    result = subprocess.run([sys.executable, SCRIPT, "structure", "--project-file", path, "--repo", "acme/site",
+                             "--key-env", "MY_LINEAR_KEY", "--plan", os.path.join(tmp, "plan.json")],
+                            env=env, capture_output=True, text=True, timeout=60)
+    check("structure refuses {} and writes nothing".format(name),
+          result.returncode != 0 and writes(env) == [] and "Nothing was written" in result.stderr,
+          result.stdout + result.stderr)
+
 # --- The skill says how to run it.
 
 text = open(SKILL).read() if os.path.exists(SKILL) else ""
@@ -388,7 +429,13 @@ def says(phrase):
     check("SKILL.md says: " + phrase, phrase in text)
 
 
-says("migrate.py structure --project '<project name>' --repo <owner>/<repo> --key-env")
+says("migrate.py structure --project-file <file> --repo <owner>/<repo> --key-env")
+says("migrate.py read-linear --key-env <NAME> --project-file <file>")
+says("--source-file <file>")
+says("with your file tool, never the shell")
+commands = [line for line in text.splitlines() if "migrate.py" in line]
+check("no command in SKILL.md takes a Linear project's name typed into it",
+      commands and not any("<project name>" in line or "<source>" in line for line in commands), commands)
 check("SKILL.md no longer says Linear to GitHub is not built at all",
       "**Linear to GitHub** has not been built yet" not in text)
 
