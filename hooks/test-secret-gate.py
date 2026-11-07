@@ -36,6 +36,9 @@ LINK_DIR = tempfile.mkdtemp()
 open(os.path.join(LINK_DIR, ".netrc"), "w").close()
 os.symlink(os.path.join(LINK_DIR, ".netrc"), os.path.join(LINK_DIR, ".env"))
 
+# A 1Password reference whose last part is a secret-file name.
+OP_REF = "op" + "://v/i/" + "credential"
+
 # (label, tool, tool_input, expected decision)
 CASES = [
     ("shell profile, whole file", "Read", {"file_path": HOME + "/.zshenv"}, "deny"),
@@ -145,6 +148,24 @@ CASES = [
     ("leaf split by quotes", "Bash", {"command": 'cat ~/.ssh/id_"rsa"'}, "deny"),
     ("kube split by quotes", "Bash", {"command": "cat ~/.ku'be'/config"}, "deny"),
     ("quoted ordinary command", "Bash", {"command": 'echo "hello" \'world\''}, "allow"),
+    # MAST-19: a 1Password reference names no file. Under `op run` the value goes only into the
+    # child's environment and op masks it in output, so the reference passes there. Anything that
+    # prints the secret still refuses. The reference is built from pieces so no command line in
+    # this file carries it whole.
+    ("op run with a reference", "Bash",
+     {"command": "KEY='" + OP_REF + "' op run -- bash script.sh"}, "allow"),
+    ("op read of a reference", "Bash", {"command": "op read '" + OP_REF + "'"}, "deny"),
+    # A bare `op item get x --reveal` is refused by block-secret-fetches.py (its cases file holds
+    # it); here the reference beside an `op item get` keeps this gate refusing too.
+    ("op item get beside op run", "Bash",
+     {"command": "KEY=" + OP_REF + " op run -- echo hi && op item get x --reveal"}, "deny"),
+    ("reference piped to op inject", "Bash", {"command": "echo " + OP_REF + " | op inject"}, "deny"),
+    ("op inject beside op run", "Bash",
+     {"command": "KEY=" + OP_REF + " op run -- echo hi; echo " + OP_REF + " | op inject"}, "deny"),
+    ("op run that reads a dotenv", "Bash",
+     {"command": "KEY='" + OP_REF + "' op run -- cat .env"}, "deny"),
+    ("a bare reference, no op run", "Bash", {"command": "echo " + OP_REF}, "deny"),
+    ("ls is allowed", "Bash", {"command": "ls -la"}, "allow"),
 ]
 
 
