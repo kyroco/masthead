@@ -174,6 +174,12 @@ def secret_mentioned_in_command(command, cwd=None):
     # Remove quote characters first so a name split by quotes is seen whole.
     command = command.replace('"', "").replace("'", "")
 
+    # A 1Password reference (op://vault/item/field) names no file. Under `op run` the value goes only
+    # into the child's environment and op masks it in what the command prints, so the reference may pass
+    # there. Any command that prints a secret (op read, op item get, op inject) keeps it blocked.
+    op_run_only = (re.search(r"(^|[\s;&|(])op\s+run\b", command)
+                   and not re.search(r"(^|[\s;&|(])op\s+(read|inject|item\s+get|document\s+get)\b", command))
+
     # Split on whitespace and shell metacharacters and test each fragment as a path.
     for token in re.split(r"[\s;|&<>()\[\]{}`,]+", command):
         token = token.strip().rstrip(".:;")
@@ -181,6 +187,8 @@ def secret_mentioned_in_command(command, cwd=None):
             continue
         # Strip a leading redirect or assignment that swallowed the path.
         token = token.split("=")[-1]
+        if op_run_only and token.startswith("op://"):
+            continue
         if not looks_like_a_path(token):
             continue
         if is_secret_path(token):
