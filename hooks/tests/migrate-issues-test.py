@@ -229,6 +229,9 @@ code, out, err = run(["check-linear", "--key-env", "MY_LINEAR_KEY", "--team", "W
                      env=linear_env(MY_LINEAR_KEY=KEY))
 check("check-linear reaches Linear with the key", code == 0 and "Pat Doe" in out and "Acme" in out, out + err)
 check("check-linear finds the team", 'team "Web" (WEB)' in out, out)
+check("check-linear's team lookup carries a first: limit, so Linear never refuses it as too complex (MAST-18)",
+      Linear.seen and re.search(r"teams\(first:\s*\d+", Linear.seen[-1]["body"]["query"]),
+      Linear.seen and Linear.seen[-1]["body"]["query"])
 check("the key is sent to Linear", Linear.seen and Linear.seen[-1]["auth"] == KEY, str(Linear.seen))
 check("the key is not in the output", no_key(out, err))
 check("check-linear only reads Linear",
