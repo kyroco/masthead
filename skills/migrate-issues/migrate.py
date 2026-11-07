@@ -273,8 +273,13 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 SEND = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect)
 
 
-def linear(key, query, variables=None):
-    """Send one request to Linear. Returns its data, or stops with its error, the key hidden."""
+class Refused(Exception):
+    """Linear refused a request; the text is its error, the key hidden."""
+
+
+def linear(key, query, variables=None, refusal=False):
+    """Send one request to Linear. Returns its data, or stops with its error, the key hidden. With
+    refusal, an error Linear answers with is raised as Refused for the caller to handle."""
     request = urllib.request.Request(
         linear_url(), data=json.dumps({"query": query, "variables": variables or {}}).encode(),
         headers={"Authorization": key, "Content-Type": "application/json"}, method="POST")
@@ -296,7 +301,10 @@ def linear(key, query, variables=None):
     except ValueError:
         fail("Linear answered with something other than JSON: {}".format(hide(body, key)[:600]), 1)
     if answer.get("errors"):
-        fail("Linear refused the request: {}".format(hide(json.dumps(answer["errors"]), key)[:600]), 1)
+        said = hide(json.dumps(answer["errors"]), key)[:600]
+        if refusal:
+            raise Refused(said)
+        fail("Linear refused the request: {}".format(said), 1)
     return answer.get("data") or {}
 
 
@@ -304,7 +312,7 @@ def check_linear(args):
     key = read_key(args.key_env)
     if args.team:
         data = linear(key, "query($key:String!){ viewer{name} organization{name urlKey} "
-                           "teams(filter:{key:{eq:$key}}){nodes{name key}} }", {"key": args.team.upper()})
+                           "teams(first:1, filter:{key:{eq:$key}}){nodes{name key}} }", {"key": args.team.upper()})
     else:
         data = linear(key, "{ viewer{name} organization{name urlKey} }")
     viewer = (data.get("viewer") or {}).get("name", "-")
@@ -481,6 +489,7 @@ def plan(args):
 ISSUE_QUERY = """query($owner:String!,$name:String!,$number:Int!,$after:String){
   repository(owner:$owner,name:$name){ issue(number:$number){ number title body bodyHTML state
     milestone{title} labels(first:100){nodes{name}}
+    projectItems(first:20){ nodes{ project{ title } } }
     parent{ number repository{nameWithOwner} }
     subIssues(first:100){ pageInfo{hasNextPage} nodes{ number repository{nameWithOwner} } }
     blockedBy(first:100){ pageInfo{hasNextPage} nodes{ number repository{nameWithOwner} } }
@@ -614,12 +623,14 @@ def place(name, made):
     return (low + high) / 2.0
 
 
-TEAM = """query($key:String!){ teams(filter:{key:{eq:$key}}){ nodes{ id key
+# Every list carries first:, since Linear prices a list with none at 50 and refuses a query it prices
+# over 10,000 as too complex.
+TEAM = """query($key:String!){ teams(first:1, filter:{key:{eq:$key}}){ nodes{ id key
   states(first:100){nodes{id name}} labels(first:250){nodes{id name}} } }
   issueLabels(first:250, filter:{team:{null:true}}){nodes{id name}} }"""
 
-PROJECTS = """query($name:String!){ projects(filter:{name:{eq:$name}}){ nodes{ id name
-  teams{nodes{id}} projectMilestones{nodes{id name sortOrder}} } } }"""
+PROJECTS = """query($name:String!){ projects(first:10, filter:{name:{eq:$name}}){ nodes{ id name
+  teams(first:25){nodes{id}} projectMilestones(first:100){nodes{id name sortOrder}} } } }"""
 
 # Matched whatever the case: the hidden line holds the repository as the person typed it on that run.
 COPIES = """query($team:ID!,$mark:String!,$after:String){
@@ -628,7 +639,10 @@ COPIES = """query($team:ID!,$mark:String!,$after:String){
     pageInfo{hasNextPage endCursor} nodes{ id description createdAt project{id} } } }"""
 
 PROJECT_BY_ID = """query($id:String!){ project(id:$id){ id name
-  teams{nodes{id}} projectMilestones{nodes{id name sortOrder}} } }"""
+  teams(first:25){nodes{id}} projectMilestones(first:100){nodes{id name sortOrder}} } }"""
+
+# The team above a team, with its labels, which a team under it may use too.
+TEAM_PARENT = """query($id:String!){ team(id:$id){ parent{ id labels(first:250){nodes{id name}} } } }"""
 
 
 MARK = "<!-- copied from GitHub {}#{}"
@@ -834,8 +848,16 @@ def copy(args):
         fail('No Linear team with the key "{}" that this key can see. Nothing was written.'.format(args.team.upper()), 1)
     team = teams[0]
     needs_human = {s["name"].lower(): s["id"] for s in team["states"]["nodes"]}.get(NEEDS_HUMAN.lower())
+    # Every label the team can use: the workspace's, those of each team above it, then its own.
+    usable, above, seen = [], team["id"], set()
+    while above and above not in seen:
+        seen.add(above)
+        parent = (linear(key, TEAM_PARENT, {"id": above}).get("team") or {}).get("parent")
+        above = (parent or {}).get("id")
+        if parent:
+            usable = ((parent.get("labels") or {}).get("nodes") or []) + usable
     labels = {}
-    for label in ((found.get("issueLabels") or {}).get("nodes") or []) + team["labels"]["nodes"]:
+    for label in ((found.get("issueLabels") or {}).get("nodes") or []) + usable + team["labels"]["nodes"]:
         labels[label["name"].lower()] = label["id"]
 
     # Read every chosen issue before writing anything, so a GitHub failure writes nothing.
@@ -849,26 +871,37 @@ def copy(args):
     # Copies already made, anywhere on the team, archived ones too, found by their hidden line only:
     # a renamed project or a copy moved to another project is still found, and nothing else can tell
     # which issue a copy came from.
-    found, homes = {}, collections.Counter()
+    found, home = {}, {}
     for node in sorted(every_page(key, COPIES, {"team": team["id"], "mark": MARK.format(args.repo, "")},
                                   ("issues",)), key=lambda n: n["createdAt"]):
         number = copied_from(args.repo, node.get("description"))
-        if number is not None:
-            found.setdefault(number, node["id"])
-            if node.get("project"):
-                homes[node["project"]["id"]] += 1
+        if number is not None and number not in found:
+            found[number] = node["id"]
+            home[number] = (node.get("project") or {}).get("id")
 
-    # The project: the one the earlier copies sit in, whatever it is called now; else found by name
-    # on this team; else made.
-    if homes:
-        projects = [linear(key, PROJECT_BY_ID, {"id": homes.most_common(1)[0][0]}).get("project")]
-    else:
-        projects = [p for p in ((linear(key, PROJECTS, {"name": title}).get("projects") or {}).get("nodes") or [])
-                    if any(t["id"] == team["id"] for t in p["teams"]["nodes"])]
+    # An issue in another GitHub project too may have been copied with that project, so its copy never
+    # says where this project's Linear project is.
+    elsewhere = {}
+    for issue in issues:
+        others = sorted({(item.get("project") or {}).get("title") for item in
+                         ((issue.get("projectItems") or {}).get("nodes") or [])} - {title, None})
+        if others:
+            elsewhere[issue["number"]] = others
+
+    # The project: a GitHub project is a Linear project of the same name, found by that name on this
+    # team. Only when none has it, as after a rename, the one most of this project's own earlier copies
+    # sit in. Else it is made.
+    projects = [p for p in ((linear(key, PROJECTS, {"name": title}).get("projects") or {}).get("nodes") or [])
+                if any(t["id"] == team["id"] for t in p["teams"]["nodes"])]
     if len(projects) > 1:
         fail('{} Linear projects on the team are named "{}". Nothing was written.'.format(len(projects), shown(title)), 1)
+    homes = collections.Counter(home[n] for n, _ in items if home.get(n) and n not in elsewhere)
+    if not projects and homes:
+        projects = [linear(key, PROJECT_BY_ID, {"id": homes.most_common(1)[0][0]}).get("project")]
     project = projects[0] if projects and projects[0] else create(key, "projectCreate", "project",
                                                                    {"name": title, "teamIds": [team["id"]]})
+    # Copies made before into another Linear project stay there, and are named.
+    apart = [n for n, _ in items if n in found and home.get(n) != project["id"]]
     existing = (project.get("projectMilestones") or {}).get("nodes") or []
     milestones = {m["name"]: m["id"] for m in existing}
     made = {m["name"]: float(m.get("sortOrder") or 0) for m in existing}
@@ -883,6 +916,7 @@ def copy(args):
             new_milestones += 1
 
     new_issues = new_comments = new_labels = 0
+    left_off = collections.OrderedDict()
     for issue in issues:
         if issue["number"] in found:
             target = {"id": found[issue["number"]]}
@@ -895,9 +929,23 @@ def copy(args):
                 if name.lower() in NEEDS_HUMAN_LABELS:
                     held = True
                     continue
+                if labels.get(name.lower(), "") is None:
+                    left_off[name.lower()][1].append(issue["number"])
+                    continue
                 if name.lower() not in labels:
-                    labels[name.lower()] = create(key, "issueLabelCreate", "issueLabel",
-                                                  {"name": name, "teamId": team["id"]})["id"]
+                    query = ("mutation($input:IssueLabelCreateInput!){ issueLabelCreate(input:$input){ "
+                             "success issueLabel{ id } } }")
+                    try:
+                        answer = linear(key, query, {"input": {"name": name, "teamId": team["id"]}}, refusal=True)
+                    except Refused as refused:
+                        # A team under this one holds a label of that name, which this team cannot use and
+                        # Linear will not repeat above it. The issue is copied without it, and it is named.
+                        if "inherited label" not in str(refused).lower():
+                            fail("Linear refused the request: {}".format(refused), 1)
+                        labels[name.lower()] = None
+                        left_off[name.lower()] = (name, [issue["number"]])
+                        continue
+                    labels[name.lower()] = made(answer, "issueLabelCreate", "issueLabel")["id"]
                     new_labels += 1
                 label_ids.append(labels[name.lower()])
             fields = {"teamId": team["id"], "title": issue["title"],
@@ -933,6 +981,16 @@ def copy(args):
         new_comments, "" if new_comments == 1 else "s", new_labels, "" if new_labels == 1 else "s"))
     if len(issues) > new_issues:
         lines.append("Already in Linear, so not made again: {}.".format(plural(len(issues) - new_issues)))
+    if apart:
+        lines.append("Copied before into another Linear project, and left there: {}.".format("; ".join(
+            "#{}".format(n) + (" (in more than one GitHub project: {})".format(", ".join(
+                '"{}"'.format(shown(t)) for t in [title] + elsewhere[n])) if n in elsewhere else "")
+            for n in apart)))
+    if left_off:
+        lines.append("Labels left off, because a team under this one already has a label of that name, which "
+                     "Linear will not make again on this team: {}. Add them in Linear by hand if wanted.".format(
+                         "; ".join('"{}" (on {})'.format(shown(name), ", ".join("#{}".format(n) for n in numbers))
+                                   for name, numbers in left_off.values())))
     lines += link_lines
     lines.append("Nothing was written to GitHub.")
     print(hide("\n".join(lines), key))
@@ -999,6 +1057,29 @@ def as_written(text):
     return " ".join(text.split())
 
 
+TABLE_DIVIDER = re.compile(r"\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*")
+AUTOLINK = re.compile(r"\[([^\[\]\n]+)\]\(<?(?:https?://|mailto:)?\1/?>?\)")
+ESCAPE = re.compile(r"\\([!-/:-@\[-`{-~])")
+
+
+def as_linear_shows(text):
+    """Text as finish compares a GitHub text with its Linear copy: as_written, after letting go of what
+    Linear rewrites by itself when it saves text. It writes a table's divider row as `| -- |`, a list
+    bullet as `*`, a symbol with a backslash before it (`~` as `\\~`), and a bare address such as
+    example.com as a link to itself, `[example.com](<http://example.com>)`. Both sides are folded the
+    same way, so any other change, a word, a number or a symbol, still differs."""
+    text = ESCAPE.sub(r"\1", text or "")
+    text = AUTOLINK.sub(r"\1", text)
+    lines = []
+    for line in text.splitlines():
+        if "|" in line and "-" in line and TABLE_DIVIDER.fullmatch(line):
+            cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+            line = "|" + "|".join((":" if c.startswith(":") else "") + "-" + (":" if c.endswith(":") else "")
+                                  for c in cells) + "|"
+        lines.append(re.sub(r"^(\s*)[-+*](\s)", r"\1*\2", line))
+    return as_written("\n".join(lines))
+
+
 def close_not_planned(repo, number):
     """Close one GitHub issue as not planned, with no comment: nothing is deleted and nothing names
     its Linear copy. True when gh closed it."""
@@ -1047,7 +1128,7 @@ def finish(args):
                     count += 1
             return count
 
-        matched = found(as_written)
+        matched = found(as_linear_shows)
         linear_comments += matched
         text = linear(key, COPY_TEXT, {"id": copies[number]}).get("issue") or {}
         if matched < len(wanted) and found(same_text) == len(wanted):
@@ -1058,7 +1139,7 @@ def finish(args):
             held.append("#{} has {} of its {} comments in Linear".format(number, matched, len(wanted)))
         elif as_written(text.get("title")) != as_written(issue["title"]):
             held.append("#{} has another title in Linear".format(number))
-        elif as_written(without_mark(text.get("description"))) != as_written(
+        elif as_linear_shows(without_mark(text.get("description"))) != as_linear_shows(
                 without_mark(with_mark(issue.get("body"), args.repo, number))):
             held.append("#{} has other text in Linear".format(number))
         else:

@@ -157,13 +157,17 @@ written until it comes.
 into Linear, and writes nothing to GitHub:
 
 - One Linear project with the GitHub project's name, on the target team,
-  made when the team has none by that name.
+  found by that name, and made when the team has none by that name. Each
+  GitHub project of one repository moved to the same team gets its own.
 - Each GitHub milestone a milestone inside it, named as step 3 showed, in
   build order. An issue lands in the milestone its GitHub milestone maps to;
   an issue with no milestone lands in the project with no milestone.
-- Each issue with the same title, body and labels. A label the team does not
-  have yet is made on the team. `needs-decision` and `parked` are not copied
-  as labels: the issue lands as Needs Human instead.
+- Each issue with the same title, body and labels. A label the team can
+  already use (its own, the workspace's, or one of a team above it) is used;
+  any other is made on the team. When a team under it already has a label of
+  that name, Linear will not make it, so the issue is copied without it and
+  the label is named. `needs-decision` and `parked` are not copied as labels:
+  the issue lands as Needs Human instead.
 - Every comment, oldest first, each starting with a line naming who wrote it
   on GitHub and when, in Eastern, because the copy is posted as the person
   running the move:
@@ -181,7 +185,11 @@ the GitHub issue it came from:
 Run it again and nothing is copied twice: an issue whose copy carries that
 line, anywhere on the team, is not made again, however its title or text
 changed since, and even when the Linear project was renamed or the copy moved
-to another project; new issues then land in the project the copies sit in.
+to another project. A copy that sits in another Linear project is left there
+and named. When no Linear project has the GitHub project's name, as after a
+rename, new issues land in the project this GitHub project's own copies sit
+in; an issue that is in another GitHub project too is named and never picks
+it.
 Only the last line of a copy's body counts, and a line like it written into
 the GitHub text is changed so it never counts. A
 comment already on its copy is not posted again; two comments with the same
@@ -230,8 +238,11 @@ It writes nothing to Linear. It prints the count of issues and comments on
 GitHub and on their Linear copies, and lists every image in the GitHub text,
 so the person can check each one shows in Linear. Then it closes on GitHub,
 as not planned, each issue whose copy holds the same title, body and every
-one of its comments, symbol for symbol; only spacing, and Linear writing a
-link's address inside `<>`, are let go. It posts no comment and deletes
+one of its comments, symbol for symbol. Only what Linear rewrites by itself
+is let go: spacing, a link's address inside `<>`, a table's divider row
+(`|---|` as `| -- |`), a list bullet (`-` as `*`), a backslash before a
+symbol (`~` as `\~`), and a bare address made a link to itself. A lost word
+or a changed number or symbol still holds the issue open. It posts no comment and deletes
 nothing, so nothing on GitHub names the Linear copy, and the copy names its
 GitHub issue only in its hidden line. An issue whose copy is missing, short a
 comment, or holds another title, body or comment text stays open and is
