@@ -15,6 +15,7 @@ python3 hooks/tests/migrate-copy-test.py
 import http.server
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -71,7 +72,8 @@ if query.lstrip().startswith("mutation"):
 world = json.load(open(os.environ["FAKE_GH_WORLD"]))
 if "projectV2" in query:
     owner = "organization" if "organization(" in query else "user"
-    print(json.dumps({"data": {owner: {"projectV2": world["project"]}}}))
+    project = world.get("projects", {}).get(fields.get("number"), world["project"])
+    print(json.dumps({"data": {owner: {"projectV2": project}}}))
     sys.exit(0)
 number = fields["number"]
 if number in world.get("broken", []):
@@ -172,6 +174,10 @@ class Store:
         self.comments = []
         self.relations = []
         self.writes = []
+        # Labels the team cannot use but Linear still refuses to repeat: on a team under it.
+        self.sub_team_labels = []
+        # Labels of the team above, which this team may use.
+        self.parent_labels = []
 
     def next(self, prefix):
         self.n += 1
@@ -200,6 +206,8 @@ def answer(store, body):
             store.milestones.append(m)
             return {"projectMilestoneCreate": {"success": True, "projectMilestone": {"id": m["id"]}}}
         if "issueLabelCreate" in query:
+            if data["name"].lower() in [l["name"].lower() for l in store.sub_team_labels + store.parent_labels]:
+                raise AssertionError("conflicting inherited label - use replaceTeamLabels")
             label = {"id": store.next("lb"), "name": data["name"]}
             store.team_labels.append(label)
             return {"issueLabelCreate": {"success": True, "issueLabel": {"id": label["id"]}}}
@@ -212,7 +220,12 @@ def answer(store, body):
             store.comments.append(c)
             return {"commentCreate": {"success": True, "comment": {"id": c["id"]}}}
         raise AssertionError("unknown mutation " + query)
-    if "teams(" in query:
+    if "team(id:" in query and "parent{" in query:
+        parent = {"id": "team-parent", "labels": {"nodes": store.parent_labels}} if (
+            v.get("id") == "team-web" and store.parent_labels) else None
+        return {"team": {"parent": parent}}
+    # The team lookup asks for teams at the top; a project's own teams list is not that lookup.
+    if re.search(r"\{\s*teams\(", query):
         nodes = [{"id": "team-web", "key": "WEB", "states": {"nodes": store.states},
                   "labels": {"nodes": store.team_labels}}] if v.get("key") == "WEB" else []
         return {"teams": {"nodes": nodes}, "issueLabels": {"nodes": store.workspace_labels}}
@@ -273,10 +286,12 @@ def answer(store, body):
 class Linear(http.server.BaseHTTPRequestHandler):
     store = None
     auths = []
+    queries = []
 
     def do_POST(self):
         body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
         Linear.auths.append(self.headers.get("Authorization"))
+        Linear.queries.append(body["query"])
         try:
             payload = {"data": answer(Linear.store, body)}
         except AssertionError as error:
@@ -1004,6 +1019,160 @@ for name, plan_path in (
     open(envf["FAKE_GH_LOG"], "w").close()
     code, out, err = finish(envf, plan=plan_path)
     check("finish refuses {} and closes nothing".format(name), code != 0 and not closes(envf), out + err)
+
+# --- MAST-18: several GitHub projects of one repository moved to one Linear team, each into its own
+# Linear project (Robert, November 3: "A project in Github is a project in Linear").
+
+def world_of(projects):
+    """A world with several GitHub projects of acme/site, {number: (title, issues)}. An issue listed under
+    two projects is in both, and GitHub says so on the issue."""
+    world, titles = {"projects": {}, "issues": {}}, {}
+    for number, (title, issues) in projects.items():
+        one = world_for(issues)
+        one["project"]["title"] = title
+        world["projects"][str(number)] = one["project"]
+        for n in one["issues"]:
+            titles.setdefault(n, []).append(title)
+        world["issues"].update(one["issues"])
+    for n, issue in world["issues"].items():
+        issue["projectItems"] = {"nodes": [{"project": {"title": t}} for t in titles[n]]}
+    world["project"] = world["projects"][str(min(projects))]
+    return world
+
+
+def run_project(env, command, number, plan_path, *extra):
+    args = [sys.executable, SCRIPT, command, "--repo", "acme/site", "--project", str(number), "--team", "WEB",
+            "--key-env", "MY_LINEAR_KEY", "--plan", plan_path] + list(extra)
+    result = subprocess.run(args, env=env, capture_output=True, text=True, timeout=60)
+    return result.returncode, result.stdout, result.stderr
+
+
+def plan_for(number):
+    return save_plan(tempfile.mkdtemp(prefix="migrate-plan-"), source="acme/site project {}".format(number))
+
+
+def copy_number(store, number):
+    found = [i for i in store.issues if i["description"].endswith("acme/site#{} -->".format(number))]
+    return found[0] if len(found) == 1 else None
+
+
+def project_of(store, number):
+    found = copy_number(store, number)
+    names = {p["id"]: p["name"] for p in store.projects}
+    return names.get(found.get("projectId")) if found else None
+
+
+plan7, plan8 = plan_for(7), plan_for(8)
+
+# Two GitHub projects of one repository, copied one after the other to one team.
+INDEX = [gh_issue(71, "Index the code", None), gh_issue(72, "Speed up search", "Code index: 1. Faster")]
+PRINT = [gh_issue(73, "Print the poster", "Poster: 1. Draft"), gh_issue(74, "Mail the poster", None)]
+Linear.store = store = Store()
+Linear.queries = []
+envp, _ = fake_gh(world_of({7: ("Code index", INDEX), 8: ("Poster", PRINT)}))
+code7, out7, err7 = run_project(envp, "copy", 7, plan7)
+code8, out8, err8 = run_project(envp, "copy", 8, plan8)
+check("two GitHub projects of one repository copied one after the other both run", code7 == 0 and code8 == 0,
+      out7 + err7 + out8 + err8)
+check("each GitHub project gets its own Linear project with its own name",
+      sorted(p["name"] for p in store.projects) == ["Code index", "Poster"], store.projects)
+check("the first project's issues are in its own Linear project",
+      project_of(store, 71) == "Code index" and project_of(store, 72) == "Code index",
+      [(i["description"], i["projectId"]) for i in store.issues])
+check("the second project's issues are in its own Linear project, not the first one's",
+      project_of(store, 73) == "Poster" and project_of(store, 74) == "Poster",
+      [(i["description"], i["projectId"]) for i in store.issues])
+poster = [p["id"] for p in store.projects if p["name"] == "Poster"]
+check("the second project's milestone is inside its own Linear project",
+      [m["projectId"] for m in store.milestones if m["name"] == "1. Draft"] == poster, store.milestones)
+code8, out8, err8 = run_project(envp, "copy", 8, plan8)
+check("copying the second project again still uses its own Linear project and makes nothing",
+      code8 == 0 and len(store.projects) == 2 and len(store.issues) == 4, out8 + err8)
+
+# An issue in two GitHub projects never pulls the second project into the first one's Linear project.
+SHARED = gh_issue(75, "Rotate the keys", None)
+TRUST = [gh_issue(76, "Pin the actions", None), SHARED]
+AUDIT = [gh_issue(77, "Write the policy", None), SHARED]
+Linear.store = store = Store()
+envs, _ = fake_gh(world_of({7: ("CI trust", TRUST), 8: ("Audit", AUDIT)}))
+code7, out7, err7 = run_project(envs, "copy", 7, plan7)
+code8, out8, err8 = run_project(envs, "copy", 8, plan8)
+check("a project sharing an issue with one copied before gets its own Linear project",
+      code8 == 0 and sorted(p["name"] for p in store.projects) == ["Audit", "CI trust"], out8 + err8)
+check("its own issues land in it", project_of(store, 77) == "Audit",
+      [(i["description"], i["projectId"]) for i in store.issues])
+check("the shared issue keeps its one copy, where it was first copied",
+      project_of(store, 75) == "CI trust" and len(store.issues) == 3, [i["description"] for i in store.issues])
+check("the shared issue is named, not used to pick the project",
+      "#75" in out8 and "more than one GitHub project" in out8, out8)
+
+# Every list Linear prices carries a first: limit, so Linear never refuses a query as too complex.
+LISTS = re.compile(r"\b(teams|projects|projectMilestones|labels|issueLabels|states|issues|comments|relations)"
+                   r"\s*(\([^)]*\))?\s*\{")
+
+
+def unlimited(query):
+    return [name for name, args in LISTS.findall(query) if "first:" not in args]
+
+
+Linear.store = store = Store()
+Linear.queries = []
+envq, _ = fake_gh(world_of({7: ("Code index", INDEX), 8: ("Poster", PRINT)}))
+run_project(envq, "copy", 7, plan7)
+store.projects[0]["name"] = "Code index, renamed in Linear"
+run_project(envq, "copy", 7, plan7)
+run_project(envq, "finish", 7, plan7)
+check("the team and project queries were sent", any("teams(" in q for q in Linear.queries)
+      and any("projects(" in q for q in Linear.queries) and any("project(id" in q for q in Linear.queries),
+      Linear.queries)
+check("every team, project, milestone and label list asked of Linear carries a first: limit",
+      not [q for q in Linear.queries if unlimited(q)], [(unlimited(q), q) for q in Linear.queries if unlimited(q)])
+
+# finish lets go of Linear's own rewrites: table dividers, bullets, escapes and links it makes of bare
+# addresses. A copy that lost a word or changed a number is still held open.
+GITHUB_TEXT = ("| Step | Owner |\n|---|---|\n| Build | Pat |\n\n- first part\n- second ~ish part\n\n"
+               "See example.com for 3 notes.")
+LINEAR_TEXT = ("| Step | Owner |\n| -- | -- |\n| Build | Pat |\n\n* first part\n* second \\~ish part\n\n"
+               "See [example.com](<http://example.com>) for 3 notes.")
+REWRITES = [gh_issue(81, "Same text", None, body=GITHUB_TEXT,
+                     comments=[comment("octocat", "2026-11-03T18:27:00Z", "- one\n- two ~ three")]),
+            gh_issue(82, "Lost a word", None, body=GITHUB_TEXT),
+            gh_issue(83, "Changed a number", None, body=GITHUB_TEXT)]
+Linear.store = store = Store()
+envw, _ = fake_gh(world_for(REWRITES))
+run(envw, plan=plan7)
+for number, text in ((81, LINEAR_TEXT), (82, LINEAR_TEXT.replace("second ", "")),
+                     (83, LINEAR_TEXT.replace("3 notes", "4 notes"))):
+    copy_number(store, number)["description"] = text + "\n\n<!-- copied from GitHub acme/site#{} -->".format(number)
+for c in store.comments:
+    c["body"] = c["body"].replace("- one\n- two ~ three", "* one\n* two \\~ three")
+open(envw["FAKE_GH_LOG"], "w").close()
+code, out, err = finish(envw, plan=plan7)
+check("finish closes an issue whose copy differs only by Linear's table, bullet, escape and link rewrites",
+      81 in closed_numbers(envw), out + err)
+check("finish holds open a copy that lost a word", 82 not in closed_numbers(envw)
+      and "#82 has other text in Linear" in out, out)
+check("finish holds open a copy that changed a number", 83 not in closed_numbers(envw)
+      and "#83 has other text in Linear" in out, out)
+
+# A label that lives only on a team under the target team does not stop the copy; one on the team above is used.
+LABELLED = [gh_issue(91, "Draw the logo", None, labels=["Design", "Feature"]),
+            gh_issue(92, "Run the deploy", None, labels=["Ops"])]
+Linear.store = store = Store()
+store.sub_team_labels = [{"id": "lb-sub-design", "name": "Design"}]
+store.parent_labels = [{"id": "lb-parent-ops", "name": "Ops"}]
+envl, _ = fake_gh(world_for(LABELLED))
+code, out, err = run(envl, plan=plan7)
+check("a label that exists only on a team under the target team does not stop the copy",
+      code == 0 and len(store.issues) == 2, out + err)
+logo = copy_number(store, 91)
+check("the issue is copied with the labels the team can use",
+      logo is not None and logo.get("labelIds") == ["lb-feature"], logo)
+check("the label left off is named, with its issue", '"Design"' in out and "#91" in out, out)
+deploy = copy_number(store, 92)
+check("a label of the team above is used, not made again",
+      deploy is not None and deploy.get("labelIds") == ["lb-parent-ops"]
+      and not any(l["name"] == "Ops" for l in store.team_labels), (deploy, store.team_labels))
 
 # --- The skill says how to run the copy, by key and by connector.
 
