@@ -735,6 +735,28 @@ sed 's/old/new/g' scripts/create-pr.sh
 sed -i '' 's|a/b|c/d|' scripts/create-pr.sh
 sed -i.bak -e 's/a/b/2' scripts/create-pr.sh
 EOF
+# Round 2 fix 1: the shell drops a comment, apostrophes and all, so an apostrophe
+# in one comment does not open a quote that runs on to the next line and hides it.
+gated_lines() {
+  # $1 = what the case shows, $2 = the command.
+  run_gate "$d" "$2"
+  ok "$STATUS" "2" "$1"
+}
+gated_lines "a run on the line after a comment with an apostrophe is still gated" "cat README.md  # let's look
+bash scripts/create-pr.sh --fill  # it's ready"
+gated_lines "the same after a read of the script itself" "cat scripts/create-pr.sh | head -5  # let's see it
+bash scripts/create-pr.sh --fill  # it's ready"
+gated_lines "the same with the run handed to git in a variable" "cat README.md  # let's look
+GIT_EXTERNAL_DIFF=scripts/create-pr.sh git diff  # it's the diff"
+gated_lines "the same with no space before the comment's text" "cat README #don't skip
+bash scripts/create-pr.sh #it's ready"
+run_gate "$d" "cat scripts/create-pr.sh  # let's see it"
+ok "$STATUS" "0" "a read with a comment that holds an apostrophe is not gated"
+run_gate "$d" "# look at the script, it's long
+cat scripts/create-pr.sh | head -5  # the top of it"
+ok "$STATUS" "0" "a read under a comment line is not gated"
+run_gate "$d" "grep -n 'a # b' scripts/create-pr.sh"
+ok "$STATUS" "0" "a # inside quotes is part of the pattern, not a comment"
 
 # A stand-in for mix that counts its calls, for the cases that ask whether the
 # slow Elixir rung ran at all. It exits with the code in $TMP/mixcode.
