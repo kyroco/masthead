@@ -35,7 +35,205 @@ if re.match(r"^mcp__.+__create_pull_request$", str(d.get("tool_name") or "")): p
 else: print((d.get("tool_input") or {}).get("command",""))' 2>/dev/null || true)"
 _CWD="$(printf '%s\n' "$_PARSED" | head -1)"
 _CMD="$(printf '%s\n' "$_PARSED" | tail -n +2)"
-# Pass the command unless it is a git push, a `gh pr create` or a create-pr.sh run; a here-string avoids a SIGPIPE false pass.
+# The Python that reads the words of the command. It is held in a plain here-document, outside any $( ),
+# because bash 3.2 reads a quote or a backtick in a here-document nested inside $( ) as its own.
+_CMD_READER=""
+IFS= read -r -d '' _CMD_READER <<'PYEOF' || true
+import re, subprocess, sys
+# What a push sends, from the command CMD and the tree of HEAD: skip, check, or other REFSPEC.
+cmd, head_tree = sys.argv[1], sys.argv[2]
+VALUED = {"-o", "--push-option", "--repo", "--receive-pack", "--exec"}
+
+
+def shell_words(seg):
+    """Split one command into words the way a shell does, leaving out its redirections:
+    2>&1, >file, >>file, &>file, <file, and an operator whose target is the next word.
+    A quoted or escaped > or < is part of a word, as it is to the shell."""
+    words, cur, plain, drop, i, n = [], None, True, False, 0, len(seg)
+    while i <= n:
+        c = seg[i] if i < n else " "
+        redirect = c in "<>" or (c == "&" and seg[i + 1:i + 2] == ">")
+        if c in " \t\r\n" or redirect:
+            # A word made only of the bare digits 0 to 9, right against the operator, is its file descriptor.
+            # Only those ten: str.isdigit() and \d also take digits of other scripts, which the shell reads as a word.
+            if redirect and cur is not None and plain and re.fullmatch(r"[0-9]+", cur):
+                cur = None
+            if cur is not None:
+                if drop:
+                    drop = False  # this word was the target of the redirect before it
+                else:
+                    words.append(cur)
+            cur, plain = None, True
+            if redirect:
+                while i < n and seg[i] in "<>&|":
+                    i += 1
+                drop = True
+                continue
+        elif c == "'":
+            end = seg.find("'", i + 1)
+            if end < 0:
+                raise ValueError("no closing quote")
+            cur, plain, i = (cur or "") + seg[i + 1:end], False, end
+        elif c == '"':
+            cur, plain, i = cur or "", False, i + 1
+            while i < n and seg[i] != '"':
+                if seg[i] == "\\" and seg[i + 1:i + 2] in ('"', "\\", "$", "`"):
+                    i += 1
+                cur += seg[i]
+                i += 1
+            if i >= n:
+                raise ValueError("no closing quote")
+        elif c == "\\":
+            if i + 1 >= n:
+                raise ValueError("nothing after the backslash")
+            cur, plain, i = (cur or "") + seg[i + 1], False, i + 1
+        else:
+            cur = (cur or "") + c
+        i += 1
+    return words
+
+
+def loose_words(seg):
+    """The same for a piece shell_words cannot read (a quote cut in half): split on spaces, drop what is shaped like a redirect."""
+    words, drop = [], False
+    for word in seg.split():
+        if drop:
+            drop = False
+        elif re.match(r"^([0-9]*|&)[<>]", word):
+            drop = re.match(r"^([0-9]*|&)[<>]+[&|]?$", word) is not None
+        else:
+            words.append(word)
+    return words
+
+
+def parts(text):
+    """The commands in one command line, cut at newlines, ;, &&, || and |, quotes not read."""
+    return re.split(r"\n|;|&&|\|\||\|", text)
+
+
+def drop_assignments(words):
+    while words and re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", words[0]):
+        words.pop(0)
+    return words
+
+
+def shell_parts(text):
+    """The commands in one command line, cut where the shell cuts them: at a newline, ;, &&, ||, | or a lone &
+    that is not inside quotes, with a line continued by a backslash joined first. Also says what the line holds
+    that this reader does not follow: a command inside it ($( ), backticks, <( ), >( ), which stay live inside
+    double quotes), a command sent to the background, or a here-document. Raises ValueError on a quote left open."""
+    pieces, holds, cur, quote, i, n = [], set(), "", None, 0, len(text)
+    while i < n:
+        c, two = text[i], text[i:i + 2]
+        if quote == "'":
+            quote = None if c == "'" else quote
+        elif c == "\\" and i + 1 < n:
+            if text[i + 1] != "\n":
+                cur += two
+            i += 2
+            continue
+        elif two == "$(" or c == "`":
+            holds.add("a command inside it")
+        elif quote == '"':
+            quote = None if c == '"' else quote
+        elif c in "'\"":
+            quote = c
+        elif text[i:i + 3] == "<<<":
+            cur, i = cur + "<<<", i + 3
+            continue
+        elif two in ("<(", ">("):
+            holds.add("a command inside it")
+        elif two == "<<":
+            holds.add("a here-document")
+        elif two in ("&&", "||") or c in ";|\n":
+            pieces.append(cur)
+            cur, i = "", i + (2 if two in ("&&", "||") else 1)
+            continue
+        elif c == "&" and not (text[i - 1:i] in ("<", ">") or text[i + 1:i + 2] == ">"):
+            holds.add("a command sent to the background")
+            pieces.append(cur)
+            cur, i = "", i + 1
+            continue
+        cur += c
+        i += 1
+    if quote:
+        raise ValueError("no closing quote")
+    pieces.append(cur)
+    return pieces, holds
+
+
+# A command that names create-pr.sh is taken for a run of it, whatever else it does and however the name
+# reaches the shell (a word, a redirect, a here-string), so it needs the receipt. The top of the gate decides
+# the same way: there is no rule that tells a read of the file from a run. One was tried and taken out, because
+# every review of it found a new way to run the script past it.
+verdict = "check" if "create-pr.sh" in cmd else "skip"
+# Two readings of the command, and a push that either one shows is read. The first cuts the line without
+# reading quotes, as this gate always has, so a push written inside a quoted command line is still seen. The
+# second cuts it where the shell does, so a push whose words a line continuation, or a ; or | inside quotes,
+# would split is read whole.
+readings = []
+for seg in parts(cmd):
+    try:
+        readings.append(shell_words(seg))
+    except ValueError:
+        readings.append(loose_words(seg))
+try:
+    readings.extend([shell_words(seg) for seg in shell_parts(cmd)[0]])
+except ValueError:
+    pass  # a quote left open: only the first reading stands
+for words in readings:
+    words = drop_assignments(words)
+    if not words:
+        continue
+    joined = " ".join(words)
+    if re.search(r"(^|\s)gh\s+pr\s+create(\s|$)", joined):
+        verdict = "check" if verdict == "skip" else verdict
+        continue
+    if words[0] != "git":
+        continue
+    i = 1
+    while i < len(words) and words[i].startswith("-"):
+        i += 2 if words[i] in ("-C", "-c") else 1
+    if i >= len(words) or words[i] != "push":
+        continue
+    args, deleting, positional = words[i + 1:], False, []
+    j = 0
+    while j < len(args):
+        a = args[j]
+        if a in ("--delete", "-d"):
+            deleting = True
+        elif a in ("--all", "--mirror", "--branches"):
+            print("other " + a)
+            sys.exit(0)
+        elif a in VALUED:
+            j += 1
+        elif not a.startswith("-"):
+            positional.append(a)
+        j += 1
+    refspecs = positional[1:]
+    if deleting:
+        continue
+    if not refspecs:
+        verdict = "check"
+        continue
+    for spec in refspecs:
+        src = spec.lstrip("+").split(":", 1)[0]
+        if src == "":
+            continue  # ":branch" deletes it
+        if not head_tree:
+            verdict = "check"  # no commit yet: nothing to compare, the check decides
+            continue
+        tree = subprocess.run(["git", "rev-parse", "--verify", "-q", src + "^{tree}"],
+                              capture_output=True, text=True).stdout.strip()
+        if tree != head_tree:
+            print("other " + spec)
+            sys.exit(0)
+        verdict = "check"
+print(verdict)
+PYEOF
+
+# Pass the command unless it is a git push, a `gh pr create` or one that names create-pr.sh; a here-string avoids a SIGPIPE false pass.
+# Naming create-pr.sh is enough: a read of the file is gated like a run of it, which is the loose match kept on purpose.
 if ! grep -Eq '(^|[^[:alnum:]_./-])git([[:space:]]+[^;&|[:space:]]+)*[[:space:]]+push([[:space:]]|$|[;&|])|gh[[:space:]]+pr[[:space:]]+create|create-pr\.sh' <<<"$_CMD"; then
   exit 0
 fi
@@ -65,6 +263,91 @@ BASE="$(git merge-base HEAD origin/main 2>/dev/null || true)"
 if [ -z "$BASE" ]; then
   echo "WARN: no origin/main to compare against, so only uncommitted files were checked. Run 'git fetch origin main' and push again for a full check." >&2
 fi
+
+# Remember a pass. When every rung has passed, one line goes into this worktree's git directory, and a later
+# call whose state matches that line skips the slow stack rungs. The quick rungs always run. The line names
+# what the slow rungs read: the tree of HEAD, the merge base with origin/main, this script with the fact
+# reader beside it, the pinned toolchain file, and a print of the files git ignores (see ignored_print). A
+# checkout with anything uncommitted, untracked or hidden from git status has no key, and neither has a call
+# whose environment can point git somewhere else. So no variable and no setting can aim the gate at a record
+# made for another commit: the most one can do is switch the reuse off. What the line cannot see is listed in
+# the gate catalog.
+pass_key() {
+  local name dirty hidden links tree gate toolchain toolsum tools
+  [ -n "$BASE" ] || return 0
+  # Any GIT_ variable outside this list may move the repository, the index, the objects or the config git reads.
+  for name in $(env | sed -n 's/^\(GIT_[A-Za-z0-9_]*\)=.*/\1/p'); do
+    case "$name" in
+      GIT_EDITOR|GIT_SEQUENCE_EDITOR|GIT_PAGER|GIT_TERMINAL_PROMPT|GIT_ASKPASS|GIT_SSH|GIT_SSH_COMMAND) ;;
+      GIT_CEILING_DIRECTORIES|GIT_OPTIONAL_LOCKS|GIT_AUTHOR_*|GIT_COMMITTER_*|GIT_TRACE*) ;;
+      *) return 0 ;;
+    esac
+  done
+  # The rungs check files on disk, so one uncommitted or untracked file means the tree of HEAD is not what they saw.
+  dirty="$(git status --porcelain --untracked-files=all --ignore-submodules=none 2>/dev/null)" || return 0
+  [ -z "$dirty" ] || return 0
+  # A file marked assume-unchanged or skip-worktree can differ on disk while git status calls the tree clean.
+  hidden="$(git ls-files -v 2>/dev/null)" || return 0
+  grep -q '^[a-zS] ' <<<"$hidden" && return 0
+  # A submodule keeps an index of its own, where a file can be hidden the same way out of this checkout's sight,
+  # and files git ignores that this checkout cannot list. A checkout that holds one has no key.
+  links="$(git ls-files -s 2>/dev/null)" || return 0
+  grep -q '^160000 ' <<<"$links" && return 0
+  tree="$(git rev-parse --verify -q 'HEAD^{tree}' 2>/dev/null)" || return 0
+  [ -n "$tree" ] || return 0
+  # A plugin update changes this script or the fact reader, and so voids every record made before it.
+  gate="$(cat "$_HOOK_DIR/$(basename "${BASH_SOURCE[0]}")" "$_HOOK_DIR/project_fact.py" 2>/dev/null | git hash-object --stdin 2>/dev/null)" || return 0
+  [ -n "$gate" ] || return 0
+  toolsum=none
+  toolchain="$(project_fact "$TOP" --path PROJECT_TOOLCHAIN_ENV)"
+  if [ -n "$toolchain" ] && [ -f "$toolchain" ]; then
+    toolsum="$(git hash-object --no-filters -- "$toolchain" 2>/dev/null)" || return 0
+    [ -n "$toolsum" ] || return 0
+  fi
+  # Where each tool the stack rungs call is found on PATH, or that it is not found: a tool installed, removed
+  # or moved since the pass changes which checks run, so it changes the key. A tool upgraded in place is not seen.
+  tools="$(for name in mix elixir node npx npm swift swiftformat swiftlint tofu terraform tflint checkov trivy; do
+    printf '%s=%s\n' "$name" "$(command -v "$name" 2>/dev/null || true)"
+  done | git hash-object --stdin 2>/dev/null)" || return 0
+  [ -n "$tools" ] || return 0
+  printf 'masthead push gate pass 3 tree=%s base=%s gate=%s toolchain=%s tools=%s\n' "$tree" "$BASE" "$gate" "$toolsum" "$tools"
+}
+# The files git ignores are read by the stack rungs too: installed packages, build output. This prints one
+# hash over the path, size and time stamp of every one of them, so a file that is added, changed or removed
+# after a pass shows as a different print. An ignored folder that is a git clone of its own (a package
+# fetched from git) comes from git as one entry, so its files are walked. One whose .git is a file is a
+# linked worktree, another checkout with a gate of its own, and is not walked: a main checkout can hold
+# dozens of them, each as large as itself. The rungs write build output themselves, so the print is taken
+# after they pass, and it is not part of the key that is compared across the run. Prints nothing when the
+# files cannot be listed, and then nothing is remembered or reused.
+ignored_print() {
+  local print
+  # Under pipefail a git that fails fails the pipe, so a list that could not be made is never read as an empty one.
+  print="$(git ls-files --others --ignored --exclude-standard -z 2>/dev/null | python3 -I -c 'import hashlib, os, sys
+seen = hashlib.sha1()
+def note(path):
+    try:
+        info = os.lstat(path)
+        seen.update(os.fsencode(path) + b"\0" + ("%d %d %d" % (info.st_size, info.st_mtime_ns, info.st_mode)).encode() + b"\n")
+    except OSError:
+        seen.update(os.fsencode(path) + b"\0gone\n")
+for raw in sorted(sys.stdin.buffer.read().split(b"\0")):
+    if not raw:
+        continue
+    path = os.fsdecode(raw)
+    note(path)
+    if path.endswith("/") and os.path.isdir(os.path.join(path, ".git")):
+        for folder, folders, files in os.walk(path):
+            folders[:] = sorted(name for name in folders if name != ".git")
+            for name in sorted(files):
+                note(os.path.join(folder, name))
+print(seen.hexdigest())' 2>/dev/null)" || return 0
+  printf '%s' "$print"
+}
+# Take the key before the changed files are listed, so a commit that lands after this line shows up at the
+# end as a key that no longer matches, and that run is not remembered.
+PASS_KEY="$(pass_key)"
+PASS_RECORD="$(git rev-parse --git-path masthead-push-gate-pass 2>/dev/null || true)"
 CHANGED="$( {
   [ -n "$BASE" ] && git diff --name-only "$BASE" HEAD 2>/dev/null
   git status --porcelain --untracked-files=all 2>/dev/null | awk '{print $NF}'
@@ -96,6 +379,10 @@ existing() {
 
 block() { echo "BLOCK: $1" >&2; fail=1; }
 warn()  { echo "WARN: $1" >&2; }
+# A check skipped because its tool is not on this machine. It warns the same way, and it leaves a mark in a
+# file, because the rungs run in subshells: a run with a mark is not remembered as a pass (see the end).
+_SKIPPED=""
+skipped() { warn "$1"; [ -n "$_SKIPPED" ] && echo skipped >> "$_SKIPPED"; return 0; }
 
 # Secrets: block a credential compiled into source, with a repo-owned allow-secret waiver on the line or the line above.
 gate_secrets() {
@@ -192,10 +479,10 @@ gate_elixir() {
       echo "Accepted exceptions belong in .credo.exs, which the repo owns and reviews, not in disabling this gate." >&2
     fi
   else
-    warn "credo is not available, so the lint rung was skipped."
+    skipped "credo is not available, so the lint rung was skipped."
   fi
 
-  # The local-tests rung at the end covers the tests.
+  # The local-tests rung covers the tests.
 }
 
 # Node: prettier, eslint, tsc and vitest, for plain Node and React or Next projects.
@@ -211,7 +498,7 @@ gate_node() {
       block "'prettier --check' failed on the changed files. Run 'npx prettier --write' on them."
     fi
   else
-    warn "prettier is not available, so the format rung was skipped."
+    skipped "prettier is not available, so the format rung was skipped."
   fi
 
   if npx --no-install eslint --version >/dev/null 2>&1; then
@@ -222,7 +509,7 @@ gate_node() {
       echo "Accepted exceptions belong in the repo's eslint config, or in an inline '// eslint-disable-* -- <justification>', not in disabling this gate." >&2
     fi
   else
-    warn "eslint is not available, so the lint rung was skipped."
+    skipped "eslint is not available, so the lint rung was skipped."
   fi
 
   if [ -f tsconfig.json ]; then
@@ -232,7 +519,7 @@ gate_node() {
         npx --no-install tsc --noEmit >&2 2>&1 || true
       fi
     else
-      warn "tsconfig.json is present but typescript is not installed, so the typecheck rung was skipped."
+      skipped "tsconfig.json is present but typescript is not installed, so the typecheck rung was skipped."
     fi
   fi
 
@@ -248,7 +535,7 @@ gate_node() {
       npm test --silent >&2 2>&1 || true
     fi
   else
-    warn "neither vitest nor an npm test script is available, so the test rung was skipped."
+    skipped "neither vitest nor an npm test script is available, so the test rung was skipped."
   fi
 }
 
@@ -265,7 +552,7 @@ gate_swift() {
         block "'swiftformat --lint' found unformatted Swift. Run 'swiftformat .'."
       fi
     else
-      warn ".swiftformat is present but swiftformat is not installed, so the format rung was skipped."
+      skipped ".swiftformat is present but swiftformat is not installed, so the format rung was skipped."
     fi
   fi
 
@@ -277,7 +564,7 @@ gate_swift() {
         echo "Project-accepted exceptions belong in .swiftlint.yml, which the repo owns and reviews, not in disabling this gate." >&2
       fi
     else
-      warn "a SwiftLint config is present but swiftlint is not installed, so the lint rung was skipped."
+      skipped "a SwiftLint config is present but swiftlint is not installed, so the lint rung was skipped."
     fi
   fi
 
@@ -325,7 +612,7 @@ gate_kotlin() {
     fi
   done
   if [ -z "$kt_task" ]; then
-    warn "no ktlint task on this Gradle project, so the lint rung was skipped."
+    skipped "no ktlint task on this Gradle project, so the lint rung was skipped."
   elif ! ./gradlew --offline "$kt_task" >/dev/null 2>&1; then
     block "'./gradlew $kt_task' reported lint violations:"
     ./gradlew --offline "$kt_task" >&2 2>&1 || true
@@ -369,7 +656,7 @@ gate_tf() {
           exit 1
         fi
       else
-        echo "WARN: '$RUNTIME init -backend=false' did not initialise $d, so validate was skipped." >&2
+        skipped "'$RUNTIME init -backend=false' did not initialise $d, so validate was skipped."
       fi
 
       if command -v tflint >/dev/null 2>&1; then
@@ -379,7 +666,7 @@ gate_tf() {
           exit 1
         fi
       else
-        echo "WARN: tflint is not installed, so the lint rung was skipped." >&2
+        skipped "tflint is not installed, so the lint rung was skipped."
       fi
 
       if command -v checkov >/dev/null 2>&1; then
@@ -394,7 +681,7 @@ gate_tf() {
         trivy config --exit-code 1 --quiet . >/dev/null 2>&1 \
           || { echo "BLOCK: 'trivy config' reported findings in $d. Fix them, or record accepted risk in .trivyignore with sign-off." >&2; exit 1; }
       else
-        echo "WARN: neither checkov nor trivy is installed, so the security scan was skipped." >&2
+        skipped "neither checkov nor trivy is installed, so the security scan was skipped."
       fi
     ) || fail=1
   done
@@ -431,80 +718,12 @@ each_root() {
   done
 }
 
-[ -n "$SECRETSCAN" ] && gate_secrets
-[ -n "$ELIXIR" ] && each_root gate_elixir "mix.lock mix.exs" ELIXIR
-[ -n "$NODE" ]   && each_root gate_node package.json NODE
-# No Rust rung; CI runs it.
-[ -n "$SWIFT" ]  && each_root gate_swift Package.swift SWIFT
-[ -n "$KOTLIN" ] && each_root gate_kotlin gradlew KOTLIN
-[ -n "$TF" ]     && gate_tf
-
 # Local tests: require the push-check script's receipt for HEAD, and refuse a push of any other commit.
 gate_local_tests() {
   check_script="$(project_fact "$TOP" --path PROJECT_PUSH_CHECK)"
   [ -n "$check_script" ] && [ -f "$check_script" ] || return 0
   check_rel="${check_script#"$TOP"/}"
-  sends="$(python3 - "$_CMD" "$(git rev-parse --verify -q 'HEAD^{tree}' 2>/dev/null)" <<'PYEOF' 2>/dev/null || echo check
-import re, shlex, subprocess, sys
-cmd, head_tree = sys.argv[1], sys.argv[2]
-VALUED = {"-o", "--push-option", "--repo", "--receive-pack", "--exec"}
-verdict = "skip"
-for seg in re.split(r"\n|;|&&|\|\||\|", cmd):
-    try:
-        words = shlex.split(seg)
-    except ValueError:
-        words = seg.split()
-    while words and re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", words[0]):
-        words.pop(0)
-    if not words:
-        continue
-    joined = " ".join(words)
-    if re.search(r"(^|\s)gh\s+pr\s+create(\s|$)|create-pr\.sh", joined):
-        verdict = "check" if verdict == "skip" else verdict
-        continue
-    if words[0] != "git":
-        continue
-    i = 1
-    while i < len(words) and words[i].startswith("-"):
-        i += 2 if words[i] in ("-C", "-c") else 1
-    if i >= len(words) or words[i] != "push":
-        continue
-    args, deleting, positional = words[i + 1:], False, []
-    j = 0
-    while j < len(args):
-        a = args[j]
-        if a in ("--delete", "-d"):
-            deleting = True
-        elif a in ("--all", "--mirror", "--branches"):
-            print("other " + a)
-            sys.exit(0)
-        elif a in VALUED:
-            j += 1
-        elif not a.startswith("-"):
-            positional.append(a)
-        j += 1
-    refspecs = positional[1:]
-    if deleting:
-        continue
-    if not refspecs:
-        verdict = "check"
-        continue
-    for spec in refspecs:
-        src = spec.lstrip("+").split(":", 1)[0]
-        if src == "":
-            continue  # ":branch" deletes it
-        if not head_tree:
-            verdict = "check"  # no commit yet: nothing to compare, the check decides
-            continue
-        tree = subprocess.run(["git", "rev-parse", "--verify", "-q", src + "^{tree}"],
-                              capture_output=True, text=True).stdout.strip()
-        if tree != head_tree:
-            print("other " + spec)
-            sys.exit(0)
-        verdict = "check"
-print(verdict)
-PYEOF
-)"
+  sends="$(python3 -c "$_CMD_READER" "$_CMD" "$(git rev-parse --verify -q 'HEAD^{tree}' 2>/dev/null)" 2>/dev/null || echo check)"
   case "$sends" in
     skip) return 0 ;;
     other*)
@@ -517,12 +736,65 @@ PYEOF
     printf '%s\n' "$out" | sed 's/^/  /' >&2
   fi
 }
+
+# The quick rungs run first: what the push sends and the test receipt, then the secret scan. A refusal from
+# either one stops the gate here, so it costs seconds and not the minutes the stack rungs can take.
+SLOW="$ELIXIR$NODE$SWIFT$KOTLIN$TF"
 gate_local_tests
+[ -n "$SECRETSCAN" ] && gate_secrets
+if [ "$fail" -ne 0 ]; then
+  echo "" >&2
+  if [ -n "$SLOW" ]; then
+    echo "Nothing was pushed. Fix the failures above and push again. The slower checks of the changed code (format, compile, lint and tests) have not run yet: they run once these pass." >&2
+  else
+    echo "Nothing was pushed. Fix the failures above and push again; the gate re-runs on the branch." >&2
+  fi
+  exit 2
+fi
+
+[ -n "$SLOW" ] || exit 0
+
+# The slow rungs: each changed stack's own format, compile, lint and tests. They are skipped when this exact
+# state has passed them before.
+if [ -n "$PASS_KEY" ] && [ -n "$PASS_RECORD" ] && [ -f "$PASS_RECORD" ]; then
+  _RECORDED="$(cat "$PASS_RECORD" 2>/dev/null)"
+  # The print of the ignored files costs a walk of them, so it is taken only when the rest of the line matches.
+  case "$_RECORDED" in
+    "$PASS_KEY ignored="?*)
+      _PRINT="$(ignored_print)"
+      if [ -n "$_PRINT" ] && [ "$_RECORDED" = "$PASS_KEY ignored=$_PRINT" ]; then
+        echo "NOTE: the checks of the changed code (format, compile, lint and tests) passed earlier on exactly these files and this base, with nothing uncommitted and no ignored file changed since, so they were not run again." >&2
+        exit 0
+      fi
+      ;;
+  esac
+fi
+_SKIPPED="$(mktemp "${TMPDIR:-/tmp}/hard-gate-skipped.XXXXXX" 2>/dev/null || true)"
+[ -n "$ELIXIR" ] && each_root gate_elixir "mix.lock mix.exs" ELIXIR
+[ -n "$NODE" ]   && each_root gate_node package.json NODE
+# No Rust rung; CI runs it.
+[ -n "$SWIFT" ]  && each_root gate_swift Package.swift SWIFT
+[ -n "$KOTLIN" ] && each_root gate_kotlin gradlew KOTLIN
+[ -n "$TF" ]     && gate_tf
+# Whether every check ran: no mark, and a file to hold one. When the file could not be made, nothing is known.
+_ALL_RAN=no
+[ -n "$_SKIPPED" ] && [ -f "$_SKIPPED" ] && [ ! -s "$_SKIPPED" ] && _ALL_RAN=yes
+[ -n "$_SKIPPED" ] && rm -f "$_SKIPPED"
 
 if [ "$fail" -ne 0 ]; then
   echo "" >&2
   echo "Nothing was pushed. Fix the failures above and push again; the gate re-runs on the branch." >&2
   exit 2
+fi
+
+# Remember the pass, but only when every check ran (a check skipped for a missing tool was not passed, and it
+# must run on this commit once the tool is there), and only when the state is still the one the rungs started
+# on: a commit, an edit or a new file that arrived while they ran leaves no record.
+if [ "$_ALL_RAN" = yes ] && [ -n "$PASS_KEY" ] && [ -n "$PASS_RECORD" ] && [ "$(pass_key)" = "$PASS_KEY" ]; then
+  _PRINT="$(ignored_print)"
+  if [ -n "$_PRINT" ] && printf '%s ignored=%s\n' "$PASS_KEY" "$_PRINT" > "$PASS_RECORD.$$" 2>/dev/null; then
+    mv -f "$PASS_RECORD.$$" "$PASS_RECORD" 2>/dev/null || rm -f "$PASS_RECORD.$$"
+  fi
 fi
 
 exit 0

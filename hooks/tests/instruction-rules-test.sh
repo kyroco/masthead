@@ -144,6 +144,45 @@ for doc in README.md docs/explainer.template.html docs/explainer.html scripts/di
   never "$doc" "English p""ass"
 done
 says  references/session-cliffs.md "Add the changelog entry when the repo keeps one"
+
+# The full pre-push check runs once. Measured 2026-11-11 over 24 pull requests: a
+# median of 3 runs each, 31 of 111 never read and 5 thrown away by a commit that
+# landed while the run was going, because it was started with the verifiers.
+says  references/session-cliffs.md "Run it one time, after the fixes of the last verification round are in"
+says  references/session-cliffs.md "Do not commit while it runs: the run is then thrown away"
+says  references/session-cliffs.md "Do not start the repo's pre-push check now to save time"
+says  references/session-cliffs.md "any commit made after it starts makes its receipt stale"
+says  skills/work-on/worker.md "Run the repo's pre-push check one time: on the last commit, after the fixes of the last verification round are in"
+says  skills/work-on/worker.md "Do not start it when you send out the verifiers, because any later commit makes its receipt stale"
+says  skills/work-on/worker.md "Do not commit while it runs, because the run is then thrown away"
+# The push gate's order and its remembered pass, where a person reads about them.
+for doc in README.md docs/explainer.template.html docs/explainer.html; do
+  says "$doc" "the test receipt and the secret scan first, then the stack checks, which are skipped when this exact commit already passed them"
+  says "$doc" "no file git ignores (installed packages, build output) has been added, removed, or changed in size or time stamp"
+  says "$doc" "Nothing is remembered in a checkout that holds a submodule, or after a run that skipped a check because its tool was not installed"
+  # Round 3 fix 2: the pass does see a tool installed, removed or moved on PATH; only one upgraded in place is missed.
+  says "$doc" "It does not see a tool upgraded in place"
+  never "$doc" "It does not see a tool that changed on the machine since"
+  # Round 2 fix 5: the pass does not follow the files of another worktree kept inside the checkout, and the page says so.
+  says "$doc" "or a change inside another worktree of the repository kept in the checkout"
+  never "$doc" "It does not see a file git ignores"
+done
+says  references/gate-catalog.md "git rev-parse --git-path masthead-push-gate-pass"
+says  references/gate-catalog.md "a print of the path, size and time stamp of the files git ignores"
+# The read rule for create-pr.sh was dropped (Robert, 2026-11-11): naming the file is enough, a read included.
+says  references/gate-catalog.md "or any command that names a \`create-pr.sh\`, a read of the file included"
+never references/gate-catalog.md "unless it only reads it"
+never references/gate-catalog.md "file commands"
+never references/gate-catalog.md "commands that print"
+says  references/gate-catalog.md "a file marked assume-unchanged or skip-worktree, a submodule in the checkout, no origin/main"
+says  references/gate-catalog.md "A run in which a check was skipped because its tool is not installed is not remembered"
+never references/gate-catalog.md "a rung that only warned because its tool was missing"
+never references/gate-catalog.md "The remembered pass does not see a file git ignores"
+says  references/gate-catalog.md "no variable or setting names another record or turns the reuse on"
+# Round 1 finding F6: the refusal of a push of anything but HEAD needs the repo's push check, and the row says so.
+says  references/gate-catalog.md "when the repo names a \`PROJECT_PUSH_CHECK\` script, it refuses a push that sends anything but HEAD"
+says  references/gate-catalog.md "A repo that names no push check gets neither refusal"
+never references/gate-catalog.md "stops the gate there: it refuses a push that sends anything but HEAD"
 never references/session-cliffs.md "which is not plain English"
 says  README.md "a sentence a customer reads that is false in some state"
 says  docs/explainer.template.html "a sentence a customer reads that is false in some state"

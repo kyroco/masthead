@@ -64,7 +64,9 @@ ok() {
 }
 
 contains() {
-  if printf '%s' "$1" | grep -q "$2"; then
+  # A here-string, not a pipe: under pipefail grep -q leaves at its first match,
+  # printf takes a broken pipe on the rest, and a match is read as a miss.
+  if grep -q "$2" <<<"$1"; then
     pass=$((pass + 1))
     echo "  ok: $3"
   else
@@ -492,6 +494,602 @@ run_gate "$d" "git push origin other:refs/heads/x"
 ok "$STATUS" "2" "pushing another commit to a new name is refused"
 run_gate "$d" "git push --all origin"
 ok "$STATUS" "2" "pushing every branch is refused"
+
+echo "29. a shell redirect after the push is not read as a branch"
+# Found 2026-11-11: `git push -u origin BRANCH 2>&1 | tail -3` was refused as
+# sending '2>&1', because every word after the remote was read as a refspec.
+# It refused 18 pushes across 17 of 24 pull requests.
+cur="$(cd "$d" && git branch --show-current)"
+run_gate "$d" "git push -u origin $cur 2>&1 | tail -3"
+ok "$STATUS" "0" "2>&1 and a pipe after the branch still push the branch"
+run_gate "$d" "git push -q origin $cur 2>/dev/null"
+ok "$STATUS" "0" "2>/dev/null after the branch still pushes the branch"
+for redirect in "> push.log" ">push.log" ">> push.log" "&> push.log" "&>push.log" \
+    "< /dev/null" "</dev/null" "2> err.log" ">&2" "2>&1 >/dev/null"; do
+  run_gate "$d" "git push origin $cur $redirect"
+  ok "$STATUS" "0" "a push of the branch followed by '$redirect' goes through"
+done
+run_gate "$d" "git push 2>&1 origin $cur"
+ok "$STATUS" "0" "a redirect before the remote is dropped too"
+run_gate "$d" "git push origin $cur>push.log"
+ok "$STATUS" "0" "a redirect written against the branch name ends the name there"
+# A push that really names another branch is still refused, and the refusal
+# names the branch, not the redirect.
+run_gate "$d" "git push -u origin other 2>&1 | tail -3"
+ok "$STATUS" "2" "another branch with 2>&1 and a pipe is still refused"
+contains "$ERR" "sends 'other'" "the refusal names the branch, not the redirect"
+run_gate "$d" "git push origin $cur other > push.log"
+ok "$STATUS" "2" "a second refspec naming another branch is still refused"
+run_gate "$d" "git push origin other>push.log"
+ok "$STATUS" "2" "another branch with a redirect written against it is still refused"
+contains "$ERR" "sends 'other'" "and the refusal names that branch"
+run_gate "$d" "git push origin '>other'"
+ok "$STATUS" "2" "a quoted word that starts with > is a refspec, not a redirect"
+run_gate "$d" "git push origin $cur 2>&1 other"
+ok "$STATUS" "2" "a branch named after a redirect is still read"
+# Round 1 finding F1: only the plain digits 0 to 9 are a file number to the
+# shell. A branch named with another script's digit is a branch.
+( cd "$d" && git branch "٣" other && git branch "²" other ) >/dev/null 2>&1
+for name in "٣" "²" "１"; do
+  run_gate "$d" "git push origin $name>x"
+  ok "$STATUS" "2" "a branch named $name right against a redirect is still read as a branch"
+  contains "$ERR" "sends '$name'" "and the refusal names it"
+done
+run_gate "$d" "git push origin $cur ٣> x"
+ok "$STATUS" "2" "the same with a second refspec and a space after the redirect"
+run_gate "$d" "git push origin $cur 2>x"
+ok "$STATUS" "0" "a plain digit right against a redirect is still a file number"
+# Round 1 finding F8: a push whose words are split by a line continuation, or by
+# a ; or | inside quotes, is one push to the shell, and the branch it names counts.
+run_gate "$d" "git push \\
+  origin other"
+ok "$STATUS" "2" "a push of another branch carried over two lines is refused"
+contains "$ERR" "sends 'other'" "and the refusal names the branch"
+while IFS= read -r pushing; do
+  run_gate "$d" "$pushing"
+  ok "$STATUS" "2" "a push of another branch is refused: $pushing"
+  contains "$ERR" "sends 'other'" "and the refusal names the branch"
+done <<'EOF'
+git push -o "note=a;b" origin other
+git push -o "a|b" origin other
+git push -o 'a && b' origin other
+git push -o 'a || b' origin other
+EOF
+run_gate "$d" "git push \\
+  origin $cur"
+ok "$STATUS" "0" "a push of the checked-out branch carried over two lines goes through"
+run_gate "$d" "git push -o \"note=a;b\" origin $cur"
+ok "$STATUS" "0" "a push of the checked-out branch with a ; inside quotes goes through"
+# The cut that does not read quotes is still made too, so what it caught is still caught.
+run_gate "$d" "bash -c \"git fetch; git push origin other\""
+ok "$STATUS" "2" "a push of another branch inside a quoted command line is still refused"
+run_gate "$d" "cat > notes.txt <<EOF
+it's a note
+EOF
+git push origin other
+echo 'done'"
+ok "$STATUS" "2" "a push of another branch after a here-document with an apostrophe is still refused"
+
+echo "30. every command that names create-pr.sh is gated, a read of it included"
+# The gate has always taken any command that names the file for a run of it, so
+# `sed -n 1,30p scripts/kyroco/create-pr.sh | grep '^#'` runs the whole gate
+# (265 seconds for one worker, measured 2026-11-11). A rule that told a read
+# from a run was built in this change and taken out again on Robert's decision
+# of 2026-11-11, "Drop the read rule": each of three review rounds found a way
+# to run the script past it. These are the reads that rule let through and
+# every way around it the rounds found. All of them are gated.
+d="$(newrepo names-create-pr)"
+# allow-secret: the fixture line below is the thing under test.
+printf '%s\n' '      web_identity_token: "signed-test-token",' > "$d/a.ex"
+# The secret in the tree blocks any command the gate takes for a PR, so exit 2
+# here means the gate ran.
+while IFS= read -r naming; do
+  run_gate "$d" "$naming"
+  ok "$STATUS" "2" "gated: $naming"
+done <<'EOF'
+sed -n 1,30p scripts/kyroco/create-pr.sh | grep '^#'
+cat scripts/create-pr.sh
+ls -la scripts/create-pr.sh
+grep -n receipt scripts/kyroco/create-pr.sh
+head -20 scripts/create-pr.sh 2>/dev/null
+cd scripts && wc -l create-pr.sh
+scripts/create-pr.sh --fill
+bash scripts/kyroco/create-pr.sh
+./create-pr.sh
+cd scripts && ./create-pr.sh --fill
+FOO=1 scripts/create-pr.sh
+env FOO=1 bash scripts/create-pr.sh
+time ./scripts/create-pr.sh
+op run -- scripts/create-pr.sh
+just pr scripts/create-pr.sh
+sh -c "scripts/create-pr.sh --fill"
+cat scripts/create-pr.sh | bash
+ls scripts/create-pr.sh | xargs bash
+chmod +x scripts/create-pr.sh && scripts/create-pr.sh
+sed -n 1p scripts/create-pr.sh; (./scripts/create-pr.sh)
+cat scripts/create-pr.sh & ./scripts/create-pr.sh
+echo "$(bash scripts/create-pr.sh)"
+echo `bash scripts/create-pr.sh`
+diff <(bash scripts/create-pr.sh) expected.txt
+find . -name create-pr.sh -exec bash {} \;
+git -c alias.pr='!scripts/create-pr.sh' pr
+git bisect run scripts/create-pr.sh
+cat "scripts/create-pr.sh
+grep -nE 'receipt|gh pr' scripts/create-pr.sh
+sed -n '1,30p;/main/p' scripts/create-pr.sh
+grep -n 'a && b' scripts/create-pr.sh
+grep -n '\$(' scripts/create-pr.sh
+grep -n '&' scripts/create-pr.sh
+grep -n "a | b" scripts/create-pr.sh
+grep -n 'a `b` c' scripts/create-pr.sh
+grep -n \| scripts/create-pr.sh
+grep -n "$(bash scripts/create-pr.sh)" README.md
+grep -n "`bash scripts/create-pr.sh`" README.md
+cat 'a;b' ; scripts/create-pr.sh
+grep -n 'a | b' README.md | bash scripts/create-pr.sh
+cat 'a&b' & scripts/create-pr.sh
+cat scripts/create-pr.sh 'unclosed
+cat <<EOF > scripts/create-pr.sh
+GIT_EXTERNAL_DIFF=scripts/create-pr.sh git diff
+GIT_EXTERNAL_DIFF=scripts/create-pr.sh git diff -- README.md
+GIT_EDITOR=scripts/create-pr.sh git commit
+PAGER=scripts/create-pr.sh git log
+GIT_PAGER="bash scripts/create-pr.sh" git show
+LESSOPEN="|scripts/create-pr.sh %s" cat README.md
+cd scripts && GIT_EXTERNAL_DIFF=./create-pr.sh git diff
+rg --pre scripts/create-pr.sh x README.md
+rg --pre=scripts/create-pr.sh x README.md
+sort --compress-program=scripts/create-pr.sh README.md
+sort --compress-program scripts/create-pr.sh README.md
+bat --pager scripts/create-pr.sh README.md
+gh alias set --shell pr scripts/create-pr.sh
+sed -n '1e bash scripts/create-pr.sh' README.md
+sed e scripts/create-pr.sh
+sed 's/.*/bash &/e' scripts/create-pr.sh
+sed -n -e 1p -e '1e true' scripts/create-pr.sh
+sed -n '/x/{e;}' scripts/create-pr.sh
+sed -f run.sed scripts/create-pr.sh
+sed --file=run.sed scripts/create-pr.sh
+sed -n '1w scripts/create-pr.sh' README.md
+sed -n 1,30p scripts/create-pr.sh
+sed -n '10,$p' scripts/create-pr.sh
+sed -n '/receipt/,/fi/p' scripts/create-pr.sh
+sed -n '/^#/!p' scripts/create-pr.sh
+sed -n -e 5p -e 10p scripts/create-pr.sh
+sed -E -n '/main|base/p' scripts/create-pr.sh
+sed 10q scripts/create-pr.sh
+sed -n '$=' scripts/create-pr.sh
+sed 's/old/new/g' scripts/create-pr.sh
+printf -v GIT_EDITOR %s scripts/create-pr.sh; git commit --allow-empty
+printf -v GIT_EDITOR %s scripts/create-pr.sh; git commit --allow-empty -m x
+read -r GIT_EDITOR <<< scripts/create-pr.sh; git commit --allow-empty
+export GIT_EDITOR=scripts/create-pr.sh; git commit --allow-empty
+cp scripts/create-pr.sh .git/hooks/pre-commit && git commit --allow-empty -m x
+cp scripts/create-pr.sh .git/hooks/pre-commit
+mv scripts/create-pr.sh .git/hooks/post-checkout && git checkout -
+cat scripts/create-pr.sh > .git/hooks/pre-commit
+cat scripts/create-pr.sh >> run-later.sh
+cat scripts/create-pr.sh 2> scripts/errors.txt
+sed -n p scripts/create-pr.sh > .git/hooks/pre-commit
+tee .git/hooks/pre-commit < scripts/create-pr.sh
+uniq scripts/create-pr.sh .git/hooks/pre-commit
+sed -i '' 's|a/b|c/d|' scripts/create-pr.sh
+sed -i.bak -e 's/a/b/2' scripts/create-pr.sh
+sed -n '/[/]/p;s|x|/w out|' scripts/create-pr.sh
+chmod +x scripts/create-pr.sh
+git add scripts/create-pr.sh && git commit -m "Say in create-pr.sh what it checks" -- scripts/create-pr.sh
+git log --oneline -3 -- scripts/create-pr.sh
+git diff main -- scripts/kyroco/create-pr.sh
+git show HEAD:scripts/create-pr.sh --output=.git/hooks/pre-commit
+cat $HOME/scripts/create-pr.sh
+cat "$HOME/scripts/create-pr.sh"
+cat scripts/{create-pr.sh,other.sh}
+./cat scripts/create-pr.sh
+scripts/cat scripts/create-pr.sh
+cat < scripts/create-pr.sh
+cat () ( bash scripts/create-pr.sh ); cat scripts/create-pr.sh
+cat scripts/create-pr.sh 2>/dev/null
+grep -c receipt scripts/create-pr.sh >/dev/null 2>&1
+ls -la scripts/create-pr.sh 2>&1 | head -3
+echo "--- the script"; cat scripts/create-pr.sh
+test -f scripts/create-pr.sh && cat scripts/create-pr.sh
+[ -f scripts/create-pr.sh ] && wc -l scripts/create-pr.sh
+cd scripts && ls -la create-pr.sh
+cat scripts/create-pr.sh | cut -c1-120 | tr -s ' '
+diff scripts/create-pr.sh scripts/other.sh
+stat scripts/create-pr.sh
+test -v 'a[$(bash scripts/create-pr.sh)]'
+[ -v 'x[$(bash scripts/create-pr.sh)]' ]
+test -v 'a[$(cp scripts/create-pr.sh .git/hooks/pre-commit)]'; cat scripts/create-pr.sh >/dev/null
+EOF
+gated_lines() {
+  # $1 = what the case shows, $2 = the command.
+  run_gate "$d" "$2"
+  ok "$STATUS" "2" "$1"
+}
+gated_lines "a read carried over two lines with a backslash is gated" "cat scripts/create-pr.sh \\
+  | head -5"
+gated_lines "a pipe into a shell carried over two lines is gated" "cat scripts/create-pr.sh \\
+  | bash"
+gated_lines "a run on the line after a comment with an apostrophe is gated" "cat README.md  # let's look
+bash scripts/create-pr.sh --fill  # it's ready"
+gated_lines "the same after a read of the script itself" "cat scripts/create-pr.sh | head -5  # let's see it
+bash scripts/create-pr.sh --fill  # it's ready"
+gated_lines "the same with the run handed to git in a variable" "cat README.md  # let's look
+GIT_EXTERNAL_DIFF=scripts/create-pr.sh git diff  # it's the diff"
+gated_lines "the same with no space before the comment's text" "cat README #don't skip
+bash scripts/create-pr.sh #it's ready"
+gated_lines "a read with a comment is gated" "cat scripts/create-pr.sh  # let's see it"
+gated_lines "a read under a comment line is gated" "# look at the script, it's long
+cat scripts/create-pr.sh | head -5  # the top of it"
+run_gate "$d" "cat scripts/other.sh | head -5"
+ok "$STATUS" "0" "a read of a file with another name is none of the gate's business"
+# Round 1 finding F2: a command that names the script needs the test receipt
+# however the name reaches the shell. With redirects dropped from the words, the
+# receipt rung must not look for the name only in the words that are left.
+d="$(newrepo stdin-create-pr)"
+mkdir -p "$d/scripts" "$d/.claude"
+echo '{"env": {"PROJECT_PUSH_CHECK": "scripts/local-tests.sh"}}' > "$d/.claude/settings.json"
+printf '#!/usr/bin/env bash\n[ "$1" = --check ] || exit 9\necho "local-tests: no receipt for this commit."\nexit 1\n' > "$d/scripts/local-tests.sh"
+echo "# notes" > "$d/README.md"
+while IFS= read -r running; do
+  run_gate "$d" "$running"
+  ok "$STATUS" "2" "a run with no receipt is refused: $running"
+  contains "$ERR" "local tests have not passed" "and the refusal is the receipt's"
+done <<'EOF'
+bash scripts/create-pr.sh
+bash < scripts/create-pr.sh
+bash -s -- --fill < scripts/create-pr.sh
+sh <scripts/create-pr.sh
+bash 0<scripts/create-pr.sh
+bash <<< "$(cat scripts/create-pr.sh)"
+cat scripts/create-pr.sh | bash
+EOF
+run_gate "$d" "cat scripts/create-pr.sh"
+ok "$STATUS" "2" "a read of the script in that checkout is asked for the receipt too"
+contains "$ERR" "local tests have not passed" "and the refusal is the receipt's"
+
+# A stand-in for mix that counts its calls, for the cases that ask whether the
+# slow Elixir rung ran at all. It exits with the code in $TMP/mixcode.
+mkdir -p "$TMP/countbin"
+# When $TMP/mixhook exists, `mix compile` runs it once first: a change that lands
+# while the slow rung is running. While $TMP/no-credo exists, `mix help credo`
+# fails, which is how the gate learns that credo is not installed.
+printf '#!/bin/sh\necho "$*" >> "%s"\nif [ "$1" = compile ] && [ -x "%s" ]; then "%s"; rm -f "%s"; fi\nif [ "$1 $2" = "help credo" ] && [ -e "%s" ]; then exit 1; fi\nexit "$(cat "%s" 2>/dev/null || echo 0)"\n' \
+  "$TMP/mixlog" "$TMP/mixhook" "$TMP/mixhook" "$TMP/mixhook" "$TMP/no-credo" "$TMP/mixcode" > "$TMP/countbin/mix"
+chmod +x "$TMP/countbin/mix"
+# $1 = the checkout, $2 = the command (default: a plain push of HEAD), $3 = one
+# more NAME=value for the gate's environment. MIXRUNS is how many times mix ran.
+run_counted() {
+  : > "$TMP/mixlog"
+  payload="$(python3 -c 'import json,sys; print(json.dumps({"hook_event_name":"PreToolUse","tool_name":"Bash","cwd":sys.argv[1],"tool_input":{"command":sys.argv[2]}}))' "$1" "${2:-git push -u origin HEAD}")"
+  ( cd "$1" && printf '%s' "$payload" \
+      | env CLAUDE_PROJECT_DIR="$1" PATH="$TMP/countbin:$PATH" GIT_CEILING_DIRECTORIES="$TMP" ${3:+"$3"} \
+        bash "${GATE_UNDER_TEST:-$GATE}" 2>"$TMP/err" ; echo $? > "$TMP/status" )
+  STATUS="$(cat "$TMP/status")"
+  ERR="$(cat "$TMP/err")"
+  MIXRUNS="$(wc -l < "$TMP/mixlog" | tr -d ' ')"
+}
+ran() {
+  # $1 = yes or no, $2 = what the case shows.
+  if [ "$MIXRUNS" -gt 0 ]; then got=yes; else got=no; fi
+  ok "$got" "$1" "$2"
+}
+# A checkout with an Elixir change on a branch off origin/main, and a push check
+# whose answer is the code in $TMP/check-code, outside the checkout, so changing
+# the answer leaves the working tree clean.
+quick_repo() {
+  d="$(newrepo "$1")"
+  mkdir -p "$d/scripts" "$d/.claude" "$d/lib"
+  printf '{"env": {"PROJECT_PUSH_CHECK": "scripts/local-tests.sh", "PROJECT_TOOLCHAIN_ENV": "%s"}}\n' "$TMP/quick-toolchain.env" > "$d/.claude/settings.json"
+  echo 'export QUICK_TOOLCHAIN=1' > "$TMP/quick-toolchain.env"
+  printf '#!/usr/bin/env bash\n[ "$1" = --check ] || exit 9\necho "local-tests: the stub says so."\nexit "$(cat "%s")"\n' "$TMP/check-code" > "$d/scripts/local-tests.sh"
+  : > "$d/mix.exs"
+  printf 'deps/\n_build/\n.claude/worktrees/\n' > "$d/.gitignore"
+  ( cd "$d" && git add -A && git commit -qm base && git update-ref refs/remotes/origin/main HEAD ) >/dev/null 2>&1
+  printf 'defmodule A do\nend\n' > "$d/lib/a.ex"
+  ( cd "$d" && git add -A && git commit -qm "an Elixir change" ) >/dev/null 2>&1
+  echo 0 > "$TMP/check-code"
+  echo 0 > "$TMP/mixcode"
+}
+
+echo "31. the quick checks run first, and a refusal from one stops before the slow ones"
+# Measured 2026-11-11: the receipt check ran last, so a refused push still cost
+# the full wait for format, compile and lint (a median of 184 seconds).
+quick_repo quick-first
+echo 1 > "$TMP/check-code"
+run_counted "$d"
+ok "$STATUS" "2" "a missing test receipt refuses the push"
+contains "$ERR" "local tests have not passed" "it says the local tests have not passed"
+ran no "and the Elixir rung did not run first"
+contains "$ERR" "have not run yet" "it says the slower checks have not run yet"
+run_counted "$d" "git push origin other-branch"
+ok "$STATUS" "2" "a push of another branch is refused"
+contains "$ERR" "not HEAD" "it says the push is not HEAD"
+ran no "and the Elixir rung did not run first"
+echo 0 > "$TMP/check-code"
+# allow-secret: the fixture line below is the thing under test.
+printf '%s\n' '      web_identity_token: "signed-test-token",' > "$d/lib/b.ex"
+run_counted "$d"
+ok "$STATUS" "2" "a secret refuses the push"
+contains "$ERR" "possible secret" "it names what it found"
+ran no "and the Elixir rung did not run first"
+echo 1 > "$TMP/check-code"
+run_counted "$d"
+contains "$ERR" "local tests have not passed" "with both quick checks failing, the receipt is reported"
+contains "$ERR" "possible secret" "and so is the secret, in the same refusal"
+echo 0 > "$TMP/check-code"
+rm -f "$d/lib/b.ex"
+echo 1 > "$TMP/mixcode"
+run_counted "$d"
+ok "$STATUS" "2" "with both quick checks passing, a failing Elixir rung still refuses the push"
+contains "$ERR" "mix compile" "and it names the failing command"
+echo 0 > "$TMP/mixcode"
+run_counted "$d"
+ok "$STATUS" "0" "with every check passing the push goes through"
+ran yes "and the Elixir rung ran"
+
+echo "32. a pass is remembered, so the slow checks do not run twice on the same commit"
+# Measured 2026-11-11: the gate reran format, compile and lint on every push and
+# every PR create, 67 times for a median of 184 seconds, even when the same
+# commit had passed minutes before.
+quick_repo remembered
+record="$d/.git/masthead-push-gate-pass"
+run_counted "$d"
+ok "$STATUS" "0" "the first push of a commit passes"
+ran yes "and it runs the Elixir rung"
+[ -f "$record" ] && wrote=yes || wrote=no
+ok "$wrote" "yes" "the pass is written into the checkout's git directory"
+ok "$(cd "$d" && git status --porcelain --untracked-files=all | wc -l | tr -d ' ')" "0" "so the record is never a file git could commit"
+run_counted "$d"
+ok "$STATUS" "0" "the same commit pushed again passes"
+ran no "without running the Elixir rung again"
+contains "$ERR" "not run again" "and it says the earlier pass was used"
+run_counted "$d" "gh pr create --fill"
+ok "$STATUS" "0" "opening the PR on that commit passes"
+ran no "without running the Elixir rung again"
+# The quick checks are not part of what is remembered.
+echo 1 > "$TMP/check-code"
+run_counted "$d"
+ok "$STATUS" "2" "a remembered pass does not excuse a missing test receipt"
+contains "$ERR" "local tests have not passed" "it says the local tests have not passed"
+echo 0 > "$TMP/check-code"
+run_counted "$d" "git push origin no-such-branch"
+ok "$STATUS" "2" "nor a push of another branch"
+run_counted "$d" "" "PATH=$TMP/brokenawk:$TMP/countbin:$PATH"
+ok "$STATUS" "2" "and the secret scan still runs: one that cannot run still refuses"
+contains "$ERR" "secret scan could not run" "it says the scan did not run"
+run_counted "$d"
+ran no "after those refusals the pass still stands for the same commit"
+
+echo "33. every way a remembered pass could be stale runs the slow checks again"
+git_in() { ( cd "$d" && git "$@" ) >/dev/null 2>&1; }
+# Each case starts from a remembered pass and ends on one, so the next case
+# proves its own change and nothing left over from the one before.
+remembered() {
+  run_counted "$d"
+  ran no "$1"
+}
+printf 'defmodule B do\nend\n' > "$d/lib/b.ex"
+git_in add -A && git_in commit -qm "a second change"
+run_counted "$d"
+ran yes "a new commit runs them"
+remembered "and that commit is then remembered"
+printf 'defmodule B do\n  def b, do: 1\nend\n' > "$d/lib/b.ex"
+git_in commit -qa --amend --no-edit
+run_counted "$d"
+ran yes "an amended commit runs them"
+remembered "and the amended commit is then remembered"
+git_in commit -q --amend -m "the same files under a new message"
+remembered "an amend that changes only the message keeps the pass, since the files are the same"
+echo '# an edit' >> "$d/lib/a.ex"
+run_counted "$d"
+ran yes "an uncommitted edit runs them"
+run_counted "$d"
+ran yes "and a pass on a tree with an uncommitted edit is not remembered"
+git_in add lib/a.ex
+run_counted "$d"
+ran yes "a staged edit runs them"
+git_in reset -q HEAD lib/a.ex && git_in checkout -- lib/a.ex
+remembered "taking the edit back returns to the remembered commit"
+echo 'notes' > "$d/notes.txt"
+run_counted "$d"
+ran yes "an untracked file runs them"
+run_counted "$d"
+ran yes "and a pass on a tree with an untracked file is not remembered"
+rm -f "$d/notes.txt"
+remembered "removing the file returns to the remembered commit"
+# Round 1 finding F4: the stack rungs read files git ignores too (installed
+# packages, build output), so a change in one makes the remembered pass stale.
+mkdir -p "$d/deps/dep/lib" "$d/_build"
+echo 'one' > "$d/deps/dep/lib/dep.ex"
+ok "$(cd "$d" && git status --porcelain --untracked-files=all | wc -l | tr -d ' ')" "0" "git status does not list a file under an ignored folder"
+run_counted "$d"
+ran yes "but a new file git ignores runs them"
+remembered "and the pass is then remembered with that file in place"
+echo 'two, and longer' > "$d/deps/dep/lib/dep.ex"
+run_counted "$d"
+ran yes "an ignored file with new contents runs them"
+remembered "and is then remembered"
+touch -t 202001010000 "$d/deps/dep/lib/dep.ex"
+run_counted "$d"
+ran yes "an ignored file with the same size and a new time stamp runs them"
+remembered "and is then remembered"
+echo 'built' > "$d/_build/out.beam"
+run_counted "$d"
+ran yes "a new file in a second ignored folder runs them"
+remembered "and is then remembered"
+rm -f "$d/deps/dep/lib/dep.ex"
+run_counted "$d"
+ran yes "a removed ignored file runs them"
+remembered "and is then remembered"
+# A folder git ignores that is a git checkout of its own, as a package fetched
+# from git is: git lists it as one entry, so its files are walked one by one.
+mkdir -p "$d/deps/fetched/lib"
+( cd "$d/deps/fetched" && git init -q . ) >/dev/null 2>&1
+echo 'one' > "$d/deps/fetched/lib/f.ex"
+run_counted "$d"
+ran yes "a new ignored folder that is its own git checkout runs them"
+remembered "and is then remembered"
+echo 'two, and longer' > "$d/deps/fetched/lib/f.ex"
+run_counted "$d"
+ran yes "a changed file inside that folder runs them"
+remembered "and is then remembered"
+# A linked worktree inside an ignored folder is another checkout, with its own
+# files and its own gate. It is not walked: a main checkout can hold dozens.
+git_in worktree add -q "$d/.claude/worktrees/side" -b side HEAD
+run_counted "$d"
+ran yes "a new linked worktree in an ignored folder runs them once"
+remembered "and is then remembered"
+echo '# a change in the other checkout' >> "$d/.claude/worktrees/side/lib/a.ex"
+remembered "a change inside the linked worktree leaves this checkout's pass standing"
+git_in update-index --assume-unchanged lib/a.ex
+echo '# hidden from git status' >> "$d/lib/a.ex"
+ok "$(cd "$d" && git status --porcelain | wc -l | tr -d ' ')" "0" "git status calls a file marked assume-unchanged clean"
+run_counted "$d"
+ran yes "but an edit hidden that way still runs them"
+git_in update-index --no-assume-unchanged lib/a.ex && git_in checkout -- lib/a.ex
+remembered "unmarking the file returns to the remembered commit"
+git_in update-index --skip-worktree lib/a.ex
+echo '# hidden from git status' >> "$d/lib/a.ex"
+run_counted "$d"
+ran yes "an edit hidden with skip-worktree runs them"
+git_in update-index --no-skip-worktree lib/a.ex && git_in checkout -- lib/a.ex
+remembered "unmarking the file returns to the remembered commit"
+git_in update-ref refs/remotes/origin/main HEAD~1
+run_counted "$d"
+ran yes "a moved merge base with origin/main runs them"
+remembered "and the new base is then remembered"
+echo 'export QUICK_TOOLCHAIN=2' > "$TMP/quick-toolchain.env"
+run_counted "$d"
+ran yes "a changed toolchain file runs them"
+remembered "and the new toolchain is then remembered"
+# The gate script: a copy with the same bytes is the same gate, one more line is not.
+mkdir -p "$TMP/gatecopy"
+cp "$GATE" "$(dirname "$GATE")/project_fact.py" "$TMP/gatecopy/"
+GATE_UNDER_TEST="$TMP/gatecopy/hard-gate.sh"
+remembered "the same gate script from another folder still matches"
+echo '# one more line, as a plugin update would bring' >> "$TMP/gatecopy/hard-gate.sh"
+run_counted "$d"
+ran yes "a changed gate script runs them"
+remembered "and the pass is then remembered for the new script"
+echo '# one more line' >> "$TMP/gatecopy/project_fact.py"
+run_counted "$d"
+ran yes "a changed fact reader beside the gate runs them"
+unset GATE_UNDER_TEST
+run_counted "$d"
+ran yes "and the record the changed script wrote does not count for this one"
+# The environment. A variable that can point git somewhere else switches the
+# reuse off; it cannot point the gate at another record.
+for setting in "GIT_DIR=$d/.git" "GIT_WORK_TREE=$d" "GIT_INDEX_FILE=$d/.git/index" \
+    "GIT_CONFIG_GLOBAL=/dev/null" "GIT_CONFIG_COUNT=0" "GIT_A_NAME_NOBODY_KNOWS=1"; do
+  run_counted "$d" "" "$setting"
+  ran yes "${setting%%=*} in the gate's environment switches the reuse off"
+done
+run_counted "$d" "" "GIT_EDITOR=true"
+ran no "GIT_EDITOR, which moves nothing, leaves the reuse on"
+ok "$(grep -o 'MASTHEAD_[A-Z_]*' "$GATE" | sort -u | tr '\n' ' ')" "MASTHEAD_DONE_GATE " "the gate reads no switch but the one that turns the whole gate off"
+cp "$record" "$TMP/record-elsewhere"
+rm -f "$record"
+for setting in "MASTHEAD_PUSH_GATE_PASS=$TMP/record-elsewhere" "MASTHEAD_PASS_RECORD=$TMP/record-elsewhere" "PROJECT_PUSH_GATE_PASS=$TMP/record-elsewhere"; do
+  run_counted "$d" "" "$setting"
+  ran yes "${setting%%=*} does not point the gate at a record kept somewhere else"
+  rm -f "$record"
+done
+run_counted "$d"
+ran yes "with the record gone the slow checks run"
+# A refusal is never remembered.
+printf 'defmodule C do\nend\n' > "$d/lib/c.ex"
+git_in add -A && git_in commit -qm "a third change"
+echo 1 > "$TMP/mixcode"
+run_counted "$d"
+ok "$STATUS" "2" "a failing Elixir rung refuses the push"
+echo 0 > "$TMP/mixcode"
+run_counted "$d"
+ran yes "and that refusal is not remembered as a pass"
+# A commit that lands while the slow checks run: part of them saw the old files.
+printf '#!/bin/sh\ncd "%s" && echo "# landed mid-run" >> lib/c.ex && git commit -qam "landed while the gate ran"\n' "$d" > "$TMP/mixhook"
+chmod +x "$TMP/mixhook"
+git_in commit -q --allow-empty --amend -m "a third change, reworded" && echo '# again' >> "$d/lib/c.ex" && git_in commit -qam "a fourth change"
+started_on="$(cd "$d" && git rev-parse 'HEAD^{tree}')"
+run_counted "$d"
+ok "$STATUS" "0" "a run that a commit lands in the middle of still passes"
+ok "$(grep -c "tree=$started_on " "$record")" "0" "it is not remembered for the commit it started on, which part of it never saw"
+run_counted "$d"
+ran yes "and it is not remembered for the commit that landed"
+# An edit made and taken back while they run leaves the tree clean, so only the
+# stat of the file shows it; an untracked file left behind does show.
+printf '#!/bin/sh\necho scratch > "%s/left-behind.txt"\n' "$d" > "$TMP/mixhook"
+chmod +x "$TMP/mixhook"
+echo '# a fifth' >> "$d/lib/c.ex" && git_in commit -qam "a fifth change"
+run_counted "$d"
+rm -f "$d/left-behind.txt"
+run_counted "$d"
+ran yes "a run that leaves a new file behind is not remembered"
+# Each worktree keeps its own record.
+remembered "the main checkout has a remembered pass"
+git_in worktree add -q "$TMP/remembered-worktree" -b second-checkout HEAD
+run_counted "$TMP/remembered-worktree"
+ok "$STATUS" "0" "a second worktree at the same commit passes"
+ran yes "and runs the slow checks itself: the first worktree's record is not its own"
+run_counted "$TMP/remembered-worktree"
+ran no "then it remembers its own pass"
+ok "$(cd "$TMP/remembered-worktree" && git rev-parse --git-path masthead-push-gate-pass | grep -c '/worktrees/')" "1" "in its own git directory"
+# Round 2 fix 4: a check a rung skips because its tool is not on this machine
+# was not passed. A run with one is not remembered, so the check runs on that
+# commit as soon as the tool is there.
+quick_repo skipped-check
+: > "$TMP/no-credo"
+run_counted "$d"
+ok "$STATUS" "0" "a push with credo not installed goes through"
+contains "$ERR" "credo is not available" "with a warning that the lint check was skipped"
+run_counted "$d"
+ran yes "but that run is not remembered as a pass"
+rm -f "$TMP/no-credo"
+run_counted "$d"
+ran yes "so the stack checks run again once credo is there"
+ok "$(grep -c '^credo --strict' "$TMP/mixlog")" "1" "and credo itself runs on that commit"
+remembered "and the run in which nothing was skipped is remembered"
+# The same from the other side: a tool the stack checks would use that shows up
+# on PATH after a pass, or moves, makes the pass stale.
+mkdir -p "$TMP/newtool"
+printf '#!/bin/sh\nexit 0\n' > "$TMP/newtool/tflint"
+chmod +x "$TMP/newtool/tflint"
+run_counted "$d" "" "PATH=$TMP/newtool:$TMP/countbin:$PATH"
+ran yes "a tool that appears on PATH after the pass runs them again"
+run_counted "$d" "" "PATH=$TMP/newtool:$TMP/countbin:$PATH"
+ran no "and the pass with that tool in place is remembered"
+run_counted "$d"
+ran yes "and taking the tool off PATH again runs them again"
+# Round 1 finding F5: a submodule keeps an index of its own, where a file can be
+# hidden from git status out of this checkout's sight. A checkout that has one
+# never reuses a pass.
+quick_repo with-submodule
+mkdir -p "$d/vendor/dep/lib"
+( cd "$d/vendor/dep" && git init -q . && git config user.email t@t && git config user.name t \
+    && printf 'defmodule Dep do\nend\n' > lib/dep.ex && git add -A && git commit -qm "the dependency" ) >/dev/null 2>&1
+git_in add vendor/dep && git_in commit -qm "a submodule"
+ok "$(cd "$d" && git ls-files -s vendor/dep | cut -c1-6)" "160000" "the checkout holds a submodule"
+run_counted "$d"
+ok "$STATUS" "0" "the first push of a checkout with a submodule passes"
+( cd "$d/vendor/dep" && git update-index --assume-unchanged lib/dep.ex ) >/dev/null 2>&1
+echo '# hidden from git status' >> "$d/vendor/dep/lib/dep.ex"
+ok "$(cd "$d" && git status --porcelain --ignore-submodules=none | wc -l | tr -d ' ')" "0" "git status calls an edit hidden inside the submodule clean"
+run_counted "$d"
+ran yes "but an edit hidden inside a submodule still runs them"
+( cd "$d/vendor/dep" && git update-index --no-assume-unchanged lib/dep.ex && git checkout -- lib/dep.ex ) >/dev/null 2>&1
+run_counted "$d"
+run_counted "$d"
+ran yes "a checkout with a submodule runs them every time"
+# With no origin/main there is no merge base, so nothing is remembered.
+d="$(newrepo no-base)"
+mkdir -p "$d/lib"
+: > "$d/mix.exs"
+git_in add -A && git_in commit -qm base
+printf 'defmodule A do\nend\n' > "$d/lib/a.ex"
+run_counted "$d"
+run_counted "$d"
+ran yes "a checkout with no origin/main runs the slow checks every time"
 
 echo "22. a tracked package.json root runs its test script on push"
 d="$(newrepo node-tracked)"

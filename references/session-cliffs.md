@@ -86,7 +86,10 @@ order. The steps live here and nowhere else; a repo supplies only its own facts
    the change touches authorization, secrets, untrusted input or privilege,
    or the repo's security conventions call for it, with those conventions as
    its claims. Brief each as `references/dispatch-brief.md` says. You do not
-   read, merge or drop their results. `/code-review` is not used.
+   read, merge or drop their results. `/code-review` is not used. Do not
+   start the repo's pre-push check now to save time: any commit made after
+   it starts makes its receipt stale, and the fixes are still to come. Step
+   8 runs it once.
 3. Send the `adjudicator` the commit range, the reviewed files (the files the
    change touched before its first verification, the same list on every
    round), the path of every findings file the round wrote, the README's
@@ -133,10 +136,15 @@ order. The steps live here and nowhere else; a repo supplies only its own facts
    work.
 8. Commit, then run the repo's pre-push check on that last commit: the script
    its `.claude/settings.json` env names as `PROJECT_PUSH_CHECK`, or its own
-   test command when it names none, in one command with nothing sourced. Read
+   test command when it names none, in one command with nothing sourced. Run
+   it one time, after the fixes of the last verification round are in. Do
+   not commit while it runs: the run is then thrown away, because its receipt
+   names a commit that is no longer the last one. Read
    the output, not the exit code. When it cannot reach its test stack, do what
    it prints, and stop and report only when that fails too. `hard-gate.sh`
-   refuses the push and the PR until the check's receipt matches the commit.
+   refuses the push and the PR until the check's receipt matches the commit;
+   it reads the receipt before its slower checks, so a refusal comes back in
+   seconds.
 9. Push and open one PR to main. Its body gives the unproven list, the
    extras brought to the user, the agent-run count (the rows added to
    `<state>/dispatches.tsv` for this issue whose outcome is not refused), and
