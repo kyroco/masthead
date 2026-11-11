@@ -160,6 +160,8 @@ for doc in README.md docs/explainer.template.html docs/explainer.html; do
   says "$doc" "the test receipt and the secret scan first, then the stack checks, which are skipped when this exact commit already passed them"
   says "$doc" "no file git ignores (installed packages, build output) has been added, changed or removed"
   says "$doc" "It does not see a tool that changed on the machine since"
+  # Round 2 fix 5: the pass does not follow the files of another worktree kept inside the checkout, and the page says so.
+  says "$doc" "or a change inside another worktree of the repository kept in the checkout"
   never "$doc" "It does not see a file git ignores"
 done
 says  references/gate-catalog.md "git rev-parse --git-path masthead-push-gate-pass"
