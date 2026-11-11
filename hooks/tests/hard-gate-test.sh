@@ -539,6 +539,36 @@ run_gate "$d" "git push origin $cur ٣> x"
 ok "$STATUS" "2" "the same with a second refspec and a space after the redirect"
 run_gate "$d" "git push origin $cur 2>x"
 ok "$STATUS" "0" "a plain digit right against a redirect is still a file number"
+# Round 1 finding F8: a push whose words are split by a line continuation, or by
+# a ; or | inside quotes, is one push to the shell, and the branch it names counts.
+run_gate "$d" "git push \\
+  origin other"
+ok "$STATUS" "2" "a push of another branch carried over two lines is refused"
+contains "$ERR" "sends 'other'" "and the refusal names the branch"
+while IFS= read -r pushing; do
+  run_gate "$d" "$pushing"
+  ok "$STATUS" "2" "a push of another branch is refused: $pushing"
+  contains "$ERR" "sends 'other'" "and the refusal names the branch"
+done <<'EOF'
+git push -o "note=a;b" origin other
+git push -o "a|b" origin other
+git push -o 'a && b' origin other
+git push -o 'a || b' origin other
+EOF
+run_gate "$d" "git push \\
+  origin $cur"
+ok "$STATUS" "0" "a push of the checked-out branch carried over two lines goes through"
+run_gate "$d" "git push -o \"note=a;b\" origin $cur"
+ok "$STATUS" "0" "a push of the checked-out branch with a ; inside quotes goes through"
+# The cut that does not read quotes is still made too, so what it caught is still caught.
+run_gate "$d" "bash -c \"git fetch; git push origin other\""
+ok "$STATUS" "2" "a push of another branch inside a quoted command line is still refused"
+run_gate "$d" "cat > notes.txt <<EOF
+it's a note
+EOF
+git push origin other
+echo 'done'"
+ok "$STATUS" "2" "a push of another branch after a here-document with an apostrophe is still refused"
 
 echo "30. reading create-pr.sh is not opening a PR, and running it still is"
 # Found 2026-11-11: `sed -n 1,30p scripts/kyroco/create-pr.sh | grep '^#'` ran
