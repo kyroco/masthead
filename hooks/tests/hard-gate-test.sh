@@ -682,6 +682,20 @@ EOF
 run_gate "$d" "cat scripts/create-pr.sh \\
   | bash"
 ok "$STATUS" "2" "a pipe into a shell carried over two lines is still gated"
+# Round 1 finding F7: a NAME=value before a file command can hand it a program
+# to run (git diff runs GIT_EXTERNAL_DIFF), so a command with one is not a read.
+while IFS= read -r running; do
+  run_gate "$d" "$running"
+  ok "$STATUS" "2" "a run is still gated: $running"
+done <<'EOF'
+GIT_EXTERNAL_DIFF=scripts/create-pr.sh git diff
+GIT_EXTERNAL_DIFF=scripts/create-pr.sh git diff -- README.md
+GIT_EDITOR=scripts/create-pr.sh git commit
+PAGER=scripts/create-pr.sh git log
+GIT_PAGER="bash scripts/create-pr.sh" git show
+LESSOPEN="|scripts/create-pr.sh %s" cat README.md
+cd scripts && GIT_EXTERNAL_DIFF=./create-pr.sh git diff
+EOF
 
 # A stand-in for mix that counts its calls, for the cases that ask whether the
 # slow Elixir rung ran at all. It exits with the code in $TMP/mixcode.
