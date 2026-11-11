@@ -771,7 +771,7 @@ quick_repo() {
   echo 'export QUICK_TOOLCHAIN=1' > "$TMP/quick-toolchain.env"
   printf '#!/usr/bin/env bash\n[ "$1" = --check ] || exit 9\necho "local-tests: the stub says so."\nexit "$(cat "%s")"\n' "$TMP/check-code" > "$d/scripts/local-tests.sh"
   : > "$d/mix.exs"
-  printf 'deps/\n_build/\n' > "$d/.gitignore"
+  printf 'deps/\n_build/\n.claude/worktrees/\n' > "$d/.gitignore"
   ( cd "$d" && git add -A && git commit -qm base && git update-ref refs/remotes/origin/main HEAD ) >/dev/null 2>&1
   printf 'defmodule A do\nend\n' > "$d/lib/a.ex"
   ( cd "$d" && git add -A && git commit -qm "an Elixir change" ) >/dev/null 2>&1
@@ -921,6 +921,14 @@ echo 'two, and longer' > "$d/deps/fetched/lib/f.ex"
 run_counted "$d"
 ran yes "a changed file inside that folder runs them"
 remembered "and is then remembered"
+# A linked worktree inside an ignored folder is another checkout, with its own
+# files and its own gate. It is not walked: a main checkout can hold dozens.
+git_in worktree add -q "$d/.claude/worktrees/side" -b side HEAD
+run_counted "$d"
+ran yes "a new linked worktree in an ignored folder runs them once"
+remembered "and is then remembered"
+echo '# a change in the other checkout' >> "$d/.claude/worktrees/side/lib/a.ex"
+remembered "a change inside the linked worktree leaves this checkout's pass standing"
 git_in update-index --assume-unchanged lib/a.ex
 echo '# hidden from git status' >> "$d/lib/a.ex"
 ok "$(cd "$d" && git status --porcelain | wc -l | tr -d ' ')" "0" "git status calls a file marked assume-unchanged clean"

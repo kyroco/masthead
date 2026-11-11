@@ -158,9 +158,13 @@ says  skills/work-on/worker.md "Do not commit while it runs, because the run is 
 # The push gate's order and its remembered pass, where a person reads about them.
 for doc in README.md docs/explainer.template.html docs/explainer.html; do
   says "$doc" "the test receipt and the secret scan first, then the stack checks, which are skipped when this exact commit already passed them"
-  says "$doc" "It does not see a file git ignores, or a tool that changed on the machine since"
+  says "$doc" "no file git ignores (installed packages, build output) has been added, changed or removed"
+  says "$doc" "It does not see a tool that changed on the machine since"
+  never "$doc" "It does not see a file git ignores"
 done
 says  references/gate-catalog.md "git rev-parse --git-path masthead-push-gate-pass"
+says  references/gate-catalog.md "a print of the path, size and time stamp of every file git ignores"
+never references/gate-catalog.md "The remembered pass does not see a file git ignores"
 says  references/gate-catalog.md "no variable or setting names another record or turns the reuse on"
 says  references/gate-catalog.md "one made only of file commands such as \`cat\`, \`sed\`, \`grep\` or \`ls\` reads it and is let through"
 never references/session-cliffs.md "which is not plain English"

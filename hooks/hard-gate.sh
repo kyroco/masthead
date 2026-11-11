@@ -387,10 +387,11 @@ fi
 # Remember a pass. When every rung has passed, one line goes into this worktree's git directory, and a later
 # call whose state matches that line skips the slow stack rungs. The quick rungs always run. The line names
 # what the slow rungs read: the tree of HEAD, the merge base with origin/main, this script with the fact
-# reader beside it, and the pinned toolchain file. A checkout with anything uncommitted, untracked or hidden
-# from git status has no key, and neither has a call whose environment can point git somewhere else. So no
-# variable and no setting can aim the gate at a record made for another commit: the most one can do is
-# switch the reuse off. What the line cannot see is listed in the gate catalog.
+# reader beside it, the pinned toolchain file, and a print of the files git ignores (see ignored_print). A
+# checkout with anything uncommitted, untracked or hidden from git status has no key, and neither has a call
+# whose environment can point git somewhere else. So no variable and no setting can aim the gate at a record
+# made for another commit: the most one can do is switch the reuse off. What the line cannot see is listed in
+# the gate catalog.
 pass_key() {
   local name dirty hidden tree gate toolchain toolsum
   [ -n "$BASE" ] || return 0
@@ -419,7 +420,39 @@ pass_key() {
     toolsum="$(git hash-object --no-filters -- "$toolchain" 2>/dev/null)" || return 0
     [ -n "$toolsum" ] || return 0
   fi
-  printf 'masthead push gate pass 1 tree=%s base=%s gate=%s toolchain=%s\n' "$tree" "$BASE" "$gate" "$toolsum"
+  printf 'masthead push gate pass 2 tree=%s base=%s gate=%s toolchain=%s\n' "$tree" "$BASE" "$gate" "$toolsum"
+}
+# The files git ignores are read by the stack rungs too: installed packages, build output. This prints one
+# hash over the path, size and time stamp of every one of them, so a file that is added, changed or removed
+# after a pass shows as a different print. An ignored folder that is a git clone of its own (a package
+# fetched from git) comes from git as one entry, so its files are walked. One whose .git is a file is a
+# linked worktree, another checkout with a gate of its own, and is not walked: a main checkout can hold
+# dozens of them, each as large as itself. The rungs write build output themselves, so the print is taken
+# after they pass, and it is not part of the key that is compared across the run. Prints nothing when the
+# files cannot be listed, and then nothing is remembered or reused.
+ignored_print() {
+  local print
+  # Under pipefail a git that fails fails the pipe, so a list that could not be made is never read as an empty one.
+  print="$(git ls-files --others --ignored --exclude-standard -z 2>/dev/null | python3 -I -c 'import hashlib, os, sys
+seen = hashlib.sha1()
+def note(path):
+    try:
+        info = os.lstat(path)
+        seen.update(os.fsencode(path) + b"\0" + ("%d %d %d" % (info.st_size, info.st_mtime_ns, info.st_mode)).encode() + b"\n")
+    except OSError:
+        seen.update(os.fsencode(path) + b"\0gone\n")
+for raw in sorted(sys.stdin.buffer.read().split(b"\0")):
+    if not raw:
+        continue
+    path = os.fsdecode(raw)
+    note(path)
+    if path.endswith("/") and os.path.isdir(os.path.join(path, ".git")):
+        for folder, folders, files in os.walk(path):
+            folders[:] = sorted(name for name in folders if name != ".git")
+            for name in sorted(files):
+                note(os.path.join(folder, name))
+print(seen.hexdigest())' 2>/dev/null)" || return 0
+  printf '%s' "$print"
 }
 # Take the key before the changed files are listed, so a commit that lands after this line shows up at the
 # end as a key that no longer matches, and that run is not remembered.
@@ -829,9 +862,18 @@ fi
 
 # The slow rungs: each changed stack's own format, compile, lint and tests. They are skipped when this exact
 # state has passed them before.
-if [ -n "$PASS_KEY" ] && [ -n "$PASS_RECORD" ] && [ -f "$PASS_RECORD" ] && [ "$(cat "$PASS_RECORD" 2>/dev/null)" = "$PASS_KEY" ]; then
-  echo "NOTE: the checks of the changed code (format, compile, lint and tests) passed earlier on exactly this commit and base, with nothing uncommitted, so they were not run again." >&2
-  exit 0
+if [ -n "$PASS_KEY" ] && [ -n "$PASS_RECORD" ] && [ -f "$PASS_RECORD" ]; then
+  _RECORDED="$(cat "$PASS_RECORD" 2>/dev/null)"
+  # The print of the ignored files costs a walk of them, so it is taken only when the rest of the line matches.
+  case "$_RECORDED" in
+    "$PASS_KEY ignored="?*)
+      _PRINT="$(ignored_print)"
+      if [ -n "$_PRINT" ] && [ "$_RECORDED" = "$PASS_KEY ignored=$_PRINT" ]; then
+        echo "NOTE: the checks of the changed code (format, compile, lint and tests) passed earlier on exactly these files and this base, with nothing uncommitted and no ignored file changed since, so they were not run again." >&2
+        exit 0
+      fi
+      ;;
+  esac
 fi
 [ -n "$ELIXIR" ] && each_root gate_elixir "mix.lock mix.exs" ELIXIR
 [ -n "$NODE" ]   && each_root gate_node package.json NODE
@@ -849,7 +891,8 @@ fi
 # Remember the pass, but only when the state is still the one the rungs started on: a commit, an edit or a
 # new file that arrived while they ran leaves no record.
 if [ -n "$PASS_KEY" ] && [ -n "$PASS_RECORD" ] && [ "$(pass_key)" = "$PASS_KEY" ]; then
-  if printf '%s\n' "$PASS_KEY" > "$PASS_RECORD.$$" 2>/dev/null; then
+  _PRINT="$(ignored_print)"
+  if [ -n "$_PRINT" ] && printf '%s ignored=%s\n' "$PASS_KEY" "$_PRINT" > "$PASS_RECORD.$$" 2>/dev/null; then
     mv -f "$PASS_RECORD.$$" "$PASS_RECORD" 2>/dev/null || rm -f "$PASS_RECORD.$$"
   fi
 fi
