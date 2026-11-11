@@ -35,9 +35,199 @@ if re.match(r"^mcp__.+__create_pull_request$", str(d.get("tool_name") or "")): p
 else: print((d.get("tool_input") or {}).get("command",""))' 2>/dev/null || true)"
 _CWD="$(printf '%s\n' "$_PARSED" | head -1)"
 _CMD="$(printf '%s\n' "$_PARSED" | tail -n +2)"
+# The Python that reads the words of the command. It is held in a plain here-document, outside any $( ),
+# because bash 3.2 reads a quote or a backtick in a here-document nested inside $( ) as its own.
+_CMD_READER=""
+IFS= read -r -d '' _CMD_READER <<'PYEOF' || true
+import re, subprocess, sys
+# Two questions about one command. "opens-pr CMD" prints no when a create-pr.sh the command names is
+# only read, and yes otherwise. "sends CMD HEAD_TREE" prints what a push sends: skip, check, or other REFSPEC.
+mode, cmd = sys.argv[1], sys.argv[2]
+VALUED = {"-o", "--push-option", "--repo", "--receive-pack", "--exec"}
+# Commands that read, search, list, copy or mark a file and cannot be made to run it by accident.
+# Anything not named here that names create-pr.sh is taken for a run of it: the match stays loose that way round.
+READERS = {
+    "cat", "bat", "less", "more", "head", "tail", "sed", "grep", "egrep", "fgrep", "rg", "ls", "wc", "nl", "cut",
+    "sort", "uniq", "file", "stat", "du", "tree", "diff", "cmp", "jq", "tr", "column", "echo", "printf", "test", "[",
+    "true", "false", "cd", "pwd", "chmod", "touch", "cp", "mv", "rm", "mkdir", "tee", "basename", "dirname",
+    "readlink", "realpath", "md5", "md5sum", "shasum", "sha256sum", "shellcheck", "shfmt", "gh",
+}
+# The git commands that do the same. bisect, rebase, grep, submodule and the rest can run a command, so they are not here.
+GIT_READERS = {
+    "add", "annotate", "blame", "cat-file", "checkout", "commit", "diff", "log", "ls-files", "ls-tree", "mv",
+    "restore", "rm", "show", "status",
+}
+GIT_PLAIN_OPTIONS = {"--no-pager", "-P", "--no-optional-locks", "--literal-pathspecs"}
+
+
+def shell_words(seg):
+    """Split one command into words the way a shell does, leaving out its redirections:
+    2>&1, >file, >>file, &>file, <file, and an operator whose target is the next word.
+    A quoted or escaped > or < is part of a word, as it is to the shell."""
+    words, cur, plain, drop, i, n = [], None, True, False, 0, len(seg)
+    while i <= n:
+        c = seg[i] if i < n else " "
+        redirect = c in "<>" or (c == "&" and seg[i + 1:i + 2] == ">")
+        if c in " \t\r\n" or redirect:
+            # A word made only of bare digits, right against the operator, is its file descriptor.
+            if redirect and cur is not None and plain and cur.isdigit():
+                cur = None
+            if cur is not None:
+                if drop:
+                    drop = False  # this word was the target of the redirect before it
+                else:
+                    words.append(cur)
+            cur, plain = None, True
+            if redirect:
+                while i < n and seg[i] in "<>&|":
+                    i += 1
+                drop = True
+                continue
+        elif c == "'":
+            end = seg.find("'", i + 1)
+            if end < 0:
+                raise ValueError("no closing quote")
+            cur, plain, i = (cur or "") + seg[i + 1:end], False, end
+        elif c == '"':
+            cur, plain, i = cur or "", False, i + 1
+            while i < n and seg[i] != '"':
+                if seg[i] == "\\" and seg[i + 1:i + 2] in ('"', "\\", "$", "`"):
+                    i += 1
+                cur += seg[i]
+                i += 1
+            if i >= n:
+                raise ValueError("no closing quote")
+        elif c == "\\":
+            if i + 1 >= n:
+                raise ValueError("nothing after the backslash")
+            cur, plain, i = (cur or "") + seg[i + 1], False, i + 1
+        else:
+            cur = (cur or "") + c
+        i += 1
+    return words
+
+
+def loose_words(seg):
+    """The same for a piece shell_words cannot read (a quote cut in half): split on spaces, drop what is shaped like a redirect."""
+    words, drop = [], False
+    for word in seg.split():
+        if drop:
+            drop = False
+        elif re.match(r"^(\d*|&)[<>]", word):
+            drop = re.match(r"^(\d*|&)[<>]+[&|]?$", word) is not None
+        else:
+            words.append(word)
+    return words
+
+
+def parts(text):
+    """The commands in one command line, cut at newlines, ;, &&, || and |, quotes not read."""
+    return re.split(r"\n|;|&&|\|\||\|", text)
+
+
+def drop_assignments(words):
+    while words and re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", words[0]):
+        words.pop(0)
+    return words
+
+
+def only_reads(text):
+    """Whether every part of the command is a plain file command, so a create-pr.sh it names is read and not run."""
+    # A command inside the command ($( ), backticks, <( )) or one sent to the background is not read here.
+    if re.search(r"\$\(|`|[<>]\(", text) or re.search(r"(?<![&<>])&(?![&>])", text):
+        return False
+    for seg in parts(text):
+        try:
+            words = drop_assignments(shell_words(seg))
+        except ValueError:
+            return False
+        if not words:
+            continue
+        name = words[0].rsplit("/", 1)[-1]
+        if name == "git":
+            i = 1
+            while i < len(words) and words[i].startswith("-"):
+                if words[i] == "-C":
+                    i += 2
+                elif words[i] in GIT_PLAIN_OPTIONS:
+                    i += 1
+                else:
+                    return False  # -c and the like can name a command to run
+            if i >= len(words) or words[i] not in GIT_READERS:
+                return False
+        elif name not in READERS:
+            return False
+    return True
+
+
+runs_create_pr = "create-pr.sh" in cmd and not only_reads(cmd)
+if mode == "opens-pr":
+    print("yes" if runs_create_pr or "create-pr.sh" not in cmd else "no")
+    sys.exit(0)
+
+head_tree = sys.argv[3]
+verdict = "skip"
+for seg in parts(cmd):
+    try:
+        words = shell_words(seg)
+    except ValueError:
+        words = loose_words(seg)
+    words = drop_assignments(words)
+    if not words:
+        continue
+    joined = " ".join(words)
+    if re.search(r"(^|\s)gh\s+pr\s+create(\s|$)", joined) or (runs_create_pr and "create-pr.sh" in joined):
+        verdict = "check" if verdict == "skip" else verdict
+        continue
+    if words[0] != "git":
+        continue
+    i = 1
+    while i < len(words) and words[i].startswith("-"):
+        i += 2 if words[i] in ("-C", "-c") else 1
+    if i >= len(words) or words[i] != "push":
+        continue
+    args, deleting, positional = words[i + 1:], False, []
+    j = 0
+    while j < len(args):
+        a = args[j]
+        if a in ("--delete", "-d"):
+            deleting = True
+        elif a in ("--all", "--mirror", "--branches"):
+            print("other " + a)
+            sys.exit(0)
+        elif a in VALUED:
+            j += 1
+        elif not a.startswith("-"):
+            positional.append(a)
+        j += 1
+    refspecs = positional[1:]
+    if deleting:
+        continue
+    if not refspecs:
+        verdict = "check"
+        continue
+    for spec in refspecs:
+        src = spec.lstrip("+").split(":", 1)[0]
+        if src == "":
+            continue  # ":branch" deletes it
+        if not head_tree:
+            verdict = "check"  # no commit yet: nothing to compare, the check decides
+            continue
+        tree = subprocess.run(["git", "rev-parse", "--verify", "-q", src + "^{tree}"],
+                              capture_output=True, text=True).stdout.strip()
+        if tree != head_tree:
+            print("other " + spec)
+            sys.exit(0)
+        verdict = "check"
+print(verdict)
+PYEOF
+
 # Pass the command unless it is a git push, a `gh pr create` or a create-pr.sh run; a here-string avoids a SIGPIPE false pass.
-if ! grep -Eq '(^|[^[:alnum:]_./-])git([[:space:]]+[^;&|[:space:]]+)*[[:space:]]+push([[:space:]]|$|[;&|])|gh[[:space:]]+pr[[:space:]]+create|create-pr\.sh' <<<"$_CMD"; then
-  exit 0
+if ! grep -Eq '(^|[^[:alnum:]_./-])git([[:space:]]+[^;&|[:space:]]+)*[[:space:]]+push([[:space:]]|$|[;&|])|gh[[:space:]]+pr[[:space:]]+create' <<<"$_CMD"; then
+  # A command that names create-pr.sh is taken for a run of it, unless every part of it only reads files
+  # (cat, sed, grep, ls and the like). Only the reader's plain "no" lets it pass, so a reader that fails gates.
+  grep -q 'create-pr\.sh' <<<"$_CMD" || exit 0
+  [ "$(python3 -c "$_CMD_READER" opens-pr "$_CMD" 2>/dev/null)" = no ] && exit 0
 fi
 [ -n "$_CWD" ] && { cd "$_CWD" 2>/dev/null || true; }
 # Move into the checkout the push acts on: a leading `cd DIR`, then each `git -C DIR`, with quotes stripped.
@@ -439,138 +629,12 @@ each_root() {
 [ -n "$KOTLIN" ] && each_root gate_kotlin gradlew KOTLIN
 [ -n "$TF" ]     && gate_tf
 
-# The Python that reads the words of the command. It is held in a plain here-document, outside any $( ),
-# because bash 3.2 reads a quote or a backtick in a here-document nested inside $( ) as its own.
-_CMD_READER=""
-IFS= read -r -d '' _CMD_READER <<'PYEOF' || true
-import re, subprocess, sys
-cmd, head_tree = sys.argv[1], sys.argv[2]
-VALUED = {"-o", "--push-option", "--repo", "--receive-pack", "--exec"}
-
-
-def shell_words(seg):
-    """Split one command into words the way a shell does, leaving out its redirections:
-    2>&1, >file, >>file, &>file, <file, and an operator whose target is the next word.
-    A quoted or escaped > or < is part of a word, as it is to the shell."""
-    words, cur, plain, drop, i, n = [], None, True, False, 0, len(seg)
-    while i <= n:
-        c = seg[i] if i < n else " "
-        redirect = c in "<>" or (c == "&" and seg[i + 1:i + 2] == ">")
-        if c in " \t\r\n" or redirect:
-            # A word made only of bare digits, right against the operator, is its file descriptor.
-            if redirect and cur is not None and plain and cur.isdigit():
-                cur = None
-            if cur is not None:
-                if drop:
-                    drop = False  # this word was the target of the redirect before it
-                else:
-                    words.append(cur)
-            cur, plain = None, True
-            if redirect:
-                while i < n and seg[i] in "<>&|":
-                    i += 1
-                drop = True
-                continue
-        elif c == "'":
-            end = seg.find("'", i + 1)
-            if end < 0:
-                raise ValueError("no closing quote")
-            cur, plain, i = (cur or "") + seg[i + 1:end], False, end
-        elif c == '"':
-            cur, plain, i = cur or "", False, i + 1
-            while i < n and seg[i] != '"':
-                if seg[i] == "\\" and seg[i + 1:i + 2] in ('"', "\\", "$", "`"):
-                    i += 1
-                cur += seg[i]
-                i += 1
-            if i >= n:
-                raise ValueError("no closing quote")
-        elif c == "\\":
-            if i + 1 >= n:
-                raise ValueError("nothing after the backslash")
-            cur, plain, i = (cur or "") + seg[i + 1], False, i + 1
-        else:
-            cur = (cur or "") + c
-        i += 1
-    return words
-
-
-def loose_words(seg):
-    """The same for a piece shell_words cannot read (a quote cut in half): split on spaces, drop what is shaped like a redirect."""
-    words, drop = [], False
-    for word in seg.split():
-        if drop:
-            drop = False
-        elif re.match(r"^(\d*|&)[<>]", word):
-            drop = re.match(r"^(\d*|&)[<>]+[&|]?$", word) is not None
-        else:
-            words.append(word)
-    return words
-
-
-verdict = "skip"
-for seg in re.split(r"\n|;|&&|\|\||\|", cmd):
-    try:
-        words = shell_words(seg)
-    except ValueError:
-        words = loose_words(seg)
-    while words and re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", words[0]):
-        words.pop(0)
-    if not words:
-        continue
-    joined = " ".join(words)
-    if re.search(r"(^|\s)gh\s+pr\s+create(\s|$)|create-pr\.sh", joined):
-        verdict = "check" if verdict == "skip" else verdict
-        continue
-    if words[0] != "git":
-        continue
-    i = 1
-    while i < len(words) and words[i].startswith("-"):
-        i += 2 if words[i] in ("-C", "-c") else 1
-    if i >= len(words) or words[i] != "push":
-        continue
-    args, deleting, positional = words[i + 1:], False, []
-    j = 0
-    while j < len(args):
-        a = args[j]
-        if a in ("--delete", "-d"):
-            deleting = True
-        elif a in ("--all", "--mirror", "--branches"):
-            print("other " + a)
-            sys.exit(0)
-        elif a in VALUED:
-            j += 1
-        elif not a.startswith("-"):
-            positional.append(a)
-        j += 1
-    refspecs = positional[1:]
-    if deleting:
-        continue
-    if not refspecs:
-        verdict = "check"
-        continue
-    for spec in refspecs:
-        src = spec.lstrip("+").split(":", 1)[0]
-        if src == "":
-            continue  # ":branch" deletes it
-        if not head_tree:
-            verdict = "check"  # no commit yet: nothing to compare, the check decides
-            continue
-        tree = subprocess.run(["git", "rev-parse", "--verify", "-q", src + "^{tree}"],
-                              capture_output=True, text=True).stdout.strip()
-        if tree != head_tree:
-            print("other " + spec)
-            sys.exit(0)
-        verdict = "check"
-print(verdict)
-PYEOF
-
 # Local tests: require the push-check script's receipt for HEAD, and refuse a push of any other commit.
 gate_local_tests() {
   check_script="$(project_fact "$TOP" --path PROJECT_PUSH_CHECK)"
   [ -n "$check_script" ] && [ -f "$check_script" ] || return 0
   check_rel="${check_script#"$TOP"/}"
-  sends="$(python3 -c "$_CMD_READER" "$_CMD" "$(git rev-parse --verify -q 'HEAD^{tree}' 2>/dev/null)" 2>/dev/null || echo check)"
+  sends="$(python3 -c "$_CMD_READER" sends "$_CMD" "$(git rev-parse --verify -q 'HEAD^{tree}' 2>/dev/null)" 2>/dev/null || echo check)"
   case "$sends" in
     skip) return 0 ;;
     other*)
