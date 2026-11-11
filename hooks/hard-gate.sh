@@ -439,21 +439,81 @@ each_root() {
 [ -n "$KOTLIN" ] && each_root gate_kotlin gradlew KOTLIN
 [ -n "$TF" ]     && gate_tf
 
-# Local tests: require the push-check script's receipt for HEAD, and refuse a push of any other commit.
-gate_local_tests() {
-  check_script="$(project_fact "$TOP" --path PROJECT_PUSH_CHECK)"
-  [ -n "$check_script" ] && [ -f "$check_script" ] || return 0
-  check_rel="${check_script#"$TOP"/}"
-  sends="$(python3 - "$_CMD" "$(git rev-parse --verify -q 'HEAD^{tree}' 2>/dev/null)" <<'PYEOF' 2>/dev/null || echo check
-import re, shlex, subprocess, sys
+# The Python that reads the words of the command. It is held in a plain here-document, outside any $( ),
+# because bash 3.2 reads a quote or a backtick in a here-document nested inside $( ) as its own.
+_CMD_READER=""
+IFS= read -r -d '' _CMD_READER <<'PYEOF' || true
+import re, subprocess, sys
 cmd, head_tree = sys.argv[1], sys.argv[2]
 VALUED = {"-o", "--push-option", "--repo", "--receive-pack", "--exec"}
+
+
+def shell_words(seg):
+    """Split one command into words the way a shell does, leaving out its redirections:
+    2>&1, >file, >>file, &>file, <file, and an operator whose target is the next word.
+    A quoted or escaped > or < is part of a word, as it is to the shell."""
+    words, cur, plain, drop, i, n = [], None, True, False, 0, len(seg)
+    while i <= n:
+        c = seg[i] if i < n else " "
+        redirect = c in "<>" or (c == "&" and seg[i + 1:i + 2] == ">")
+        if c in " \t\r\n" or redirect:
+            # A word made only of bare digits, right against the operator, is its file descriptor.
+            if redirect and cur is not None and plain and cur.isdigit():
+                cur = None
+            if cur is not None:
+                if drop:
+                    drop = False  # this word was the target of the redirect before it
+                else:
+                    words.append(cur)
+            cur, plain = None, True
+            if redirect:
+                while i < n and seg[i] in "<>&|":
+                    i += 1
+                drop = True
+                continue
+        elif c == "'":
+            end = seg.find("'", i + 1)
+            if end < 0:
+                raise ValueError("no closing quote")
+            cur, plain, i = (cur or "") + seg[i + 1:end], False, end
+        elif c == '"':
+            cur, plain, i = cur or "", False, i + 1
+            while i < n and seg[i] != '"':
+                if seg[i] == "\\" and seg[i + 1:i + 2] in ('"', "\\", "$", "`"):
+                    i += 1
+                cur += seg[i]
+                i += 1
+            if i >= n:
+                raise ValueError("no closing quote")
+        elif c == "\\":
+            if i + 1 >= n:
+                raise ValueError("nothing after the backslash")
+            cur, plain, i = (cur or "") + seg[i + 1], False, i + 1
+        else:
+            cur = (cur or "") + c
+        i += 1
+    return words
+
+
+def loose_words(seg):
+    """The same for a piece shell_words cannot read (a quote cut in half): split on spaces, drop what is shaped like a redirect."""
+    words, drop = [], False
+    for word in seg.split():
+        if drop:
+            drop = False
+        elif re.match(r"^(\d*|&)[<>]", word):
+            drop = re.match(r"^(\d*|&)[<>]+[&|]?$", word) is not None
+        else:
+            words.append(word)
+    return words
+
+
 verdict = "skip"
 for seg in re.split(r"\n|;|&&|\|\||\|", cmd):
     try:
-        words = shlex.split(seg)
+        words = shell_words(seg)
     except ValueError:
-        words = seg.split()
+        words = loose_words(seg)
     while words and re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", words[0]):
         words.pop(0)
     if not words:
@@ -504,7 +564,13 @@ for seg in re.split(r"\n|;|&&|\|\||\|", cmd):
         verdict = "check"
 print(verdict)
 PYEOF
-)"
+
+# Local tests: require the push-check script's receipt for HEAD, and refuse a push of any other commit.
+gate_local_tests() {
+  check_script="$(project_fact "$TOP" --path PROJECT_PUSH_CHECK)"
+  [ -n "$check_script" ] && [ -f "$check_script" ] || return 0
+  check_rel="${check_script#"$TOP"/}"
+  sends="$(python3 -c "$_CMD_READER" "$_CMD" "$(git rev-parse --verify -q 'HEAD^{tree}' 2>/dev/null)" 2>/dev/null || echo check)"
   case "$sends" in
     skip) return 0 ;;
     other*)
