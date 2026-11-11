@@ -167,7 +167,9 @@ if mode == "opens-pr":
     sys.exit(0)
 
 head_tree = sys.argv[3]
-verdict = "skip"
+# One answer for the whole command, the same one the top of the gate acts on: a command taken for a run of
+# create-pr.sh opens a PR however the name reaches the shell (a word, a redirect, a here-string), so it needs the receipt.
+verdict = "check" if runs_create_pr else "skip"
 for seg in parts(cmd):
     try:
         words = shell_words(seg)
@@ -177,7 +179,7 @@ for seg in parts(cmd):
     if not words:
         continue
     joined = " ".join(words)
-    if re.search(r"(^|\s)gh\s+pr\s+create(\s|$)", joined) or (runs_create_pr and "create-pr.sh" in joined):
+    if re.search(r"(^|\s)gh\s+pr\s+create(\s|$)", joined):
         verdict = "check" if verdict == "skip" else verdict
         continue
     if words[0] != "git":
