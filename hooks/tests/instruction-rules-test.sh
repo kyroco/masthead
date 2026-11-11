@@ -172,6 +172,8 @@ says  references/gate-catalog.md "when the repo names a \`PROJECT_PUSH_CHECK\` s
 says  references/gate-catalog.md "A repo that names no push check gets neither refusal"
 never references/gate-catalog.md "stops the gate there: it refuses a push that sends anything but HEAD"
 says  references/gate-catalog.md "one made only of file commands such as \`cat\`, \`sed\`, \`grep\` or \`ls\` reads it and is let through"
+says  references/gate-catalog.md "The list holds only commands that print"
+says  references/gate-catalog.md "every git command"
 never references/session-cliffs.md "which is not plain English"
 says  README.md "a sentence a customer reads that is false in some state"
 says  docs/explainer.template.html "a sentence a customer reads that is false in some state"
