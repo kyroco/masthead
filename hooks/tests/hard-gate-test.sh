@@ -815,9 +815,10 @@ EOF
 # slow Elixir rung ran at all. It exits with the code in $TMP/mixcode.
 mkdir -p "$TMP/countbin"
 # When $TMP/mixhook exists, `mix compile` runs it once first: a change that lands
-# while the slow rung is running.
-printf '#!/bin/sh\necho "$*" >> "%s"\nif [ "$1" = compile ] && [ -x "%s" ]; then "%s"; rm -f "%s"; fi\nexit "$(cat "%s" 2>/dev/null || echo 0)"\n' \
-  "$TMP/mixlog" "$TMP/mixhook" "$TMP/mixhook" "$TMP/mixhook" "$TMP/mixcode" > "$TMP/countbin/mix"
+# while the slow rung is running. While $TMP/no-credo exists, `mix help credo`
+# fails, which is how the gate learns that credo is not installed.
+printf '#!/bin/sh\necho "$*" >> "%s"\nif [ "$1" = compile ] && [ -x "%s" ]; then "%s"; rm -f "%s"; fi\nif [ "$1 $2" = "help credo" ] && [ -e "%s" ]; then exit 1; fi\nexit "$(cat "%s" 2>/dev/null || echo 0)"\n' \
+  "$TMP/mixlog" "$TMP/mixhook" "$TMP/mixhook" "$TMP/mixhook" "$TMP/no-credo" "$TMP/mixcode" > "$TMP/countbin/mix"
 chmod +x "$TMP/countbin/mix"
 # $1 = the checkout, $2 = the command (default: a plain push of HEAD), $3 = one
 # more NAME=value for the gate's environment. MIXRUNS is how many times mix ran.
@@ -1096,6 +1097,21 @@ ran yes "and runs the slow checks itself: the first worktree's record is not its
 run_counted "$TMP/remembered-worktree"
 ran no "then it remembers its own pass"
 ok "$(cd "$TMP/remembered-worktree" && git rev-parse --git-path masthead-push-gate-pass | grep -c '/worktrees/')" "1" "in its own git directory"
+# Round 2 fix 4: a check a rung skips because its tool is not on this machine
+# was not passed. A run with one is not remembered, so the check runs on that
+# commit as soon as the tool is there.
+quick_repo skipped-check
+: > "$TMP/no-credo"
+run_counted "$d"
+ok "$STATUS" "0" "a push with credo not installed goes through"
+contains "$ERR" "credo is not available" "with a warning that the lint check was skipped"
+run_counted "$d"
+ran yes "but that run is not remembered as a pass"
+rm -f "$TMP/no-credo"
+run_counted "$d"
+ran yes "so the stack checks run again once credo is there"
+ok "$(grep -c '^credo --strict' "$TMP/mixlog")" "1" "and credo itself runs on that commit"
+remembered "and the run in which nothing was skipped is remembered"
 # Round 1 finding F5: a submodule keeps an index of its own, where a file can be
 # hidden from git status out of this checkout's sight. A checkout that has one
 # never reuses a pass.
