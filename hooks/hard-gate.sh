@@ -436,7 +436,7 @@ fi
 # made for another commit: the most one can do is switch the reuse off. What the line cannot see is listed in
 # the gate catalog.
 pass_key() {
-  local name dirty hidden links tree gate toolchain toolsum
+  local name dirty hidden links tree gate toolchain toolsum tools
   [ -n "$BASE" ] || return 0
   # Any GIT_ variable outside this list may move the repository, the index, the objects or the config git reads.
   for name in $(env | sed -n 's/^\(GIT_[A-Za-z0-9_]*\)=.*/\1/p'); do
@@ -467,7 +467,13 @@ pass_key() {
     toolsum="$(git hash-object --no-filters -- "$toolchain" 2>/dev/null)" || return 0
     [ -n "$toolsum" ] || return 0
   fi
-  printf 'masthead push gate pass 2 tree=%s base=%s gate=%s toolchain=%s\n' "$tree" "$BASE" "$gate" "$toolsum"
+  # Where each tool the stack rungs call is found on PATH, or that it is not found: a tool installed, removed
+  # or moved since the pass changes which checks run, so it changes the key. A tool upgraded in place is not seen.
+  tools="$(for name in mix elixir node npx npm swift swiftformat swiftlint tofu terraform tflint checkov trivy; do
+    printf '%s=%s\n' "$name" "$(command -v "$name" 2>/dev/null || true)"
+  done | git hash-object --stdin 2>/dev/null)" || return 0
+  [ -n "$tools" ] || return 0
+  printf 'masthead push gate pass 3 tree=%s base=%s gate=%s toolchain=%s tools=%s\n' "$tree" "$BASE" "$gate" "$toolsum" "$tools"
 }
 # The files git ignores are read by the stack rungs too: installed packages, build output. This prints one
 # hash over the path, size and time stamp of every one of them, so a file that is added, changed or removed
