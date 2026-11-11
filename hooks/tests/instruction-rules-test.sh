@@ -166,7 +166,8 @@ for doc in README.md docs/explainer.template.html docs/explainer.html; do
   never "$doc" "It does not see a file git ignores"
 done
 says  references/gate-catalog.md "git rev-parse --git-path masthead-push-gate-pass"
-says  references/gate-catalog.md "a print of the path, size and time stamp of every file git ignores"
+says  references/gate-catalog.md "a print of the path, size and time stamp of the files git ignores"
+says  references/gate-catalog.md "or a command that names a \`create-pr.sh\`, unless it only reads it"
 says  references/gate-catalog.md "a file marked assume-unchanged or skip-worktree, a submodule in the checkout, no origin/main"
 says  references/gate-catalog.md "A run in which a check was skipped because its tool is not installed is not remembered"
 never references/gate-catalog.md "a rung that only warned because its tool was missing"
