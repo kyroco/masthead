@@ -527,6 +527,18 @@ run_gate "$d" "git push origin '>other'"
 ok "$STATUS" "2" "a quoted word that starts with > is a refspec, not a redirect"
 run_gate "$d" "git push origin $cur 2>&1 other"
 ok "$STATUS" "2" "a branch named after a redirect is still read"
+# Round 1 finding F1: only the plain digits 0 to 9 are a file number to the
+# shell. A branch named with another script's digit is a branch.
+( cd "$d" && git branch "٣" other && git branch "²" other ) >/dev/null 2>&1
+for name in "٣" "²" "１"; do
+  run_gate "$d" "git push origin $name>x"
+  ok "$STATUS" "2" "a branch named $name right against a redirect is still read as a branch"
+  contains "$ERR" "sends '$name'" "and the refusal names it"
+done
+run_gate "$d" "git push origin $cur ٣> x"
+ok "$STATUS" "2" "the same with a second refspec and a space after the redirect"
+run_gate "$d" "git push origin $cur 2>x"
+ok "$STATUS" "0" "a plain digit right against a redirect is still a file number"
 
 echo "30. reading create-pr.sh is not opening a PR, and running it still is"
 # Found 2026-11-11: `sed -n 1,30p scripts/kyroco/create-pr.sh | grep '^#'` ran
