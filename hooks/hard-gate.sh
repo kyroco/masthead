@@ -218,11 +218,21 @@ head_tree = sys.argv[3]
 # One answer for the whole command, the same one the top of the gate acts on: a command taken for a run of
 # create-pr.sh opens a PR however the name reaches the shell (a word, a redirect, a here-string), so it needs the receipt.
 verdict = "check" if runs_create_pr else "skip"
+# Two readings of the command, and a push that either one shows is read. The first cuts the line without
+# reading quotes, as this gate always has, so a push written inside a quoted command line is still seen. The
+# second cuts it where the shell does, so a push whose words a line continuation, or a ; or | inside quotes,
+# would split is read whole.
+readings = []
 for seg in parts(cmd):
     try:
-        words = shell_words(seg)
+        readings.append(shell_words(seg))
     except ValueError:
-        words = loose_words(seg)
+        readings.append(loose_words(seg))
+try:
+    readings.extend([shell_words(seg) for seg in shell_parts(cmd)[0]])
+except ValueError:
+    pass  # a quote left open: only the first reading stands
+for words in readings:
     words = drop_assignments(words)
     if not words:
         continue
