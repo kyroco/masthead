@@ -96,6 +96,10 @@ would have to change, is a question, not a redraw.
 ## 6. Prove it and open the PR
 
 Follow **Opening a PR** in `${CLAUDE_PLUGIN_ROOT}/references/session-cliffs.md`.
+Run the repo's pre-push check one time: on the last commit, after the fixes
+of the last verification round are in. Do not start it when you send out the
+verifiers, because any later commit makes its receipt stale. Do not commit
+while it runs, because the run is then thrown away.
 Once the PR is open, set the Status to In Review with `set-status.sh`.
 
 ## 7. Report

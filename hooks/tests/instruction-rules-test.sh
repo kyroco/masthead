@@ -144,6 +144,25 @@ for doc in README.md docs/explainer.template.html docs/explainer.html scripts/di
   never "$doc" "English p""ass"
 done
 says  references/session-cliffs.md "Add the changelog entry when the repo keeps one"
+
+# The full pre-push check runs once. Measured 2026-11-11 over 24 pull requests: a
+# median of 3 runs each, 31 of 111 never read and 5 thrown away by a commit that
+# landed while the run was going, because it was started with the verifiers.
+says  references/session-cliffs.md "Run it one time, after the fixes of the last verification round are in"
+says  references/session-cliffs.md "Do not commit while it runs: the run is then thrown away"
+says  references/session-cliffs.md "Do not start the repo's pre-push check now to save time"
+says  references/session-cliffs.md "any commit made after it starts makes its receipt stale"
+says  skills/work-on/worker.md "Run the repo's pre-push check one time: on the last commit, after the fixes of the last verification round are in"
+says  skills/work-on/worker.md "Do not start it when you send out the verifiers, because any later commit makes its receipt stale"
+says  skills/work-on/worker.md "Do not commit while it runs, because the run is then thrown away"
+# The push gate's order and its remembered pass, where a person reads about them.
+for doc in README.md docs/explainer.template.html docs/explainer.html; do
+  says "$doc" "the test receipt and the secret scan first, then the stack checks, which are skipped when this exact commit already passed them"
+  says "$doc" "It does not see a file git ignores, or a tool that changed on the machine since"
+done
+says  references/gate-catalog.md "git rev-parse --git-path masthead-push-gate-pass"
+says  references/gate-catalog.md "no variable or setting names another record or turns the reuse on"
+says  references/gate-catalog.md "one made only of file commands such as \`cat\`, \`sed\`, \`grep\` or \`ls\` reads it and is let through"
 never references/session-cliffs.md "which is not plain English"
 says  README.md "a sentence a customer reads that is false in some state"
 says  docs/explainer.template.html "a sentence a customer reads that is false in some state"

@@ -280,7 +280,7 @@ reason Claude can act on.
 
 | Check | Runs | Refuses | Needs |
 |---|---|---|---|
-| `hard-gate.sh` | before `git push`, `gh pr create` or a GitHub connector's `create_pull_request` | a push that carries something shaped like a secret, or fails a changed stack's format, compile, lint or type check; with the test command, a push until the push check reports the tests passed on this exact commit, and a push of any other commit | nothing for the secret scan and the stack checks; the test command from setup (`PROJECT_PUSH_CHECK`) for the test receipt |
+| `hard-gate.sh` | before `git push`, `gh pr create` or a GitHub connector's `create_pull_request`; the test receipt and the secret scan first, then the stack checks, which are skipped when this exact commit already passed them | a push that carries something shaped like a secret, or fails a changed stack's format, compile, lint or type check; with the test command, a push until the push check reports the tests passed on this exact commit, and a push of any other commit | nothing for the secret scan and the stack checks; the test command from setup (`PROJECT_PUSH_CHECK`) for the test receipt |
 | `adr-sections-gate.py`, `adr-structure-gate.sh`, `wiki-refresh.sh` | before a write; at stop; at session start | a decision record written without its sections; a finish that leaves one with an unchecked claims list; keeps the records folder fresh | a decision records folder: `ADR_DIR`, or `docs/adr` when none is named, for the two gates; the refresh only with `ADR_DIR` set to an absolute path |
 | `elixir-toolchain-env.sh`, `elixir-format-after-edit.sh` | at session start; after an edit | nothing; pins the Elixir toolchain and formats an edited file | an Elixir root (`PROJECT_ELIXIR_ROOT`) |
 
@@ -290,6 +290,13 @@ check script or the toolchain file, the same way CI runs a pull request's own
 tests. The record of which commit passed is a file in the checkout too. So the
 push check is a guard against forgetting, not against intent; a pull request
 review is the guard against intent.
+
+The push gate also remembers that a commit passed its stack checks, in one
+line in the checkout's git folder, so a second push or the pull request on the
+same commit does not wait for them again. The line holds for the same files,
+the same base on main, the same gate script and the same pinned toolchain, and
+only while nothing is uncommitted or untracked. It does not see a file git
+ignores, or a tool that changed on the machine since.
 
 ### On or off with an install option
 
