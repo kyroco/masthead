@@ -167,6 +167,10 @@ says  references/gate-catalog.md "a print of the path, size and time stamp of ev
 says  references/gate-catalog.md "a file marked assume-unchanged or skip-worktree, a submodule in the checkout, no origin/main"
 never references/gate-catalog.md "The remembered pass does not see a file git ignores"
 says  references/gate-catalog.md "no variable or setting names another record or turns the reuse on"
+# Round 1 finding F6: the refusal of a push of anything but HEAD needs the repo's push check, and the row says so.
+says  references/gate-catalog.md "when the repo names a \`PROJECT_PUSH_CHECK\` script, it refuses a push that sends anything but HEAD"
+says  references/gate-catalog.md "A repo that names no push check gets neither refusal"
+never references/gate-catalog.md "stops the gate there: it refuses a push that sends anything but HEAD"
 says  references/gate-catalog.md "one made only of file commands such as \`cat\`, \`sed\`, \`grep\` or \`ls\` reads it and is let through"
 never references/session-cliffs.md "which is not plain English"
 says  README.md "a sentence a customer reads that is false in some state"
