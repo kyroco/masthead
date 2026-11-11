@@ -64,7 +64,9 @@ ok() {
 }
 
 contains() {
-  if printf '%s' "$1" | grep -q "$2"; then
+  # A here-string, not a pipe: under pipefail grep -q leaves at its first match,
+  # printf takes a broken pipe on the rest, and a match is read as a miss.
+  if grep -q "$2" <<<"$1"; then
     pass=$((pass + 1))
     echo "  ok: $3"
   else
@@ -581,7 +583,10 @@ EOF
 # A stand-in for mix that counts its calls, for the cases that ask whether the
 # slow Elixir rung ran at all. It exits with the code in $TMP/mixcode.
 mkdir -p "$TMP/countbin"
-printf '#!/bin/sh\necho "$*" >> "%s"\nexit "$(cat "%s" 2>/dev/null || echo 0)"\n' "$TMP/mixlog" "$TMP/mixcode" > "$TMP/countbin/mix"
+# When $TMP/mixhook exists, `mix compile` runs it once first: a change that lands
+# while the slow rung is running.
+printf '#!/bin/sh\necho "$*" >> "%s"\nif [ "$1" = compile ] && [ -x "%s" ]; then "%s"; rm -f "%s"; fi\nexit "$(cat "%s" 2>/dev/null || echo 0)"\n' \
+  "$TMP/mixlog" "$TMP/mixhook" "$TMP/mixhook" "$TMP/mixhook" "$TMP/mixcode" > "$TMP/countbin/mix"
 chmod +x "$TMP/countbin/mix"
 # $1 = the checkout, $2 = the command (default: a plain push of HEAD), $3 = one
 # more NAME=value for the gate's environment. MIXRUNS is how many times mix ran.
@@ -606,7 +611,8 @@ ran() {
 quick_repo() {
   d="$(newrepo "$1")"
   mkdir -p "$d/scripts" "$d/.claude" "$d/lib"
-  echo '{"env": {"PROJECT_PUSH_CHECK": "scripts/local-tests.sh"}}' > "$d/.claude/settings.json"
+  printf '{"env": {"PROJECT_PUSH_CHECK": "scripts/local-tests.sh", "PROJECT_TOOLCHAIN_ENV": "%s"}}\n' "$TMP/quick-toolchain.env" > "$d/.claude/settings.json"
+  echo 'export QUICK_TOOLCHAIN=1' > "$TMP/quick-toolchain.env"
   printf '#!/usr/bin/env bash\n[ "$1" = --check ] || exit 9\necho "local-tests: the stub says so."\nexit "$(cat "%s")"\n' "$TMP/check-code" > "$d/scripts/local-tests.sh"
   : > "$d/mix.exs"
   ( cd "$d" && git add -A && git commit -qm base && git update-ref refs/remotes/origin/main HEAD ) >/dev/null 2>&1
@@ -643,14 +649,186 @@ contains "$ERR" "local tests have not passed" "with both quick checks failing, t
 contains "$ERR" "possible secret" "and so is the secret, in the same refusal"
 echo 0 > "$TMP/check-code"
 rm -f "$d/lib/b.ex"
-run_counted "$d"
-ok "$STATUS" "0" "with both quick checks passing the push goes through"
-ran yes "and the Elixir rung ran"
 echo 1 > "$TMP/mixcode"
 run_counted "$d"
-ok "$STATUS" "2" "a failing Elixir rung still refuses the push"
+ok "$STATUS" "2" "with both quick checks passing, a failing Elixir rung still refuses the push"
 contains "$ERR" "mix compile" "and it names the failing command"
 echo 0 > "$TMP/mixcode"
+run_counted "$d"
+ok "$STATUS" "0" "with every check passing the push goes through"
+ran yes "and the Elixir rung ran"
+
+echo "32. a pass is remembered, so the slow checks do not run twice on the same commit"
+# Measured 2026-11-11: the gate reran format, compile and lint on every push and
+# every PR create, 67 times for a median of 184 seconds, even when the same
+# commit had passed minutes before.
+quick_repo remembered
+record="$d/.git/masthead-push-gate-pass"
+run_counted "$d"
+ok "$STATUS" "0" "the first push of a commit passes"
+ran yes "and it runs the Elixir rung"
+[ -f "$record" ] && wrote=yes || wrote=no
+ok "$wrote" "yes" "the pass is written into the checkout's git directory"
+ok "$(cd "$d" && git status --porcelain --untracked-files=all | wc -l | tr -d ' ')" "0" "so the record is never a file git could commit"
+run_counted "$d"
+ok "$STATUS" "0" "the same commit pushed again passes"
+ran no "without running the Elixir rung again"
+contains "$ERR" "not run again" "and it says the earlier pass was used"
+run_counted "$d" "gh pr create --fill"
+ok "$STATUS" "0" "opening the PR on that commit passes"
+ran no "without running the Elixir rung again"
+# The quick checks are not part of what is remembered.
+echo 1 > "$TMP/check-code"
+run_counted "$d"
+ok "$STATUS" "2" "a remembered pass does not excuse a missing test receipt"
+contains "$ERR" "local tests have not passed" "it says the local tests have not passed"
+echo 0 > "$TMP/check-code"
+run_counted "$d" "git push origin no-such-branch"
+ok "$STATUS" "2" "nor a push of another branch"
+run_counted "$d" "" "PATH=$TMP/brokenawk:$TMP/countbin:$PATH"
+ok "$STATUS" "2" "and the secret scan still runs: one that cannot run still refuses"
+contains "$ERR" "secret scan could not run" "it says the scan did not run"
+run_counted "$d"
+ran no "after those refusals the pass still stands for the same commit"
+
+echo "33. every way a remembered pass could be stale runs the slow checks again"
+git_in() { ( cd "$d" && git "$@" ) >/dev/null 2>&1; }
+# Each case starts from a remembered pass and ends on one, so the next case
+# proves its own change and nothing left over from the one before.
+remembered() {
+  run_counted "$d"
+  ran no "$1"
+}
+printf 'defmodule B do\nend\n' > "$d/lib/b.ex"
+git_in add -A && git_in commit -qm "a second change"
+run_counted "$d"
+ran yes "a new commit runs them"
+remembered "and that commit is then remembered"
+printf 'defmodule B do\n  def b, do: 1\nend\n' > "$d/lib/b.ex"
+git_in commit -qa --amend --no-edit
+run_counted "$d"
+ran yes "an amended commit runs them"
+remembered "and the amended commit is then remembered"
+git_in commit -q --amend -m "the same files under a new message"
+remembered "an amend that changes only the message keeps the pass, since the files are the same"
+echo '# an edit' >> "$d/lib/a.ex"
+run_counted "$d"
+ran yes "an uncommitted edit runs them"
+run_counted "$d"
+ran yes "and a pass on a tree with an uncommitted edit is not remembered"
+git_in add lib/a.ex
+run_counted "$d"
+ran yes "a staged edit runs them"
+git_in reset -q HEAD lib/a.ex && git_in checkout -- lib/a.ex
+remembered "taking the edit back returns to the remembered commit"
+echo 'notes' > "$d/notes.txt"
+run_counted "$d"
+ran yes "an untracked file runs them"
+run_counted "$d"
+ran yes "and a pass on a tree with an untracked file is not remembered"
+rm -f "$d/notes.txt"
+remembered "removing the file returns to the remembered commit"
+git_in update-index --assume-unchanged lib/a.ex
+echo '# hidden from git status' >> "$d/lib/a.ex"
+ok "$(cd "$d" && git status --porcelain | wc -l | tr -d ' ')" "0" "git status calls a file marked assume-unchanged clean"
+run_counted "$d"
+ran yes "but an edit hidden that way still runs them"
+git_in update-index --no-assume-unchanged lib/a.ex && git_in checkout -- lib/a.ex
+remembered "unmarking the file returns to the remembered commit"
+git_in update-index --skip-worktree lib/a.ex
+echo '# hidden from git status' >> "$d/lib/a.ex"
+run_counted "$d"
+ran yes "an edit hidden with skip-worktree runs them"
+git_in update-index --no-skip-worktree lib/a.ex && git_in checkout -- lib/a.ex
+remembered "unmarking the file returns to the remembered commit"
+git_in update-ref refs/remotes/origin/main HEAD~1
+run_counted "$d"
+ran yes "a moved merge base with origin/main runs them"
+remembered "and the new base is then remembered"
+echo 'export QUICK_TOOLCHAIN=2' > "$TMP/quick-toolchain.env"
+run_counted "$d"
+ran yes "a changed toolchain file runs them"
+remembered "and the new toolchain is then remembered"
+# The gate script: a copy with the same bytes is the same gate, one more line is not.
+mkdir -p "$TMP/gatecopy"
+cp "$GATE" "$(dirname "$GATE")/project_fact.py" "$TMP/gatecopy/"
+GATE_UNDER_TEST="$TMP/gatecopy/hard-gate.sh"
+remembered "the same gate script from another folder still matches"
+echo '# one more line, as a plugin update would bring' >> "$TMP/gatecopy/hard-gate.sh"
+run_counted "$d"
+ran yes "a changed gate script runs them"
+remembered "and the pass is then remembered for the new script"
+echo '# one more line' >> "$TMP/gatecopy/project_fact.py"
+run_counted "$d"
+ran yes "a changed fact reader beside the gate runs them"
+unset GATE_UNDER_TEST
+run_counted "$d"
+ran yes "and the record the changed script wrote does not count for this one"
+# The environment. A variable that can point git somewhere else switches the
+# reuse off; it cannot point the gate at another record.
+for setting in "GIT_DIR=$d/.git" "GIT_WORK_TREE=$d" "GIT_INDEX_FILE=$d/.git/index" \
+    "GIT_CONFIG_GLOBAL=/dev/null" "GIT_CONFIG_COUNT=0" "GIT_A_NAME_NOBODY_KNOWS=1"; do
+  run_counted "$d" "" "$setting"
+  ran yes "${setting%%=*} in the gate's environment switches the reuse off"
+done
+run_counted "$d" "" "GIT_EDITOR=true"
+ran no "GIT_EDITOR, which moves nothing, leaves the reuse on"
+ok "$(grep -o 'MASTHEAD_[A-Z_]*' "$GATE" | sort -u | tr '\n' ' ')" "MASTHEAD_DONE_GATE " "the gate reads no switch but the one that turns the whole gate off"
+cp "$record" "$TMP/record-elsewhere"
+rm -f "$record"
+for setting in "MASTHEAD_PUSH_GATE_PASS=$TMP/record-elsewhere" "MASTHEAD_PASS_RECORD=$TMP/record-elsewhere" "PROJECT_PUSH_GATE_PASS=$TMP/record-elsewhere"; do
+  run_counted "$d" "" "$setting"
+  ran yes "${setting%%=*} does not point the gate at a record kept somewhere else"
+  rm -f "$record"
+done
+run_counted "$d"
+ran yes "with the record gone the slow checks run"
+# A refusal is never remembered.
+printf 'defmodule C do\nend\n' > "$d/lib/c.ex"
+git_in add -A && git_in commit -qm "a third change"
+echo 1 > "$TMP/mixcode"
+run_counted "$d"
+ok "$STATUS" "2" "a failing Elixir rung refuses the push"
+echo 0 > "$TMP/mixcode"
+run_counted "$d"
+ran yes "and that refusal is not remembered as a pass"
+# A commit that lands while the slow checks run: part of them saw the old files.
+printf '#!/bin/sh\ncd "%s" && echo "# landed mid-run" >> lib/c.ex && git commit -qam "landed while the gate ran"\n' "$d" > "$TMP/mixhook"
+chmod +x "$TMP/mixhook"
+git_in commit -q --allow-empty --amend -m "a third change, reworded" && echo '# again' >> "$d/lib/c.ex" && git_in commit -qam "a fourth change"
+started_on="$(cd "$d" && git rev-parse 'HEAD^{tree}')"
+run_counted "$d"
+ok "$STATUS" "0" "a run that a commit lands in the middle of still passes"
+ok "$(grep -c "tree=$started_on " "$record")" "0" "it is not remembered for the commit it started on, which part of it never saw"
+run_counted "$d"
+ran yes "and it is not remembered for the commit that landed"
+# An edit made and taken back while they run leaves the tree clean, so only the
+# stat of the file shows it; an untracked file left behind does show.
+printf '#!/bin/sh\necho scratch > "%s/left-behind.txt"\n' "$d" > "$TMP/mixhook"
+chmod +x "$TMP/mixhook"
+echo '# a fifth' >> "$d/lib/c.ex" && git_in commit -qam "a fifth change"
+run_counted "$d"
+rm -f "$d/left-behind.txt"
+run_counted "$d"
+ran yes "a run that leaves a new file behind is not remembered"
+# Each worktree keeps its own record.
+remembered "the main checkout has a remembered pass"
+git_in worktree add -q "$TMP/remembered-worktree" -b second-checkout HEAD
+run_counted "$TMP/remembered-worktree"
+ok "$STATUS" "0" "a second worktree at the same commit passes"
+ran yes "and runs the slow checks itself: the first worktree's record is not its own"
+run_counted "$TMP/remembered-worktree"
+ran no "then it remembers its own pass"
+ok "$(cd "$TMP/remembered-worktree" && git rev-parse --git-path masthead-push-gate-pass | grep -c '/worktrees/')" "1" "in its own git directory"
+# With no origin/main there is no merge base, so nothing is remembered.
+d="$(newrepo no-base)"
+mkdir -p "$d/lib"
+: > "$d/mix.exs"
+git_in add -A && git_in commit -qm base
+printf 'defmodule A do\nend\n' > "$d/lib/a.ex"
+run_counted "$d"
+run_counted "$d"
+ran yes "a checkout with no origin/main runs the slow checks every time"
 
 echo "22. a tracked package.json root runs its test script on push"
 d="$(newrepo node-tracked)"

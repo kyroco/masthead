@@ -255,6 +255,48 @@ BASE="$(git merge-base HEAD origin/main 2>/dev/null || true)"
 if [ -z "$BASE" ]; then
   echo "WARN: no origin/main to compare against, so only uncommitted files were checked. Run 'git fetch origin main' and push again for a full check." >&2
 fi
+
+# Remember a pass. When every rung has passed, one line goes into this worktree's git directory, and a later
+# call whose state matches that line skips the slow stack rungs. The quick rungs always run. The line names
+# what the slow rungs read: the tree of HEAD, the merge base with origin/main, this script with the fact
+# reader beside it, and the pinned toolchain file. A checkout with anything uncommitted, untracked or hidden
+# from git status has no key, and neither has a call whose environment can point git somewhere else. So no
+# variable and no setting can aim the gate at a record made for another commit: the most one can do is
+# switch the reuse off. What the line cannot see is listed in the gate catalog.
+pass_key() {
+  local name dirty hidden tree gate toolchain toolsum
+  [ -n "$BASE" ] || return 0
+  # Any GIT_ variable outside this list may move the repository, the index, the objects or the config git reads.
+  for name in $(env | sed -n 's/^\(GIT_[A-Za-z0-9_]*\)=.*/\1/p'); do
+    case "$name" in
+      GIT_EDITOR|GIT_SEQUENCE_EDITOR|GIT_PAGER|GIT_TERMINAL_PROMPT|GIT_ASKPASS|GIT_SSH|GIT_SSH_COMMAND) ;;
+      GIT_CEILING_DIRECTORIES|GIT_OPTIONAL_LOCKS|GIT_AUTHOR_*|GIT_COMMITTER_*|GIT_TRACE*) ;;
+      *) return 0 ;;
+    esac
+  done
+  # The rungs check files on disk, so one uncommitted or untracked file means the tree of HEAD is not what they saw.
+  dirty="$(git status --porcelain --untracked-files=all --ignore-submodules=none 2>/dev/null)" || return 0
+  [ -z "$dirty" ] || return 0
+  # A file marked assume-unchanged or skip-worktree can differ on disk while git status calls the tree clean.
+  hidden="$(git ls-files -v 2>/dev/null)" || return 0
+  grep -q '^[a-zS] ' <<<"$hidden" && return 0
+  tree="$(git rev-parse --verify -q 'HEAD^{tree}' 2>/dev/null)" || return 0
+  [ -n "$tree" ] || return 0
+  # A plugin update changes this script or the fact reader, and so voids every record made before it.
+  gate="$(cat "$_HOOK_DIR/$(basename "${BASH_SOURCE[0]}")" "$_HOOK_DIR/project_fact.py" 2>/dev/null | git hash-object --stdin 2>/dev/null)" || return 0
+  [ -n "$gate" ] || return 0
+  toolsum=none
+  toolchain="$(project_fact "$TOP" --path PROJECT_TOOLCHAIN_ENV)"
+  if [ -n "$toolchain" ] && [ -f "$toolchain" ]; then
+    toolsum="$(git hash-object --no-filters -- "$toolchain" 2>/dev/null)" || return 0
+    [ -n "$toolsum" ] || return 0
+  fi
+  printf 'masthead push gate pass 1 tree=%s base=%s gate=%s toolchain=%s\n' "$tree" "$BASE" "$gate" "$toolsum"
+}
+# Take the key before the changed files are listed, so a commit that lands after this line shows up at the
+# end as a key that no longer matches, and that run is not remembered.
+PASS_KEY="$(pass_key)"
+PASS_RECORD="$(git rev-parse --git-path masthead-push-gate-pass 2>/dev/null || true)"
 CHANGED="$( {
   [ -n "$BASE" ] && git diff --name-only "$BASE" HEAD 2>/dev/null
   git status --porcelain --untracked-files=all 2>/dev/null | awk '{print $NF}'
@@ -655,7 +697,14 @@ if [ "$fail" -ne 0 ]; then
   exit 2
 fi
 
-# The slow rungs: each changed stack's own format, compile, lint and tests.
+[ -n "$SLOW" ] || exit 0
+
+# The slow rungs: each changed stack's own format, compile, lint and tests. They are skipped when this exact
+# state has passed them before.
+if [ -n "$PASS_KEY" ] && [ -n "$PASS_RECORD" ] && [ -f "$PASS_RECORD" ] && [ "$(cat "$PASS_RECORD" 2>/dev/null)" = "$PASS_KEY" ]; then
+  echo "NOTE: the checks of the changed code (format, compile, lint and tests) passed earlier on exactly this commit and base, with nothing uncommitted, so they were not run again." >&2
+  exit 0
+fi
 [ -n "$ELIXIR" ] && each_root gate_elixir "mix.lock mix.exs" ELIXIR
 [ -n "$NODE" ]   && each_root gate_node package.json NODE
 # No Rust rung; CI runs it.
@@ -667,6 +716,14 @@ if [ "$fail" -ne 0 ]; then
   echo "" >&2
   echo "Nothing was pushed. Fix the failures above and push again; the gate re-runs on the branch." >&2
   exit 2
+fi
+
+# Remember the pass, but only when the state is still the one the rungs started on: a commit, an edit or a
+# new file that arrived while they ran leaves no record.
+if [ -n "$PASS_KEY" ] && [ -n "$PASS_RECORD" ] && [ "$(pass_key)" = "$PASS_KEY" ]; then
+  if printf '%s\n' "$PASS_KEY" > "$PASS_RECORD.$$" 2>/dev/null; then
+    mv -f "$PASS_RECORD.$$" "$PASS_RECORD" 2>/dev/null || rm -f "$PASS_RECORD.$$"
+  fi
 fi
 
 exit 0
