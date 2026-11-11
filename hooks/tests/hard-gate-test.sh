@@ -493,6 +493,39 @@ ok "$STATUS" "2" "pushing another commit to a new name is refused"
 run_gate "$d" "git push --all origin"
 ok "$STATUS" "2" "pushing every branch is refused"
 
+echo "29. a shell redirect after the push is not read as a branch"
+# Found 2026-11-11: `git push -u origin BRANCH 2>&1 | tail -3` was refused as
+# sending '2>&1', because every word after the remote was read as a refspec.
+# It refused 18 pushes across 17 of 24 pull requests.
+cur="$(cd "$d" && git branch --show-current)"
+run_gate "$d" "git push -u origin $cur 2>&1 | tail -3"
+ok "$STATUS" "0" "2>&1 and a pipe after the branch still push the branch"
+run_gate "$d" "git push -q origin $cur 2>/dev/null"
+ok "$STATUS" "0" "2>/dev/null after the branch still pushes the branch"
+for redirect in "> push.log" ">push.log" ">> push.log" "&> push.log" "&>push.log" \
+    "< /dev/null" "</dev/null" "2> err.log" ">&2" "2>&1 >/dev/null"; do
+  run_gate "$d" "git push origin $cur $redirect"
+  ok "$STATUS" "0" "a push of the branch followed by '$redirect' goes through"
+done
+run_gate "$d" "git push 2>&1 origin $cur"
+ok "$STATUS" "0" "a redirect before the remote is dropped too"
+run_gate "$d" "git push origin $cur>push.log"
+ok "$STATUS" "0" "a redirect written against the branch name ends the name there"
+# A push that really names another branch is still refused, and the refusal
+# names the branch, not the redirect.
+run_gate "$d" "git push -u origin other 2>&1 | tail -3"
+ok "$STATUS" "2" "another branch with 2>&1 and a pipe is still refused"
+contains "$ERR" "sends 'other'" "the refusal names the branch, not the redirect"
+run_gate "$d" "git push origin $cur other > push.log"
+ok "$STATUS" "2" "a second refspec naming another branch is still refused"
+run_gate "$d" "git push origin other>push.log"
+ok "$STATUS" "2" "another branch with a redirect written against it is still refused"
+contains "$ERR" "sends 'other'" "and the refusal names that branch"
+run_gate "$d" "git push origin '>other'"
+ok "$STATUS" "2" "a quoted word that starts with > is a refspec, not a redirect"
+run_gate "$d" "git push origin $cur 2>&1 other"
+ok "$STATUS" "2" "a branch named after a redirect is still read"
+
 echo "22. a tracked package.json root runs its test script on push"
 d="$(newrepo node-tracked)"
 mkdir -p "$d/web"
