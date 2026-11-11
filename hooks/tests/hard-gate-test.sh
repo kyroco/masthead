@@ -578,6 +578,80 @@ git bisect run scripts/create-pr.sh
 cat "scripts/create-pr.sh
 EOF
 
+# A stand-in for mix that counts its calls, for the cases that ask whether the
+# slow Elixir rung ran at all. It exits with the code in $TMP/mixcode.
+mkdir -p "$TMP/countbin"
+printf '#!/bin/sh\necho "$*" >> "%s"\nexit "$(cat "%s" 2>/dev/null || echo 0)"\n' "$TMP/mixlog" "$TMP/mixcode" > "$TMP/countbin/mix"
+chmod +x "$TMP/countbin/mix"
+# $1 = the checkout, $2 = the command (default: a plain push of HEAD), $3 = one
+# more NAME=value for the gate's environment. MIXRUNS is how many times mix ran.
+run_counted() {
+  : > "$TMP/mixlog"
+  payload="$(python3 -c 'import json,sys; print(json.dumps({"hook_event_name":"PreToolUse","tool_name":"Bash","cwd":sys.argv[1],"tool_input":{"command":sys.argv[2]}}))' "$1" "${2:-git push -u origin HEAD}")"
+  ( cd "$1" && printf '%s' "$payload" \
+      | env CLAUDE_PROJECT_DIR="$1" PATH="$TMP/countbin:$PATH" GIT_CEILING_DIRECTORIES="$TMP" ${3:+"$3"} \
+        bash "${GATE_UNDER_TEST:-$GATE}" 2>"$TMP/err" ; echo $? > "$TMP/status" )
+  STATUS="$(cat "$TMP/status")"
+  ERR="$(cat "$TMP/err")"
+  MIXRUNS="$(wc -l < "$TMP/mixlog" | tr -d ' ')"
+}
+ran() {
+  # $1 = yes or no, $2 = what the case shows.
+  if [ "$MIXRUNS" -gt 0 ]; then got=yes; else got=no; fi
+  ok "$got" "$1" "$2"
+}
+# A checkout with an Elixir change on a branch off origin/main, and a push check
+# whose answer is the code in $TMP/check-code, outside the checkout, so changing
+# the answer leaves the working tree clean.
+quick_repo() {
+  d="$(newrepo "$1")"
+  mkdir -p "$d/scripts" "$d/.claude" "$d/lib"
+  echo '{"env": {"PROJECT_PUSH_CHECK": "scripts/local-tests.sh"}}' > "$d/.claude/settings.json"
+  printf '#!/usr/bin/env bash\n[ "$1" = --check ] || exit 9\necho "local-tests: the stub says so."\nexit "$(cat "%s")"\n' "$TMP/check-code" > "$d/scripts/local-tests.sh"
+  : > "$d/mix.exs"
+  ( cd "$d" && git add -A && git commit -qm base && git update-ref refs/remotes/origin/main HEAD ) >/dev/null 2>&1
+  printf 'defmodule A do\nend\n' > "$d/lib/a.ex"
+  ( cd "$d" && git add -A && git commit -qm "an Elixir change" ) >/dev/null 2>&1
+  echo 0 > "$TMP/check-code"
+  echo 0 > "$TMP/mixcode"
+}
+
+echo "31. the quick checks run first, and a refusal from one stops before the slow ones"
+# Measured 2026-11-11: the receipt check ran last, so a refused push still cost
+# the full wait for format, compile and lint (a median of 184 seconds).
+quick_repo quick-first
+echo 1 > "$TMP/check-code"
+run_counted "$d"
+ok "$STATUS" "2" "a missing test receipt refuses the push"
+contains "$ERR" "local tests have not passed" "it says the local tests have not passed"
+ran no "and the Elixir rung did not run first"
+contains "$ERR" "have not run yet" "it says the slower checks have not run yet"
+run_counted "$d" "git push origin other-branch"
+ok "$STATUS" "2" "a push of another branch is refused"
+contains "$ERR" "not HEAD" "it says the push is not HEAD"
+ran no "and the Elixir rung did not run first"
+echo 0 > "$TMP/check-code"
+# allow-secret: the fixture line below is the thing under test.
+printf '%s\n' '      web_identity_token: "signed-test-token",' > "$d/lib/b.ex"
+run_counted "$d"
+ok "$STATUS" "2" "a secret refuses the push"
+contains "$ERR" "possible secret" "it names what it found"
+ran no "and the Elixir rung did not run first"
+echo 1 > "$TMP/check-code"
+run_counted "$d"
+contains "$ERR" "local tests have not passed" "with both quick checks failing, the receipt is reported"
+contains "$ERR" "possible secret" "and so is the secret, in the same refusal"
+echo 0 > "$TMP/check-code"
+rm -f "$d/lib/b.ex"
+run_counted "$d"
+ok "$STATUS" "0" "with both quick checks passing the push goes through"
+ran yes "and the Elixir rung ran"
+echo 1 > "$TMP/mixcode"
+run_counted "$d"
+ok "$STATUS" "2" "a failing Elixir rung still refuses the push"
+contains "$ERR" "mix compile" "and it names the failing command"
+echo 0 > "$TMP/mixcode"
+
 echo "22. a tracked package.json root runs its test script on push"
 d="$(newrepo node-tracked)"
 mkdir -p "$d/web"

@@ -385,7 +385,7 @@ gate_elixir() {
     warn "credo is not available, so the lint rung was skipped."
   fi
 
-  # The local-tests rung at the end covers the tests.
+  # The local-tests rung covers the tests.
 }
 
 # Node: prettier, eslint, tsc and vitest, for plain Node and React or Next projects.
@@ -621,14 +621,6 @@ each_root() {
   done
 }
 
-[ -n "$SECRETSCAN" ] && gate_secrets
-[ -n "$ELIXIR" ] && each_root gate_elixir "mix.lock mix.exs" ELIXIR
-[ -n "$NODE" ]   && each_root gate_node package.json NODE
-# No Rust rung; CI runs it.
-[ -n "$SWIFT" ]  && each_root gate_swift Package.swift SWIFT
-[ -n "$KOTLIN" ] && each_root gate_kotlin gradlew KOTLIN
-[ -n "$TF" ]     && gate_tf
-
 # Local tests: require the push-check script's receipt for HEAD, and refuse a push of any other commit.
 gate_local_tests() {
   check_script="$(project_fact "$TOP" --path PROJECT_PUSH_CHECK)"
@@ -647,7 +639,29 @@ gate_local_tests() {
     printf '%s\n' "$out" | sed 's/^/  /' >&2
   fi
 }
+
+# The quick rungs run first: what the push sends and the test receipt, then the secret scan. A refusal from
+# either one stops the gate here, so it costs seconds and not the minutes the stack rungs can take.
+SLOW="$ELIXIR$NODE$SWIFT$KOTLIN$TF"
 gate_local_tests
+[ -n "$SECRETSCAN" ] && gate_secrets
+if [ "$fail" -ne 0 ]; then
+  echo "" >&2
+  if [ -n "$SLOW" ]; then
+    echo "Nothing was pushed. Fix the failures above and push again. The slower checks of the changed code (format, compile, lint and tests) have not run yet: they run once these pass." >&2
+  else
+    echo "Nothing was pushed. Fix the failures above and push again; the gate re-runs on the branch." >&2
+  fi
+  exit 2
+fi
+
+# The slow rungs: each changed stack's own format, compile, lint and tests.
+[ -n "$ELIXIR" ] && each_root gate_elixir "mix.lock mix.exs" ELIXIR
+[ -n "$NODE" ]   && each_root gate_node package.json NODE
+# No Rust rung; CI runs it.
+[ -n "$SWIFT" ]  && each_root gate_swift Package.swift SWIFT
+[ -n "$KOTLIN" ] && each_root gate_kotlin gradlew KOTLIN
+[ -n "$TF" ]     && gate_tf
 
 if [ "$fail" -ne 0 ]; then
   echo "" >&2
