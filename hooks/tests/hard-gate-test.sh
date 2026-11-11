@@ -570,18 +570,22 @@ git push origin other
 echo 'done'"
 ok "$STATUS" "2" "a push of another branch after a here-document with an apostrophe is still refused"
 
-echo "30. reading create-pr.sh is not opening a PR, and running it still is"
-# Found 2026-11-11: `sed -n 1,30p scripts/kyroco/create-pr.sh | grep '^#'` ran
-# the whole gate and cost one worker 265 seconds, because any command that
-# named the file counted as a run of it.
-d="$(newrepo reads-create-pr)"
+echo "30. every command that names create-pr.sh is gated, a read of it included"
+# The gate has always taken any command that names the file for a run of it, so
+# `sed -n 1,30p scripts/kyroco/create-pr.sh | grep '^#'` runs the whole gate
+# (265 seconds for one worker, measured 2026-11-11). A rule that told a read
+# from a run was built in this change and taken out again on Robert's decision
+# of 2026-11-11, "Drop the read rule": each of three review rounds found a way
+# to run the script past it. These are the reads that rule let through and
+# every way around it the rounds found. All of them are gated.
+d="$(newrepo names-create-pr)"
 # allow-secret: the fixture line below is the thing under test.
 printf '%s\n' '      web_identity_token: "signed-test-token",' > "$d/a.ex"
-# The secret in the tree blocks any command the gate takes for a PR, so exit 0
-# here means the gate stood aside and exit 2 means it ran.
-while IFS= read -r reading; do
-  run_gate "$d" "$reading"
-  ok "$STATUS" "0" "a read is not gated: $reading"
+# The secret in the tree blocks any command the gate takes for a PR, so exit 2
+# here means the gate ran.
+while IFS= read -r naming; do
+  run_gate "$d" "$naming"
+  ok "$STATUS" "2" "gated: $naming"
 done <<'EOF'
 sed -n 1,30p scripts/kyroco/create-pr.sh | grep '^#'
 cat scripts/create-pr.sh
@@ -589,11 +593,6 @@ ls -la scripts/create-pr.sh
 grep -n receipt scripts/kyroco/create-pr.sh
 head -20 scripts/create-pr.sh 2>/dev/null
 cd scripts && wc -l create-pr.sh
-EOF
-while IFS= read -r running; do
-  run_gate "$d" "$running"
-  ok "$STATUS" "2" "a run is still gated: $running"
-done <<'EOF'
 scripts/create-pr.sh --fill
 bash scripts/kyroco/create-pr.sh
 ./create-pr.sh
@@ -616,39 +615,6 @@ find . -name create-pr.sh -exec bash {} \;
 git -c alias.pr='!scripts/create-pr.sh' pr
 git bisect run scripts/create-pr.sh
 cat "scripts/create-pr.sh
-EOF
-# Round 1 finding F2: a run of the script through standard input still needs the
-# test receipt. The receipt rung looked for the name only in the words left
-# after redirects were dropped, and the name sat in a dropped redirect.
-d="$(newrepo stdin-create-pr)"
-mkdir -p "$d/scripts" "$d/.claude"
-echo '{"env": {"PROJECT_PUSH_CHECK": "scripts/local-tests.sh"}}' > "$d/.claude/settings.json"
-printf '#!/usr/bin/env bash\n[ "$1" = --check ] || exit 9\necho "local-tests: no receipt for this commit."\nexit 1\n' > "$d/scripts/local-tests.sh"
-echo "# notes" > "$d/README.md"
-while IFS= read -r running; do
-  run_gate "$d" "$running"
-  ok "$STATUS" "2" "a run with no receipt is refused: $running"
-  contains "$ERR" "local tests have not passed" "and the refusal is the receipt's"
-done <<'EOF'
-bash scripts/create-pr.sh
-bash < scripts/create-pr.sh
-bash -s -- --fill < scripts/create-pr.sh
-sh <scripts/create-pr.sh
-bash 0<scripts/create-pr.sh
-bash <<< "$(cat scripts/create-pr.sh)"
-cat scripts/create-pr.sh | bash
-EOF
-run_gate "$d" "cat scripts/create-pr.sh"
-ok "$STATUS" "0" "a read of the script in that checkout asks for no receipt"
-# Round 1 finding F3: a |, ;, && or & inside quotes is part of a pattern, not the
-# end of a command, so a grep or sed that carries one is still only a read.
-d="$(newrepo quoted-reads)"
-# allow-secret: the fixture line below is the thing under test.
-printf '%s\n' '      web_identity_token: "signed-test-token",' > "$d/a.ex"
-while IFS= read -r reading; do
-  run_gate "$d" "$reading"
-  ok "$STATUS" "0" "a read is not gated: $reading"
-done <<'EOF'
 grep -nE 'receipt|gh pr' scripts/create-pr.sh
 sed -n '1,30p;/main/p' scripts/create-pr.sh
 grep -n 'a && b' scripts/create-pr.sh
@@ -657,16 +623,6 @@ grep -n '&' scripts/create-pr.sh
 grep -n "a | b" scripts/create-pr.sh
 grep -n 'a `b` c' scripts/create-pr.sh
 grep -n \| scripts/create-pr.sh
-EOF
-run_gate "$d" "cat scripts/create-pr.sh \\
-  | head -5"
-ok "$STATUS" "0" "a read carried over two lines with a backslash is not gated"
-# What quotes do not hide: a command inside double quotes still runs, and a
-# separator outside the quotes still ends the command.
-while IFS= read -r running; do
-  run_gate "$d" "$running"
-  ok "$STATUS" "2" "a run is still gated: $running"
-done <<'EOF'
 grep -n "$(bash scripts/create-pr.sh)" README.md
 grep -n "`bash scripts/create-pr.sh`" README.md
 cat 'a;b' ; scripts/create-pr.sh
@@ -674,16 +630,6 @@ grep -n 'a | b' README.md | bash scripts/create-pr.sh
 cat 'a&b' & scripts/create-pr.sh
 cat scripts/create-pr.sh 'unclosed
 cat <<EOF > scripts/create-pr.sh
-EOF
-run_gate "$d" "cat scripts/create-pr.sh \\
-  | bash"
-ok "$STATUS" "2" "a pipe into a shell carried over two lines is still gated"
-# Round 1 finding F7: a NAME=value before a file command can hand it a program
-# to run (git diff runs GIT_EXTERNAL_DIFF), so a command with one is not a read.
-while IFS= read -r running; do
-  run_gate "$d" "$running"
-  ok "$STATUS" "2" "a run is still gated: $running"
-done <<'EOF'
 GIT_EXTERNAL_DIFF=scripts/create-pr.sh git diff
 GIT_EXTERNAL_DIFF=scripts/create-pr.sh git diff -- README.md
 GIT_EDITOR=scripts/create-pr.sh git commit
@@ -691,14 +637,6 @@ PAGER=scripts/create-pr.sh git log
 GIT_PAGER="bash scripts/create-pr.sh" git show
 LESSOPEN="|scripts/create-pr.sh %s" cat README.md
 cd scripts && GIT_EXTERNAL_DIFF=./create-pr.sh git diff
-EOF
-# Round 1 finding F9: a file command with an option or a script that runs a
-# program is not a read. rg --pre, sort --compress-program and a pager run the
-# program they are given, and GNU sed runs one with its e command or the e flag.
-while IFS= read -r running; do
-  run_gate "$d" "$running"
-  ok "$STATUS" "2" "a run is still gated: $running"
-done <<'EOF'
 rg --pre scripts/create-pr.sh x README.md
 rg --pre=scripts/create-pr.sh x README.md
 sort --compress-program=scripts/create-pr.sh README.md
@@ -713,12 +651,6 @@ sed -n '/x/{e;}' scripts/create-pr.sh
 sed -f run.sed scripts/create-pr.sh
 sed --file=run.sed scripts/create-pr.sh
 sed -n '1w scripts/create-pr.sh' README.md
-EOF
-# The sed scripts a read is made of still pass.
-while IFS= read -r reading; do
-  run_gate "$d" "$reading"
-  ok "$STATUS" "0" "a read is not gated: $reading"
-done <<'EOF'
 sed -n 1,30p scripts/create-pr.sh
 sed -n '10,$p' scripts/create-pr.sh
 sed -n '/receipt/,/fi/p' scripts/create-pr.sh
@@ -728,47 +660,10 @@ sed -E -n '/main|base/p' scripts/create-pr.sh
 sed 10q scripts/create-pr.sh
 sed -n '$=' scripts/create-pr.sh
 sed 's/old/new/g' scripts/create-pr.sh
-EOF
-# Round 2 fix 1: the shell drops a comment, apostrophes and all, so an apostrophe
-# in one comment does not open a quote that runs on to the next line and hides it.
-gated_lines() {
-  # $1 = what the case shows, $2 = the command.
-  run_gate "$d" "$2"
-  ok "$STATUS" "2" "$1"
-}
-gated_lines "a run on the line after a comment with an apostrophe is still gated" "cat README.md  # let's look
-bash scripts/create-pr.sh --fill  # it's ready"
-gated_lines "the same after a read of the script itself" "cat scripts/create-pr.sh | head -5  # let's see it
-bash scripts/create-pr.sh --fill  # it's ready"
-gated_lines "the same with the run handed to git in a variable" "cat README.md  # let's look
-GIT_EXTERNAL_DIFF=scripts/create-pr.sh git diff  # it's the diff"
-gated_lines "the same with no space before the comment's text" "cat README #don't skip
-bash scripts/create-pr.sh #it's ready"
-run_gate "$d" "cat scripts/create-pr.sh  # let's see it"
-ok "$STATUS" "0" "a read with a comment that holds an apostrophe is not gated"
-run_gate "$d" "# look at the script, it's long
-cat scripts/create-pr.sh | head -5  # the top of it"
-ok "$STATUS" "0" "a read under a comment line is not gated"
-run_gate "$d" "grep -n 'a # b' scripts/create-pr.sh"
-ok "$STATUS" "0" "a # inside quotes is part of the pattern, not a comment"
-# Round 2 fix 2: a command that sets a variable can hand a later command a
-# program to run without a NAME=value word. Only commands that print are reads.
-while IFS= read -r running; do
-  run_gate "$d" "$running"
-  ok "$STATUS" "2" "a run is still gated: $running"
-done <<'EOF'
 printf -v GIT_EDITOR %s scripts/create-pr.sh; git commit --allow-empty
 printf -v GIT_EDITOR %s scripts/create-pr.sh; git commit --allow-empty -m x
 read -r GIT_EDITOR <<< scripts/create-pr.sh; git commit --allow-empty
 export GIT_EDITOR=scripts/create-pr.sh; git commit --allow-empty
-EOF
-# Round 2 fix 3: a copy of the script put where something runs it (a git hook, a
-# file run later under another name) is a run in two steps. A read is a command
-# that only prints: it writes no file, changes no file and runs no git command.
-while IFS= read -r running; do
-  run_gate "$d" "$running"
-  ok "$STATUS" "2" "not a read, so still gated: $running"
-done <<'EOF'
 cp scripts/create-pr.sh .git/hooks/pre-commit && git commit --allow-empty -m x
 cp scripts/create-pr.sh .git/hooks/pre-commit
 mv scripts/create-pr.sh .git/hooks/post-checkout && git checkout -
@@ -793,12 +688,6 @@ cat scripts/{create-pr.sh,other.sh}
 scripts/cat scripts/create-pr.sh
 cat < scripts/create-pr.sh
 cat () ( bash scripts/create-pr.sh ); cat scripts/create-pr.sh
-EOF
-# What a read may still carry: output thrown away or joined, and other commands that print.
-while IFS= read -r reading; do
-  run_gate "$d" "$reading"
-  ok "$STATUS" "0" "a read is not gated: $reading"
-done <<'EOF'
 cat scripts/create-pr.sh 2>/dev/null
 grep -c receipt scripts/create-pr.sh >/dev/null 2>&1
 ls -la scripts/create-pr.sh 2>&1 | head -3
@@ -809,7 +698,56 @@ cd scripts && ls -la create-pr.sh
 cat scripts/create-pr.sh | cut -c1-120 | tr -s ' '
 diff scripts/create-pr.sh scripts/other.sh
 stat scripts/create-pr.sh
+test -v 'a[$(bash scripts/create-pr.sh)]'
+[ -v 'x[$(bash scripts/create-pr.sh)]' ]
+test -v 'a[$(cp scripts/create-pr.sh .git/hooks/pre-commit)]'; cat scripts/create-pr.sh >/dev/null
 EOF
+gated_lines() {
+  # $1 = what the case shows, $2 = the command.
+  run_gate "$d" "$2"
+  ok "$STATUS" "2" "$1"
+}
+gated_lines "a read carried over two lines with a backslash is gated" "cat scripts/create-pr.sh \\
+  | head -5"
+gated_lines "a pipe into a shell carried over two lines is gated" "cat scripts/create-pr.sh \\
+  | bash"
+gated_lines "a run on the line after a comment with an apostrophe is gated" "cat README.md  # let's look
+bash scripts/create-pr.sh --fill  # it's ready"
+gated_lines "the same after a read of the script itself" "cat scripts/create-pr.sh | head -5  # let's see it
+bash scripts/create-pr.sh --fill  # it's ready"
+gated_lines "the same with the run handed to git in a variable" "cat README.md  # let's look
+GIT_EXTERNAL_DIFF=scripts/create-pr.sh git diff  # it's the diff"
+gated_lines "the same with no space before the comment's text" "cat README #don't skip
+bash scripts/create-pr.sh #it's ready"
+gated_lines "a read with a comment is gated" "cat scripts/create-pr.sh  # let's see it"
+gated_lines "a read under a comment line is gated" "# look at the script, it's long
+cat scripts/create-pr.sh | head -5  # the top of it"
+run_gate "$d" "cat scripts/other.sh | head -5"
+ok "$STATUS" "0" "a read of a file with another name is none of the gate's business"
+# Round 1 finding F2: a command that names the script needs the test receipt
+# however the name reaches the shell. With redirects dropped from the words, the
+# receipt rung must not look for the name only in the words that are left.
+d="$(newrepo stdin-create-pr)"
+mkdir -p "$d/scripts" "$d/.claude"
+echo '{"env": {"PROJECT_PUSH_CHECK": "scripts/local-tests.sh"}}' > "$d/.claude/settings.json"
+printf '#!/usr/bin/env bash\n[ "$1" = --check ] || exit 9\necho "local-tests: no receipt for this commit."\nexit 1\n' > "$d/scripts/local-tests.sh"
+echo "# notes" > "$d/README.md"
+while IFS= read -r running; do
+  run_gate "$d" "$running"
+  ok "$STATUS" "2" "a run with no receipt is refused: $running"
+  contains "$ERR" "local tests have not passed" "and the refusal is the receipt's"
+done <<'EOF'
+bash scripts/create-pr.sh
+bash < scripts/create-pr.sh
+bash -s -- --fill < scripts/create-pr.sh
+sh <scripts/create-pr.sh
+bash 0<scripts/create-pr.sh
+bash <<< "$(cat scripts/create-pr.sh)"
+cat scripts/create-pr.sh | bash
+EOF
+run_gate "$d" "cat scripts/create-pr.sh"
+ok "$STATUS" "2" "a read of the script in that checkout is asked for the receipt too"
+contains "$ERR" "local tests have not passed" "and the refusal is the receipt's"
 
 # A stand-in for mix that counts its calls, for the cases that ask whether the
 # slow Elixir rung ran at all. It exits with the code in $TMP/mixcode.
