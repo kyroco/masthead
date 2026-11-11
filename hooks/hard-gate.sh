@@ -132,12 +132,60 @@ def drop_assignments(words):
     return words
 
 
+def shell_parts(text):
+    """The commands in one command line, cut where the shell cuts them: at a newline, ;, &&, ||, | or a lone &
+    that is not inside quotes, with a line continued by a backslash joined first. Also says what the line holds
+    that this reader does not follow: a command inside it ($( ), backticks, <( ), >( ), which stay live inside
+    double quotes), a command sent to the background, or a here-document. Raises ValueError on a quote left open."""
+    pieces, holds, cur, quote, i, n = [], set(), "", None, 0, len(text)
+    while i < n:
+        c, two = text[i], text[i:i + 2]
+        if quote == "'":
+            quote = None if c == "'" else quote
+        elif c == "\\" and i + 1 < n:
+            if text[i + 1] != "\n":
+                cur += two
+            i += 2
+            continue
+        elif two == "$(" or c == "`":
+            holds.add("a command inside it")
+        elif quote == '"':
+            quote = None if c == '"' else quote
+        elif c in "'\"":
+            quote = c
+        elif text[i:i + 3] == "<<<":
+            cur, i = cur + "<<<", i + 3
+            continue
+        elif two in ("<(", ">("):
+            holds.add("a command inside it")
+        elif two == "<<":
+            holds.add("a here-document")
+        elif two in ("&&", "||") or c in ";|\n":
+            pieces.append(cur)
+            cur, i = "", i + (2 if two in ("&&", "||") else 1)
+            continue
+        elif c == "&" and not (text[i - 1:i] in ("<", ">") or text[i + 1:i + 2] == ">"):
+            holds.add("a command sent to the background")
+            pieces.append(cur)
+            cur, i = "", i + 1
+            continue
+        cur += c
+        i += 1
+    if quote:
+        raise ValueError("no closing quote")
+    pieces.append(cur)
+    return pieces, holds
+
+
 def only_reads(text):
     """Whether every part of the command is a plain file command, so a create-pr.sh it names is read and not run."""
-    # A command inside the command ($( ), backticks, <( )) or one sent to the background is not read here.
-    if re.search(r"\$\(|`|[<>]\(", text) or re.search(r"(?<![&<>])&(?![&>])", text):
+    try:
+        pieces, holds = shell_parts(text)
+    except ValueError:
         return False
-    for seg in parts(text):
+    if holds:
+        return False
+    for seg in pieces:
         try:
             words = drop_assignments(shell_words(seg))
         except ValueError:
