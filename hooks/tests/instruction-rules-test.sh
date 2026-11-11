@@ -164,6 +164,7 @@ for doc in README.md docs/explainer.template.html docs/explainer.html; do
 done
 says  references/gate-catalog.md "git rev-parse --git-path masthead-push-gate-pass"
 says  references/gate-catalog.md "a print of the path, size and time stamp of every file git ignores"
+says  references/gate-catalog.md "a file marked assume-unchanged or skip-worktree, a submodule in the checkout, no origin/main"
 never references/gate-catalog.md "The remembered pass does not see a file git ignores"
 says  references/gate-catalog.md "no variable or setting names another record or turns the reuse on"
 says  references/gate-catalog.md "one made only of file commands such as \`cat\`, \`sed\`, \`grep\` or \`ls\` reads it and is let through"

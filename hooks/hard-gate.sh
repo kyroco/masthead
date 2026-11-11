@@ -393,7 +393,7 @@ fi
 # made for another commit: the most one can do is switch the reuse off. What the line cannot see is listed in
 # the gate catalog.
 pass_key() {
-  local name dirty hidden tree gate toolchain toolsum
+  local name dirty hidden links tree gate toolchain toolsum
   [ -n "$BASE" ] || return 0
   # Any GIT_ variable outside this list may move the repository, the index, the objects or the config git reads.
   for name in $(env | sed -n 's/^\(GIT_[A-Za-z0-9_]*\)=.*/\1/p'); do
@@ -409,6 +409,10 @@ pass_key() {
   # A file marked assume-unchanged or skip-worktree can differ on disk while git status calls the tree clean.
   hidden="$(git ls-files -v 2>/dev/null)" || return 0
   grep -q '^[a-zS] ' <<<"$hidden" && return 0
+  # A submodule keeps an index of its own, where a file can be hidden the same way out of this checkout's sight,
+  # and files git ignores that this checkout cannot list. A checkout that holds one has no key.
+  links="$(git ls-files -s 2>/dev/null)" || return 0
+  grep -q '^160000 ' <<<"$links" && return 0
   tree="$(git rev-parse --verify -q 'HEAD^{tree}' 2>/dev/null)" || return 0
   [ -n "$tree" ] || return 0
   # A plugin update changes this script or the fact reader, and so voids every record made before it.
