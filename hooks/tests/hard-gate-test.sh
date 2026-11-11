@@ -696,6 +696,45 @@ GIT_PAGER="bash scripts/create-pr.sh" git show
 LESSOPEN="|scripts/create-pr.sh %s" cat README.md
 cd scripts && GIT_EXTERNAL_DIFF=./create-pr.sh git diff
 EOF
+# Round 1 finding F9: a file command with an option or a script that runs a
+# program is not a read. rg --pre, sort --compress-program and a pager run the
+# program they are given, and GNU sed runs one with its e command or the e flag.
+while IFS= read -r running; do
+  run_gate "$d" "$running"
+  ok "$STATUS" "2" "a run is still gated: $running"
+done <<'EOF'
+rg --pre scripts/create-pr.sh x README.md
+rg --pre=scripts/create-pr.sh x README.md
+sort --compress-program=scripts/create-pr.sh README.md
+sort --compress-program scripts/create-pr.sh README.md
+bat --pager scripts/create-pr.sh README.md
+gh alias set --shell pr scripts/create-pr.sh
+sed -n '1e bash scripts/create-pr.sh' README.md
+sed e scripts/create-pr.sh
+sed 's/.*/bash &/e' scripts/create-pr.sh
+sed -n -e 1p -e '1e true' scripts/create-pr.sh
+sed -n '/x/{e;}' scripts/create-pr.sh
+sed -f run.sed scripts/create-pr.sh
+sed --file=run.sed scripts/create-pr.sh
+sed -n '1w scripts/create-pr.sh' README.md
+EOF
+# The sed scripts a read is made of still pass.
+while IFS= read -r reading; do
+  run_gate "$d" "$reading"
+  ok "$STATUS" "0" "a read is not gated: $reading"
+done <<'EOF'
+sed -n 1,30p scripts/create-pr.sh
+sed -n '10,$p' scripts/create-pr.sh
+sed -n '/receipt/,/fi/p' scripts/create-pr.sh
+sed -n '/^#/!p' scripts/create-pr.sh
+sed -n -e 5p -e 10p scripts/create-pr.sh
+sed -E -n '/main|base/p' scripts/create-pr.sh
+sed 10q scripts/create-pr.sh
+sed -n '$=' scripts/create-pr.sh
+sed 's/old/new/g' scripts/create-pr.sh
+sed -i '' 's|a/b|c/d|' scripts/create-pr.sh
+sed -i.bak -e 's/a/b/2' scripts/create-pr.sh
+EOF
 
 # A stand-in for mix that counts its calls, for the cases that ask whether the
 # slow Elixir rung ran at all. It exits with the code in $TMP/mixcode.
