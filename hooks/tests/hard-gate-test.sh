@@ -1021,6 +1021,26 @@ ran yes "and runs the slow checks itself: the first worktree's record is not its
 run_counted "$TMP/remembered-worktree"
 ran no "then it remembers its own pass"
 ok "$(cd "$TMP/remembered-worktree" && git rev-parse --git-path masthead-push-gate-pass | grep -c '/worktrees/')" "1" "in its own git directory"
+# Round 1 finding F5: a submodule keeps an index of its own, where a file can be
+# hidden from git status out of this checkout's sight. A checkout that has one
+# never reuses a pass.
+quick_repo with-submodule
+mkdir -p "$d/vendor/dep/lib"
+( cd "$d/vendor/dep" && git init -q . && git config user.email t@t && git config user.name t \
+    && printf 'defmodule Dep do\nend\n' > lib/dep.ex && git add -A && git commit -qm "the dependency" ) >/dev/null 2>&1
+git_in add vendor/dep && git_in commit -qm "a submodule"
+ok "$(cd "$d" && git ls-files -s vendor/dep | cut -c1-6)" "160000" "the checkout holds a submodule"
+run_counted "$d"
+ok "$STATUS" "0" "the first push of a checkout with a submodule passes"
+( cd "$d/vendor/dep" && git update-index --assume-unchanged lib/dep.ex ) >/dev/null 2>&1
+echo '# hidden from git status' >> "$d/vendor/dep/lib/dep.ex"
+ok "$(cd "$d" && git status --porcelain --ignore-submodules=none | wc -l | tr -d ' ')" "0" "git status calls an edit hidden inside the submodule clean"
+run_counted "$d"
+ran yes "but an edit hidden inside a submodule still runs them"
+( cd "$d/vendor/dep" && git update-index --no-assume-unchanged lib/dep.ex && git checkout -- lib/dep.ex ) >/dev/null 2>&1
+run_counted "$d"
+run_counted "$d"
+ran yes "a checkout with a submodule runs them every time"
 # With no origin/main there is no merge base, so nothing is remembered.
 d="$(newrepo no-base)"
 mkdir -p "$d/lib"
