@@ -536,6 +536,10 @@ existing() {
 
 block() { echo "BLOCK: $1" >&2; fail=1; }
 warn()  { echo "WARN: $1" >&2; }
+# A check skipped because its tool is not on this machine. It warns the same way, and it leaves a mark in a
+# file, because the rungs run in subshells: a run with a mark is not remembered as a pass (see the end).
+_SKIPPED=""
+skipped() { warn "$1"; [ -n "$_SKIPPED" ] && echo skipped >> "$_SKIPPED"; return 0; }
 
 # Secrets: block a credential compiled into source, with a repo-owned allow-secret waiver on the line or the line above.
 gate_secrets() {
@@ -632,7 +636,7 @@ gate_elixir() {
       echo "Accepted exceptions belong in .credo.exs, which the repo owns and reviews, not in disabling this gate." >&2
     fi
   else
-    warn "credo is not available, so the lint rung was skipped."
+    skipped "credo is not available, so the lint rung was skipped."
   fi
 
   # The local-tests rung covers the tests.
@@ -651,7 +655,7 @@ gate_node() {
       block "'prettier --check' failed on the changed files. Run 'npx prettier --write' on them."
     fi
   else
-    warn "prettier is not available, so the format rung was skipped."
+    skipped "prettier is not available, so the format rung was skipped."
   fi
 
   if npx --no-install eslint --version >/dev/null 2>&1; then
@@ -662,7 +666,7 @@ gate_node() {
       echo "Accepted exceptions belong in the repo's eslint config, or in an inline '// eslint-disable-* -- <justification>', not in disabling this gate." >&2
     fi
   else
-    warn "eslint is not available, so the lint rung was skipped."
+    skipped "eslint is not available, so the lint rung was skipped."
   fi
 
   if [ -f tsconfig.json ]; then
@@ -672,7 +676,7 @@ gate_node() {
         npx --no-install tsc --noEmit >&2 2>&1 || true
       fi
     else
-      warn "tsconfig.json is present but typescript is not installed, so the typecheck rung was skipped."
+      skipped "tsconfig.json is present but typescript is not installed, so the typecheck rung was skipped."
     fi
   fi
 
@@ -688,7 +692,7 @@ gate_node() {
       npm test --silent >&2 2>&1 || true
     fi
   else
-    warn "neither vitest nor an npm test script is available, so the test rung was skipped."
+    skipped "neither vitest nor an npm test script is available, so the test rung was skipped."
   fi
 }
 
@@ -705,7 +709,7 @@ gate_swift() {
         block "'swiftformat --lint' found unformatted Swift. Run 'swiftformat .'."
       fi
     else
-      warn ".swiftformat is present but swiftformat is not installed, so the format rung was skipped."
+      skipped ".swiftformat is present but swiftformat is not installed, so the format rung was skipped."
     fi
   fi
 
@@ -717,7 +721,7 @@ gate_swift() {
         echo "Project-accepted exceptions belong in .swiftlint.yml, which the repo owns and reviews, not in disabling this gate." >&2
       fi
     else
-      warn "a SwiftLint config is present but swiftlint is not installed, so the lint rung was skipped."
+      skipped "a SwiftLint config is present but swiftlint is not installed, so the lint rung was skipped."
     fi
   fi
 
@@ -765,7 +769,7 @@ gate_kotlin() {
     fi
   done
   if [ -z "$kt_task" ]; then
-    warn "no ktlint task on this Gradle project, so the lint rung was skipped."
+    skipped "no ktlint task on this Gradle project, so the lint rung was skipped."
   elif ! ./gradlew --offline "$kt_task" >/dev/null 2>&1; then
     block "'./gradlew $kt_task' reported lint violations:"
     ./gradlew --offline "$kt_task" >&2 2>&1 || true
@@ -809,7 +813,7 @@ gate_tf() {
           exit 1
         fi
       else
-        echo "WARN: '$RUNTIME init -backend=false' did not initialise $d, so validate was skipped." >&2
+        skipped "'$RUNTIME init -backend=false' did not initialise $d, so validate was skipped."
       fi
 
       if command -v tflint >/dev/null 2>&1; then
@@ -819,7 +823,7 @@ gate_tf() {
           exit 1
         fi
       else
-        echo "WARN: tflint is not installed, so the lint rung was skipped." >&2
+        skipped "tflint is not installed, so the lint rung was skipped."
       fi
 
       if command -v checkov >/dev/null 2>&1; then
@@ -834,7 +838,7 @@ gate_tf() {
         trivy config --exit-code 1 --quiet . >/dev/null 2>&1 \
           || { echo "BLOCK: 'trivy config' reported findings in $d. Fix them, or record accepted risk in .trivyignore with sign-off." >&2; exit 1; }
       else
-        echo "WARN: neither checkov nor trivy is installed, so the security scan was skipped." >&2
+        skipped "neither checkov nor trivy is installed, so the security scan was skipped."
       fi
     ) || fail=1
   done
@@ -922,12 +926,17 @@ if [ -n "$PASS_KEY" ] && [ -n "$PASS_RECORD" ] && [ -f "$PASS_RECORD" ]; then
       ;;
   esac
 fi
+_SKIPPED="$(mktemp "${TMPDIR:-/tmp}/hard-gate-skipped.XXXXXX" 2>/dev/null || true)"
 [ -n "$ELIXIR" ] && each_root gate_elixir "mix.lock mix.exs" ELIXIR
 [ -n "$NODE" ]   && each_root gate_node package.json NODE
 # No Rust rung; CI runs it.
 [ -n "$SWIFT" ]  && each_root gate_swift Package.swift SWIFT
 [ -n "$KOTLIN" ] && each_root gate_kotlin gradlew KOTLIN
 [ -n "$TF" ]     && gate_tf
+# Whether every check ran: no mark, and a file to hold one. When the file could not be made, nothing is known.
+_ALL_RAN=no
+[ -n "$_SKIPPED" ] && [ -f "$_SKIPPED" ] && [ ! -s "$_SKIPPED" ] && _ALL_RAN=yes
+[ -n "$_SKIPPED" ] && rm -f "$_SKIPPED"
 
 if [ "$fail" -ne 0 ]; then
   echo "" >&2
@@ -935,9 +944,10 @@ if [ "$fail" -ne 0 ]; then
   exit 2
 fi
 
-# Remember the pass, but only when the state is still the one the rungs started on: a commit, an edit or a
-# new file that arrived while they ran leaves no record.
-if [ -n "$PASS_KEY" ] && [ -n "$PASS_RECORD" ] && [ "$(pass_key)" = "$PASS_KEY" ]; then
+# Remember the pass, but only when every check ran (a check skipped for a missing tool was not passed, and it
+# must run on this commit once the tool is there), and only when the state is still the one the rungs started
+# on: a commit, an edit or a new file that arrived while they ran leaves no record.
+if [ "$_ALL_RAN" = yes ] && [ -n "$PASS_KEY" ] && [ -n "$PASS_RECORD" ] && [ "$(pass_key)" = "$PASS_KEY" ]; then
   _PRINT="$(ignored_print)"
   if [ -n "$_PRINT" ] && printf '%s ignored=%s\n' "$PASS_KEY" "$_PRINT" > "$PASS_RECORD.$$" 2>/dev/null; then
     mv -f "$PASS_RECORD.$$" "$PASS_RECORD" 2>/dev/null || rm -f "$PASS_RECORD.$$"

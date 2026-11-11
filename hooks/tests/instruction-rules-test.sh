@@ -165,6 +165,8 @@ done
 says  references/gate-catalog.md "git rev-parse --git-path masthead-push-gate-pass"
 says  references/gate-catalog.md "a print of the path, size and time stamp of every file git ignores"
 says  references/gate-catalog.md "a file marked assume-unchanged or skip-worktree, a submodule in the checkout, no origin/main"
+says  references/gate-catalog.md "A run in which a check was skipped because its tool is not installed is not remembered"
+never references/gate-catalog.md "a rung that only warned because its tool was missing"
 never references/gate-catalog.md "The remembered pass does not see a file git ignores"
 says  references/gate-catalog.md "no variable or setting names another record or turns the reuse on"
 # Round 1 finding F6: the refusal of a push of anything but HEAD needs the repo's push check, and the row says so.
