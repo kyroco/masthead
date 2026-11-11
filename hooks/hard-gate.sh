@@ -187,11 +187,15 @@ def only_reads(text):
         return False
     for seg in pieces:
         try:
-            words = drop_assignments(shell_words(seg))
+            words = shell_words(seg)
         except ValueError:
             return False
         if not words:
             continue
+        # A NAME=value before the command can hand it a program to run (GIT_EXTERNAL_DIFF, GIT_EDITOR, PAGER),
+        # so its value would have to be read too. A command that sets one is not taken for a read.
+        if re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", words[0]):
+            return False
         name = words[0].rsplit("/", 1)[-1]
         if name == "git":
             i = 1
