@@ -614,6 +614,44 @@ cat scripts/create-pr.sh | bash
 EOF
 run_gate "$d" "cat scripts/create-pr.sh"
 ok "$STATUS" "0" "a read of the script in that checkout asks for no receipt"
+# Round 1 finding F3: a |, ;, && or & inside quotes is part of a pattern, not the
+# end of a command, so a grep or sed that carries one is still only a read.
+d="$(newrepo quoted-reads)"
+# allow-secret: the fixture line below is the thing under test.
+printf '%s\n' '      web_identity_token: "signed-test-token",' > "$d/a.ex"
+while IFS= read -r reading; do
+  run_gate "$d" "$reading"
+  ok "$STATUS" "0" "a read is not gated: $reading"
+done <<'EOF'
+grep -nE 'receipt|gh pr' scripts/create-pr.sh
+sed -n '1,30p;/main/p' scripts/create-pr.sh
+grep -n 'a && b' scripts/create-pr.sh
+grep -n '\$(' scripts/create-pr.sh
+grep -n '&' scripts/create-pr.sh
+grep -n "a | b" scripts/create-pr.sh
+grep -n 'a `b` c' scripts/create-pr.sh
+grep -n \| scripts/create-pr.sh
+EOF
+run_gate "$d" "cat scripts/create-pr.sh \\
+  | head -5"
+ok "$STATUS" "0" "a read carried over two lines with a backslash is not gated"
+# What quotes do not hide: a command inside double quotes still runs, and a
+# separator outside the quotes still ends the command.
+while IFS= read -r running; do
+  run_gate "$d" "$running"
+  ok "$STATUS" "2" "a run is still gated: $running"
+done <<'EOF'
+grep -n "$(bash scripts/create-pr.sh)" README.md
+grep -n "`bash scripts/create-pr.sh`" README.md
+cat 'a;b' ; scripts/create-pr.sh
+grep -n 'a | b' README.md | bash scripts/create-pr.sh
+cat 'a&b' & scripts/create-pr.sh
+cat scripts/create-pr.sh 'unclosed
+cat <<EOF > scripts/create-pr.sh
+EOF
+run_gate "$d" "cat scripts/create-pr.sh \\
+  | bash"
+ok "$STATUS" "2" "a pipe into a shell carried over two lines is still gated"
 
 # A stand-in for mix that counts its calls, for the cases that ask whether the
 # slow Elixir rung ran at all. It exits with the code in $TMP/mixcode.
