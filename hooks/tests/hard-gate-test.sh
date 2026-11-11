@@ -591,6 +591,29 @@ git -c alias.pr='!scripts/create-pr.sh' pr
 git bisect run scripts/create-pr.sh
 cat "scripts/create-pr.sh
 EOF
+# Round 1 finding F2: a run of the script through standard input still needs the
+# test receipt. The receipt rung looked for the name only in the words left
+# after redirects were dropped, and the name sat in a dropped redirect.
+d="$(newrepo stdin-create-pr)"
+mkdir -p "$d/scripts" "$d/.claude"
+echo '{"env": {"PROJECT_PUSH_CHECK": "scripts/local-tests.sh"}}' > "$d/.claude/settings.json"
+printf '#!/usr/bin/env bash\n[ "$1" = --check ] || exit 9\necho "local-tests: no receipt for this commit."\nexit 1\n' > "$d/scripts/local-tests.sh"
+echo "# notes" > "$d/README.md"
+while IFS= read -r running; do
+  run_gate "$d" "$running"
+  ok "$STATUS" "2" "a run with no receipt is refused: $running"
+  contains "$ERR" "local tests have not passed" "and the refusal is the receipt's"
+done <<'EOF'
+bash scripts/create-pr.sh
+bash < scripts/create-pr.sh
+bash -s -- --fill < scripts/create-pr.sh
+sh <scripts/create-pr.sh
+bash 0<scripts/create-pr.sh
+bash <<< "$(cat scripts/create-pr.sh)"
+cat scripts/create-pr.sh | bash
+EOF
+run_gate "$d" "cat scripts/create-pr.sh"
+ok "$STATUS" "0" "a read of the script in that checkout asks for no receipt"
 
 # A stand-in for mix that counts its calls, for the cases that ask whether the
 # slow Elixir rung ran at all. It exits with the code in $TMP/mixcode.
