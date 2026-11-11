@@ -296,7 +296,9 @@ line in the checkout's git folder, so a second push or the pull request on the
 same commit does not wait for them again. The line holds for the same files,
 the same base on main, the same gate script and the same pinned toolchain, and
 only while nothing is uncommitted or untracked and no file git ignores
-(installed packages, build output) has been added, changed or removed. It does
+(installed packages, build output) has been added, removed, or changed in size
+or time stamp. Nothing is remembered in a checkout that holds a submodule, or
+after a run that skipped a check because its tool was not installed. It does
 not see a tool that changed on the machine since, or a change inside another
 worktree of the repository kept in the checkout: that one is a checkout of its
 own, with its own files and its own line.
