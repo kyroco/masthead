@@ -526,6 +526,58 @@ ok "$STATUS" "2" "a quoted word that starts with > is a refspec, not a redirect"
 run_gate "$d" "git push origin $cur 2>&1 other"
 ok "$STATUS" "2" "a branch named after a redirect is still read"
 
+echo "30. reading create-pr.sh is not opening a PR, and running it still is"
+# Found 2026-11-11: `sed -n 1,30p scripts/kyroco/create-pr.sh | grep '^#'` ran
+# the whole gate and cost one worker 265 seconds, because any command that
+# named the file counted as a run of it.
+d="$(newrepo reads-create-pr)"
+# allow-secret: the fixture line below is the thing under test.
+printf '%s\n' '      web_identity_token: "signed-test-token",' > "$d/a.ex"
+# The secret in the tree blocks any command the gate takes for a PR, so exit 0
+# here means the gate stood aside and exit 2 means it ran.
+while IFS= read -r reading; do
+  run_gate "$d" "$reading"
+  ok "$STATUS" "0" "a read is not gated: $reading"
+done <<'EOF'
+sed -n 1,30p scripts/kyroco/create-pr.sh | grep '^#'
+cat scripts/create-pr.sh
+ls -la scripts/create-pr.sh
+grep -n receipt scripts/kyroco/create-pr.sh
+head -20 scripts/create-pr.sh 2>/dev/null
+cd scripts && wc -l create-pr.sh
+chmod +x scripts/create-pr.sh
+git log --oneline -3 -- scripts/create-pr.sh
+git diff main -- scripts/kyroco/create-pr.sh
+git add scripts/create-pr.sh && git commit -m "Say in create-pr.sh what it checks" -- scripts/create-pr.sh
+EOF
+while IFS= read -r running; do
+  run_gate "$d" "$running"
+  ok "$STATUS" "2" "a run is still gated: $running"
+done <<'EOF'
+scripts/create-pr.sh --fill
+bash scripts/kyroco/create-pr.sh
+./create-pr.sh
+cd scripts && ./create-pr.sh --fill
+FOO=1 scripts/create-pr.sh
+env FOO=1 bash scripts/create-pr.sh
+time ./scripts/create-pr.sh
+op run -- scripts/create-pr.sh
+just pr scripts/create-pr.sh
+sh -c "scripts/create-pr.sh --fill"
+cat scripts/create-pr.sh | bash
+ls scripts/create-pr.sh | xargs bash
+chmod +x scripts/create-pr.sh && scripts/create-pr.sh
+sed -n 1p scripts/create-pr.sh; (./scripts/create-pr.sh)
+cat scripts/create-pr.sh & ./scripts/create-pr.sh
+echo "$(bash scripts/create-pr.sh)"
+echo `bash scripts/create-pr.sh`
+diff <(bash scripts/create-pr.sh) expected.txt
+find . -name create-pr.sh -exec bash {} \;
+git -c alias.pr='!scripts/create-pr.sh' pr
+git bisect run scripts/create-pr.sh
+cat "scripts/create-pr.sh
+EOF
+
 echo "22. a tracked package.json root runs its test script on push"
 d="$(newrepo node-tracked)"
 mkdir -p "$d/web"
