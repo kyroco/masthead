@@ -589,10 +589,6 @@ ls -la scripts/create-pr.sh
 grep -n receipt scripts/kyroco/create-pr.sh
 head -20 scripts/create-pr.sh 2>/dev/null
 cd scripts && wc -l create-pr.sh
-chmod +x scripts/create-pr.sh
-git log --oneline -3 -- scripts/create-pr.sh
-git diff main -- scripts/kyroco/create-pr.sh
-git add scripts/create-pr.sh && git commit -m "Say in create-pr.sh what it checks" -- scripts/create-pr.sh
 EOF
 while IFS= read -r running; do
   run_gate "$d" "$running"
@@ -732,8 +728,6 @@ sed -E -n '/main|base/p' scripts/create-pr.sh
 sed 10q scripts/create-pr.sh
 sed -n '$=' scripts/create-pr.sh
 sed 's/old/new/g' scripts/create-pr.sh
-sed -i '' 's|a/b|c/d|' scripts/create-pr.sh
-sed -i.bak -e 's/a/b/2' scripts/create-pr.sh
 EOF
 # Round 2 fix 1: the shell drops a comment, apostrophes and all, so an apostrophe
 # in one comment does not open a quote that runs on to the next line and hides it.
@@ -767,6 +761,54 @@ printf -v GIT_EDITOR %s scripts/create-pr.sh; git commit --allow-empty
 printf -v GIT_EDITOR %s scripts/create-pr.sh; git commit --allow-empty -m x
 read -r GIT_EDITOR <<< scripts/create-pr.sh; git commit --allow-empty
 export GIT_EDITOR=scripts/create-pr.sh; git commit --allow-empty
+EOF
+# Round 2 fix 3: a copy of the script put where something runs it (a git hook, a
+# file run later under another name) is a run in two steps. A read is a command
+# that only prints: it writes no file, changes no file and runs no git command.
+while IFS= read -r running; do
+  run_gate "$d" "$running"
+  ok "$STATUS" "2" "not a read, so still gated: $running"
+done <<'EOF'
+cp scripts/create-pr.sh .git/hooks/pre-commit && git commit --allow-empty -m x
+cp scripts/create-pr.sh .git/hooks/pre-commit
+mv scripts/create-pr.sh .git/hooks/post-checkout && git checkout -
+cat scripts/create-pr.sh > .git/hooks/pre-commit
+cat scripts/create-pr.sh >> run-later.sh
+cat scripts/create-pr.sh 2> scripts/errors.txt
+sed -n p scripts/create-pr.sh > .git/hooks/pre-commit
+tee .git/hooks/pre-commit < scripts/create-pr.sh
+uniq scripts/create-pr.sh .git/hooks/pre-commit
+sed -i '' 's|a/b|c/d|' scripts/create-pr.sh
+sed -i.bak -e 's/a/b/2' scripts/create-pr.sh
+sed -n '/[/]/p;s|x|/w out|' scripts/create-pr.sh
+chmod +x scripts/create-pr.sh
+git add scripts/create-pr.sh && git commit -m "Say in create-pr.sh what it checks" -- scripts/create-pr.sh
+git log --oneline -3 -- scripts/create-pr.sh
+git diff main -- scripts/kyroco/create-pr.sh
+git show HEAD:scripts/create-pr.sh --output=.git/hooks/pre-commit
+cat $HOME/scripts/create-pr.sh
+cat "$HOME/scripts/create-pr.sh"
+cat scripts/{create-pr.sh,other.sh}
+./cat scripts/create-pr.sh
+scripts/cat scripts/create-pr.sh
+cat < scripts/create-pr.sh
+cat () ( bash scripts/create-pr.sh ); cat scripts/create-pr.sh
+EOF
+# What a read may still carry: output thrown away or joined, and other commands that print.
+while IFS= read -r reading; do
+  run_gate "$d" "$reading"
+  ok "$STATUS" "0" "a read is not gated: $reading"
+done <<'EOF'
+cat scripts/create-pr.sh 2>/dev/null
+grep -c receipt scripts/create-pr.sh >/dev/null 2>&1
+ls -la scripts/create-pr.sh 2>&1 | head -3
+echo "--- the script"; cat scripts/create-pr.sh
+test -f scripts/create-pr.sh && cat scripts/create-pr.sh
+[ -f scripts/create-pr.sh ] && wc -l scripts/create-pr.sh
+cd scripts && ls -la create-pr.sh
+cat scripts/create-pr.sh | cut -c1-120 | tr -s ' '
+diff scripts/create-pr.sh scripts/other.sh
+stat scripts/create-pr.sh
 EOF
 
 # A stand-in for mix that counts its calls, for the cases that ask whether the
