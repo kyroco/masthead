@@ -1112,6 +1112,17 @@ run_counted "$d"
 ran yes "so the stack checks run again once credo is there"
 ok "$(grep -c '^credo --strict' "$TMP/mixlog")" "1" "and credo itself runs on that commit"
 remembered "and the run in which nothing was skipped is remembered"
+# The same from the other side: a tool the stack checks would use that shows up
+# on PATH after a pass, or moves, makes the pass stale.
+mkdir -p "$TMP/newtool"
+printf '#!/bin/sh\nexit 0\n' > "$TMP/newtool/tflint"
+chmod +x "$TMP/newtool/tflint"
+run_counted "$d" "" "PATH=$TMP/newtool:$TMP/countbin:$PATH"
+ran yes "a tool that appears on PATH after the pass runs them again"
+run_counted "$d" "" "PATH=$TMP/newtool:$TMP/countbin:$PATH"
+ran no "and the pass with that tool in place is remembered"
+run_counted "$d"
+ran yes "and taking the tool off PATH again runs them again"
 # Round 1 finding F5: a submodule keeps an index of its own, where a file can be
 # hidden from git status out of this checkout's sight. A checkout that has one
 # never reuses a pass.
