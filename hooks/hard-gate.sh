@@ -40,33 +40,10 @@ _CMD="$(printf '%s\n' "$_PARSED" | tail -n +2)"
 _CMD_READER=""
 IFS= read -r -d '' _CMD_READER <<'PYEOF' || true
 import re, subprocess, sys
-# Two questions about one command. "opens-pr CMD" prints no when a create-pr.sh the command names is
-# only read, and yes otherwise. "sends CMD HEAD_TREE" prints what a push sends: skip, check, or other REFSPEC.
-mode, cmd = sys.argv[1], sys.argv[2]
+# What a push sends, from the command CMD and the tree of HEAD: skip, check, or other REFSPEC.
+cmd, head_tree = sys.argv[1], sys.argv[2]
 VALUED = {"-o", "--push-option", "--repo", "--receive-pack", "--exec"}
-# Commands that only print: they read files or their own words and write to standard output. None of them
-# writes a file, changes one, sets a variable or has an option that runs a program, on GNU or on BSD. A command
-# that names create-pr.sh is a read only when every command in it is one of these, written as plain words (see
-# plain_commands). Anything else that names the file is taken for a run of it: the match stays loose that way round.
-# Left out on purpose: cp, mv, tee, uniq and any redirect to a file (a copy of the script can be run later under
-# another name, or as a git hook), chmod and sed -i (they change a file), printf (-v sets a variable), every
-# git command (hooks, editors and diff programs), and rg, sort, the pagers and gh (each takes a program to run).
-PRINTERS = {
-    "cat", "head", "tail", "grep", "egrep", "fgrep", "sed", "ls", "wc", "nl", "cut", "tr", "diff", "stat", "du",
-    "echo", "test", "[", "cd", "pwd", "basename", "dirname", "realpath", "readlink",
-    "md5", "md5sum", "shasum", "sha256sum",
-}
-# One sed command that prints, deletes, quits, counts, moves text between its two buffers or substitutes: an
-# optional address or pair of addresses (a line number, $, or /regex/), an optional !, then the command. A
-# substitution may carry only the flags g, p, i, I and a number. GNU sed's e command and e flag run a program,
-# and r, w and the w flag name a file, so none of those fit.
-SED_ADDRESS = r"(?:[0-9]+|\$|/(?:[^/\\\n]|\\.)*/)"
-SED_COMMAND = re.compile(
-    r"\s*(?:" + SED_ADDRESS + r"(?:\s*,\s*(?:\+[0-9]+|" + SED_ADDRESS + r"))?)?\s*!?\s*"
-    r"(?:[pdq=nNPDhHgGx]"
-    r"|s(?P<cut>[/|,#:@%])(?:(?!(?P=cut))[^\\\n]|\\.)*(?P=cut)(?:(?!(?P=cut))[^\\\n]|\\.)*(?P=cut)[gpiI0-9]*)"
-    r"\s*")
-SED_PLAIN_OPTIONS = {"--posix", "--quiet", "--silent", "--regexp-extended", "--separate", "--unbuffered", "--null-data"}
+
 
 def shell_words(seg):
     """Split one command into words the way a shell does, leaving out its redirections:
@@ -129,56 +106,6 @@ def loose_words(seg):
     return words
 
 
-def sed_script_reads(script):
-    """Whether every command of a sed script is one SED_COMMAND takes, with ; or a newline between them.
-    A script with a [ is not taken: BSD sed reads a delimiter inside brackets as text, GNU sed reads a slash
-    there the same way, and this reader does not, so the two could cut the script at different places."""
-    if "[" in script:
-        return False
-    at = 0
-    while True:
-        found = SED_COMMAND.match(script, at)
-        if not found:
-            return False
-        at = found.end()
-        if at == len(script):
-            return True
-        if script[at] not in ";\n":
-            return False
-        at += 1
-        if at == len(script):
-            return True
-
-
-def sed_reads(words):
-    """Whether a sed command only prints: each script is one sed_script_reads takes, and no option edits the file
-    in place (-i), names a script file (-f) or is one this reader does not know."""
-    scripts, others, named, i = [], [], False, 1
-    while i < len(words):
-        word = words[i]
-        if word in ("-e", "--expression"):
-            if i + 1 >= len(words):
-                return False
-            scripts.append(words[i + 1])
-            named, i = True, i + 2
-            continue
-        if word.startswith("--expression="):
-            scripts.append(word.split("=", 1)[1])
-            named = True
-        elif word in SED_PLAIN_OPTIONS or re.fullmatch(r"-[nErsuz]+", word):
-            pass
-        elif word.startswith("-") and word != "-":
-            return False
-        else:
-            others.append(word)
-        i += 1
-    if not named:
-        if not others:
-            return False
-        scripts.append(others[0])
-    return all(sed_script_reads(script) for script in scripts)
-
-
 def parts(text):
     """The commands in one command line, cut at newlines, ;, &&, || and |, quotes not read."""
     return re.split(r"\n|;|&&|\|\||\|", text)
@@ -235,99 +162,11 @@ def shell_parts(text):
     return pieces, holds
 
 
-PLAIN_REDIRECT = re.compile(r"(?:[0-9]*>[ \t]*/dev/null|[0-9]*>&[0-9]|&>[ \t]*/dev/null)(?=[ \t\n;|&]|$)")
-
-
-def plain_commands(text):
-    """The commands of a command line, each a list of words, when the line is written plainly enough to be sure
-    what the shell does with it; None when it is not. Plain is: bare words, single quotes, double quotes with no
-    $ or backtick in them, a backslash before a character, a comment (dropped to the end of its line, as the
-    shell drops it), the separators newline, ;, &&, || and |, and a redirect that throws output away or joins
-    it (2>/dev/null, >/dev/null, 2>&1). Anything else the shell acts on gives None: a $, a backtick, ( ) { },
-    a <, a redirect to a file, a lone &, a quote left open."""
-    commands, words, cur, i, n = [], [], None, 0, len(text)
-    while True:
-        c = text[i] if i < n else "\n"
-        two = text[i:i + 2]
-        if c == "'":
-            end = text.find("'", i + 1)
-            if end < 0:
-                return None
-            cur, i = (cur or "") + text[i + 1:end], end + 1
-        elif c == '"':
-            cur, i = cur or "", i + 1
-            while i < n and text[i] != '"':
-                if text[i] in "$`":
-                    return None
-                if text[i] == "\\" and text[i + 1:i + 2] in ('"', "\\", "$", "`", "\n"):
-                    i += 1
-                    if text[i] == "\n":
-                        i += 1
-                        continue
-                cur += text[i]
-                i += 1
-            if i >= n:
-                return None
-            i += 1
-        elif c == "\\" and i < n:
-            if i + 1 >= n:
-                return None
-            if text[i + 1] != "\n":
-                cur = (cur or "") + text[i + 1]
-            i += 2
-        elif c == "#" and cur is None:
-            while i < n and text[i] != "\n":
-                i += 1
-        elif c in "$`(){}<":
-            return None
-        elif c in " \t\n;|&>" or (cur is None and c in "0123456789" and PLAIN_REDIRECT.match(text, i)):
-            # The end of a word, and then what ended it: a blank, a separator or a redirect.
-            redirect = PLAIN_REDIRECT.match(text, i) if c in "&>0123456789" else None
-            if cur is not None:
-                words.append(cur)
-                cur = None
-            if redirect:
-                i = redirect.end()
-                continue
-            if c in " \t":
-                i += 1
-                continue
-            if c == ">" or (c == "&" and two != "&&"):
-                return None
-            commands.append(words)
-            words = []
-            if i >= n:
-                return [command for command in commands if command]
-            i += 2 if two in ("&&", "||") else 1
-        else:
-            cur = (cur or "") + c
-            i += 1
-
-
-def only_reads(text):
-    """Whether the command only prints, so a create-pr.sh it names is read and not run: every command in it is
-    one of PRINTERS, named bare (no folder before it, no NAME=value before it), and a sed carries only scripts
-    sed_reads takes."""
-    commands = plain_commands(text)
-    if commands is None:
-        return False
-    for words in commands:
-        if words[0] not in PRINTERS:
-            return False
-        if words[0] == "sed" and not sed_reads(words):
-            return False
-    return True
-
-
-runs_create_pr = "create-pr.sh" in cmd and not only_reads(cmd)
-if mode == "opens-pr":
-    print("yes" if runs_create_pr or "create-pr.sh" not in cmd else "no")
-    sys.exit(0)
-
-head_tree = sys.argv[3]
-# One answer for the whole command, the same one the top of the gate acts on: a command taken for a run of
-# create-pr.sh opens a PR however the name reaches the shell (a word, a redirect, a here-string), so it needs the receipt.
-verdict = "check" if runs_create_pr else "skip"
+# A command that names create-pr.sh is taken for a run of it, whatever else it does and however the name
+# reaches the shell (a word, a redirect, a here-string), so it needs the receipt. The top of the gate decides
+# the same way: there is no rule that tells a read of the file from a run. One was tried and taken out, because
+# every review of it found a new way to run the script past it.
+verdict = "check" if "create-pr.sh" in cmd else "skip"
 # Two readings of the command, and a push that either one shows is read. The first cuts the line without
 # reading quotes, as this gate always has, so a push written inside a quoted command line is still seen. The
 # second cuts it where the shell does, so a push whose words a line continuation, or a ; or | inside quotes,
@@ -393,12 +232,10 @@ for words in readings:
 print(verdict)
 PYEOF
 
-# Pass the command unless it is a git push, a `gh pr create` or a create-pr.sh run; a here-string avoids a SIGPIPE false pass.
-if ! grep -Eq '(^|[^[:alnum:]_./-])git([[:space:]]+[^;&|[:space:]]+)*[[:space:]]+push([[:space:]]|$|[;&|])|gh[[:space:]]+pr[[:space:]]+create' <<<"$_CMD"; then
-  # A command that names create-pr.sh is taken for a run of it, unless every part of it only reads files
-  # (cat, sed, grep, ls and the like). Only the reader's plain "no" lets it pass, so a reader that fails gates.
-  grep -q 'create-pr\.sh' <<<"$_CMD" || exit 0
-  [ "$(python3 -c "$_CMD_READER" opens-pr "$_CMD" 2>/dev/null)" = no ] && exit 0
+# Pass the command unless it is a git push, a `gh pr create` or one that names create-pr.sh; a here-string avoids a SIGPIPE false pass.
+# Naming create-pr.sh is enough: a read of the file is gated like a run of it, which is the loose match kept on purpose.
+if ! grep -Eq '(^|[^[:alnum:]_./-])git([[:space:]]+[^;&|[:space:]]+)*[[:space:]]+push([[:space:]]|$|[;&|])|gh[[:space:]]+pr[[:space:]]+create|create-pr\.sh' <<<"$_CMD"; then
+  exit 0
 fi
 [ -n "$_CWD" ] && { cd "$_CWD" 2>/dev/null || true; }
 # Move into the checkout the push acts on: a leading `cd DIR`, then each `git -C DIR`, with quotes stripped.
@@ -886,7 +723,7 @@ gate_local_tests() {
   check_script="$(project_fact "$TOP" --path PROJECT_PUSH_CHECK)"
   [ -n "$check_script" ] && [ -f "$check_script" ] || return 0
   check_rel="${check_script#"$TOP"/}"
-  sends="$(python3 -c "$_CMD_READER" sends "$_CMD" "$(git rev-parse --verify -q 'HEAD^{tree}' 2>/dev/null)" 2>/dev/null || echo check)"
+  sends="$(python3 -c "$_CMD_READER" "$_CMD" "$(git rev-parse --verify -q 'HEAD^{tree}' 2>/dev/null)" 2>/dev/null || echo check)"
   case "$sends" in
     skip) return 0 ;;
     other*)
