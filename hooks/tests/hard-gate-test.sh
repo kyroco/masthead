@@ -757,6 +757,17 @@ cat scripts/create-pr.sh | head -5  # the top of it"
 ok "$STATUS" "0" "a read under a comment line is not gated"
 run_gate "$d" "grep -n 'a # b' scripts/create-pr.sh"
 ok "$STATUS" "0" "a # inside quotes is part of the pattern, not a comment"
+# Round 2 fix 2: a command that sets a variable can hand a later command a
+# program to run without a NAME=value word. Only commands that print are reads.
+while IFS= read -r running; do
+  run_gate "$d" "$running"
+  ok "$STATUS" "2" "a run is still gated: $running"
+done <<'EOF'
+printf -v GIT_EDITOR %s scripts/create-pr.sh; git commit --allow-empty
+printf -v GIT_EDITOR %s scripts/create-pr.sh; git commit --allow-empty -m x
+read -r GIT_EDITOR <<< scripts/create-pr.sh; git commit --allow-empty
+export GIT_EDITOR=scripts/create-pr.sh; git commit --allow-empty
+EOF
 
 # A stand-in for mix that counts its calls, for the cases that ask whether the
 # slow Elixir rung ran at all. It exits with the code in $TMP/mixcode.
