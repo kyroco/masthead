@@ -44,14 +44,27 @@ import re, subprocess, sys
 # only read, and yes otherwise. "sends CMD HEAD_TREE" prints what a push sends: skip, check, or other REFSPEC.
 mode, cmd = sys.argv[1], sys.argv[2]
 VALUED = {"-o", "--push-option", "--repo", "--receive-pack", "--exec"}
-# Commands that read, search, list, copy or mark a file and cannot be made to run it by accident.
+# Commands that read, search, list, copy or mark a file and have no option that runs a program.
 # Anything not named here that names create-pr.sh is taken for a run of it: the match stays loose that way round.
+# rg (--pre), sort (--compress-program), bat, less and more (a pager) and gh (a shell alias) each take a program
+# to run, so they are not here. sed is here, and its script is read first: see sed_reads.
 READERS = {
-    "cat", "bat", "less", "more", "head", "tail", "sed", "grep", "egrep", "fgrep", "rg", "ls", "wc", "nl", "cut",
-    "sort", "uniq", "file", "stat", "du", "tree", "diff", "cmp", "jq", "tr", "column", "echo", "printf", "test", "[",
+    "cat", "head", "tail", "sed", "grep", "egrep", "fgrep", "ls", "wc", "nl", "cut",
+    "uniq", "file", "stat", "du", "tree", "diff", "cmp", "jq", "tr", "column", "echo", "printf", "test", "[",
     "true", "false", "cd", "pwd", "chmod", "touch", "cp", "mv", "rm", "mkdir", "tee", "basename", "dirname",
-    "readlink", "realpath", "md5", "md5sum", "shasum", "sha256sum", "shellcheck", "shfmt", "gh",
+    "readlink", "realpath", "md5", "md5sum", "shasum", "sha256sum", "shellcheck", "shfmt",
 }
+# One sed command that prints, deletes, quits, counts, moves text between its two buffers or substitutes: an
+# optional address or pair of addresses (a line number, $, or /regex/), an optional !, then the command. A
+# substitution may carry only the flags g, p, i, I and a number. GNU sed's e command and e flag run a program,
+# and r, w and the w flag name a file, so none of those fit.
+SED_ADDRESS = r"(?:[0-9]+|\$|/(?:[^/\\\n]|\\.)*/)"
+SED_COMMAND = re.compile(
+    r"\s*(?:" + SED_ADDRESS + r"(?:\s*,\s*(?:\+[0-9]+|" + SED_ADDRESS + r"))?)?\s*!?\s*"
+    r"(?:[pdq=nNPDhHgGx]"
+    r"|s(?P<cut>[/|,#:@%])(?:(?!(?P=cut))[^\\\n]|\\.)*(?P=cut)(?:(?!(?P=cut))[^\\\n]|\\.)*(?P=cut)[gpiI0-9]*)"
+    r"\s*")
+SED_PLAIN_OPTIONS = {"--posix", "--quiet", "--silent", "--regexp-extended", "--separate", "--unbuffered", "--null-data"}
 # The git commands that do the same. bisect, rebase, grep, submodule and the rest can run a command, so they are not here.
 GIT_READERS = {
     "add", "annotate", "blame", "cat-file", "checkout", "commit", "diff", "log", "ls-files", "ls-tree", "mv",
@@ -119,6 +132,54 @@ def loose_words(seg):
         else:
             words.append(word)
     return words
+
+
+def sed_script_reads(script):
+    """Whether every command of a sed script is one SED_COMMAND takes, with ; or a newline between them."""
+    at = 0
+    while True:
+        found = SED_COMMAND.match(script, at)
+        if not found:
+            return False
+        at = found.end()
+        if at == len(script):
+            return True
+        if script[at] not in ";\n":
+            return False
+        at += 1
+        if at == len(script):
+            return True
+
+
+def sed_reads(words):
+    """Whether a sed command only reads or edits text: each script is one sed_script_reads takes, and no option
+    names a script file (-f) or is one this reader does not know."""
+    scripts, others, named, i = [], [], False, 1
+    while i < len(words):
+        word = words[i]
+        if word in ("-e", "--expression"):
+            if i + 1 >= len(words):
+                return False
+            scripts.append(words[i + 1])
+            named, i = True, i + 2
+            continue
+        if word.startswith("--expression="):
+            scripts.append(word.split("=", 1)[1])
+            named = True
+        elif word == "-i" and words[i + 1:i + 2] == [""]:
+            i += 1  # BSD sed: -i takes its backup suffix as the next word, and '' means none
+        elif word in SED_PLAIN_OPTIONS or re.fullmatch(r"-[nErsuz]+|-i.*|--in-place(=.*)?", word):
+            pass
+        elif word.startswith("-") and word != "-":
+            return False
+        else:
+            others.append(word)
+        i += 1
+    if not named:
+        if not others:
+            return False
+        scripts.append(others[0])
+    return all(sed_script_reads(script) for script in scripts)
 
 
 def parts(text):
@@ -209,6 +270,8 @@ def only_reads(text):
             if i >= len(words) or words[i] not in GIT_READERS:
                 return False
         elif name not in READERS:
+            return False
+        elif name == "sed" and not sed_reads(words):
             return False
     return True
 
