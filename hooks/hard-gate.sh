@@ -69,8 +69,9 @@ def shell_words(seg):
         c = seg[i] if i < n else " "
         redirect = c in "<>" or (c == "&" and seg[i + 1:i + 2] == ">")
         if c in " \t\r\n" or redirect:
-            # A word made only of bare digits, right against the operator, is its file descriptor.
-            if redirect and cur is not None and plain and cur.isdigit():
+            # A word made only of the bare digits 0 to 9, right against the operator, is its file descriptor.
+            # Only those ten: str.isdigit() and \d also take digits of other scripts, which the shell reads as a word.
+            if redirect and cur is not None and plain and re.fullmatch(r"[0-9]+", cur):
                 cur = None
             if cur is not None:
                 if drop:
@@ -113,8 +114,8 @@ def loose_words(seg):
     for word in seg.split():
         if drop:
             drop = False
-        elif re.match(r"^(\d*|&)[<>]", word):
-            drop = re.match(r"^(\d*|&)[<>]+[&|]?$", word) is not None
+        elif re.match(r"^([0-9]*|&)[<>]", word):
+            drop = re.match(r"^([0-9]*|&)[<>]+[&|]?$", word) is not None
         else:
             words.append(word)
     return words
