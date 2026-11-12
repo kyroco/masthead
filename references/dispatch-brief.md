@@ -29,11 +29,12 @@ it, never for a gate.
 
 A brief to `verifier` passes the check the first time when it carries these,
 in this order. One verifier per scenario; it gets the scenario and nothing
-of your account of the change. It answers two questions and no others: does
-a test exist that really proves this Given, When, Then, and does it pass
-(it would fail if the behavior were missing); and, for a bug fix, was the
-test written first and did it fail before the fix (the commit that adds the
-failing test comes before the commit that fixes the bug).
+of your account of the change. It answers two questions: is each Then true
+in every state production can reach, and is there a test that really proves
+it and passes (it would fail if the behavior were missing); and, for a bug
+fix, was the test written first and did it fail before the fix (the commit
+that adds the failing test comes before the commit that fixes the bug). It
+is not a general review of the code.
 
 ```
 read_only: true
@@ -69,13 +70,13 @@ thought_id with your findings.
 
 The claims are the scenario's Then lines, and each sentence a customer
 reads that the diff adds or edits; leave that second bullet out when the
-diff has no such text. The verifier asks its first question of each one, so
-a sentence no test shows to be true comes back as a no. Add no claim of
-your own: nothing you think works
-beyond the scenario, no list of the cases you handled. A claim the scenario
-does not make sends the verifier looking past the scenario, and that is not
-its job. What it notices outside its two questions it does not follow up: it
-writes the judge one line, with the file and line, and moves on.
+diff has no such text. The verifier tries to make each one false in the
+states production can reach. Add no claim of your own: nothing you think
+works beyond the scenario, no list of the cases you handled. A claim the
+scenario does not make sends the verifier looking past the scenario, and
+that is not its job. What it notices outside the scenario it does not
+follow up: it writes the judge one line, with the file and line, and moves
+on.
 
 The `Bug fix:` line lets the verifier answer its second question: it reads
 the two commits and checks that the test came first.

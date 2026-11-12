@@ -114,15 +114,22 @@ scenario it sends one verifier the scenario, the decision lines it rests on,
 the README's opening paragraph on who uses the product, the mockup page the
 scenario rests on, the diff, the test that proves the scenario, and the
 list of what it could not prove. Nothing else: not its notes, not
-an earlier review. The verifier answers two questions and no others. Does a
-test really prove this scenario, so that it would fail if the behavior were
-missing, and does it pass? And, for a bug fix, was the test written first,
-and did it fail before the fix? Where the change adds or edits a sentence a
-customer reads, that sentence is a claim of the scenario and gets the same
-first question.
-It is not a general review of the code: when it notices something else that
-looks like a real fault a customer could hit, it writes one line for the
-judge, with the file and line, and moves on. A security reviewer joins
+an earlier review. The verifier answers two questions. Is each Then true in
+every state production can reach, and does a test really prove it, so that
+it would fail if the behavior were missing, and pass? And, for a bug fix,
+was the test written first, and did it fail before the fix? For the first
+question it assumes the code is wrong and tries to prove it, with every way
+the scenario's own claims go wrong as its methods: a write that fails
+halfway, an input nobody handled, a promise to a caller the code breaks, a
+shared module written again, a sentence a customer reads that is false in
+some state. It tries only states production can reach, starting from a real
+entry point such as a route, a job or a webhook. For every claim it returns
+either "true in every state", with the run that shows it, or each state
+where it is false, with the run; never partly.
+It is not a general review of the code: when it notices something outside
+the scenario that looks like a real fault a customer could hit, it writes
+one line for the judge, with the file and line, and moves on. A security
+reviewer joins
 when the change touches sign-in, secrets or input from outside, with the
 repository's security rules as its claims. None of them can edit anything.
 None of them can reach the network. Then a judge, given the same product

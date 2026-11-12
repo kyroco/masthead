@@ -199,7 +199,7 @@ def review():
         revs.append(b); y = bottom(b) + 8
     sec = c.box(rx, y, [("security reviewer", "body")], RED, min_w=170, pad=10)
     revs.append(sec); y = bottom(sec) + 10
-    note = c.box(rx, y, [("each one answers two questions about the tests;", "body"), ("no author's notes, no editing, no network", "body")], OUTBOX, pad=10)
+    note = c.box(rx, y, [("each one tries to make each Then false, and checks its test;", "body"), ("no author's notes, no editing, no network", "body")], OUTBOX, pad=10)
     c.arrow(right(worker), worker[1] + 40, revs[1][0] - 2, worker[1] + 40)
 
     jx = right(revs[0]) + 70

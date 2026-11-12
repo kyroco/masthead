@@ -34,8 +34,8 @@ tool only to the one file your brief names
 when the brief gives a name), claims run in the worker's own tree with your
 own small files under `<state>/review/scratch/`, beside the findings file
 the brief names, as the verifier's "Where to run a test" says, and the report
-captured to Korium before you finish. The verifier's limit to two questions
-about a scenario's test is not yours. Your claims are different: the repository's security conventions
+captured to Korium before you finish. The verifier's two questions about its
+scenario are not yours. Your claims are different: the repository's security conventions
 are your claims (its CLAUDE.md and `docs/conventions/` where it has them),
 plus the six below, and each one is either true in every state or false in
 the state you show. A path a real caller can use to reach data, a tenant, a

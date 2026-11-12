@@ -84,9 +84,10 @@ order. The steps live here and nowhere else; a repo supplies only its own facts
    paragraph, the mockup page the scenario rests on where there is one, the
    diff, the test that proves each Then, the two commits of a bug fix where
    there is one, and your did-not-prove list. A verifier answers two
-   questions and no others: does a test really prove the scenario and pass,
-   and, for a bug fix, was the test written first and did it fail before the
-   fix. Its claims are the scenario's Then lines and nothing you add;
+   questions: is each Then true in every state production can reach, with a
+   test that really proves it and passes; and, for a bug fix, was the test
+   written first and did it fail before the fix. It is not a general review
+   of the code. Its claims are the scenario's Then lines and nothing you add;
    where the diff adds or edits text a customer reads (screen text, a refusal
    sentence, the site's docs, the changelog), every sentence of it is a claim
    of the scenario it belongs to. Add the `security-reviewer` when
