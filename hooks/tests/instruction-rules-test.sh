@@ -1014,5 +1014,21 @@ says  agents/verifier.md "is not a yes from reading alone"
 says  agents/verifier.md 'it is not proven here, as "What you never run" says'
 never agents/verifier.md "you judge by reading the test and the code it reaches"
 says  agents/verifier.md "Where you cannot tell from reading, it is not proven here"
+# Round 1 fix 3: the security reviewer got its way of testing a claim by
+# pointing at verifier sections this change removed, so it now carries those
+# rules itself, word for word as they stood at ac86e48.
+says  agents/security-reviewer.md "## How you test a claim"
+says  agents/security-reviewer.md "find the production code that reaches it from a real entry point"
+says  agents/security-reviewer.md "A state that only a test setup builds is not a finding, and will be rejected by the adjudicator"
+says  agents/security-reviewer.md "the ordinary case, empty or missing input, the same call arriving twice where production really repeats it (for example a retry, a webhook, a job), and data left from before the change"
+says  agents/security-reviewer.md "Prove each answer with a test that reaches the state the way production does, through a real entry point"
+says  agents/security-reviewer.md '"Could happen" and "looks risky" are not states'
+says  agents/security-reviewer.md "If you are not sure a claim is false, it is not false; never return one to show you found something"
+says  agents/security-reviewer.md "These are ways to look at a claim, not a list to fill"
+says  agents/security-reviewer.md "ask what is left if it fails halfway or is retried"
+says  agents/security-reviewer.md "the other copies of that rule the change now disagrees with"
+says  agents/security-reviewer.md "an input production can send that the change does not handle"
+says  agents/security-reviewer.md "ask the code index (\`code_locate\`) before you call it new"
+says  agents/security-reviewer.md "Comments, module docs and internal docs are not verified"
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
