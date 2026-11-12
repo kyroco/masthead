@@ -183,8 +183,8 @@ says  references/gate-catalog.md "when the repo names a \`PROJECT_PUSH_CHECK\` s
 says  references/gate-catalog.md "A repo that names no push check gets neither refusal"
 never references/gate-catalog.md "stops the gate there: it refuses a push that sends anything but HEAD"
 never references/session-cliffs.md "which is not plain English"
-says  README.md "that sentence is a claim of the scenario and gets the same first question"
-says  docs/explainer.template.html "that sentence is a claim of the scenario and gets the same first question"
+says  README.md "a sentence a customer reads that is false in some state"
+says  docs/explainer.template.html "a sentence a customer reads that is false in some state"
 never agents/verifier.md "plain English"
 says  scripts/diagrams.py "5. push check"
 
@@ -916,28 +916,50 @@ done
 # 3 choices of what we do today is correct, what you proposed is incorrect", so
 # one blind pass, up to two re-checks, the judge on every round and a finding
 # fixed test first all stay.
-# 1. The verifier's job is two questions per scenario and no others.
-says  agents/verifier.md "You take one scenario and answer two questions about it, and no others"
-says  agents/verifier.md "Does a test exist that really proves this Given, When, Then, and does it pass"
+# 1. The verifier's job is two questions per scenario. The first keeps the
+# probing: the parent session found on 2026-11-11 that "two questions and no
+# others" cut a safeguard Robert never gave up. His yardstick for a cut, word
+# for word: "could this catch a bug a customer would hit? If yes, it stays,
+# however slow" (his answer: "yes that's exactly right"). Trying each Then in
+# the states production can reach can catch such a bug, so it stays.
+says  agents/verifier.md "You take one scenario's claims and try to make each one false"
+says  agents/verifier.md "it needs to be adversarial and assume the architecture and code is shit and prove it's right by looking. It's not about always finding something."
+says  agents/verifier.md "A claim you could not make false, with the run that shows it, is as much your result as one you could"
+says  agents/verifier.md "You answer two questions about the scenario. You are not a general review of the code"
+says  agents/verifier.md "Is each Then true in every state production can reach, and does a test exist that really proves it and passes"
+says  agents/verifier.md "## The first question: is each Then true, and does a test prove it"
+says  agents/verifier.md "Before you build a state to test, find the production code that reaches it from a real entry point"
+says  agents/verifier.md "The author's claims are suspect until you prove otherwise"
+says  agents/verifier.md "does the code make each Then true in each state the Given allows"
+says  agents/verifier.md "For each claim, try the states production can reach: the ordinary case, empty or missing input, the same call arriving twice where production really repeats it (for example a retry, a webhook, a job), and data left from before the change"
+says  agents/verifier.md "Prove each answer with a test that reaches the state the way production does, through a real entry point"
+says  agents/verifier.md "A Then that is false in a state production can reach is a no, whether or not a test exists for the ordinary case"
+says  agents/verifier.md "true in every state"
+says  agents/verifier.md '"Could happen" and "looks risky" are not states'
+says  agents/verifier.md "If you are not sure a claim is false, it is not false; never return one to show you found something"
+says  agents/verifier.md "## Ways to look"
+says  agents/verifier.md "These are ways to look at the scenario's own claims, not a list to fill"
+says  agents/verifier.md "ask what is left if it fails halfway or is retried"
+says  agents/verifier.md "the other copies of that rule the change now disagrees with"
+says  agents/verifier.md "an input production can send that the change does not handle"
+says  agents/verifier.md "ask the code index (\`code_locate\`) before you call it new"
+says  agents/verifier.md "A breach of the repository's written rules (CLAUDE.md, \`docs/conventions/\`) is a finding only when it makes one of the claims false"
+says  agents/verifier.md "Quote it as a false claim"
+for doc in agents/verifier.md agents/adjudicator.md references/dispatch-brief.md references/session-cliffs.md README.md docs/explainer.template.html docs/explainer.html; do
+  never "$doc" "and no others"
+done
 says  agents/verifier.md "it would fail if the behavior were missing"
 says  agents/verifier.md "For a bug fix: was the test written first, and did it fail before the fix"
 says  agents/verifier.md "The commit that adds the failing test comes before the commit that fixes the bug"
-says  agents/verifier.md "It answers two questions and no others"
-says  agents/verifier.md "You are not a general review of the code"
-says  agents/verifier.md "## The first question: the scenario's test"
 says  agents/verifier.md "## The second question: a bug's test came first"
 says  agents/verifier.md "A Then with no test is a no"
 says  agents/verifier.md 'Read the two commits with `git log` and `git show`. You check out nothing'
-never agents/verifier.md "try to make each one false"
-never agents/verifier.md "true in every state"
-never agents/verifier.md "each state where the claim is false"
-never agents/verifier.md "try the states production can reach"
-never agents/verifier.md "assume the architecture"
 never agents/verifier.md "the author's claim and unproven lists"
-says  references/dispatch-brief.md "It answers two questions and no others"
-says  references/dispatch-brief.md "does a test exist that really proves this Given, When, Then, and does it pass"
+says  references/dispatch-brief.md "It answers two questions: is each Then true in every state production can reach, and is there a test that really proves it and passes"
+says  references/dispatch-brief.md "It is not a general review of the code"
 says  references/dispatch-brief.md "was the test written first and did it fail before the fix"
-says  references/session-cliffs.md "A verifier answers two questions and no others"
+says  references/session-cliffs.md "A verifier answers two questions: is each Then true in every state production can reach, with a test that really proves it and passes"
+says  agents/adjudicator.md "is each Then true in every state production can reach, with a test that really proves it and passes"
 # 2. The brief asks for no claim beyond the scenario.
 never references/dispatch-brief.md "each thing the author claims works"
 says  references/dispatch-brief.md "Claims: - <each Then line of the scenario> - <each sentence a customer reads that the diff adds or edits> Not proven: <list>."
@@ -949,9 +971,11 @@ never references/session-cliffs.md "what you claim works"
 never references/session-cliffs.md "both lists"
 says  references/session-cliffs.md "Its claims are the scenario's Then lines and nothing you add"
 says  references/session-cliffs.md "A bug gets its test first: the failing test in a commit of its own, then the fix"
-# 3. It flags what it notices outside the two questions in one line, and hunts for nothing.
-never agents/verifier.md "## Ways to look"
-says  agents/verifier.md "## Outside your two questions"
+# 3. It flags what it notices outside the scenario in one line, and does not chase it.
+says  agents/verifier.md "## Outside the scenario"
+never agents/verifier.md "## Outside your two questions"
+never agents/verifier.md "a write that could fail halfway, an input nobody handles"
+says  agents/verifier.md "code the change did not touch, the design, style, names"
 says  agents/verifier.md "Nothing else is a claim"
 says  agents/verifier.md "Do not chase it"
 says  agents/verifier.md 'write one line under `For the judge`, a heading of its own apart from your answers, with its `file:line` and what looks wrong, and move on'
@@ -960,7 +984,8 @@ says  agents/adjudicator.md "Read the code from that line yourself"
 says  agents/adjudicator.md "no test that passes really proves it"
 says  agents/adjudicator.md "a bug fix's test did not come first"
 # 4. The rest of the review is as it was, and the security reviewer keeps its own scope.
-says  agents/security-reviewer.md "The verifier's limit to two questions about a scenario's test is not yours"
+says  agents/security-reviewer.md "The verifier's two questions about its scenario are not yours"
+never agents/security-reviewer.md "The verifier's limit to two questions about a scenario's test is not yours"
 never agents/security-reviewer.md "Everything in the \`verifier\` agent applies"
 says  agents/security-reviewer.md "You review one change for the ways it can be attacked"
 says  agents/adjudicator.md "Do these six steps in this order and never skip one"
@@ -982,26 +1007,27 @@ never hooks/test-commit-attribution-gate.py "mutate a copy"
 says  hooks/test-commit-attribution-gate.py "it failed against the hook before the change and passes after"
 # The pages a person reads say the same job.
 for doc in README.md docs/explainer.template.html docs/explainer.html; do
-  says  "$doc" "The verifier answers two questions and no others"
+  says  "$doc" "Is each Then true in every state production can reach, and does a test really prove it"
+  says  "$doc" "It tries only states production can reach"
   says  "$doc" "it writes one line for the judge, with the file and line, and moves on"
   never "$doc" "what it claims works"
-  never "$doc" "The verifier assumes the code is wrong and tries to prove it"
-  never "$doc" "true in every state"
 done
 for doc in scripts/diagrams.py docs/images/review.svg docs/explainer.html; do
   never "$doc" "tries to make every claim false"
   never "$doc" "each false claim's path"
-  says  "$doc" "each one answers two questions about the tests"
+  never "$doc" "each one answers two questions about the tests"
+  says  "$doc" "each one tries to make each Then false, and checks its test"
 done
-# Round 1 fix 1: a sentence a customer reads is a claim of its scenario and gets
-# the first question, so the verifier has two questions and no third job.
-says  agents/verifier.md "it gets the same first question"
-says  agents/verifier.md "A sentence no test shows to be true is a no"
-never agents/verifier.md "where none does, read the code and say you read it rather than ran it"
-says  references/dispatch-brief.md "a sentence no test shows to be true comes back as a no"
-says  agents/adjudicator.md "a test that checks something other than the Then or the sentence"
-says  agents/adjudicator.md "or no test that passes shows it"
+# Round 1 fix 1 made a sentence a customer reads need a test of its own, to
+# keep "no others" true. With "no others" gone, the sentence check is as it
+# was on main: what it says is what the code does, in the states tried.
+never agents/verifier.md "it gets the same first question"
+never agents/verifier.md "A sentence no test shows to be true is a no"
+never references/dispatch-brief.md "a sentence no test shows to be true comes back as a no"
+never agents/adjudicator.md "or the sentence a person reads"
+never agents/adjudicator.md "or no test that passes shows it"
 never agents/adjudicator.md "such as a sentence a person reads that is false or a security finding"
+says  agents/adjudicator.md "A finding that a claim is false holds when it names the \`file:line\`, the state, the wrong result, and a path from a real production entry point to that state"
 for doc in README.md docs/explainer.template.html docs/explainer.html; do
   never "$doc" "it also checks that the sentence says what the code does"
 done
