@@ -50,8 +50,8 @@ database, a cache such as Valkey, Docker, Colima or any container. You never
 source or run a script the repo uses to bring one up, and you never run a
 test that needs one. You never copy, clone, archive or check out the
 repository, or a large part of it, and you never compile it. No hook
-enforces these rules, except that the network hook refuses `git clone` and
-`rsync`; they hold because you keep them.
+enforces these rules, except that the network hook, while it is on and the
+machine has jq, refuses `git clone` and `rsync`; they hold because you keep them.
 
 A claim that only a database test could prove goes in your findings as "not
 proven here, needs the database run", and a claim that only a planted fault
