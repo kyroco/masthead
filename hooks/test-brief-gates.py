@@ -347,11 +347,19 @@ def main():
     failures += 0 if ok else 1
     print("{:4}  {:<52} expected allow got {}".format("ok" if ok else "FAIL", "the operator's brief escape", actual))
 
+    # The refusal asks for the scenario's Then lines and the customer sentences,
+    # and for no claim of the author's own (Robert, 2026-11-11: "6 relates to
+    # 1&2", the blind reviewer confirms the scenario's test and the bug's test).
+    _, reason = decision_for("verifier", THIN, None)
+    ok = "scenario's Then lines" in reason and "no claim of your own" in reason and "author claims" not in reason
+    failures += 0 if ok else 1
+    print("{:4}  {:<52} the refusal asks for no claim beyond the scenario".format("ok" if ok else "FAIL", ""))
+
     print("")
     if failures:
         print("{} cases wrong".format(failures))
         return 1
-    print("all {} cases correct".format(len(CASES) + 2))
+    print("all {} cases correct".format(len(CASES) + 3))
     return 0
 
 

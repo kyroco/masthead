@@ -66,11 +66,27 @@ same cause. Keep the clearest one.
 
 ## Check each finding holds
 
-A finding holds when it names the `file:line`, the state, the wrong result,
-and a path from a real production entry point to that state. Throw out a
-finding missing any of these. A claim is either false or it is not: for
-example, "could happen", "looks risky" and "breaks best practice" are not
-valid results.
+A verifier answers two questions about its scenario: is each Then true in
+every state production can reach, with a test that really proves it and
+passes; and, for a bug fix, was the test written first and did it fail
+before the fix. A claim it found false is a finding, and so is a no about
+the test.
+
+A finding that a claim is false holds when it names the `file:line`, the
+state, the wrong result, and a path from a real production entry point to
+that state. Throw out a finding missing any of these. A claim is either
+false or it is not: for example, "could happen", "looks risky" and "breaks
+best practice" are not valid results.
+
+A no about the test holds when you read the test, or the commits, it names
+and see the same thing: no test, a test that checks something other than
+the Then, a test that fails, or a test that did not come before its fix.
+
+A line under a verifier's `For the judge` heading is something it noticed
+outside its scenario and did not follow up, so it gives only a
+`file:line` and what looks wrong. Read the code from that line yourself. It
+holds when you find the state, the wrong result and a path from a real
+production entry point to that state; throw it out when you do not.
 
 Read the code along the path the verifier gave. Do not run its test again.
 If the path does not reach the state, or a guard on that path stops it,
@@ -98,8 +114,9 @@ secret or a privilege, is the one thing you pass on: see the verdict.
 A finding that holds goes to one of two places.
 
 It is fixed in this PR when one of these is true: a Then in the scenario is
-false; the change caused something that worked before to break; or text a
-person reads that the change added or edited is now false.
+false, or no test that passes really proves it; a bug fix's test did not
+come first; the change caused something that worked before to break; or text
+a person reads that the change added or edited is now false.
 
 Everything else is an extra. List it in your verdict; the worker decides
 whether it reaches the person. New code that does what a shared module already

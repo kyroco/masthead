@@ -136,7 +136,6 @@ says  agents/verifier.md "check that what it says is what the code does"
 never agents/verifier.md "plain English against"
 never agents/verifier.md "customer-text convention"
 never agents/verifier.md "every sentence a customer reads about that behavior"
-says  agents/verifier.md "the other copies of that rule the change now disagrees with"
 never agents/verifier.md "two callers at once"
 never agents/verifier.md "(ADR-0003)"
 says  references/session-cliffs.md "adds or edits text a customer reads"
@@ -202,13 +201,10 @@ fi
 says  agents/verifier.md "name: verifier"
 says  agents/verifier.md "You never get the author's account of the change or another review"
 says  agents/verifier.md "A state that only a test setup builds is not a finding"
-says  agents/verifier.md "true in every state"
-says  agents/verifier.md "each state where the claim is false"
-says  agents/verifier.md "## Ways to look"
 never agents/verifier.md "## The angle"
 never agents/verifier.md "Your brief names one angle"
 never agents/verifier.md "a prior reviewer's report"
-says  agents/security-reviewer.md "Everything in the \`verifier\` agent applies"
+says  agents/security-reviewer.md "These rules of the \`verifier\` agent are yours too"
 says  agents/security-reviewer.md "the repository's security conventions are your claims"
 never agents/security-reviewer.md "Everything in the \`reviewer\` agent applies"
 says  references/agent-preamble.md "Read by verifier"
@@ -911,5 +907,168 @@ for doc in README.md docs/explainer.template.html docs/explainer.html references
   never "$doc" "a scratch copy under"
   never "$doc" "PROJECT_SUBSTRATE_SCRIPTS"
 done
+# The blind reviewer confirms the scenario's test and the bug's test, and stops
+# there. Robert's rulings on 2026-11-11, word for word. On what the blind
+# reviewer is for: "6 relates to 1&2", where line 1 of the floor is "Every
+# scenario in the issue, written given, when, then, has a test that passes",
+# line 2 is "A bug gets its test first, then the fix" and line 6 is "A blind
+# reviewer has confirmed lines 1 and 2". On the rest of the review: "I mean all
+# 3 choices of what we do today is correct, what you proposed is incorrect", so
+# one blind pass, up to two re-checks, the judge on every round and a finding
+# fixed test first all stay.
+# 1. The verifier's job is two questions per scenario. The first keeps the
+# probing: the parent session found on 2026-11-11 that "two questions and no
+# others" cut a safeguard Robert never gave up. His yardstick for a cut, word
+# for word: "could this catch a bug a customer would hit? If yes, it stays,
+# however slow" (his answer: "yes that's exactly right"). Trying each Then in
+# the states production can reach can catch such a bug, so it stays.
+says  agents/verifier.md "You take one scenario's claims and try to make each one false"
+says  agents/verifier.md "it needs to be adversarial and assume the architecture and code is shit and prove it's right by looking. It's not about always finding something."
+says  agents/verifier.md "A claim you could not make false, with the run that shows it, is as much your result as one you could"
+says  agents/verifier.md "You answer two questions about the scenario. You are not a general review of the code"
+says  agents/verifier.md "Is each Then true in every state production can reach, and does a test exist that really proves it and passes"
+says  agents/verifier.md "## The first question: is each Then true, and does a test prove it"
+says  agents/verifier.md "Before you build a state to test, find the production code that reaches it from a real entry point"
+says  agents/verifier.md "The author's claims are suspect until you prove otherwise"
+says  agents/verifier.md "does the code make each Then true in each state the Given allows"
+says  agents/verifier.md "For each claim, try the states production can reach: the ordinary case, empty or missing input, the same call arriving twice where production really repeats it (for example a retry, a webhook, a job), and data left from before the change"
+says  agents/verifier.md "Prove each answer with a test that reaches the state the way production does, through a real entry point"
+says  agents/verifier.md "A Then that is false in a state production can reach is a no, whether or not a test exists for the ordinary case"
+says  agents/verifier.md "true in every state"
+says  agents/verifier.md '"Could happen" and "looks risky" are not states'
+says  agents/verifier.md "If you are not sure a claim is false, it is not false; never return one to show you found something"
+says  agents/verifier.md "## Ways to look"
+says  agents/verifier.md "These are ways to look at the scenario's own claims, not a list to fill"
+says  agents/verifier.md "ask what is left if it fails halfway or is retried"
+says  agents/verifier.md "the other copies of that rule the change now disagrees with"
+says  agents/verifier.md "an input production can send that the change does not handle"
+says  agents/verifier.md "ask the code index (\`code_locate\`) before you call it new"
+says  agents/verifier.md "A breach of the repository's written rules (CLAUDE.md, \`docs/conventions/\`) is a finding only when it makes one of the claims false"
+says  agents/verifier.md "Quote it as a false claim"
+for doc in agents/verifier.md agents/adjudicator.md references/dispatch-brief.md references/session-cliffs.md README.md docs/explainer.template.html docs/explainer.html; do
+  never "$doc" "and no others"
+done
+says  agents/verifier.md "it would fail if the behavior were missing"
+says  agents/verifier.md "For a bug fix: was the test written first, and did it fail before the fix"
+says  agents/verifier.md "The commit that adds the failing test comes before the commit that fixes the bug"
+says  agents/verifier.md "## The second question: a bug's test came first"
+says  agents/verifier.md "A Then with no test is a no"
+says  agents/verifier.md 'Read the two commits with `git log` and `git show`. You check out nothing'
+never agents/verifier.md "the author's claim and unproven lists"
+says  references/dispatch-brief.md "It answers two questions: is each Then true in every state production can reach, and is there a test that really proves it and passes"
+says  references/dispatch-brief.md "It is not a general review of the code"
+says  references/dispatch-brief.md "was the test written first and did it fail before the fix"
+says  references/session-cliffs.md "A verifier answers two questions: is each Then true in every state production can reach, with a test that really proves it and passes"
+says  agents/adjudicator.md "is each Then true in every state production can reach, with a test that really proves it and passes"
+# 2. The brief asks for no claim beyond the scenario.
+never references/dispatch-brief.md "each thing the author claims works"
+says  references/dispatch-brief.md "Claims: - <each Then line of the scenario> - <each sentence a customer reads that the diff adds or edits> Not proven: <list>."
+says  references/dispatch-brief.md 'Bug fix: <the commit that adds the failing test, then the commit that fixes the bug>, or "not a bug fix".'
+says  references/dispatch-brief.md "Add no claim of your own"
+never hooks/engram-protocol.sh "what the author claims works"
+says  hooks/engram-protocol.sh "List under it the scenario's Then lines and every sentence a customer reads that the change adds or edits, and no claim of your own"
+never references/session-cliffs.md "what you claim works"
+never references/session-cliffs.md "both lists"
+says  references/session-cliffs.md "Its claims are the scenario's Then lines and nothing you add"
+says  references/session-cliffs.md "A bug gets its test first: the failing test in a commit of its own, then the fix"
+# 3. It flags what it notices outside the scenario in one line, and does not chase it.
+says  agents/verifier.md "## Outside the scenario"
+never agents/verifier.md "## Outside your two questions"
+never agents/verifier.md "a write that could fail halfway, an input nobody handles"
+says  agents/verifier.md "code the change did not touch, the design, style, names"
+says  agents/verifier.md "Nothing else is a claim"
+says  agents/verifier.md "Do not chase it"
+says  agents/verifier.md 'write one line under `For the judge`, a heading of its own apart from your answers, with its `file:line` and what looks wrong, and move on'
+says  agents/adjudicator.md 'A line under a verifier'"'"'s `For the judge` heading'
+says  agents/adjudicator.md "Read the code from that line yourself"
+says  agents/adjudicator.md "no test that passes really proves it"
+says  agents/adjudicator.md "a bug fix's test did not come first"
+# 4. The rest of the review is as it was, and the security reviewer keeps its own scope.
+says  agents/security-reviewer.md "The verifier's two questions about its scenario are not yours"
+never agents/security-reviewer.md "The verifier's limit to two questions about a scenario's test is not yours"
+never agents/security-reviewer.md "Everything in the \`verifier\` agent applies"
+says  agents/security-reviewer.md "You review one change for the ways it can be attacked"
+says  agents/adjudicator.md "Do these six steps in this order and never skip one"
+says  references/session-cliffs.md "then the \`adjudicator\` on that round's findings files as in step 3"
+says  references/session-cliffs.md "in two commits of its own: a test that reproduces it and fails, then the fix"
+# 5. Nothing proves a test by breaking code on purpose. Robert's ruling, word
+# for word: "'Breaking the code on purpose to watch the test go red' No. that
+# proves nothing". The line he accepted ("this is what I think is right, yes"):
+# "The proof a test works is that it failed before the change and passes after.
+# Nothing breaks code on purpose to prove a test, not once and not on every run."
+says  references/session-cliffs.md "The proof a test works is that it failed before the change and passes after. Nothing breaks code on purpose to prove a test, not once and not on every run."
+says  agents/verifier.md "never by taking the change out or planting a fault"
+says  agents/verifier.md "The proof a test works is that it failed before the change and passes after"
+never references/session-cliffs.md "To undo a mutation"
+never references/session-cliffs.md "Commit before mutating"
+never references/session-cliffs.md "mutated tree"
+never hooks/test-commit-attribution-gate.py "mutation proof"
+never hooks/test-commit-attribution-gate.py "mutate a copy"
+says  hooks/test-commit-attribution-gate.py "it failed against the hook before the change and passes after"
+# The pages a person reads say the same job.
+for doc in README.md docs/explainer.template.html docs/explainer.html; do
+  says  "$doc" "Is each Then true in every state production can reach, and does a test really prove it"
+  says  "$doc" "It tries only states production can reach"
+  says  "$doc" "it writes one line for the judge, with the file and line, and moves on"
+  never "$doc" "what it claims works"
+done
+for doc in scripts/diagrams.py docs/images/review.svg docs/explainer.html; do
+  never "$doc" "tries to make every claim false"
+  never "$doc" "each false claim's path"
+  never "$doc" "each one answers two questions about the tests"
+  says  "$doc" "each one tries to make each Then false, and checks its test"
+done
+# Round 1 fix 1 made a sentence a customer reads need a test of its own, to
+# keep "no others" true. With "no others" gone, the sentence check is as it
+# was on main: what it says is what the code does, in the states tried.
+never agents/verifier.md "it gets the same first question"
+never agents/verifier.md "A sentence no test shows to be true is a no"
+never references/dispatch-brief.md "a sentence no test shows to be true comes back as a no"
+never agents/adjudicator.md "or the sentence a person reads"
+never agents/adjudicator.md "or no test that passes shows it"
+never agents/adjudicator.md "such as a sentence a person reads that is false or a security finding"
+says  agents/adjudicator.md "A finding that a claim is false holds when it names the \`file:line\`, the state, the wrong result, and a path from a real production entry point to that state"
+for doc in README.md docs/explainer.template.html docs/explainer.html; do
+  never "$doc" "it also checks that the sentence says what the code does"
+done
+# Round 1 fix 2: the verifier's new text and its older "What you never run"
+# text gave opposite rules for a test that should fail once the change is taken
+# out. One rule now: a yes rests on what the test plainly checks or on the
+# commits, and what is left is not proven here, never a yes from reading alone.
+says  agents/verifier.md "you judge from what the test checks and from the commits, never by taking the change out or planting a fault"
+says  agents/verifier.md "is not a yes from reading alone"
+says  agents/verifier.md 'it is not proven here, as "What you never run" says'
+never agents/verifier.md "you judge by reading the test and the code it reaches"
+says  agents/verifier.md "Where you cannot tell from reading, it is not proven here"
+# Round 1 fix 3: the security reviewer got its way of testing a claim by
+# pointing at verifier sections this change removed, so it now carries those
+# rules itself, word for word as they stood at ac86e48.
+says  agents/security-reviewer.md "## How you test a claim"
+says  agents/security-reviewer.md "find the production code that reaches it from a real entry point"
+says  agents/security-reviewer.md "A state that only a test setup builds is not a finding, and will be rejected by the adjudicator"
+says  agents/security-reviewer.md "the ordinary case, empty or missing input, the same call arriving twice where production really repeats it (for example a retry, a webhook, a job), and data left from before the change"
+says  agents/security-reviewer.md "Prove each answer with a test that reaches the state the way production does, through a real entry point"
+says  agents/security-reviewer.md '"Could happen" and "looks risky" are not states'
+says  agents/security-reviewer.md "If you are not sure a claim is false, it is not false; never return one to show you found something"
+says  agents/security-reviewer.md "These are ways to look at a claim, not a list to fill"
+says  agents/security-reviewer.md "ask what is left if it fails halfway or is retried"
+says  agents/security-reviewer.md "the other copies of that rule the change now disagrees with"
+says  agents/security-reviewer.md "an input production can send that the change does not handle"
+says  agents/security-reviewer.md "ask the code index (\`code_locate\`) before you call it new"
+says  agents/security-reviewer.md "Comments, module docs and internal docs are not verified"
+# Re-verify round 1 fix: the copy left lines out, so the security reviewer's
+# scope grew. It now carries every line it took from the verifier at ac86e48,
+# word for word: what counts as a claim, the stance, and how it reports.
+says  agents/security-reviewer.md "Nothing else is a claim: a fault in code the change did not touch is not a finding"
+says  agents/security-reviewer.md "A breach of the repository's written rules (CLAUDE.md, \`docs/conventions/\`) is a finding only when it makes one of the claims false"
+says  agents/security-reviewer.md "it needs to be adversarial and assume the architecture and code is shit and prove it's right by looking. It's not about always finding something."
+says  agents/security-reviewer.md "A claim you could not make false, with the run that shows it, is as much your result as one you could"
+says  agents/security-reviewer.md "The author's claims are suspect until you prove otherwise"
+says  agents/security-reviewer.md "The scenario's Given, When and Then, as written, are the standard"
+says  agents/security-reviewer.md "When the change adds or edits text a person reads"
+says  agents/security-reviewer.md "A claim that a test covers something is false when no test fails without the change"
+says  agents/security-reviewer.md "Never write that file with a shell command. If the write is refused, put the findings in your final reply and say so"
+says  agents/security-reviewer.md "Quote it as a false claim"
+says  agents/security-reviewer.md "Your final message is the report: each claim with its answer, false ones first"
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]

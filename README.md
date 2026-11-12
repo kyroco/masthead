@@ -112,22 +112,31 @@ filed.
 When a worker thinks it's done, it doesn't grade its own work. For each
 scenario it sends one verifier the scenario, the decision lines it rests on,
 the README's opening paragraph on who uses the product, the mockup page the
-scenario rests on, the diff, and two lists: what it
-claims works and what it could not prove. Nothing else: not its notes, not
-an earlier review. The verifier assumes the code is wrong and tries to prove
-it, with every way a change goes wrong as its methods: a write that fails
+scenario rests on, the diff, the test that proves the scenario, and the
+list of what it could not prove. Nothing else: not its notes, not
+an earlier review. The verifier answers two questions. Is each Then true in
+every state production can reach, and does a test really prove it, so that
+it would fail if the behavior were missing, and pass? And, for a bug fix,
+was the test written first, and did it fail before the fix? For the first
+question it assumes the code is wrong and tries to prove it, with every way
+the scenario's own claims go wrong as its methods: a write that fails
 halfway, an input nobody handled, a promise to a caller the code breaks, a
 shared module written again, a sentence a customer reads that is false in
 some state. It tries only states production can reach, starting from a real
 entry point such as a route, a job or a webhook. For every claim it returns
 either "true in every state", with the run that shows it, or each state
-where it is false, with the run; never partly. A security reviewer joins
+where it is false, with the run; never partly.
+It is not a general review of the code: when it notices something outside
+the scenario that looks like a real fault a customer could hit, it writes
+one line for the judge, with the file and line, and moves on. A security
+reviewer joins
 when the change touches sign-in, secrets or input from outside, with the
 repository's security rules as its claims. None of them can edit anything.
 None of them can reach the network. Then a judge, given the same product
 context and nothing from the worker, reads the code along each verifier's
 path without running the tests a third time, and places each finding that
-holds: fixed in this pull request when a scenario's Then is false, something
+holds: fixed in this pull request when a scenario's Then is false or no
+test proves it, a bug's test did not come first, something
 that worked before broke, or words a person reads are now wrong; otherwise
 an extra, which the worker scores like its own. That placement is final for
 the worker and the foreman; nobody files anything. The worker fixes the

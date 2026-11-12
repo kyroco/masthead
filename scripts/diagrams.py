@@ -189,7 +189,7 @@ def workflow():
 def review():
     c = Canvas(1100, 620)
     c.text(40, 40, "The verification: verifiers who read cold, and a judge that reads and places", size=20, color="#1f2937", bold=True)
-    worker = c.box(40, 120, [("the worker", "title"), ("finishes the change and sends", "body"), ("each scenario, the diff, its claims", "body")], FOREMAN)
+    worker = c.box(40, 120, [("the worker", "title"), ("finishes the change and sends", "body"), ("each scenario, the diff, its tests", "body")], FOREMAN)
     rx = right(worker) + 50
     names = ["verifier: scenario 1", "verifier: scenario 2", "verifier: scenario 3", "verifier: scenario 4"]
     revs = []
@@ -199,16 +199,16 @@ def review():
         revs.append(b); y = bottom(b) + 8
     sec = c.box(rx, y, [("security reviewer", "body")], RED, min_w=170, pad=10)
     revs.append(sec); y = bottom(sec) + 10
-    note = c.box(rx, y, [("each one tries to make every claim false:", "body"), ("no author's notes, no editing, no network", "body")], OUTBOX, pad=10)
+    note = c.box(rx, y, [("each one tries to make each Then false, and checks its test;", "body"), ("no author's notes, no editing, no network", "body")], OUTBOX, pad=10)
     c.arrow(right(worker), worker[1] + 40, revs[1][0] - 2, worker[1] + 40)
 
     jx = right(revs[0]) + 70
-    judge = c.box(jx, 150, [("the judge", "title"), ("reads the code along each false claim's path,", "body"), ("nothing from the worker,", "body"), ("and places it; that is final for the worker;", "body"), ("an unsettled security finding", "body"), ("goes to you", "body")], JUDGE)
+    judge = c.box(jx, 150, [("the judge", "title"), ("reads the code along each finding's path,", "body"), ("nothing from the worker,", "body"), ("and places it; that is final for the worker;", "body"), ("an unsettled security finding", "body"), ("goes to you", "body")], JUDGE)
     c.arrow(right(revs[2]), revs[2][1] + 18, judge[0] - 2, revs[2][1] + 18)
-    c.text((right(revs[2]) + judge[0]) / 2, revs[2][1] + 8, "false claims", size=12, anchor="middle")
+    c.text((right(revs[2]) + judge[0]) / 2, revs[2][1] + 8, "findings", size=12, anchor="middle")
 
     ox = right(judge) + 60
-    fix = c.box(ox, 90, [("the fix list", "title"), ("a Then is false, something broke, or words", "body"), ("a person reads are wrong; a file and a line", "body")], GOOD)
+    fix = c.box(ox, 90, [("the fix list", "title"), ("a Then is false or no test proves it,", "body"), ("something broke, or words a person reads", "body"), ("are wrong; a file and a line", "body")], GOOD)
     new = c.box(ox, bottom(fix) + 24, [("extras", "title"), ("real, but not this change's to fix: the worker", "body"), ("brings you what scores 8 or higher, and you answer", "body"), ("each: fix now, fix later, or proceed", "body")], INK)
     out = c.box(ox, bottom(new) + 24, [("thrown out", "title"), ("does not hold, or is noise;", "body"), ("gone for good", "body")], OUTBOX)
     c.arrow(right(judge), judge[1] + 30, fix[0] - 2, fix[1] + fix[3] / 2, color=GOOD["stroke"])

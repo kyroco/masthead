@@ -472,7 +472,7 @@ print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permiss
       END { if (!seen) print "missing"; else if (seen) print "empty" }' | head -1)"
     case "$claims_state" in
       yes) ;;
-      *) reasons="Verification brief rule: a verifier is told what it must prove or break, never just handed a diff, and the check reads one exact form: $CLAIMS_FORM. List under it the scenario's Then lines, what the author claims works, and every sentence a customer reads that the change adds or edits (for the security reviewer, the repository's security conventions; for a plan, the plan's lines), one bullet each. Then retry." ;;
+      *) reasons="Verification brief rule: a verifier is told what it must confirm, never just handed a diff, and the check reads one exact form: $CLAIMS_FORM. List under it the scenario's Then lines and every sentence a customer reads that the change adds or edits, and no claim of your own (for the security reviewer, the repository's security conventions; for a plan, the plan's lines), one bullet each. Then retry." ;;
     esac
 
     # The round cap, on a verifier's brief only. A round is the verifier's dispatch: the security reviewer sent beside it is neither counted nor capped, and no other agent's row counts. The row is written before the agent runs, so a verifier that died or was declined has spent its round. The dispatch log decides how many rounds this session has had on this branch; the number in the brief is for the log.

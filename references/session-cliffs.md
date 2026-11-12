@@ -13,8 +13,10 @@ sandbox, and hooks still decide whether an action may run.
 
 **Reading a test result at all.** A green count proves nothing about which tests
 ran. A red run naming tests proves they did. Read the output, not the exit code,
-and check removals as well as presence; a green run on a dirty or mutated tree
-proves nothing about the intended tree. More ways a run lies about itself:
+and check removals as well as presence; a green run on a dirty tree
+proves nothing about the intended tree. The proof a test works is that it
+failed before the change and passes after. Nothing breaks code on purpose to
+prove a test, not once and not on every run. More ways a run lies about itself:
 
 - An edit that changes line count moves the test, so a line-numbered selection
   matches nothing and prints "All tests have been excluded. Result: 0 tests" with
@@ -64,8 +66,8 @@ next bold lead, so a bold opener here silently truncates the injection. -->
     git checkout -- <dir>          reverts every file under it
     git checkout HEAD -- <file>    destroys your own uncommitted work
 
-To undo a mutation, restore your exact edit with an Edit call, or copy the file
-to the scratchpad first and restore from the copy. Commit before mutating, so
+To undo an edit of your own, reverse it with an Edit call, or copy the file
+to the scratchpad first and restore from the copy. Commit first, so
 HEAD is where your work is.
 
 **Opening a PR.** Every change reaches main through one reviewed PR, in this
@@ -73,13 +75,19 @@ order. The steps live here and nowhere else; a repo supplies only its own facts
 (its pre-push check, its changelog format) in its
 `CLAUDE.md` and `docs/conventions/`.
 
-1. Build on a branch and commit. Keep two lists: what you claim works, and what
-   you did not prove. Every verifier gets both.
+1. Build on a branch and commit. A bug gets its test first: the failing
+   test in a commit of its own, then the fix. Keep one list: what you did
+   not prove. Every verifier gets it.
 2. Send the first verification of the finished diff in one message, so they
    run blind and at the same time: one `verifier` per scenario, given the
    scenario, the decision-record lines it rests on, the README's opening
    paragraph, the mockup page the scenario rests on where there is one, the
-   diff and both lists;
+   diff, the test that proves each Then, the two commits of a bug fix where
+   there is one, and your did-not-prove list. A verifier answers two
+   questions: is each Then true in every state production can reach, with a
+   test that really proves it and passes; and, for a bug fix, was the test
+   written first and did it fail before the fix. It is not a general review
+   of the code. Its claims are the scenario's Then lines and nothing you add;
    where the diff adds or edits text a customer reads (screen text, a refusal
    sentence, the site's docs, the changelog), every sentence of it is a claim
    of the scenario it belongs to. Add the `security-reviewer` when
