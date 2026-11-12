@@ -892,9 +892,9 @@ says  references/dispatch-brief.md "Nothing enforces this"
 never references/dispatch-brief.md "ensure-substrates"
 says  references/session-cliffs.md "lists as not proven here"
 # Round 1 fix F1: the network hook already refuses two of the copy commands for two of the helpers, and the text says so.
-says  agents/verifier.md "except that the network hook refuses \`git clone\` and \`rsync\`"
-says  agents/security-reviewer.md "except that the network hook refuses \`git clone\` and \`rsync\`"
-says  references/dispatch-brief.md "except that the network hook refuses a verifier's or a security reviewer's \`git clone\` and \`rsync\`"
+says  agents/verifier.md "except that the network hook, while it is on and the machine has jq, refuses \`git clone\` and \`rsync\`"
+says  agents/security-reviewer.md "except that the network hook, while it is on and the machine has jq, refuses \`git clone\` and \`rsync\`"
+says  references/dispatch-brief.md "except that the network hook, while it is on and the machine has jq, refuses a verifier's or a security reviewer's \`git clone\` and \`rsync\`"
 never references/dispatch-brief.md "no hook checks it"
 # Round 1 fix F2: no run takes the change out, so a claim that needed a private copy is settled by nobody and is listed as not proven.
 says  references/session-cliffs.md "This run settles each claim the verdict lists as not proven here for want of a database"
