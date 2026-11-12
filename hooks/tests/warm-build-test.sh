@@ -25,10 +25,19 @@ echo a > "$d/a.txt"
 
 warm() { ( cd "$1" && bash "$SRC" "${@:2}" ); }
 
+# Off macOS, cloning needs a disk that can clone files (ext4 cannot). Where it
+# cannot, clone must exit 3 and copy nothing, and the checks of what a clone
+# holds are skipped.
+CAN=1
+if [ "$(uname)" != Darwin ]; then
+  echo x > "$T/probe"; cp --reflink=always "$T/probe" "$T/probe.c" 2>/dev/null || CAN=0
+fi
+can() { [ "$CAN" = 1 ]; }
+
 # 1. No command named: the foreman builds nothing and says workers build cold.
 out="$(warm "$d" build 2>&1)"; rc=$?
 [ "$rc" -eq 3 ] && ok || bad "no PROJECT_WARM_BUILD should exit 3, got $rc: $out"
-ls "$d/.claude/worktrees" 2>/dev/null | grep -q masthead-warm && bad "a warm tree was made with no command" || ok
+[ -n "$(find "$d/.claude/worktrees" -maxdepth 1 -name "masthead-warm*" 2>/dev/null)" ] && bad "a warm tree was made with no command" || ok
 
 # 2. A command named: one warm tree at origin/main, built, marked ready, its output in a log.
 printf '{"env": {"PROJECT_WARM_BUILD": "mkdir -p build cache && echo built >> build/out && echo c > cache/c && echo ran >> %s/runs"}}\n' "$T" > "$d/.claude/settings.json"
@@ -49,9 +58,14 @@ w1b="$(warm "$d" build 2>/dev/null)"
 ( cd "$d" && g worktree add -q --detach "$d/.claude/worktrees/w1" HEAD ) >/dev/null 2>&1
 wt="$d/.claude/worktrees/w1"
 out="$(warm "$wt" clone "$w1" 2>&1)"; rc=$?
-[ "$rc" -eq 0 ] && ok || bad "clone should pass, got $rc: $out"
-[ "$(cat "$wt/build/out" 2>/dev/null)" = built ] && ok || bad "build/ was not cloned"
-[ -f "$wt/cache/c" ] && ok || bad "cache/ was not cloned"
+if can; then
+  [ "$rc" -eq 0 ] && ok || bad "clone should pass, got $rc: $out"
+  [ "$(cat "$wt/build/out" 2>/dev/null)" = built ] && ok || bad "build/ was not cloned"
+  [ -f "$wt/cache/c" ] && ok || bad "cache/ was not cloned"
+else
+  [ "$rc" -eq 3 ] && ok || bad "a disk that cannot clone should exit 3, got $rc: $out"
+  [ ! -e "$wt/build" ] && ok || bad "a disk that cannot clone got a full copy"
+fi
 [ -z "$(git -C "$wt" status --porcelain)" ] && ok || bad "the clone left the worktree dirty"
 
 # 5. A path the worktree already has is kept, never overwritten.
@@ -60,14 +74,14 @@ wt2="$d/.claude/worktrees/w2"
 mkdir -p "$wt2/build" && echo mine > "$wt2/build/out"
 warm "$wt2" clone "$w1" >/dev/null 2>&1
 [ "$(cat "$wt2/build/out")" = mine ] && ok || bad "a path the worktree already had was overwritten"
-[ -f "$wt2/cache/c" ] && ok || bad "the other paths should still be cloned"
+can && { [ -f "$wt2/cache/c" ] && ok || bad "the other paths should still be cloned"; }
 
 # 6. PROJECT_WARM_PATHS narrows what is cloned.
 printf '{"env": {"PROJECT_WARM_BUILD": "mkdir -p build cache && echo built >> build/out && echo c > cache/c && echo ran >> %s/runs", "PROJECT_WARM_PATHS": "build"}}\n' "$T" > "$d/.claude/settings.json"
 ( cd "$d" && g worktree add -q --detach "$d/.claude/worktrees/w3" HEAD ) >/dev/null 2>&1
 wt3="$d/.claude/worktrees/w3"
 warm "$wt3" clone "$w1" >/dev/null 2>&1
-[ -f "$wt3/build/out" ] && ok || bad "a named path was not cloned"
+can && { [ -f "$wt3/build/out" ] && ok || bad "a named path was not cloned"; }
 [ ! -e "$wt3/cache" ] && ok || bad "a path not named was cloned"
 
 # 7. A tree with no ready marker is not cloned: the worker builds cold.
@@ -89,13 +103,14 @@ mkdir -p "$w1/.claude" && echo '{}' > "$w1/.claude/settings.local.json"
 printf '{"env": {"PROJECT_WARM_BUILD": "mkdir -p build cache && echo built >> build/out && echo c > cache/c && echo ran >> %s/runs"}}\n' "$T" > "$d/.claude/settings.json"
 warm "$d/.claude/worktrees/w4" clone "$w1" >/dev/null 2>&1
 [ ! -e "$d/.claude/worktrees/w4/.claude/settings.local.json" ] && ok || bad "a file under .claude/ was cloned"
-[ -f "$d/.claude/worktrees/w4/build/out" ] && ok || bad "build/ should be cloned beside the skipped .claude file"
+can && { [ -f "$d/.claude/worktrees/w4/build/out" ] && ok || bad "build/ should be cloned beside the skipped .claude file"; }
 
 # 10. Main moves: a new tree, seeded from the last one, so the command finds the old output.
 echo b > "$d/a.txt"; ( cd "$d" && g commit -qam two && g push -q origin HEAD:main ) >/dev/null 2>&1
 w2="$(warm "$d" build 2>/dev/null)"; rc=$?
 [ "$rc" -eq 0 ] && [ "$w2" != "$w1" ] && ok || bad "a moved main should make a new tree, got $rc $w2"
-[ "$(wc -l < "$w2/build/out" | tr -d ' ')" = 2 ] && ok || bad "the new tree was not seeded from the last one"
+seeded=2; can || seeded=1
+[ "$(wc -l < "$w2/build/out" | tr -d ' ')" = "$seeded" ] && ok || bad "the new tree should hold $seeded build lines (seeded only where the disk can clone)"
 [ -d "$w1" ] && ok || bad "the previous tree should be kept while workers may still clone it"
 
 # 11. A third tree removes the oldest, keeping two.
@@ -111,12 +126,12 @@ printf '{"env": {"PROJECT_WARM_BUILD": "echo broken; exit 7"}}\n' > "$d/.claude/
 out="$(warm "$d" build 2>&1)"; rc=$?
 [ "$rc" -eq 1 ] && ok || bad "a failing command should exit 1, got $rc"
 printf '%s' "$out" | grep -q broken && ok || bad "a failure should show the log's last lines"
-ls "$d/.claude/worktrees/" | grep -q "masthead-warm-$(git -C "$d" rev-parse --short=12 origin/main).ready" && bad "a failed build was marked ready" || ok
+[ -e "$d/.claude/worktrees/masthead-warm-$(git -C "$d" rev-parse --short=12 origin/main).ready" ] && bad "a failed build was marked ready" || ok
 
 # 13. end removes every warm tree.
 warm "$d" end >/dev/null 2>&1
-ls "$d/.claude/worktrees/" | grep -q masthead-warm && bad "end left a warm tree" || ok
+[ -n "$(find "$d/.claude/worktrees" -maxdepth 1 -name "masthead-warm*")" ] && bad "end left a warm tree" || ok
 git -C "$d" worktree list | grep -q masthead-warm && bad "git still lists a warm tree after end" || ok
 
-echo "$pass passed, $fail failed"
+if can; then echo "$pass passed, $fail failed"; else echo "$pass passed, $fail failed; the checks of cloned content were skipped, this disk cannot clone files"; fi
 [ "$fail" -eq 0 ]

@@ -24,8 +24,8 @@
 #
 # Exit 0: done. Exit 3: nothing to use, so the worker builds cold as before:
 # no command named, the tree is not ready, it belongs to another repository,
-# or it is on another disk, where cp -c would silently fall back to a full
-# copy. Exit 1: the warm-up command failed; the log's last lines are printed.
+# it is on another disk, where cp -c would silently fall back to a full copy,
+# or (off macOS) the disk cannot clone files at all. Exit 1: the warm-up command failed; the log's last lines are printed.
 set -uo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
@@ -43,6 +43,19 @@ warm_dir="$main/.claude/worktrees"
 fact() { CLAUDE_PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$top}" python3 "$fact_py" --root "$top" "$1" 2>/dev/null; }
 
 device() { python3 -c 'import os,sys; print(os.stat(sys.argv[1]).st_dev)' "$1"; }
+
+# Whether folder $1 can hold a copy-on-write clone. On macOS cp -c never
+# fails (it falls back to a full copy), so the same-disk check is the guard
+# there. Elsewhere, try cp --reflink=always on a small file: a disk that cannot
+# clone (ext4, for one) refuses it.
+can_clone() {
+  [ "$(uname)" = Darwin ] && return 0
+  local probe="$1/.masthead-clone-probe.$$" rc
+  echo probe > "$probe" 2>/dev/null || return 1
+  cp --reflink=always "$probe" "$probe.c" 2>/dev/null; rc=$?
+  rm -f "$probe" "$probe.c"
+  return $rc
+}
 
 # Clone build output from tree $1 into tree $2.
 clone_into() {
@@ -88,7 +101,7 @@ build)
   git -C "$main" worktree prune
   git -C "$main" worktree add -q --detach "$tree" "$sha" >/dev/null 2>&1 || { echo "could not make $tree" >&2; exit 1; }
   last="$(ls -t "$warm_dir"/masthead-warm-*.ready 2>/dev/null | head -1)"
-  [ -n "$last" ] && [ -d "${last%.ready}" ] && clone_into "${last%.ready}" "$tree" > "$tree.log"
+  [ -n "$last" ] && [ -d "${last%.ready}" ] && can_clone "$tree" && clone_into "${last%.ready}" "$tree" > "$tree.log"
   if ! ( cd "$tree" && bash -c "$cmd" ) >> "$tree.log" 2>&1; then
     echo "the warm-up command failed; workers build cold. Last lines of $tree.log:" >&2
     tail -20 "$tree.log" >&2
@@ -116,6 +129,10 @@ clone)
   fi
   if [ "$(device "$from")" != "$(device "$top")" ]; then
     echo "$from is on another disk, where a clone would be a full copy; build cold"
+    exit 3
+  fi
+  if ! can_clone "$top"; then
+    echo "this disk cannot clone files, so a copy would cost the full size; build cold"
     exit 3
   fi
   clone_into "$from" "$top"
