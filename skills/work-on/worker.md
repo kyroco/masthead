@@ -25,6 +25,22 @@ their input.
 
 Work in a worktree named after the issue, so #1418 is `1418-issue`.
 
+When your foreman's prompt names a warm build ("Warm build: <tree path>"),
+clone it into your worktree now, from the worktree's top folder, before any
+command that fetches or builds:
+
+    ${CLAUDE_PLUGIN_ROOT}/skills/work-on/warm-build.sh clone <tree path>
+
+It clones the foreman's built output (on Kyroco, the dependencies, `_build`
+and the Rust `target` folders) with an APFS clone, which takes a few seconds
+and no extra disk until a file changes, and keeps anything your worktree
+already has. Your first build then compiles only your own code and what
+differs from the warm tree. Exit 3 says why it cloned nothing (the tree is
+not ready, belongs to another repository, or is on another disk, where a
+clone would be a full copy): build cold, as you would with no warm build.
+Never clone a build from the main checkout or from another worker's
+worktree: only the tree your foreman names.
+
 ## 2. Understand what you are building
 
 Read the issue and every comment, since answers arrive as comments, and read

@@ -12,7 +12,10 @@ the `env` block of its own `.claude/settings.json`, and
 `PROJECT_ELIXIR_ROOT`, `PROJECT_TOOLCHAIN_ENV`, `PROJECT_PUSH_CHECK` and
 `PROJECT_STATE_DIR` (the folder the workflow keeps its per-checkout state in,
 the scope file, review findings and lane locks: `.claude/state` when the repo
-states none). A repo that states none still
+states none), and `PROJECT_WARM_BUILD` and `PROJECT_WARM_PATHS` (the command a
+foreman runs once to build the repo, and the paths each worker clones from
+that build: `skills/work-on/warm-build.sh`, described in the foreman's **Warm
+up the build**). A repo that states none still
 gets every gate; the ones that need a fact look for it or stand aside. Facts are
 read only from the session's own repository (its folder and that repository's
 other worktrees): a fact names a file to source or a script to run, so a clone
