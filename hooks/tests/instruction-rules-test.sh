@@ -529,7 +529,7 @@ says  references/gate-catalog.md "runs only with the Korium memory install optio
 says  references/gate-catalog.md "since the previous Stop"
 never references/gate-catalog.md "since the user last spoke"
 says  references/gate-catalog.md "with the Korium memory option on, prints"
-says  references/gate-catalog.md "or a scratch copy under"
+says  references/gate-catalog.md "or a scratch file under"
 for doc in docs/explainer.html docs/images/review.svg docs/images/workflow.svg; do
   never "$doc" "the same nine steps"
 done
@@ -852,5 +852,64 @@ says  "$F" "claude --bg --model opus --effort <level> --name \"<n>-issue\" \"/wo
 
 # Review S1-pagination: every page of issues and comments is read.
 says  "$F" "while the answer says \`hasNextPage\` true, call again with its \`cursor\` until no page is left"
+
+# Review helpers start no database and no container, copy no code tree and
+# compile nothing. Robert's decisions on 2026-11-11, word for word: "Yes, bar
+# them", then "Yes, bar that too", then "ship text only": the rules are stated
+# to each helper and no hook enforces them, so no sentence may say one does.
+for helper in agents/verifier.md agents/security-reviewer.md agents/adjudicator.md; do
+  says  "$helper" "never start, restart or migrate a database, a cache such as Valkey, Docker, Colima or any container"
+  says  "$helper" "never source or run a script the repo uses to bring one up"
+  says  "$helper" "never run a test that needs one"
+  says  "$helper" "never copy, clone, archive or check out the repository, or a large part of it"
+  says  "$helper" "never compile"
+  says  "$helper" "No hook enforces"
+  never "$helper" "throwaway worktree"
+  never "$helper" "bash-scope-reviewer.sh\` refuses"
+  never "$helper" "PROJECT_SUBSTRATE_SCRIPTS"
+  never "$helper" "ensure-substrates"
+done
+says  agents/verifier.md "## What you never run"
+says  agents/verifier.md "You read the code where it is, in the worker's own tree"
+says  agents/verifier.md "no \`mix compile\`, \`mix deps.get\`, \`mix deps.compile\`, \`swift build\` or \`cargo build\`"
+says  agents/verifier.md "run the tests that need no database"
+says  agents/verifier.md "when that changes no tracked file"
+says  agents/verifier.md "A small file of your own (a probe script, a test file)"
+says  agents/verifier.md "Two kinds of claim you answer a third way"
+says  agents/verifier.md "not proven here, needs the database run"
+says  agents/verifier.md "a planted fault in a private copy"
+says  agents/verifier.md "When only a run of the tests without the change could show that, it is not proven here"
+says  agents/security-reviewer.md "as the verifier's \"Where to run a test\" says"
+never agents/security-reviewer.md "Running a claim"
+says  agents/security-reviewer.md "not proven here, needs the database run"
+says  agents/security-reviewer.md "are the two exceptions"
+says  agents/adjudicator.md "**Not proven here**"
+says  agents/adjudicator.md "is not a finding and is never thrown out"
+says  agents/adjudicator.md "a database or a private copy"
+says  references/dispatch-brief.md "A review helper starts no database and copies no code tree"
+says  references/dispatch-brief.md "never ask a helper to run a database test or to prove a claim by breaking the code in a copy"
+says  references/dispatch-brief.md "Nothing enforces this"
+never references/dispatch-brief.md "ensure-substrates"
+says  references/session-cliffs.md "lists as not proven here"
+# Round 1 fix F1: the network hook already refuses two of the copy commands for two of the helpers, and the text says so.
+says  agents/verifier.md "except that the network hook, while it is on and the machine has jq, refuses \`git clone\` and \`rsync\`"
+says  agents/security-reviewer.md "except that the network hook, while it is on and the machine has jq, refuses \`git clone\` and \`rsync\`"
+says  references/dispatch-brief.md "except that the network hook, while it is on and the machine has jq, refuses a verifier's or a security reviewer's \`git clone\` and \`rsync\`"
+never references/dispatch-brief.md "no hook checks it"
+# Round 1 fix F2: no run takes the change out, so a claim that needed a private copy is settled by nobody and is listed as not proven.
+says  references/session-cliffs.md "This run settles each claim the verdict lists as not proven here for want of a database"
+says  references/session-cliffs.md "every claim that needed a private copy"
+says  references/dispatch-brief.md "no run settles that one, so it goes on your did-not-prove list"
+says  agents/verifier.md "No run settles the second"
+never agents/verifier.md "Say with each what the worker's run"
+never agents/security-reviewer.md "each with what the worker's run has to show"
+says  hooks/review-write-fence.py "never a copy of the tree"
+never hooks/review-write-fence.py "make a throwaway worktree"
+says  hooks/bash-scope-reviewer.sh 'REVIEWER_AGENTS="verifier|security-reviewer"'
+never hooks/bash-scope-reviewer.sh "DATABASE_BARRED_AGENTS"
+for doc in README.md docs/explainer.template.html docs/explainer.html references/gate-catalog.md; do
+  never "$doc" "a scratch copy under"
+  never "$doc" "PROJECT_SUBSTRATE_SCRIPTS"
+done
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]

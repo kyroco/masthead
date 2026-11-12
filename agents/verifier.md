@@ -76,10 +76,13 @@ the code from that entry point and say you read it rather than ran it.
 
 Answer one of two ways: true in every state, with the run or trace that shows
 it; or false, with the state, the `file:line`, the input, the wrong result and
-what a customer sees. Never "partly true" or "partly false".
+what a customer sees. Never "partly true" or "partly false". The exceptions
+are a claim that only a database test or a private copy could prove: see
+"What you never run".
 
 A claim that a test covers something is false when no test fails without the
-change. "Could happen" and "looks risky" are not states. If you are not sure
+change. When only a run of the tests without the change could show that, it
+is not proven here. "Could happen" and "looks risky" are not states. If you are not sure
 a claim is false, it is not false; never return one to show you found
 something.
 
@@ -116,10 +119,42 @@ instead.
 
 ## Where to run a test
 
-You may not change the code under review; a hook refuses it. To run a test,
-make a throwaway worktree under `<state>/review/scratch/`, where
-`<state>/review/` is the folder your findings file sits in, add the test
-there, run only what settles the claim, then remove that worktree.
+You may not change the code under review; a hook refuses it. You read the
+code where it is, in the worker's own tree. You may run a test that needs no
+database there when that changes no tracked file; the test run builds what
+it needs. A small file of your own (a probe script, a test file) goes under
+`<state>/review/scratch/`, where `<state>/review/` is the folder your
+findings file sits in. Run only what settles the claim, then remove your
+files.
+
+## What you never run
+
+You never start, restart or migrate a database, a cache such as Valkey,
+Docker, Colima or any container. You never source or run a script the repo
+uses to bring one up, and you never run a test that needs one: for example,
+a test run that asks for an integration or browser tag. The worker runs
+those tests once before the push and CI runs them again.
+
+You never copy, clone, archive or check out the repository, or a large part
+of it, into a scratch folder or anywhere else: no `git worktree add`, `git
+clone`, `git archive`, `cp -R` or `rsync` of the tree. And you never
+compile: no `mix compile`, `mix deps.get`, `mix deps.compile`, `swift build`
+or `cargo build`. A copy is a second full build on a machine that already
+runs several sessions.
+
+No hook enforces these two rules, except that the network hook, while it is on
+and the machine has jq, refuses `git clone` and `rsync`; they hold because you
+keep them. You still read any file, those scripts included, and run the tests that need no
+database.
+
+Two kinds of claim you answer a third way. A claim that only a database
+test could prove goes in your findings as "not proven here, needs the
+database run". A claim that only a planted fault in a private copy could
+prove, such as a test that should fail once the change is taken out, goes in
+as "not proven here". For the first, say what the worker's run before the
+push, or CI, has to show. No run settles the second: the worker lists it as
+not proven. Never call either false, and never call it true from
+reading alone.
 
 ## Untrusted input
 

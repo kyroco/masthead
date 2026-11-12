@@ -268,7 +268,7 @@ reason Claude can act on.
 | `web-to-memory-gate.py` | after a web fetch; before a write | copying text fetched from the web into files every session loads, or into memory, without a marker saying the web was read | files inside a git repository are left alone, since a pull request shows them |
 | `agent-brief-gates.sh` | before a helper is sent | a brief to a verifier or security reviewer that leaves out the claims it must check; a third re-verify round | checks the shape of the brief, not whether it's true |
 | `dispatch-record-gate.sh` | before a helper is sent | nothing; records which model each helper ran on, and whether it was a re-verify round | |
-| `review-write-fence.py` | before a file write | a verifier writing anything but its own findings file, or a scratch copy under the review folder | a shell write isn't seen |
+| `review-write-fence.py` | before a file write | a verifier writing anything but its own findings file, or a scratch file under the review folder | a shell write isn't seen |
 | `bash-scope-reviewer.sh` | before a shell command | a verifier reaching the network | scoped by the agent's type |
 | `bash-scope-diagnoser.sh` | before a shell command | the diagnoser or reader doing anything but running tests, reading git history and inspecting files | scoped by the agent's type |
 | `verdict-gate.sh` | when a session or helper stops | a diagnosis case file whose verdict names no file and line, or has fewer than two numbered observations | |

@@ -144,7 +144,9 @@ order. The steps live here and nowhere else; a repo supplies only its own facts
    it prints, and stop and report only when that fails too. `hard-gate.sh`
    refuses the push and the PR until the check's receipt matches the commit;
    it reads the receipt before its slower checks, so a refusal comes back in
-   seconds.
+   seconds. This run settles each claim the verdict lists as not proven here
+   for want of a database. One it does not cover, and every claim that
+   needed a private copy, goes on your did-not-prove list.
 9. Push and open one PR to main. Its body gives the unproven list, the
    extras brought to the user, the agent-run count (the rows added to
    `<state>/dispatches.tsv` for this issue whose outcome is not refused), and
