@@ -78,12 +78,14 @@ brief's `Claims:` list holds its Then lines. For each one:
   output, not the exit code, and see the test you named among those that
   ran. A test that fails, or does not run, is a no.
 
-Whether the test would fail with the behavior missing, you judge by reading
-the test and the code it reaches, never by taking the change out or planting
-a fault. The proof a test works is that it failed before the change and
-passes after. Where the commits show the test came before the code, say so.
-When only a run of the tests without the change could show that, it is not
-proven here.
+Whether the test would fail with the behavior missing, you judge from what
+the test checks and from the commits, never by taking the change out or
+planting a fault. The proof a test works is that it failed before the change
+and passes after: where the commits show the test came before the code that
+makes it pass, say so. A test that plainly checks the Then itself, through a
+real entry point, is a yes. One you have read and still cannot tell about
+is not a yes from reading alone: when only a run of the tests without the
+change could show that, it is not proven here, as "What you never run" says.
 
 When the change adds or edits text a person reads (for example a screen, a
 refusal or error message, an email, the changelog, the docs), your brief
@@ -106,8 +108,9 @@ The answer is yes when all three of these hold:
 - the test in that first commit is the test that proves the Then now, not
   one made easier to pass later;
 - the code as it stood at that first commit could not pass it. Read that
-  code with `git show <commit>:<path>`, and say you read it rather than ran
-  it.
+  code with `git show <commit>:<path>`. Where it plainly shows the bug the
+  test checks for, say you read it rather than ran it. Where you cannot tell
+  from reading, it is not proven here, as "What you never run" says.
 
 It is a no when the test and the fix arrive in one commit, when the fix
 comes first, or when the fix commit changes the test so that it is easier to
