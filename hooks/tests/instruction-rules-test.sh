@@ -1005,5 +1005,14 @@ never agents/adjudicator.md "such as a sentence a person reads that is false or 
 for doc in README.md docs/explainer.template.html docs/explainer.html; do
   never "$doc" "it also checks that the sentence says what the code does"
 done
+# Round 1 fix 2: the verifier's new text and its older "What you never run"
+# text gave opposite rules for a test that should fail once the change is taken
+# out. One rule now: a yes rests on what the test plainly checks or on the
+# commits, and what is left is not proven here, never a yes from reading alone.
+says  agents/verifier.md "you judge from what the test checks and from the commits, never by taking the change out or planting a fault"
+says  agents/verifier.md "is not a yes from reading alone"
+says  agents/verifier.md 'it is not proven here, as "What you never run" says'
+never agents/verifier.md "you judge by reading the test and the code it reaches"
+says  agents/verifier.md "Where you cannot tell from reading, it is not proven here"
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
