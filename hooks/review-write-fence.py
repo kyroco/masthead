@@ -124,8 +124,8 @@ def check(payload, agent):
         deny(f"{agent} may write only {REVIEW_REL}/{WANT[agent]}, or anything under "
              f"{REVIEW_REL}/{SCRATCH}/, in the checkout under review, and this call writes "
              f"{path or '(no path)'}. A verifier never edits the code it judges or another verifier's "
-             f"file; to run a test against changed code, make a throwaway worktree under "
-             f"{REVIEW_REL}/{SCRATCH}/ and change that. If this is the file your dispatch names and it "
+             f"file; a small file of your own (a probe script, a test file) goes under "
+             f"{REVIEW_REL}/{SCRATCH}/, never a copy of the tree. If this is the file your dispatch names and it "
              "was still refused, put the findings in your final reply and say the write was refused.")
 
 

@@ -94,6 +94,17 @@ security conventions as its claims (its CLAUDE.md and `docs/conventions/`
 where it has them) and the findings file
 `<state>/review/findings-security-reviewer-<name>.json`.
 
+**A review helper starts no database and copies no code tree.** The
+verifier, the security reviewer and the adjudicator are each told never to
+start a database, a cache or a container, never to run a script that brings
+one up or a test that needs one, never to copy, clone, archive or check out
+the repository into a scratch folder, and never to compile. A helper reads
+the code where it is and may run a test that needs no database in your tree.
+So never ask a helper to run a database test or to prove a claim by breaking
+the code in a copy. A claim only that could prove comes back as "not proven
+here", and your one pre-push run, or CI, settles it. Nothing enforces this:
+it is in each helper's instructions and no hook checks it.
+
 ## The adjudicator's brief
 
 It gets the round and what it needs to judge it, and nothing of yours: no
