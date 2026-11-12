@@ -183,8 +183,8 @@ says  references/gate-catalog.md "when the repo names a \`PROJECT_PUSH_CHECK\` s
 says  references/gate-catalog.md "A repo that names no push check gets neither refusal"
 never references/gate-catalog.md "stops the gate there: it refuses a push that sends anything but HEAD"
 never references/session-cliffs.md "which is not plain English"
-says  README.md "it also checks that the sentence says what the code does"
-says  docs/explainer.template.html "it also checks that the sentence says what the code does"
+says  README.md "that sentence is a claim of the scenario and gets the same first question"
+says  docs/explainer.template.html "that sentence is a claim of the scenario and gets the same first question"
 never agents/verifier.md "plain English"
 says  scripts/diagrams.py "5. push check"
 
@@ -992,6 +992,18 @@ for doc in scripts/diagrams.py docs/images/review.svg docs/explainer.html; do
   never "$doc" "tries to make every claim false"
   never "$doc" "each false claim's path"
   says  "$doc" "each one answers two questions about the tests"
+done
+# Round 1 fix 1: a sentence a customer reads is a claim of its scenario and gets
+# the first question, so the verifier has two questions and no third job.
+says  agents/verifier.md "it gets the same first question"
+says  agents/verifier.md "A sentence no test shows to be true is a no"
+never agents/verifier.md "where none does, read the code and say you read it rather than ran it"
+says  references/dispatch-brief.md "a sentence no test shows to be true comes back as a no"
+says  agents/adjudicator.md "a test that checks something other than the Then or the sentence"
+says  agents/adjudicator.md "or no test that passes shows it"
+never agents/adjudicator.md "such as a sentence a person reads that is false or a security finding"
+for doc in README.md docs/explainer.template.html docs/explainer.html; do
+  never "$doc" "it also checks that the sentence says what the code does"
 done
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
