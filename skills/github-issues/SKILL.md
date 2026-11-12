@@ -148,10 +148,8 @@ the table above.
 - Labels: `Bug`, `Feature` or `Improvement` for the kind of work (an existing
   `bug` label serves as Bug), plus any topic label already in the repository.
 - A blocked-by link for a real sequence dependency, never for "this would be
-  tidier after that". The one exception marks shared work: a follow-up filed
-  from a PR's review is blocked by the issue whose review found it, and only
-  the user files one, by answering "fix later" to its line; no agent files an
-  issue from a review on its own.
+  tidier after that". No issue is filed from a PR's review: an extra that
+  scores 8 or more is fixed in that PR, and one under 8 is dropped.
   `gh api -X POST repos/<repo>/issues/<blocked>/dependencies/blocked_by -F issue_id=<blocker's id>`
   (the id is `gh api repos/<repo>/issues/<n> --jq .id`, not the number).
 - A sub-issue: `gh api -X POST repos/<repo>/issues/<parent>/sub_issues -F sub_issue_id=<child's id>`.

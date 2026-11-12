@@ -106,15 +106,11 @@ order. The steps live here and nowhere else; a repo supplies only its own facts
    not your view of any finding. It reads the code along
    each verifier's path, decides whether the finding holds, and places it:
    fix in this PR, or an extra. That placement is final for you and the
-   foreman. What it throws out is gone: it is not logged or filed. Judge its
-   extras as
-   the worker's "What done is" says: bring the user each item that scores 8
-   or higher, in plain words, through the foreman when there is one, and
-   drop the rest; fix none of them here and file none. The user answers
-   each: fix now (you fix it in
-   this PR, test first, as step 4 says), fix later (the foreman files one
-   issue for it, in the same milestone and blocked by this one), or proceed
-   (nothing). Its For the foreman section (a security finding it could not
+   foreman. What it throws out is gone: it is not logged or filed. Score its
+   extras as the worker's "What done is" says: one that scores 8 or more you
+   fix in this PR, test first when it is a bug, as step 4 says; one that
+   scores under 8 you drop, bringing it to no one and filing nothing. Its For
+   the foreman section (a security finding it could not
    settle) goes to the foreman unedited (to the user when there is none), who
    brings it to the user; the PR waits for that answer.
 4. Fix each finding on the adjudicator's fix list in this PR, test first,
@@ -156,7 +152,7 @@ order. The steps live here and nowhere else; a repo supplies only its own facts
    for want of a database. One it does not cover, and every claim that
    needed a private copy, goes on your did-not-prove list.
 9. Push and open one PR to main. Its body gives the unproven list, the
-   extras brought to the user, the agent-run count (the rows added to
+   extras fixed in it with their scores, the agent-run count (the rows added to
    `<state>/dispatches.tsv` for this issue whose outcome is not refused), and
    `Fixes #<issue>`, or `Fixes <key>`, such as `Fixes KOR-12`, when the
    issue lives in Linear. Never

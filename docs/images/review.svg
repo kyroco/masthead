@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1455" height="568" viewBox="0 0 1455 568" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="14">
-  <rect width="1455" height="568" fill="#ffffff"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="1426" height="568" viewBox="0 0 1426 568" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="14">
+  <rect width="1426" height="568" fill="#ffffff"/>
   <defs><marker id="m16a34a" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#16a34a"/></marker><marker id="m6366f1" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#6366f1"/></marker><marker id="m6b7280" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#6b7280"/></marker><marker id="md97706" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#d97706"/></marker><marker id="mdb2777" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#db2777"/></marker><marker id="mdc2626" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#dc2626"/></marker></defs>
   <text x="40" y="40" text-anchor="start" font-size="20" font-weight="600" fill="#1f2937">The verification: verifiers who read cold, and a judge that reads and places</text>
   <rect x="40" y="120" width="273" height="74" rx="10" fill="#eef2ff" stroke="#6366f1" stroke-width="1.5"/>
@@ -34,11 +34,11 @@
   <text x="1166" y="132" text-anchor="middle" font-size="12" fill="#166534">a Then is false or no test proves it,</text>
   <text x="1166" y="148" text-anchor="middle" font-size="12" fill="#166534">something broke, or words a person reads</text>
   <text x="1166" y="164" text-anchor="middle" font-size="12" fill="#166534">are wrong; a file and a line</text>
-  <rect x="1008" y="204" width="388" height="90" rx="10" fill="#f3f4f6" stroke="#9ca3af" stroke-width="1.5"/>
-  <text x="1202" y="230" text-anchor="middle" font-size="14" font-weight="600" fill="#374151">extras</text>
-  <text x="1202" y="246" text-anchor="middle" font-size="12" fill="#4b5563">real, but not this change's to fix: the worker</text>
-  <text x="1202" y="262" text-anchor="middle" font-size="12" fill="#4b5563">brings you what scores 8 or higher, and you answer</text>
-  <text x="1202" y="278" text-anchor="middle" font-size="12" fill="#4b5563">each: fix now, fix later, or proceed</text>
+  <rect x="1008" y="204" width="359" height="90" rx="10" fill="#f3f4f6" stroke="#9ca3af" stroke-width="1.5"/>
+  <text x="1187" y="230" text-anchor="middle" font-size="14" font-weight="600" fill="#374151">extras</text>
+  <text x="1187" y="246" text-anchor="middle" font-size="12" fill="#4b5563">real, but not this change's to fix: the worker</text>
+  <text x="1187" y="262" text-anchor="middle" font-size="12" fill="#4b5563">scores each; 8 or higher is fixed in this PR,</text>
+  <text x="1187" y="278" text-anchor="middle" font-size="12" fill="#4b5563">lower is dropped, and nothing is filed</text>
   <rect x="1008" y="318" width="222" height="74" rx="10" fill="#f9fafb" stroke="#d1d5db" stroke-width="1.5"/>
   <text x="1119" y="344" text-anchor="middle" font-size="14" font-weight="600" fill="#6b7280">thrown out</text>
   <text x="1119" y="360" text-anchor="middle" font-size="12" fill="#6b7280">does not hold, or is noise;</text>
@@ -49,6 +49,6 @@
   <rect x="531" y="422" width="489" height="56" rx="10" fill="#eef2ff" stroke="#6366f1" stroke-width="1.5"/>
   <text x="775" y="446" text-anchor="middle" font-size="12" fill="#4338ca">the worker fixes each item on the list, test first,</text>
   <text x="775" y="462" text-anchor="middle" font-size="12" fill="#4338ca">and only the claims the fix broke are re-verified, at most twice</text>
-  <path d="M 1324 110 L 1420 110 L 1420 508 L 176 508 L 176 196" fill="none" stroke="#6366f1" stroke-width="2" stroke-linejoin="round" marker-end="url(#m6366f1)"/>
+  <path d="M 1324 110 L 1391 110 L 1391 508 L 176 508 L 176 196" fill="none" stroke="#6366f1" stroke-width="2" stroke-linejoin="round" marker-end="url(#m6366f1)"/>
   <text x="40" y="548" text-anchor="start" font-size="13" fill="#4b5563">Then: the tests run on the final commit, and one pull request goes up.</text>
 </svg>

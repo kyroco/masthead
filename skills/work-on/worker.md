@@ -80,15 +80,14 @@ always git.
 Done is three things: every scenario in the issue has a test that passes, if your work involves UI then every UI element related to this issue is functional,
 the repo's pre-push check passes, and the PR is open. Then you stop.
 
-Reviews will always find more than the scenarios ask for. Judge each one the
-way the person would: who, using what this code builds, really runs into
-this, and would they care? Drop what you would not argue for to their face.
-Bring them the rest, in plain words, when the PR is ready: through your
-foreman, or yourself when they started you. Either way it is their call, not
-more work for this PR. Your decision to pass muster means a score of 8 and
-higher when scoring a problem between 1 and 10, where 1 is nope and 10 is if
-we don't do this, we will cause a catastrophic failure. Judge it on its own
-merit, even if it might contradict something written.
+Reviews will always find more than the scenarios ask for, and so will you:
+each such thing is an extra. Score each one from 1 to 10 the way the person
+would: who, using what this code builds, really runs into this, and would
+they care? 1 is nope, and 10 is if we don't do this, we will cause a
+catastrophic failure. Judge it on its own merit, even if it might contradict
+something written. An extra that scores 8 or more is fixed in this PR, test
+first when it is a bug. One that scores under 8 is dropped: you bring it to
+no one, not your foreman and not the person, and you file nothing.
 
 If the scenarios cannot all be done and proven in this session, split the
 issue as the github-issues skill says, remove the branch you made, set the
@@ -121,9 +120,10 @@ Once the PR is open, set the Status to In Review with `set-status.sh`.
 ## 7. Report
 
 Report one row per scenario: done or not, and the evidence (a command and
-its result, a file:line, or a PR check), with the PR number. Then the extras
-you are bringing, in plain words, and how many agents you ran since the
-count you noted in step 4. Dispatched, send it to your foreman.
+its result, a file:line, or a PR check), with the PR number. Then each extra
+you fixed, in plain words, with its score and its test; how many you dropped
+under 8, as a count; and how many agents you ran since the count you noted in
+step 4. Dispatched, send it to your foreman.
 
 ## A question
 

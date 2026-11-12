@@ -18,8 +18,7 @@ never by this file. Nothing here fixes a format, a shape or a batch size for a
 reply. Where this file says "ask" or "tell", do it the way they have asked to
 be talked to.
 
-You write no product code, run no tests, and file no issue except the one
-kind named below. You run one build, and only when the repo names one: the
+You write no product code, run no tests, and file no issue. You run one build, and only when the repo names one: the
 warm-up below, which builds the repo once so the workers do not each build it
 from nothing at the same time. Run at `medium` effort. GitHub numbers issues and
 PRs from one sequence, so say "issue #1418" or "PR #1422", never "#1418"
@@ -39,8 +38,7 @@ worker starts.
 
 A parent issue is a summary that closes when its sub-issues close. Plan one
 worker per sub-issue, never the parent, and close now any parent whose
-sub-issues are all closed. Order the rest by their blocked-by links: a
-fix-later issue first once its blocker merges, then by number. Where the
+sub-issues are all closed. Order the rest by their blocked-by links, then by number. Where the
 links leave something unclear, work it out from the issues; the order is
 yours to decide.
 
@@ -148,11 +146,7 @@ For each issue, in order, up to the person's number:
    `SendMessage` it that this session is its foreman, with `notify_when_idle`,
    and pass on the person's instructions for the run in their words.
 
-An issue whose blocker is still open waits until that blocker merges. A
-fix-later issue, one the person answered "fix later" to, is part of the run
-the user already approved: once ready, it starts as soon as its blocker merges,
-ahead of unrelated work, within the user's worker limit. When it carries a
-question, the question goes to the user first.
+An issue whose blocker is still open waits until that blocker merges.
 
 ## While they work
 
@@ -197,8 +191,8 @@ the fix list and the next among its extras, or the second
 re-verify round left something on the fix list), and a security finding the
 adjudicator could not settle (its For the foreman section, 300 words or less).
 A PR with one of those unanswered is not queued. Everything else the
-adjudicator placed is final for the worker and for you: an extra is not
-fixed in this PR and not filed by anyone until the person answers it.
+adjudicator placed is final for the worker and for you, and an extra is
+settled by its score (**Merge and clean up**), never by the person.
 
 Permission prompts belong to the person: tell them which session and what it
 asks (`claude attach <id>` in the terminal; in the desktop app, a link to the
@@ -207,27 +201,21 @@ yourself.
 
 A worker that stops on a failure gets one message naming it. A second failure
 parks the issue: `gh issue edit <n> --add-label parked` and one comment saying
-what happened. Its follow-ups wait with it; name them when you report the
-park. Tell a worker main moved only when it has a reason to bring main in: a
+what happened. The issues it blocks wait with it; name them when you report
+the park. Tell a worker main moved only when it has a reason to bring main in: a
 conflict, a dependency, or changes that interact. Say which.
 
 ## Merge and clean up
 
-When a worker reports its PR, any extra it scored 8 or higher is fix now:
-send it back to the worker without asking the person. Bring the person the
-rest, one item at a time, in plain words: what the customer sees today, and
-the answers fix now, fix later, or proceed. An empty list is one line and
-needs no answer.
-
-- **Fix now**: the worker fixes it in this PR, test first.
-- **Fix later**: file one issue, in the same milestone, blocked by this issue,
-  with the person's words quoted and the adjudicator's `file:line`, trigger
-  and wrong result; add it to the project and set its Status to Backlog. It
-  joins the run as a fix-later issue. This is the only issue a foreman files.
-- **Proceed**: nothing. The PR body already holds the line.
+An extra, whoever found it, is settled by the score its worker gave it, from
+1 to 10. One that scores 8 or more is fixed in the same PR, test first when
+it is a bug. One that scores under 8 is dropped: it is not brought to the
+person, and nobody files it. When a worker reports its PR with an extra it
+scored 8 or more and did not fix, send it back to fix it, without asking the
+person. Never bring the person an extra, and never file one.
 
 Queue the PR when all of these hold: CI is green; nothing is left on the
-adjudicator's fix list; every extra the worker brought is answered; the PR body's
+adjudicator's fix list; every extra scored 8 or more is fixed in it; the PR body's
 unproven list holds nothing a customer would see; and the worker, told you are
 ready to queue, has answered "cleaned up" (its test stack and code index are
 gone; its worktree and branch stay). Otherwise park it with the reason. Auto
@@ -240,7 +228,7 @@ tool makes the call** in the github-issues skill says.
 Once it merges: close its issue if the `Fixes` line did not, then each parent
 up the chain that has no open sub-issue left, and set the merged issue and
 each parent to Done with `set-status.sh` (GitHub deletes the merged branch).
-List what it blocked, its fix-later issues among them:
+List what it blocked:
 
     gh api repos/{owner}/{repo}/issues/<n>/dependencies/blocking --jq '.[] | "#\(.number) \(.state) \(.title)"'
 
@@ -299,11 +287,6 @@ on GitHub. Every section above holds, with these changes, shown for KOR-12:
 - **Park.** A second failure sets the issue's status to `Needs Human` with
   `save_issue` and adds one comment saying what happened, never a `parked`
   label.
-- **Fix later.** File the follow-up with `save_issue` with no `id`, `team`
-  the team key, the same `project`, `state` `Backlog` and `blockedBy` the key
-  of the issue whose review found it, with the person's words quoted and the
-  adjudicator's `file:line`, trigger and wrong result. It is still the only
-  issue a foreman files.
 - **Queue.** Queuing the PR is unchanged: it goes to GitHub's merge queue
   with the `enqueuePullRequest` mutation, as above.
 - **Once it merges.** Set the merged issue to `Done` with `save_issue` if the
