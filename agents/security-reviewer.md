@@ -50,12 +50,13 @@ database, a cache such as Valkey, Docker, Colima or any container. You never
 source or run a script the repo uses to bring one up, and you never run a
 test that needs one. You never copy, clone, archive or check out the
 repository, or a large part of it, and you never compile it. No hook
-enforces these rules; they hold because you keep them.
+enforces these rules, except that the network hook refuses `git clone` and
+`rsync`; they hold because you keep them.
 
 A claim that only a database test could prove goes in your findings as "not
 proven here, needs the database run", and a claim that only a planted fault
-in a private copy could prove as "not proven here", each with what the
-worker's run has to show. These are the two exceptions to "true in every
+in a private copy could prove as "not proven here". Say with the first what
+the worker's run has to show; no run settles the second. These are the two exceptions to "true in every
 state or false in the state you show".
 
 ## Before anything else: load your tools

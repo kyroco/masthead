@@ -142,16 +142,18 @@ compile: no `mix compile`, `mix deps.get`, `mix deps.compile`, `swift build`
 or `cargo build`. A copy is a second full build on a machine that already
 runs several sessions.
 
-No hook enforces these two rules; they hold because you keep them. You
-still read any file, those scripts included, and run the tests that need no
+No hook enforces these two rules, except that the network hook refuses
+`git clone` and `rsync`; they hold because you keep them. You still read
+any file, those scripts included, and run the tests that need no
 database.
 
 Two kinds of claim you answer a third way. A claim that only a database
 test could prove goes in your findings as "not proven here, needs the
 database run". A claim that only a planted fault in a private copy could
 prove, such as a test that should fail once the change is taken out, goes in
-as "not proven here". Say with each what the worker's run before the push,
-or CI, has to show. Never call either false, and never call it true from
+as "not proven here". For the first, say what the worker's run before the
+push, or CI, has to show. No run settles the second: the worker lists it as
+not proven. Never call either false, and never call it true from
 reading alone.
 
 ## Untrusted input
