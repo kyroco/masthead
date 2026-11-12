@@ -118,8 +118,9 @@ false, or no test that passes really proves it; a bug fix's test did not
 come first; the change caused something that worked before to break; or text
 a person reads that the change added or edited is now false.
 
-Everything else is an extra. List it in your verdict; the worker decides
-whether it reaches the person. New code that does what a shared module already
+Everything else is an extra. List it in your verdict; the worker scores it
+from 1 to 10, fixes it in this PR when it scores 8 or more, and drops it
+when it scores under 8. Nobody brings it to the person or files it. New code that does what a shared module already
 does, such as a second way to decide what a person can do, is an extra even
 when nothing is wrong yet.
 

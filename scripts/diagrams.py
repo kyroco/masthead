@@ -172,11 +172,11 @@ def workflow():
     c.text(mid(cols[0]), wy - 38, "one fresh session per issue, each in its own worktree", size=12, color=FOREMAN["sub"], anchor="middle")
     rx = right(cols[-1]) - 30
     c.path(f"M {rx:.0f} {wy:.0f} L {rx:.0f} {foreman[1] + foreman[3] / 2:.0f} L {right(foreman) + 2:.0f} {foreman[1] + foreman[3] / 2:.0f}", color=GREY, dash=True)
-    c.text(right(foreman) + 12, foreman[1] + foreman[3] / 2 - 8, "questions, extras and reports come back to the foreman", size=11, color=GREY)
+    c.text(right(foreman) + 12, foreman[1] + foreman[3] / 2 - 8, "questions and reports come back to the foreman", size=11, color=GREY)
 
     # merge bar
     my = bottom(cols[0]) + 40
-    bar = c.box(40, my, [("you answer the extras each worker brings; the foreman queues it, closes its issue, and gives that worker its next issue", "title"),
+    bar = c.box(40, my, [("the foreman queues each finished PR, closes its issue, and gives that worker its next issue", "title"),
                          ("the run ends when every issue is merged, parked or skipped, with one line per issue saying which", "body")], GOOD, min_w=total - 40, title_size=13)
     for b in cols:
         c.arrow(mid(b), bottom(b), mid(b), my - 2, color=GOOD["stroke"])
@@ -209,7 +209,7 @@ def review():
 
     ox = right(judge) + 60
     fix = c.box(ox, 90, [("the fix list", "title"), ("a Then is false or no test proves it,", "body"), ("something broke, or words a person reads", "body"), ("are wrong; a file and a line", "body")], GOOD)
-    new = c.box(ox, bottom(fix) + 24, [("extras", "title"), ("real, but not this change's to fix: the worker", "body"), ("brings you what scores 8 or higher, and you answer", "body"), ("each: fix now, fix later, or proceed", "body")], INK)
+    new = c.box(ox, bottom(fix) + 24, [("extras", "title"), ("real, but not this change's to fix: the worker", "body"), ("scores each; 8 or higher is fixed in this PR,", "body"), ("lower is dropped, and nothing is filed", "body")], INK)
     out = c.box(ox, bottom(new) + 24, [("thrown out", "title"), ("does not hold, or is noise;", "body"), ("gone for good", "body")], OUTBOX)
     c.arrow(right(judge), judge[1] + 30, fix[0] - 2, fix[1] + fix[3] / 2, color=GOOD["stroke"])
     c.arrow(right(judge), judge[1] + 50, new[0] - 2, new[1] + new[3] / 2)
