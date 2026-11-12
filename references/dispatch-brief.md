@@ -29,7 +29,11 @@ it, never for a gate.
 
 A brief to `verifier` passes the check the first time when it carries these,
 in this order. One verifier per scenario; it gets the scenario and nothing
-of your account of the change.
+of your account of the change. It answers two questions and no others: does
+a test exist that really proves this Given, When, Then, and does it pass
+(it would fail if the behavior were missing); and, for a bug fix, was the
+test written first and did it fail before the fix (the commit that adds the
+failing test comes before the commit that fixes the bug).
 
 ```
 read_only: true
@@ -48,12 +52,13 @@ the placeholder.
 Code outside the diff this depends on: <modules, files and functions it calls
 into or is called by>, or "self-contained".
 
-How it is proven, and its limit: <the tests, what they drive for real, and what
-is out of reach>.
+How it is proven, and its limit: <the test that proves each Then, what it
+drives for real, and what is out of reach>.
+Bug fix: <the commit that adds the failing test, then the commit that fixes
+the bug>, or "not a bug fix".
 
 Claims:
 - <each Then line of the scenario>
-- <each thing the author claims works>
 - <each sentence a customer reads that the diff adds or edits>
 Not proven: <list>.
 
@@ -61,6 +66,17 @@ Use code_locate with repo "<repo value>" and branch "<branch>" before
 reading code. Capture your verification with agent_capture and return its
 thought_id with your findings.
 ```
+
+The claims are the scenario's Then lines, and each sentence a customer
+reads that the diff adds or edits; leave that second bullet out when the
+diff has no such text. Add no claim of your own: nothing you think works
+beyond the scenario, no list of the cases you handled. A claim the scenario
+does not make sends the verifier looking past the scenario, and that is not
+its job. What it notices outside its two questions it does not follow up: it
+writes the judge one line, with the file and line, and moves on.
+
+The `Bug fix:` line lets the verifier answer its second question: it reads
+the two commits and checks that the test came first.
 
 The form is exact, on purpose: the check reads a line that is exactly
 `Claims:` at column zero, with no marker before it and nothing after the

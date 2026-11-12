@@ -10,9 +10,10 @@ just as much: a gate that refuses a grep for the trailer text, or a commit that
 merely discusses Claude in its body, gets switched off, and a gate that is off
 protects nothing.
 
-Set COMMIT_GATE=<path> to run the suite against a different copy of the hook.
-That is how the mutation proof works: mutate a copy, point the suite at it, and
-the deny rows must go red.
+Set COMMIT_GATE=<path> to run the suite against a different copy of the hook,
+such as the hook as it stood before a change. The proof a deny row works is
+that it failed against the hook before the change and passes after; nothing
+breaks the hook on purpose to prove a row.
 """
 import json
 import os
