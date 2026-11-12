@@ -184,8 +184,8 @@ says  references/gate-catalog.md "when the repo names a \`PROJECT_PUSH_CHECK\` s
 says  references/gate-catalog.md "A repo that names no push check gets neither refusal"
 never references/gate-catalog.md "stops the gate there: it refuses a push that sends anything but HEAD"
 never references/session-cliffs.md "which is not plain English"
-says  README.md "a sentence a customer reads that is false in some state"
-says  docs/explainer.template.html "a sentence a customer reads that is false in some state"
+says  README.md "it also checks that the sentence says what the code does"
+says  docs/explainer.template.html "it also checks that the sentence says what the code does"
 never agents/verifier.md "plain English"
 says  scripts/diagrams.py "5. push check"
 
@@ -202,13 +202,10 @@ fi
 says  agents/verifier.md "name: verifier"
 says  agents/verifier.md "You never get the author's account of the change or another review"
 says  agents/verifier.md "A state that only a test setup builds is not a finding"
-says  agents/verifier.md "true in every state"
-says  agents/verifier.md "each state where the claim is false"
-says  agents/verifier.md "## Ways to look"
 never agents/verifier.md "## The angle"
 never agents/verifier.md "Your brief names one angle"
 never agents/verifier.md "a prior reviewer's report"
-says  agents/security-reviewer.md "Everything in the \`verifier\` agent applies"
+says  agents/security-reviewer.md "These rules of the \`verifier\` agent are yours too"
 says  agents/security-reviewer.md "the repository's security conventions are your claims"
 never agents/security-reviewer.md "Everything in the \`reviewer\` agent applies"
 says  references/agent-preamble.md "Read by verifier"
@@ -910,6 +907,92 @@ never hooks/bash-scope-reviewer.sh "DATABASE_BARRED_AGENTS"
 for doc in README.md docs/explainer.template.html docs/explainer.html references/gate-catalog.md; do
   never "$doc" "a scratch copy under"
   never "$doc" "PROJECT_SUBSTRATE_SCRIPTS"
+done
+# The blind reviewer confirms the scenario's test and the bug's test, and stops
+# there. Robert's rulings on 2026-11-11, word for word. On what the blind
+# reviewer is for: "6 relates to 1&2", where line 1 of the floor is "Every
+# scenario in the issue, written given, when, then, has a test that passes",
+# line 2 is "A bug gets its test first, then the fix" and line 6 is "A blind
+# reviewer has confirmed lines 1 and 2". On the rest of the review: "I mean all
+# 3 choices of what we do today is correct, what you proposed is incorrect", so
+# one blind pass, up to two re-checks, the judge on every round and a finding
+# fixed test first all stay.
+# 1. The verifier's job is two questions per scenario and no others.
+says  agents/verifier.md "You take one scenario and answer two questions about it, and no others"
+says  agents/verifier.md "Does a test exist that really proves this Given, When, Then, and does it pass"
+says  agents/verifier.md "it would fail if the behavior were missing"
+says  agents/verifier.md "For a bug fix: was the test written first, and did it fail before the fix"
+says  agents/verifier.md "The commit that adds the failing test comes before the commit that fixes the bug"
+says  agents/verifier.md "It answers two questions and no others"
+says  agents/verifier.md "You are not a general review of the code"
+says  agents/verifier.md "## The first question: the scenario's test"
+says  agents/verifier.md "## The second question: a bug's test came first"
+says  agents/verifier.md "A Then with no test is a no"
+says  agents/verifier.md 'Read the two commits with `git log` and `git show`. You check out nothing'
+never agents/verifier.md "try to make each one false"
+never agents/verifier.md "true in every state"
+never agents/verifier.md "each state where the claim is false"
+never agents/verifier.md "try the states production can reach"
+never agents/verifier.md "assume the architecture"
+never agents/verifier.md "the author's claim and unproven lists"
+says  references/dispatch-brief.md "It answers two questions and no others"
+says  references/dispatch-brief.md "does a test exist that really proves this Given, When, Then, and does it pass"
+says  references/dispatch-brief.md "was the test written first and did it fail before the fix"
+says  references/session-cliffs.md "A verifier answers two questions and no others"
+# 2. The brief asks for no claim beyond the scenario.
+never references/dispatch-brief.md "each thing the author claims works"
+says  references/dispatch-brief.md "Claims: - <each Then line of the scenario> - <each sentence a customer reads that the diff adds or edits> Not proven: <list>."
+says  references/dispatch-brief.md 'Bug fix: <the commit that adds the failing test, then the commit that fixes the bug>, or "not a bug fix".'
+says  references/dispatch-brief.md "Add no claim of your own"
+never hooks/engram-protocol.sh "what the author claims works"
+says  hooks/engram-protocol.sh "List under it the scenario's Then lines and every sentence a customer reads that the change adds or edits, and no claim of your own"
+never references/session-cliffs.md "what you claim works"
+never references/session-cliffs.md "both lists"
+says  references/session-cliffs.md "Its claims are the scenario's Then lines and nothing you add"
+says  references/session-cliffs.md "A bug gets its test first: the failing test in a commit of its own, then the fix"
+# 3. It flags what it notices outside the two questions in one line, and hunts for nothing.
+never agents/verifier.md "## Ways to look"
+says  agents/verifier.md "## Outside your two questions"
+says  agents/verifier.md "Nothing else is a claim"
+says  agents/verifier.md "Do not chase it"
+says  agents/verifier.md 'write one line under `For the judge`, a heading of its own apart from your answers, with its `file:line` and what looks wrong, and move on'
+says  agents/adjudicator.md 'A line under a verifier'"'"'s `For the judge` heading'
+says  agents/adjudicator.md "Read the code from that line yourself"
+says  agents/adjudicator.md "no test that passes really proves it"
+says  agents/adjudicator.md "a bug fix's test did not come first"
+# 4. The rest of the review is as it was, and the security reviewer keeps its own scope.
+says  agents/security-reviewer.md "The verifier's limit to two questions about a scenario's test is not yours"
+never agents/security-reviewer.md "Everything in the \`verifier\` agent applies"
+says  agents/security-reviewer.md "You review one change for the ways it can be attacked"
+says  agents/adjudicator.md "Do these six steps in this order and never skip one"
+says  references/session-cliffs.md "then the \`adjudicator\` on that round's findings files as in step 3"
+says  references/session-cliffs.md "in two commits of its own: a test that reproduces it and fails, then the fix"
+# 5. Nothing proves a test by breaking code on purpose. Robert's ruling, word
+# for word: "'Breaking the code on purpose to watch the test go red' No. that
+# proves nothing". The line he accepted ("this is what I think is right, yes"):
+# "The proof a test works is that it failed before the change and passes after.
+# Nothing breaks code on purpose to prove a test, not once and not on every run."
+says  references/session-cliffs.md "The proof a test works is that it failed before the change and passes after. Nothing breaks code on purpose to prove a test, not once and not on every run."
+says  agents/verifier.md "never by taking the change out or planting a fault"
+says  agents/verifier.md "The proof a test works is that it failed before the change and passes after"
+never references/session-cliffs.md "To undo a mutation"
+never references/session-cliffs.md "Commit before mutating"
+never references/session-cliffs.md "mutated tree"
+never hooks/test-commit-attribution-gate.py "mutation proof"
+never hooks/test-commit-attribution-gate.py "mutate a copy"
+says  hooks/test-commit-attribution-gate.py "it failed against the hook before the change and passes after"
+# The pages a person reads say the same job.
+for doc in README.md docs/explainer.template.html docs/explainer.html; do
+  says  "$doc" "The verifier answers two questions and no others"
+  says  "$doc" "it writes one line for the judge, with the file and line, and moves on"
+  never "$doc" "what it claims works"
+  never "$doc" "The verifier assumes the code is wrong and tries to prove it"
+  never "$doc" "true in every state"
+done
+for doc in scripts/diagrams.py docs/images/review.svg docs/explainer.html; do
+  never "$doc" "tries to make every claim false"
+  never "$doc" "each false claim's path"
+  says  "$doc" "each one answers two questions about the tests"
 done
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
