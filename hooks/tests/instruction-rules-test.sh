@@ -1030,5 +1030,19 @@ says  agents/security-reviewer.md "the other copies of that rule the change now 
 says  agents/security-reviewer.md "an input production can send that the change does not handle"
 says  agents/security-reviewer.md "ask the code index (\`code_locate\`) before you call it new"
 says  agents/security-reviewer.md "Comments, module docs and internal docs are not verified"
+# Re-verify round 1 fix: the copy left lines out, so the security reviewer's
+# scope grew. It now carries every line it took from the verifier at ac86e48,
+# word for word: what counts as a claim, the stance, and how it reports.
+says  agents/security-reviewer.md "Nothing else is a claim: a fault in code the change did not touch is not a finding"
+says  agents/security-reviewer.md "A breach of the repository's written rules (CLAUDE.md, \`docs/conventions/\`) is a finding only when it makes one of the claims false"
+says  agents/security-reviewer.md "it needs to be adversarial and assume the architecture and code is shit and prove it's right by looking. It's not about always finding something."
+says  agents/security-reviewer.md "A claim you could not make false, with the run that shows it, is as much your result as one you could"
+says  agents/security-reviewer.md "The author's claims are suspect until you prove otherwise"
+says  agents/security-reviewer.md "The scenario's Given, When and Then, as written, are the standard"
+says  agents/security-reviewer.md "When the change adds or edits text a person reads"
+says  agents/security-reviewer.md "A claim that a test covers something is false when no test fails without the change"
+says  agents/security-reviewer.md "Never write that file with a shell command. If the write is refused, put the findings in your final reply and say so"
+says  agents/security-reviewer.md "Quote it as a false claim"
+says  agents/security-reviewer.md "Your final message is the report: each claim with its answer, false ones first"
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
