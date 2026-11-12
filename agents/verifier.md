@@ -87,9 +87,12 @@ proven here.
 
 When the change adds or edits text a person reads (for example a screen, a
 refusal or error message, an email, the changelog, the docs), your brief
-lists each sentence as a claim too. Check that what it says is what the code
-does. Where a test checks the sentence, name it; where none does, read the
-code and say you read it rather than ran it.
+lists each sentence as a claim of the scenario, like a Then line, and it
+gets the same first question. Find the test that shows the code doing what
+the sentence says, read it and run it, and check that what it says is what
+the code does in that test. Often it is the test that proves a Then. A
+sentence no test shows to be true is a no: say what it promises that no
+test shows.
 
 ## The second question: a bug's test came first
 

@@ -118,7 +118,8 @@ an earlier review. The verifier answers two questions and no others. Does a
 test really prove this scenario, so that it would fail if the behavior were
 missing, and does it pass? And, for a bug fix, was the test written first,
 and did it fail before the fix? Where the change adds or edits a sentence a
-customer reads, it also checks that the sentence says what the code does.
+customer reads, that sentence is a claim of the scenario and gets the same
+first question.
 It is not a general review of the code: when it notices something else that
 looks like a real fault a customer could hit, it writes one line for the
 judge, with the file and line, and moves on. A security reviewer joins

@@ -70,8 +70,9 @@ A verifier answers two questions about its scenario and no others: does a
 test really prove each Then and pass, and, for a bug fix, was the test
 written first and did it fail before the fix. A no to either is a finding.
 It holds when you read the test, or the commits, it names and see the same
-thing: no test, a test that checks something other than the Then, a test
-that fails, or a test that did not come before its fix.
+thing: no test, a test that checks something other than the Then or the
+sentence a person reads, a test that fails, or a test that did not come
+before its fix.
 
 A line under a verifier's `For the judge` heading is something it noticed
 outside its two questions and did not follow up, so it gives only a
@@ -79,10 +80,9 @@ outside its two questions and did not follow up, so it gives only a
 holds when you find the state, the wrong result and a path from a real
 production entry point to that state; throw it out when you do not.
 
-Every other finding, such as a sentence a person reads that is false or a
-security finding, holds when it names the `file:line`, the state, the wrong
-result, and a path from a real production entry point to that state. Throw
-out one missing any of these. A claim is either false or it is not: for
+Every other finding, such as a security finding, holds when it names the
+`file:line`, the state, the wrong result, and a path from a real production
+entry point to that state. Throw out one missing any of these. A claim is either false or it is not: for
 example, "could happen", "looks risky" and "breaks best practice" are not
 valid results.
 
@@ -114,7 +114,8 @@ A finding that holds goes to one of two places.
 It is fixed in this PR when one of these is true: a Then in the scenario is
 false, or no test that passes really proves it; a bug fix's test did not
 come first; the change caused something that worked before to break; or text
-a person reads that the change added or edited is now false.
+a person reads that the change added or edited is now false, or no test
+that passes shows it.
 
 Everything else is an extra. List it in your verdict; the worker decides
 whether it reaches the person. New code that does what a shared module already

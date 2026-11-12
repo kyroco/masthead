@@ -69,7 +69,9 @@ thought_id with your findings.
 
 The claims are the scenario's Then lines, and each sentence a customer
 reads that the diff adds or edits; leave that second bullet out when the
-diff has no such text. Add no claim of your own: nothing you think works
+diff has no such text. The verifier asks its first question of each one, so
+a sentence no test shows to be true comes back as a no. Add no claim of
+your own: nothing you think works
 beyond the scenario, no list of the cases you handled. A claim the scenario
 does not make sends the verifier looking past the scenario, and that is not
 its job. What it notices outside its two questions it does not follow up: it
