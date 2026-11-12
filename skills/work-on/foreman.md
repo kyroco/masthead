@@ -18,8 +18,10 @@ never by this file. Nothing here fixes a format, a shape or a batch size for a
 reply. Where this file says "ask" or "tell", do it the way they have asked to
 be talked to.
 
-You write no product code, run no builds or tests, and file no issue except
-the one kind named below. Run at `medium` effort. GitHub numbers issues and
+You write no product code, run no tests, and file no issue except the one
+kind named below. You run one build, and only when the repo names one: the
+warm-up below, which builds the repo once so the workers do not each build it
+from nothing at the same time. Run at `medium` effort. GitHub numbers issues and
 PRs from one sequence, so say "issue #1418" or "PR #1422", never "#1418"
 alone.
 
@@ -76,6 +78,45 @@ Once the slots are running, say how far the queue of issues with no open
 question runs behind them, and offer to take the questions for the ones beyond
 whenever the person wants, so the queue stays ready and the run never waits on
 a question that could have been asked earlier.
+
+## Warm up the build
+
+Six workers that each fetch and compile the repo from nothing, all at once,
+fill the disk and the processors: on Kyroco, November 12, 2026, six workers
+wrote about 18 GB of dependencies between them and drove the load to 22 on
+18 cores. So when the repo names a warm-up, you build once and each worker
+clones your build.
+
+A repo names its warm-up in the `env` block of its main checkout's
+`.claude/settings.json`: `PROJECT_WARM_BUILD` is the command that fetches and
+builds, run from the top of a checkout; `PROJECT_WARM_PATHS`, if set, is the
+list of paths a worker clones (space separated, relative to the top, globs
+allowed), and with none set a worker clones every path git ignores in the
+warm tree. A repo that names no `PROJECT_WARM_BUILD` runs as before: no
+warm-up, and every worker builds its own.
+
+As soon as you know the repo, before you plan, start it with the Bash tool's
+`run_in_background`, so it builds while you read and ask:
+
+    ${CLAUDE_PLUGIN_ROOT}/skills/work-on/warm-build.sh build
+
+It builds origin/main in a worktree of its own,
+`<main checkout>/.claude/worktrees/masthead-warm-<commit>`, writes everything
+the command prints to `<tree>.log` beside it, and prints only the tree's path.
+Never read the log into this session; on a failure the script prints its last
+lines, and that is all you need. Exit 3 means the repo names no warm-up. Exit
+1 means the command failed: tell the person in one line, and the workers
+build cold. Start no worker while the warm-up is still running; it takes a
+few minutes cold, and reading the issues and agreeing the run usually take
+longer.
+
+Before you start a worker, run it again. When main has not moved it answers
+at once with the same tree; when main has moved, it makes a new tree, seeded
+from the last one so only what changed is built, and keeps the two newest.
+It never rebuilds a tree in place, because a worker may be cloning it.
+
+Each worker's prompt then names the tree: add "Warm build: <tree path>." A
+worker given none builds cold.
 
 ## Start a worker
 
@@ -214,7 +255,8 @@ so, and wait for the person.
 ## End the run
 
 Every issue is merged, parked or skipped. Stop any remaining workers (in the
-desktop app, archive them, which also removes their worktrees), capture one
+desktop app, archive them, which also removes their worktrees), remove the
+warm trees with `${CLAUDE_PLUGIN_ROOT}/skills/work-on/warm-build.sh end`, capture one
 Korium handoff (what merged, what parked and why, and the person's answers,
 verbatim), and tell the person: one line per issue with its outcome, what each
 parked issue needs, and the two counts.

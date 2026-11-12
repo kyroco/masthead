@@ -82,6 +82,11 @@ says  skills/work-on/foreman.md "already approved: once ready, it starts"
 says  skills/work-on/foreman.md "within the user's worker limit"
 says  skills/work-on/foreman.md "the question goes to the user first"
 says  skills/work-on/foreman.md "its next ready issue, those first"
+never skills/work-on/foreman.md "run no builds or tests"
+says  skills/work-on/foreman.md "warm-build.sh build"
+says  skills/work-on/foreman.md "Start no worker while the warm-up is still running"
+says  skills/work-on/worker.md "warm-build.sh clone <tree path>"
+says  references/gate-catalog.md "\`PROJECT_WARM_BUILD\`"
 
 # 4. No scenario count. The check is exact on purpose, not a prose scanner: it
 # holds the lines where the rule now lives, and refuses the three phrases this
