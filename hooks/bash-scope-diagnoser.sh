@@ -8,6 +8,11 @@ set -uo pipefail
 INPUT="$(cat)"
 
 if ! command -v jq >/dev/null 2>&1; then
+  # Project-wide, this hook reads every session's Bash call: with no jq, read the caller from its identity field in
+  # the raw text and leave anyone but the diagnoser and reader alone (MAST-37), as bash-scope-reviewer.sh does.
+  if [ "${1:-}" = "--project-wide" ] && ! printf '%s' "$INPUT" | grep -qE "\"(agent_type|subagent_type|agent_name)\"[[:space:]]*:[[:space:]]*\"(masthead:([^\"\\\\]*:)?)?(diagnoser|reader)\""; then
+    exit 0
+  fi
   echo "DENIED: jq is not installed, so the diagnoser Bash guard cannot read the tool payload." >&2
   echo "The gate fails closed: an unverifiable command is not an allowed command. Install jq, or set DIAGNOSER_BASH_GATE=off if this destination has explicitly accepted the risk." >&2
   exit 2
