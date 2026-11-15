@@ -7,15 +7,31 @@ set -uo pipefail
 INPUT="$(cat 2>/dev/null || true)"
 [ -n "$INPUT" ] || exit 0
 
-command -v jq >/dev/null 2>&1 || exit 0
+# jq reads the call when it is installed, and json_field.py when it is not, so a machine without jq is guarded the same (MAST-37).
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd -P)" || HERE="$(dirname "$0")"
+if command -v jq >/dev/null 2>&1; then
+  field() { printf '%s' "$INPUT" | jq -r "$1" 2>/dev/null || true; }
+  deny_json() { jq -n --arg r "$1" '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: $r}}' 2>/dev/null; }
+elif command -v python3 >/dev/null 2>&1 && [ -r "$HERE/json_field.py" ]; then
+  field() { printf '%s' "$INPUT" | python3 -I "$HERE/json_field.py" "$1" 2>/dev/null || true; }
+  deny_json() { python3 -I "$HERE/json_field.py" --deny "$1" 2>/dev/null; }
+else
+  # Nothing can read the call: refuse one that names a command these rules govern, rather than pass it unread.
+  case "$INPUT" in
+    *git*|*rm*|*tofu*|*terraform*|*terragrunt*|*psql*|*mysql*|*mix*|*sql*|*gh*)
+      printf '%s\n' '{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "Neither jq nor python3 is installed, so the guard against force pushes, hard resets and deletes cannot read this command, and it is refused rather than let through unread. Install jq (brew install jq) and run it again."}}' ;;
+  esac
+  exit 0
+fi
 
-TOOL="$(printf '%s' "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null || true)"
+TOOL="$(field '.tool_name // empty')"
 [ "$TOOL" = "Bash" ] || exit 0
 
-CMD="$(printf '%s' "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null || true)"
+CMD="$(field '.tool_input.command // empty')"
 [ -n "$CMD" ] || exit 0
 
-SID="$(printf '%s' "$INPUT" | jq -r '.session_id // "nosession"' 2>/dev/null || echo nosession)"
+SID="$(field '.session_id // "nosession"')"
+[ -n "$SID" ] || SID="nosession"
 # The user's private state root: $CLAUDE_PLUGIN_DATA/state, else $TMPDIR/masthead-<uid>. Mode 0700; refused when a symlink or not ours.
 state_root() {
   local r
@@ -360,13 +376,7 @@ deny() {
     printf '%s\t%s\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$1" "$CMD" \
     >> "$RECORD_DIR/attempts.tsv" 2>/dev/null) || true
 
-  jq -n --arg r "$1"$'\n\n'"$2"$'\n\nCommand: '"$CMD" '{
-    hookSpecificOutput: {
-      hookEventName: "PreToolUse",
-      permissionDecision: "deny",
-      permissionDecisionReason: $r
-    }
-  }' 2>/dev/null
+  deny_json "$1"$'\n\n'"$2"$'\n\nCommand: '"$CMD"
   exit 0
 }
 

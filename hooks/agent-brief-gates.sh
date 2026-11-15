@@ -6,10 +6,19 @@ set -uo pipefail
 INPUT="$(cat 2>/dev/null || true)"
 [ -n "$INPUT" ] || exit 0
 
-# Pass the payload to each check unparsed.
-command -v jq >/dev/null 2>&1 || exit 0
-
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd -P)" || HERE="$(dirname "$0")"
+
+# The payload goes to each check unparsed. The refusals are joined with jq when it is installed and with
+# python3 when it is not, so a machine without jq is refused the same (MAST-37). With neither, every
+# dispatch is refused, since no check could be read.
+if command -v jq >/dev/null 2>&1; then
+  HAVE_JQ=yes
+elif command -v python3 >/dev/null 2>&1 && [ -r "$HERE/json_field.py" ]; then
+  HAVE_JQ=""
+else
+  printf '%s\n' '{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "Neither jq nor python3 is installed, so the brief checks on the Agent tool cannot run, and the dispatch is refused rather than sent unchecked. Install jq (brew install jq) and send it again."}}'
+  exit 0
+fi
 PROTOCOL="$HERE/engram-protocol.sh"
 DISPATCH="$HERE/dispatch-record-gate.sh"
 
@@ -17,9 +26,15 @@ DISPATCH="$HERE/dispatch-record-gate.sh"
 REFUSALS='[]'
 
 refuse() {
-  REFUSALS="$(printf '%s' "$REFUSALS" \
-    | jq --arg id "$1" --arg reason "$2" '. + [{id: $id, reason: $reason}]' 2>/dev/null \
-    || printf '%s' "$REFUSALS")"
+  if [ -n "$HAVE_JQ" ]; then
+    REFUSALS="$(printf '%s' "$REFUSALS" \
+      | jq --arg id "$1" --arg reason "$2" '. + [{id: $id, reason: $reason}]' 2>/dev/null \
+      || printf '%s' "$REFUSALS")"
+  else
+    REFUSALS="$(printf '%s' "$REFUSALS" | python3 -I -c 'import json, sys
+print(json.dumps(json.load(sys.stdin) + [{"id": sys.argv[1], "reason": sys.argv[2]}]))' "$1" "$2" 2>/dev/null \
+      || printf '%s' "$REFUSALS")"
+  fi
 }
 
 TOTAL=0
@@ -49,9 +64,13 @@ collect() {
 
   # Pull every reason the refusal carried.
   local reasons
-  reasons="$(printf '%s' "$out" | jq -rj '
-      [ .. | objects | select(has("permissionDecisionReason")) | .permissionDecisionReason ]
-      | join("\n\n")' 2>/dev/null)"
+  if [ -n "$HAVE_JQ" ]; then
+    reasons="$(printf '%s' "$out" | jq -rj '
+        [ .. | objects | select(has("permissionDecisionReason")) | .permissionDecisionReason ]
+        | join("\n\n")' 2>/dev/null)"
+  else
+    reasons="$(printf '%s' "$out" | python3 -I "$HERE/json_field.py" --reasons 2>/dev/null)"
+  fi
 
   # Quote the raw output when the decision cannot be read.
   if [ -z "${reasons//[[:space:]]/}" ]; then
@@ -70,7 +89,11 @@ case "$(printf '%s' "${CLAUDE_PLUGIN_OPTION_HAIKU_DEFAULT:-on}" | tr '[:upper:]'
 esac
 collect "gate-verify-brief"     bash "$PROTOCOL" gate-verify-brief
 # The record runs last so it can say whether the dispatch went through: a refused dispatch is recorded as refused and never counts as a re-verify round or an agent run.
-REFUSED_COUNT="$(printf '%s' "$REFUSALS" | jq -r 'length' 2>/dev/null || echo 0)"
+if [ -n "$HAVE_JQ" ]; then
+  REFUSED_COUNT="$(printf '%s' "$REFUSALS" | jq -r 'length' 2>/dev/null || echo 0)"
+else
+  REFUSED_COUNT="$(printf '%s' "$REFUSALS" | python3 -I -c 'import json, sys; print(len(json.load(sys.stdin)))' 2>/dev/null || echo 0)"
+fi
 if [ "$REFUSED_COUNT" != "0" ]; then
   collect "dispatch-record-gate"  bash "$DISPATCH" --refused
 else
@@ -78,6 +101,24 @@ else
 fi
 
 [ "$REFUSED_COUNT" != "0" ] || exit 0
+
+if [ -z "$HAVE_JQ" ]; then
+  # The same decision as the jq program below, word for word.
+  printf '%s' "$REFUSALS" | python3 -I -c 'import json, sys
+items, total = json.load(sys.stdin), sys.argv[1]
+n = len(items)
+plural = "check" if total == "1" else "checks"
+body = "\n\n".join("[{} of {}] {}\n{}".format(i + 1, n, r["id"], r["reason"]) for i, r in enumerate(items))
+reason = ("This dispatch is refused by " + str(n) + " of the " + total + " brief " + plural
+          + " on the Agent tool. All of them are listed below, with what each one wants, so a single "
+          + "editing pass answers the lot instead of you learning about the next one only after fixing "
+          + "this one.\n\n" + body + "\n\nEach heading names the check that wrote it. They are "
+          + "independent: satisfying one does not satisfy another, and none of them is answered by "
+          + "mentioning it.")
+print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse",
+                  "permissionDecision": "deny", "permissionDecisionReason": reason}}, ensure_ascii=False))' "$TOTAL" 2>/dev/null
+  exit 0
+fi
 
 printf '%s' "$REFUSALS" | jq --arg total "$TOTAL" '
   length as $n

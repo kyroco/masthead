@@ -451,9 +451,17 @@ def main():
           str("deny" in sized_raw("x" * 2001, env={"MASTHEAD_CAPTURE_GATE": "off"})), "False")
 
     # With no jq the hook reads no field, so the length rule must count another way.
+    # Every tool on this machine but jq, since a machine without jq still has tr and grep (MAST-37).
     NO_JQ = tempfile.mkdtemp(prefix="capture-no-jq-")
-    for tool in ("bash", "cat", "id", "mkdir", "chmod", "dirname", "python3"):
-        os.symlink(os.path.realpath(shutil.which(tool)), os.path.join(NO_JQ, tool))
+    for folder in os.environ.get("PATH", "").split(os.pathsep):
+        if not os.path.isdir(folder):
+            continue
+        for name in os.listdir(folder):
+            target = os.path.join(NO_JQ, name)
+            source = os.path.join(folder, name)
+            if name != "jq" and not os.path.lexists(target) and \
+                    os.path.isfile(source) and os.access(source, os.X_OK):
+                os.symlink(source, target)
     no_jq = {"PATH": NO_JQ}
     out = sized_raw("x" * 2001, "adjudicator", no_jq)
     check("no jq: 2,001 characters is refused", str("deny" in out), "True")

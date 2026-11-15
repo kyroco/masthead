@@ -18,6 +18,12 @@ mode="${1:?usage: engram-protocol.sh <mode>}"
 payload="$(cat 2>/dev/null || echo '{}')"
 
 field() { printf '%s' "$payload" | jq -r "$1" 2>/dev/null || echo ""; }
+# With no jq, json_field.py reads a plain path such as '.tool_input.prompt // ""', so the gates that read
+# only plain paths (the brief check among them) hold the same (MAST-37). Any other filter reads as empty.
+if ! command -v jq >/dev/null 2>&1; then
+  _json_field="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd -P)/json_field.py"
+  field() { printf '%s' "$payload" | python3 -I "$_json_field" "$1" 2>/dev/null || echo ""; }
+fi
 
 # The dispatched agent: Claude Code sends this plugin's verifier as masthead:verifier, or masthead:<folder>:verifier for one in a subfolder of agents/, so a masthead: name is matched on the part after the last colon. Another plugin's agent keeps its prefix, so it is never taken for ours.
 # The masthead: namespace is trusted as this plugin's identity. A fork also named masthead would pass as ours, but reading the name from .claude-plugin/plugin.json would not tell it apart either, since a fork's plugin.json says masthead too.
@@ -55,6 +61,10 @@ if [ -n "${BASH_SOURCE[0]:-}" ]; then
 fi
 
 deny_tool() {
+  if ! command -v jq >/dev/null 2>&1; then
+    python3 -I "$_json_field" --deny "$1"
+    return
+  fi
   jq -n --arg r "$1" '{
     hookSpecificOutput: {
       hookEventName: "PreToolUse",

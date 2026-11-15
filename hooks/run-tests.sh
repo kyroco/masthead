@@ -39,6 +39,7 @@ run "code search judge down" bash "$here/tests/gate-discovery-judge-down-test.sh
 run "code search index judge" bash "$here/tests/korium-index-judge-test.sh"
 run "code search index hint" bash "$here/tests/korium-index-hint-test.sh"
 run "model choice"           bash "$here/tests/model-choice-gate-test.sh"
+run "jq stand-in"            bash "$here/tests/json-field-test.sh"
 run "reviewer shell scope"   bash "$here/tests/bash-scope-reviewer-test.sh"
 run "diagnoser shell scope"  bash "$here/tests/bash-scope-diagnoser-test.sh"
 run "review write fence"     bash "$here/tests/review-write-fence-test.sh"
