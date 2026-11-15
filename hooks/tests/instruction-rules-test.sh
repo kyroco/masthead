@@ -1444,5 +1444,15 @@ says  skills/analyze-issues/issue-check.md 'With "Architecture doc: none recorde
 says  skills/analyze-issues/SKILL.md 'With no doc recorded, those four are skipped and the check runs as before'
 says  skills/analyze-issues/SKILL.md 'project_fact.py --architecture-doc'
 never skills/analyze-issues/issue-check.md 'Run these six checks'
+# MAST-33 round 1, F2: the README says what check 8 asks, a build not reached named in Out of scope.
+says  README.md 'a scenario for each build the ADR names that its work reaches, or that build named in Out of scope'
+never README.md 'does it have a scenario for each build the ADR names, does'
+# F3: an issue that builds ADR work but names no record fails check 7, naming the record.
+says  skills/analyze-issues/issue-check.md 'An issue that names no decision record'
+says  skills/analyze-issues/issue-check.md 'check 7 fails naming that record'
+# Extra scored 8: the agent reads the architecture doc, which check 9 holds code to.
+says  skills/analyze-issues/issue-check.md 'the architecture doc named above, in full'
+# F1 test point: the line that makes a failing check 7 or 10 quote the missing line.
+says  skills/analyze-issues/issue-check.md 'Check 7 or 10 fails: quote each missing line, with its source, under the scenario it governs'
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
