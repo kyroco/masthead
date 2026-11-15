@@ -353,7 +353,8 @@ CHANGED="$( {
   git status --porcelain --untracked-files=all 2>/dev/null | awk '{print $NF}'
 } | sort -u | sed "s|^|$TOP/|")"
 
-[ -z "$CHANGED" ] && exit 0
+# With no origin/main an empty list does not mean nothing new is pushed, so the receipt rung still runs (MAST-37).
+[ -z "$CHANGED" ] && [ -n "$BASE" ] && exit 0
 # Warn that uncommitted edits are checked on disk but the push carries the committed copy.
 _DIRTY="$(git diff --name-only HEAD 2>/dev/null | head -5)"
 [ -n "$_DIRTY" ] && echo "WARN: uncommitted edits are checked as they are on disk, but this push carries the committed version of: $(printf '%s' "$_DIRTY" | tr '\n' ' ')" >&2
