@@ -366,6 +366,19 @@ commit(r, {"docs/adr/ADR-0007-take-orders.md": section(CONFORMS_NOT_DIVERGES)}, 
 why = pr(r)
 check("6: a pull request whose ADR says it does not diverge is allowed", why == "", why)
 
+# ------------------------------------------------------------------ round 1: the builds listed
+r = make_repo("r1-builds")
+ENTRY = "- `Core and extensions`: conforms, billing plugs in through the hook.\n\n"
+why = write_adr(r, adr("## Architecture Alignment\n\n" + ENTRY + "Builds: none\n"))
+check("2: 'Builds: none' is refused", "lists no builds" in why, why)
+why = write_adr(r, adr("## Architecture Alignment\n\n" + ENTRY + "Builds: TBD\n"))
+check("2: a placeholder build is refused", "lists no builds" in why, why)
+why = write_adr(r, adr("## Architecture Alignment\n\n" + ENTRY + "Builds: Hosted, Cloud\n"))
+check("2: a build the doc does not name is refused, listing the doc's builds",
+      "`Cloud`" in why and "`Hosted`" in why and "`Self-hosted`" in why, why)
+why = write_adr(r, adr("## Architecture Alignment\n\n" + ENTRY + "Builds: Hosted (core and billing), Self-hosted\n"))
+check("2: builds the doc names, with words after them, are accepted", why == "", why)
+
 shutil.rmtree(T, ignore_errors=True)
 print()
 print("%d passed, %d failed" % (passed, failed))
