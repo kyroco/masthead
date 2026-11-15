@@ -287,8 +287,13 @@ case "$mode" in
 
     # A review agent cannot run korium-cli index, so a lagging index would refuse it on every search: it is
     # refused once a session, then its searches go through (MAST-37). The main session can re-index, so it stays refused.
+    # Only Masthead's own agents, by the rule review-write-fence.py uses: a masthead: name, whose last part that
+    # names one of them is the agent. A bare name such as reader can be a repo's own agent, which can re-index.
     acting="$(field '.agent_type // .agent_name // ""')"
-    case "$acting" in masthead:*) acting="${acting##*:}" ;; esac
+    case "$acting" in
+      masthead:*) acting="$(printf '%s' "${acting#masthead:}" | awk -F: '{ for (i = NF; i >= 1; i--) if ($i ~ /^(verifier|security-reviewer|adjudicator|diagnoser|reader)$/) { printf "%s", $i; exit } }')" ;;
+      *) acting="" ;;
+    esac
     case "$acting" in
       verifier|security-reviewer|adjudicator|diagnoser|reader)
         [ -f "$dir/discovery-refused-agent" ] && exit 0
