@@ -52,8 +52,14 @@ ALIGNMENT_WANT = (
     "build this decision's work must work in. Leave out the parts it does not touch")
 # Words of reason a divergence needs after the word that declares it.
 MIN_WHY_WORDS = 3
-VERDICT = re.compile(r"(?i)\b(?:conform|diverg)\w*")
-DIVERGES = re.compile(r"(?i)\bdiverg\w*")
+# A verdict word, and the same word turned around by a "not" just before it.
+VERDICT = re.compile(r"(?i)\b(conform|diverg)\w*")
+NOT_VERDICT = re.compile(r"(?i)\b(?:does\s+not|doesn't|do\s+not|don't|not|never)\s+(conform|diverg)\w*")
+# Words that only point back at the doc or the part, so they give no reason for a divergence.
+NOT_A_REASON = {"from", "the", "this", "that", "doc", "document", "architecture", "part", "section",
+                "it", "its", "of", "to", "a", "an", "here", "in", "on", "with", "rule", "rules"}
+# A line that can open an entry: a heading, or a list item at the left margin (not a sub-bullet).
+ENTRY_LINE = re.compile(r"^(?:\s{0,3}#{1,6}\s|\s?(?:[-*+]|\d+[.)])\s)")
 BUILDS = re.compile(r"(?i)^\s*(?:[-*]\s+)?(?:\*\*|__)?\s*builds?\s*(?::\s*(?:\*\*|__)?|(?:\*\*|__)\s*:?)(.*)$")
 
 # File names a record may carry inside the folder: ADR-NNNN-x.md, adr-N-x.md, NNNN-x.md, NNNN_x.md.
@@ -134,8 +140,8 @@ def section_body(text, title):
 
 
 def _names(line, parts):
-    """The longest part of the doc this line names, when it is a list item or a heading; else None."""
-    if not re.match(r"^\s*(?:#{1,6}\s|[-*+]\s|\d+[.)]\s)", line):
+    """The longest part of the doc this line names, when it is a heading or a top-level list item; else None."""
+    if not ENTRY_LINE.match(line):
         return None
     low = " ".join(re.sub(r"[`*_]", "", line).lower().split())
     hits = [p for p in parts if re.search(r"(?<![a-z0-9])%s(?![a-z0-9])" % re.escape(p.lower()), low)]
@@ -143,8 +149,13 @@ def _names(line, parts):
 
 
 def alignment(text, parts):
-    """Read the alignment section: ({part: the entry's text}, [each build listed], whether a Builds line was found)."""
-    entries, builds, found, current, listing = {}, [], False, None, False
+    """Read the alignment section: ({part: the entry's text}, [each build listed], whether a Builds line was found).
+
+    An entry is a heading or a top-level list item naming a part. A list item runs to the next
+    blank line, taking its indented lines; a heading runs to the next heading or list item.
+    """
+    entries, builds, found = {}, [], False
+    current, kind, listing = None, None, False
     for line in section_body(text, ALIGNMENT).splitlines():
         b = BUILDS.match(line)
         if b:
@@ -153,26 +164,52 @@ def alignment(text, parts):
             builds += [x.strip() for x in re.split(r"[,;]", rest) if x.strip()]
             listing = not rest
             continue
+        part = _names(line, parts)
         if listing:
-            item = re.match(r"^\s*[-*]\s+(.+)$", line)
-            if item:
+            item = re.match(r"^\s*[-*+]\s+(.+)$", line)
+            if item and not (part and VERDICT.search(line)):
                 builds.append(item.group(1).strip())
                 continue
             if line.strip():
                 listing = False
-        part = _names(line, parts)
         if part:
-            current = part
+            current, kind = part, ("heading" if line.lstrip().startswith("#") else "item")
             entries[part] = entries.get(part, "") + " " + line
-        elif current:
-            entries[current] += " " + line
+            continue
+        if current is None:
+            continue
+        if not line.strip():
+            if kind == "item":
+                kind = "item-gap"
+            continue
+        if ENTRY_LINE.match(line) or (kind == "item-gap" and not line.startswith("  ")):
+            current = None
+            continue
+        entries[current] += " " + line
     return entries, builds, found
+
+
+def verdict(said):
+    """("conforms" or "diverges", where the verdict ends) from the first verdict the entry states; (None, 0) when none."""
+    word = VERDICT.search(said)
+    if not word:
+        return None, 0
+    turned = NOT_VERDICT.search(said)
+    if turned and turned.start() <= word.start():
+        return ("conforms" if turned.group(1).lower() == "diverg" else "diverges"), turned.end()
+    return ("conforms" if word.group(1).lower() == "conform" else "diverges"), word.end()
+
+
+def reason_words(said, after, part):
+    """The words after the verdict that give a reason: not the part's own name, not words naming the doc."""
+    rest = re.sub(r"[`*_]", "", said[after:]).lower().replace(part.lower(), " ")
+    return [w for w in re.findall(r"[a-z0-9']+", rest) if w not in NOT_A_REASON]
 
 
 def diverging(text, parts):
     """The parts of the doc a record's alignment section says it diverges from."""
     entries, _, _ = alignment(text, parts)
-    return sorted(p for p, said in entries.items() if DIVERGES.search(said))
+    return sorted(p for p, said in entries.items() if verdict(said)[0] == "diverges")
 
 
 def read_doc(doc):
@@ -196,12 +233,12 @@ def alignment_gaps(text, doc):
             "`## %s` names no part of the architecture doc (%s). Name each part this decision "
             "touches as the doc titles it, and only those. Its parts: %s." % (ALIGNMENT, doc[1], listed))
     for part, said in entries.items():
-        if not VERDICT.search(said):
+        said_verdict, end = verdict(said)
+        if not said_verdict:
             reasons.append("`## %s` names `%s` with no verdict. Say it conforms, or that it "
                            "diverges and why." % (ALIGNMENT, part))
             continue
-        m = DIVERGES.search(said)
-        if m and len(re.findall(r"[A-Za-z0-9']+", said[m.end():])) < MIN_WHY_WORDS:
+        if said_verdict == "diverges" and len(reason_words(said, end, part)) < MIN_WHY_WORDS:
             reasons.append("`## %s` says it diverges from `%s` but not why. Say what this "
                            "decision does instead and why." % (ALIGNMENT, part))
     if not found or not builds:
