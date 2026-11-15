@@ -576,6 +576,41 @@ REFUSAL="$(printf '{"tool_name":"Bash","subagent_type":"verifier","tool_input":{
 if [ -n "$SUMMARY" ] && case "$REFUSAL" in *"$SUMMARY"*) true ;; *) false ;; esac; then ok
 else bad "MAST-43 S2: the refusal does not carry reviewer_shapes.py's own summary of the shapes" "refusal: $REFUSAL"; fi
 
+# --- MAST-43 re-verify round 1: the judge's fix list ----------------------------
+mkdir -p "$SHAPES_TREE/test" "$SHAPES_TREE/pkg"
+: > "$SHAPES_TREE/test/test_urllib2net.py"
+: > "$SHAPES_TREE/pkg/__init__.py"
+: > "$SHAPES_TREE/pkg/test_y.py"
+# FIX-1: an empty quote before = or ~ still leaves zsh expanding it.
+shape_deny verifier "bash ''=brew update"
+shape_deny verifier 'python3 ""=pip3 download requests'
+shape_deny security-reviewer "cat ''=curl"
+shape_deny verifier "bash ''~/x.sh"
+shape_deny verifier "python3 \"\"~/x.py"
+shape_allow verifier "git log --format='=%h' -1"
+shape_allow verifier 'git log HEAD~1'
+# FIX-2, FIX-3, FIX-5: a switch counts only where the program reads it as a
+# switch: never as the value of the flag before it, and never after a --.
+shape_deny verifier 'xcodebuild test -scheme -skipPackageUpdates -testPlan -disableAutomaticPackageResolution'
+shape_deny security-reviewer 'semgrep --metrics=off --exclude --disable-version-check --config .claude/semgrep/sentinel-triggers.yml hooks'
+shape_deny security-reviewer 'semgrep --exclude --metrics=off --disable-version-check --config .claude/semgrep/sentinel-triggers.yml hooks'
+shape_deny security-reviewer 'semgrep --metrics=off --disable-version-check --exclude --config .claude/semgrep/sentinel-triggers.yml hooks'
+shape_deny verifier 'cargo test -- --offline'
+shape_deny verifier 'cargo test -p --offline'
+shape_deny verifier 'swift test --filter --skip-update --disable-automatic-resolution'
+shape_deny verifier 'dotnet test --filter --no-restore'
+shape_deny verifier 'mvn -pl -o test'
+shape_deny verifier 'gradle test --tests --offline'
+shape_deny verifier 'GOPROXY=off go test -run -v ./...'
+shape_allow verifier 'cargo test --offline -- --nocapture'
+shape_allow security-reviewer 'semgrep --metrics=off --disable-version-check --exclude tests --config .claude/semgrep/sentinel-triggers.yml hooks'
+# FIX-4: a dotted module whose first part is a folder with no __init__.py is
+# Python's own package of that name, not the checkout's.
+shape_deny verifier 'python3 -m unittest test.test_urllib2net'
+shape_deny verifier 'python3 -m unittest test/test_urllib2net.py'
+shape_allow verifier 'python3 -m unittest pkg.test_y'
+shape_allow verifier 'python3 -m unittest pkg/test_y.py'
+
 rm -rf "$SHAPES_TREE"
 
 printf '[bash-scope-reviewer-test] %d passed, %d failed\n' "$pass" "$fail"
