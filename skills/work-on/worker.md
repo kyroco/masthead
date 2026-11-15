@@ -87,7 +87,10 @@ they care? 1 is nope, and 10 is if we don't do this, we will cause a
 catastrophic failure. Judge it on its own merit, even if it might contradict
 something written. An extra that scores 8 or more is fixed in this PR, test
 first when it is a bug. One that scores under 8 is dropped: you bring it to
-no one, not your foreman and not the person, and you file nothing.
+no one, not your foreman and not the person, and you file nothing. An
+architecture finding the adjudicator lists as an extra is scored already:
+its score is the architecture reviewer's customer score. A principle break
+is never an extra; the adjudicator puts it on the fix list.
 
 If the scenarios cannot all be done and proven in this session, split the
 issue as the github-issues skill says, remove the branch you made, set the

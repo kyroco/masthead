@@ -87,7 +87,7 @@ falls short:
   Korium memory option on.
 - `hard-gate.sh` refuses `git push` and `gh pr create` until the repo's local
   test receipt matches the commit, when the repo names a push check.
-- `agent-brief-gates.sh` refuses a verifier brief with no claims list and a third re-verify round,
+- `agent-brief-gates.sh` refuses a verifier brief with no claims list and a third re-verify round (the architecture reviewer's re-check counts toward it),
   and an architecture reviewer's brief without the ADR alignment lines or the
   architecture doc's path, and `dispatch-record-gate.sh` writes the dispatch
   log the agent count is read from.

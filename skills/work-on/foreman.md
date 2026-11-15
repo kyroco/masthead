@@ -186,8 +186,13 @@ agent-run count. One that does not skipped the README: send it back to read it
 before you queue its PR.
 
 Some things are not yours to settle and go to the person as they stand, one at
-a time: what the second re-verify round left on the fix list, and a security finding the adjudicator could not settle (its For the
-foreman section, 300 words or less). A PR with one of those unanswered is not
+a time: what the second re-verify round left on the fix list, a security finding the adjudicator could not settle, and an ADR line and a
+mockup that disagree (its For the foreman section). While the architecture
+trial is on, the adjudicator's Architecture trial section goes to the person
+too, whole and unedited: every architecture finding with its lens, smell,
+class, scores and placement, so the person can judge how the reviewer
+performs. Send the worker the person's answer word for word; it fixes only
+the findings that answer sends back. A PR with one of those unanswered is not
 queued. Everything else the adjudicator placed is final for the worker and for
 you, whichever round placed it, and you rule on none of it.
 
@@ -210,7 +215,7 @@ an extra that rule says to fix and it did not fix, send it back to fix it,
 without asking the person.
 
 Queue the PR when all of these hold: CI is green; nothing is left on the
-adjudicator's fix list; every extra the worker's rule says to fix is fixed in it; the PR body's
+adjudicator's fix list; every architecture finding the person sent back is fixed in it; every extra the worker's rule says to fix is fixed in it; the PR body's
 unproven list holds nothing a customer would see; and the worker, told you are
 ready to queue, has answered "cleaned up" (its test stack and code index are
 gone; its worktree and branch stay). Otherwise park it with the reason. Auto

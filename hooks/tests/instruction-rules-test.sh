@@ -1201,7 +1201,7 @@ says  skills/setup/SKILL.md 'project_fact.py --architecture-doc'
 # time": "yes it does".
 # Scenario 1: one reviewer per change, sent with the first verification.
 says  references/session-cliffs.md 'one `architecture-reviewer` for the whole change, never one per scenario'
-says  references/session-cliffs.md 'The architecture reviewer goes out once per change: never on a re-verify round'
+# MAST-35 scenario 6 replaced "never on a re-verify round" with a re-check of the fixed findings.
 # Scenario 2: only the lines the change touched, the seven lenses, and what a finding names.
 says  agents/architecture-reviewer.md 'name: architecture-reviewer'
 says  agents/architecture-reviewer.md 'You review only the lines the change touched'
@@ -1318,5 +1318,52 @@ says  agents/architecture-reviewer.md 'that no requirement of it was checked is 
 # Round 1, extra scored 8: the ADR check's other job, a changed line that
 # contradicts any line of the ADR (Robert, November 14, "yes" to keeping both jobs).
 says  agents/architecture-reviewer.md 'a changed line that contradicts any line of the ADR, such as an option it rejected, is a finding, with that line quoted'
+# MAST-35: the adjudicator puts architecture findings that break a rule or a
+# named build on the fix list, and every one goes to the person during the trial.
+# Scenarios 1 to 4: what holds and where its class places it.
+says  agents/adjudicator.md 'One that quotes a line of the ADR, the architecture doc or the principles, or of the mockup page, holds when you find that line where the finding says it is, as quoted, and read the code at its `file:line` and see that code break it'
+says  agents/adjudicator.md '**rule**: it breaks a line of the ADR, the architecture doc or the principles, or contradicts the mockup page, and is not drift. Fixed in this PR: a principle break is not an extra, since going against one takes an ADR'
+says  agents/adjudicator.md '**build**: a build the architecture doc names behaves wrongly. Fixed in this PR'
+says  agents/adjudicator.md '**drift**: it breaks one of the seven rules as the project'"'"'s architecture doc states them. Fixed in this PR, whatever its customer score'
+says  agents/adjudicator.md 'A finding of class drift, rule or build is never noise'
+says  agents/adjudicator.md '**none**: none of these. Placed by the rules above, as any other finding is; as an extra, its score is the architecture reviewer'"'"'s customer score'
+says  agents/adjudicator.md 'Design cost alone, code that would only be harder to change some day, is thrown out'
+says  skills/work-on/worker.md 'its score is the architecture reviewer'"'"'s customer score'
+says  agents/adjudicator.md 'A build the doc does not name is no reason to keep a finding'
+says  agents/adjudicator.md 'the ADR'"'"'s path, the architecture doc'"'"'s path (or `none recorded`), the file that holds the project'"'"'s principles, the mockup pages'
+says  references/dispatch-brief.md 'Architecture doc: <the path project_fact.py --architecture-doc prints>, or "none recorded". Principles:'
+says  references/session-cliffs.md 'what it needs to judge the architecture reviewer'"'"'s findings'
+# The placement lives in the adjudicator's file; the PR steps point there.
+says  references/session-cliffs.md 'as "Decide where it goes" in `agents/adjudicator.md` says, for an architecture finding too'
+# Scenario 5: one fact under two lenses is one finding.
+says  agents/adjudicator.md 'Two architecture findings are the same when they report the same fact about the same code, whatever lens each was found under'
+# Scenario 6: the reviewer re-checks only the fixed findings, inside the cap of two.
+never references/session-cliffs.md 'never on a re-verify round'
+never references/dispatch-brief.md 'never on a re-verify round'
+never agents/architecture-reviewer.md 'once per change'
+says  references/session-cliffs.md 'When a fix addressed an architecture finding, send the `architecture-reviewer` in the same message, given the fix diff and only those findings'
+says  references/session-cliffs.md 'a round is the verifier, the architecture reviewer, or both under one round number'
+says  agents/architecture-reviewer.md 'Re-check only those findings'
+says  agents/architecture-reviewer.md 'Run no lens and report nothing else'
+says  references/dispatch-brief.md 'Re-verify: round 1, findings arch-2 and arch-5'
+# Scenario 7: an ADR line and a mockup that disagree go to the person, and the PR waits.
+says  agents/adjudicator.md '**disagreement**: an ADR line and a mockup disagree. For the foreman, unedited'
+says  agents/adjudicator.md 'and each ADR line and mockup that disagree, quoting both'
+says  references/session-cliffs.md 'or an ADR line and a mockup that disagree) goes to the foreman unedited'
+says  skills/work-on/foreman.md 'and an ADR line and a mockup that disagree (its For the foreman section)'
+# Scenario 8: during the trial every architecture finding goes to the person.
+says  agents/adjudicator.md 'every one, kept, merged or thrown out, goes in your verdict'"'"'s Architecture trial section, with its finding id, its `file:line`, its lens (every lens, for a merged one), its smell, its class, the reviewer'"'"'s customer score, its drift answer, and your placement'
+says  agents/adjudicator.md 'The worker fixes only the ones the person sends back'
+says  references/session-cliffs.md 'You fix only the architecture findings the person sends back'
+says  skills/work-on/foreman.md 'the adjudicator'"'"'s Architecture trial section goes to the person too, whole and unedited'
+says  skills/work-on/foreman.md 'every architecture finding the person sent back is fixed in it'
+says  README.md 'every one of its findings reaches you too, kept or thrown out'
+says  docs/explainer.html 'every one of its findings reaches you too, kept or thrown out'
+# Scenario 9: with the trial off, the placement stands with no one in between.
+says  agents/adjudicator.md 'When it reads `off`, the findings go under Fix, Extras and For the foreman as placed, with no one in between'
+says  references/dispatch-brief.md 'Architecture trial: <on or off, as project_fact.py --architecture-trial prints>'
+# Scenario 10: on from the first run (hooks/tests/architecture-trial-test.py proves the fact).
+says  README.md 'The trial is on from the first run until you set `"ARCHITECTURE_TRIAL": "off"`'
+says  references/dispatch-brief.md 'until then it is on, on a new install too'
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
