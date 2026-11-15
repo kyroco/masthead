@@ -31,7 +31,7 @@ command that fetches or builds:
 
     ${CLAUDE_PLUGIN_ROOT}/skills/work-on/warm-build.sh clone <tree path>
 
-It clones the foreman's built output (on Kyroco, the dependencies, `_build`
+It clones the foreman's built output (for example the dependencies, `_build`
 and the Rust `target` folders) with an APFS clone, which takes a few seconds
 and no extra disk until a file changes, and keeps anything your worktree
 already has. Your first build then compiles only your own code and what
@@ -77,7 +77,7 @@ always git.
 
 ## 4. What done is
 
-Done is three things: every scenario in the issue has a test that passes, if your work involves UI then every UI element related to this issue is functional,
+Done is four things: every scenario in the issue has a test that passes, if your work involves UI then every UI element related to this issue is functional,
 the repo's pre-push check passes, and the PR is open. Then you stop.
 
 Reviews will always find more than the scenarios ask for, and so will you:
@@ -110,11 +110,14 @@ would have to change, is a question, not a redraw.
 
 ## 6. Prove it and open the PR
 
-Follow **Opening a PR** in `${CLAUDE_PLUGIN_ROOT}/references/session-cliffs.md`.
-Run the repo's pre-push check one time: on the last commit, after the fixes
-of the last verification round are in. Do not start it when you send out the
-verifiers, because any later commit makes its receipt stale. Do not commit
-while it runs, because the run is then thrown away.
+Follow **Opening a PR**, step by step, as this command prints it from your
+worktree:
+
+    python3 ${CLAUDE_PLUGIN_ROOT}/hooks/prime-context.py show "Opening a PR"
+
+It prints the same steps the hook injects: your repository's own version when
+its `.claude/references/session-cliffs.md` has that lead, otherwise the
+plugin's. Its step 8 says when to run the pre-push check.
 Once the PR is open, set the Status to In Review with `set-status.sh`.
 
 ## 7. Report

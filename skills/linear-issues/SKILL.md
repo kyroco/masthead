@@ -114,9 +114,8 @@ the merge queue through GitHub, as the `github-issues` skill says.
 - Labels: `Bug`, `Feature` or `Improvement` for the kind of work, plus any
   topic label the team already has, with `addLabels`.
 - A blocked-by link for a real sequence dependency, never for "this would be
-  tidier after that". A follow-up filed from a PR's review is blocked by the
-  issue whose review found it, and only the user files one, by answering "fix
-  later" to its line; no agent files an issue from a review on its own.
+  tidier after that". No issue is filed from a PR's review: an extra is
+  settled as the worker's "What done is" says (`skills/work-on/worker.md`).
 - An open question: status Needs Human, as **What an issue holds** says.
 
 ## Working an issue

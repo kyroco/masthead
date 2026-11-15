@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run every test suite for the shared hooks in this folder; nothing runs these in CI.
+# Run every test suite for the shared hooks in this folder; CI runs this on Linux and macOS (.github/workflows/tests.yml).
 # Usage: bash hooks/run-tests.sh (CLAUDE_PROJECT_DIR is unset so the calling repo cannot make a hook stand down).
 # RUN_ONLY="<label>" runs that one suite. A suite that exits 77 was skipped: its last line says why, and it is not a failure.
 
@@ -47,6 +47,7 @@ run "secret read gate"       python3 "$here/test-secret-gate.py"
 run "masked reader"          python3 "$here/tests/read-redacted-test.py"
 run "work gates"             python3 "$here/test-work-gates.py"
 run "ADR structure gate"     bash "$here/tests/adr-structure-gate-test.sh"
+run "generic parts"          python3 "$here/tests/generic-parts-test.py"
 run "Elixir hooks"           bash "$here/tests/elixir-hooks-test.sh"
 run "wiki refresh"           bash "$here/tests/wiki-refresh-test.sh"
 run "push gate"              bash "$here/tests/hard-gate-test.sh"

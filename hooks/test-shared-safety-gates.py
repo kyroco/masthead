@@ -365,7 +365,7 @@ def main():
           edit_gate("k-off", {"MASTHEAD_SEARCH_GATE": "off"}), "allow")
 
     print("\n--- a capture is filed under the name that made it ---")
-    # ADR-0120: source_agent is the one field that answers who decided this.
+    # source_agent is the one field that answers who decided this.
     # MEASURED on 1434 real captures from 2026-08-20: this refuses 0 of them when
     # the name matches and 1076 when it does not, which is the separation the
     # length and importance rules could not produce as a test of who wrote it.
@@ -485,9 +485,14 @@ def main():
                   "return the verdict memory's thought id"):
         check(f"the adjudicator's capture section says: {words}",
               str(words in " ".join(capture_section.split())), "True")
-    check("a failed save of a thrown-out finding is reported as a count",
-          str("A thrown-out finding whose save failed is counted, never named"
+    # MAST-39: a thrown-out finding is gone, so it is never saved where the
+    # worker searches; only its count is in the verdict memory.
+    check("a thrown-out finding is never captured",
+          str("A thrown-out finding is never captured"
               in " ".join(capture_section.split())), "True")
+    check("and no thrown-out finding gets a memory of its own",
+          str("and so does each thrown-out finding"
+              in " ".join(capture_section.split())), "False")
     check("the adjudicator is no longer told to save the verdict whole",
           str("Capture the verdict to Korium" in capture_section), "False")
 
