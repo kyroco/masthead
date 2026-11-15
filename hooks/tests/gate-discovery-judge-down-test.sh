@@ -33,7 +33,7 @@ run() {
   local tmp sid out
   tmp="$(mktemp -d)"
   mkdir -p "$tmp/hooks"
-  cp "$HOOKS/engram-protocol.sh" "$HOOKS/shell-search-pattern.py" "$tmp/hooks/"
+  cp "$HOOKS/engram-protocol.sh" "$HOOKS/shell-search-pattern.py" "$HOOKS/project_fact.py" "$tmp/hooks/"
   if [ "$1" != "-" ]; then
     # The hook runs its judge with python3, so the fake is Python.
     printf 'import sys\nsys.stdin.read()\nprint(%s)\n' "'$1'" > "$tmp/hooks/korium-index-judge.py"

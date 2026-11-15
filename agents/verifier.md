@@ -230,9 +230,10 @@ compile: no `mix compile`, `mix deps.get`, `mix deps.compile`, `swift build`
 or `cargo build`. A copy is a second full build on a machine that already
 runs several sessions.
 
-No hook enforces these two rules, except that the network hook, while it is on
-and the machine has jq, refuses `git clone` and `rsync`; they hold because you
-keep them. You still read any file, those scripts included, and run the tests that need no
+No hook enforces these two rules, except that your shell runs only the
+command shapes `hooks/reviewer_shapes.py` lists, and none of them copies,
+compiles or starts anything; a test you run can still do any of these, so
+they hold because you keep them. You still read any file, those scripts included, and run the tests that need no
 database.
 
 Two kinds of claim you answer a third way. A claim that only a database

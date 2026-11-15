@@ -896,9 +896,15 @@ says  references/dispatch-brief.md "Nothing enforces this"
 never references/dispatch-brief.md "ensure-substrates"
 says  references/session-cliffs.md "lists as not proven here"
 # Round 1 fix F1: the network hook already refuses two of the copy commands for two of the helpers, and the text says so.
-says  agents/verifier.md "except that the network hook, while it is on and the machine has jq, refuses \`git clone\` and \`rsync\`"
-says  agents/security-reviewer.md "except that the network hook, while it is on and the machine has jq, refuses \`git clone\` and \`rsync\`"
-says  references/dispatch-brief.md "except that the network hook, while it is on and the machine has jq, refuses a verifier's or a security reviewer's \`git clone\` and \`rsync\`"
+# MAST-43: the verifier's shell now runs only exact shapes, none of which copies, compiles or starts anything.
+says  agents/verifier.md "except that your shell runs only the command shapes \`hooks/reviewer_shapes.py\` lists, and none of them copies, compiles or starts anything; a test you run can still do any of these"
+says  agents/security-reviewer.md "except that your shell runs only the command shapes \`hooks/reviewer_shapes.py\` lists, and none of them copies, compiles or starts anything; a test you run can still do any of these"
+says  references/dispatch-brief.md "except that a verifier's or a security reviewer's shell runs only the command shapes \`hooks/reviewer_shapes.py\` lists, none of which copies, compiles or starts anything; a test it runs can"
+says  agents/security-reviewer.md "\`semgrep --metrics=off --disable-version-check --config .claude/semgrep/sentinel-triggers.yml\`"
+says  agents/security-reviewer.md "\`opengrep --disable-version-check --config .claude/semgrep/sentinel-taint.yml\`"
+for doc in agents/verifier.md agents/security-reviewer.md references/dispatch-brief.md; do
+  never "$doc" "the network hook, while it is on"
+done
 never references/dispatch-brief.md "no hook checks it"
 # Round 1 fix F2: no run takes the change out, so a claim that needed a private copy is settled by nobody and is listed as not proven.
 says  references/session-cliffs.md "This run settles each claim the verdict lists as not proven here for want of a database"
@@ -1232,7 +1238,7 @@ says  skills/setup/SKILL.md 'project_fact.py --architecture-doc'
 # time": "yes it does".
 # Scenario 1: one reviewer per change, sent with the first verification.
 says  references/session-cliffs.md 'one `architecture-reviewer` for the whole change, never one per scenario'
-says  references/session-cliffs.md 'The architecture reviewer goes out once per change: never on a re-verify round'
+# MAST-35 scenario 6 replaced "never on a re-verify round" with a re-check of the fixed findings.
 # Scenario 2: only the lines the change touched, the seven lenses, and what a finding names.
 says  agents/architecture-reviewer.md 'name: architecture-reviewer'
 says  agents/architecture-reviewer.md 'You review only the lines the change touched'
@@ -1252,8 +1258,22 @@ says  agents/architecture-reviewer.md 'You do not search Korium'"'"'s memory'
 # Re-verify round 1, fixes V1 and N2: the README promises only what the fences do.
 never README.md 'None of them can reach the network'
 never README.md 'None of them can edit anything'
-says  README.md 'refuse the common network programs'
-says  references/gate-catalog.md 'a denylist of network programs, not an allowlist'
+# MAST-43: the README and catalog say the verifiers' shells run exact shapes, and what that leaves open.
+never README.md 'refuse the common network programs'
+says  README.md 'shells run only the command shapes in `hooks/reviewer_shapes.py`'
+says  README.md 'They refuse every other command, a wrapper such as `timeout 5 curl` included, and every redirect into a file.'
+# Round 1 arch-1, Robert, November 15: probe scripts stay, and the text says the fence covers the
+# commands typed, not code run, a probe script the agent wrote itself included.
+says  README.md 'The fence covers the commands the agent types, not code it runs: a test, a test runner, semgrep, or a probe script it wrote itself in its scratch folder can still do anything (MAST-43)'
+says  references/gate-catalog.md 'It covers the commands the agent types, not code it runs: a test, a test runner, semgrep, or a probe script the agent wrote itself in its scratch folder can still do anything'
+never references/gate-catalog.md 'a test or probe script it runs is the repository'"'"'s code'
+never hooks/reviewer_shapes.py 'A test or probe script it runs is code of the repository'
+# Round 1, S2-F1: the README's list is the fence's own summary (bash-scope-reviewer-test.sh holds them together).
+never README.md 'joined by a pipe or `&&`'
+never references/gate-catalog.md 'the reviewer network gate refuses a reviewer call naming a network tool'
+never references/gate-catalog.md 'a denylist of network programs, not an allowlist'
+says  references/gate-catalog.md 'Holds the `verifier` and `security-reviewer` shells to the exact command shapes `hooks/reviewer_shapes.py` lists'
+says  references/gate-catalog.md 'For the architecture reviewer it is a denylist of network programs'
 # Re-verify round 2 (Robert, November 15): the README and catalog claim only
 # the exact shapes the architecture reviewer's shell allows, and no fence they
 # do not have.
@@ -1261,14 +1281,14 @@ never README.md 'the architecture reviewer'"'"'s shell can only read'
 says  README.md 'The architecture reviewer'"'"'s shell runs only `git diff`, `git show` and `git log` with plain revisions and paths'
 says  README.md 'and refuses every other command'
 never references/gate-catalog.md 'refuses git'"'"'s `-O` in any spelling'
-says  references/gate-catalog.md 'a wrapper it does not see through (`timeout`, `stdbuf`, `nice -n 5`, `exec -a y`, a shell'"'"'s bundled `-lc`), a git alias set with `-c`, or git run from `find -exec`, still gets through for the verifier and security reviewer (MAST-43)'
+never references/gate-catalog.md 'still gets through for the verifier and security reviewer (MAST-43)'
 # Re-verify round 3, fixes V1 and S1, and the judge's N1: the hook-table row
 # names --comments, and neither the catalog nor the README claims a refusal a
 # wrapper gets past.
 says  README.md '`gh issue view <n>`, bare or with `--comments` | scoped by the agent'"'"'s type |'
 never references/gate-catalog.md 'refuses git'"'"'s `-O` written after git in the same command'
-says  references/gate-catalog.md 'refuses git'"'"'s `-O` when git is the first word or follows a wrapper it steps over'
-says  README.md 'though one run through a wrapper the fence does not see through, such as `timeout 5 curl`, still gets through (MAST-43)'
+never references/gate-catalog.md 'refuses git'"'"'s `-O` when git is the first word or follows a wrapper it steps over'
+never README.md 'still gets through (MAST-43)'
 says  references/gate-catalog.md 'the `architecture-reviewer` shell to exact command shapes'
 says  agents/architecture-reviewer.md 'Your shell runs only these exact commands'
 never agents/architecture-reviewer.md 'with `--comments` or `--json`'
@@ -1285,7 +1305,7 @@ fi
 VERIFIER_DENY="$(sed -n 's/^disallowedTools: //p' "$ROOT/agents/verifier.md" | tr ',' '\n' | tr -d ' ')"
 ARCH_DENY_ALL="$(sed -n 's/^disallowedTools: //p' "$ROOT/agents/architecture-reviewer.md" | tr ',' '\n' | tr -d ' ')"
 for tool in $VERIFIER_DENY; do
-  if printf '%s\n' "$ARCH_DENY_ALL" | grep -qx "$tool"; then pass=$((pass + 1)); else fail=$((fail + 1)); echo "FAIL agents/architecture-reviewer.md does not deny $tool, which the verifier denies"; fi
+  if grep -qx "$tool" <<<"$ARCH_DENY_ALL"; then pass=$((pass + 1)); else fail=$((fail + 1)); echo "FAIL agents/architecture-reviewer.md does not deny $tool, which the verifier denies"; fi
 done
 # Round 1, fix F5: the brief shape itself carries nothing of the author's account.
 says  references/dispatch-brief.md 'nothing of your account of the change: no claims, no did-not-prove list, no summary'
@@ -1294,14 +1314,14 @@ says  references/session-cliffs.md 'the principles file and the mockup pages, an
 ARCH_TOOLS="$(sed -n 's/^tools: //p' "$ROOT/agents/architecture-reviewer.md" | tr ',' '\n' | tr -d ' ')"
 ARCH_DENY="$(sed -n 's/^disallowedTools: //p' "$ROOT/agents/architecture-reviewer.md" | tr ',' '\n' | tr -d ' ')"
 for tool in mcp__korium__agent_search mcp__claude_ai_korium__agent_search mcp__korium__korium_browse mcp__claude_ai_korium__korium_browse; do
-  if printf '%s\n' "$ARCH_DENY" | grep -qx "$tool" && ! printf '%s\n' "$ARCH_TOOLS" | grep -qx "$tool"; then
+  if grep -qx "$tool" <<<"$ARCH_DENY" && ! grep -qx "$tool" <<<"$ARCH_TOOLS"; then
     pass=$((pass + 1))
   else
     fail=$((fail + 1)); echo "FAIL agents/architecture-reviewer.md does not deny $tool"
   fi
 done
 for tool in Edit MultiEdit NotebookEdit Agent WebFetch; do
-  if printf '%s\n' "$ARCH_DENY" | grep -qx "$tool"; then pass=$((pass + 1)); else fail=$((fail + 1)); echo "FAIL agents/architecture-reviewer.md does not deny $tool"; fi
+  if grep -qx "$tool" <<<"$ARCH_DENY"; then pass=$((pass + 1)); else fail=$((fail + 1)); echo "FAIL agents/architecture-reviewer.md does not deny $tool"; fi
 done
 if printf '%s\n' "$ARCH_TOOLS" | grep -E '__(save_|create_|delete_|update_|issue_write|add_|merge_|push_)' >/dev/null; then
   fail=$((fail + 1)); echo "FAIL agents/architecture-reviewer.md grants a tracker write: $(printf '%s\n' "$ARCH_TOOLS" | grep -E '__(save_|create_|delete_|update_|issue_write|add_|merge_|push_)' | tr '\n' ' ')"
@@ -1349,6 +1369,82 @@ says  agents/architecture-reviewer.md 'that no requirement of it was checked is 
 # Round 1, extra scored 8: the ADR check's other job, a changed line that
 # contradicts any line of the ADR (Robert, November 14, "yes" to keeping both jobs).
 says  agents/architecture-reviewer.md 'a changed line that contradicts any line of the ADR, such as an option it rejected, is a finding, with that line quoted'
+# MAST-35: the adjudicator puts architecture findings that break a rule or a
+# named build on the fix list, and every one goes to the person during the trial.
+# Scenarios 1 to 4: what holds and where its class places it.
+says  agents/adjudicator.md 'One that quotes a line of the ADR, the architecture doc or the principles, or of the mockup page, holds when you find that line where the finding says it is, as quoted, and read the code at its `file:line` and see that code break it'
+says  agents/adjudicator.md '**rule**: it breaks a line of the ADR, the architecture doc or the principles, or contradicts the mockup page, and is not drift. Fixed in this PR: a principle break is not an extra, since going against one takes an ADR'
+says  agents/adjudicator.md '**build**: a build the architecture doc names behaves wrongly. Fixed in this PR'
+says  agents/adjudicator.md '**drift**: it breaks one of the seven rules as the project'"'"'s architecture doc states them. Fixed in this PR, whatever its customer score'
+says  agents/adjudicator.md 'A finding of class drift, rule or build is never noise'
+says  agents/adjudicator.md '**none**: none of these. Placed by the rules above, as any other finding is; as an extra, its score is the architecture reviewer'"'"'s customer score'
+says  agents/adjudicator.md 'Design cost alone, code that would only be harder to change some day, is thrown out'
+says  agents/adjudicator.md 'A build the doc does not name is no reason to keep a finding'
+says  agents/adjudicator.md 'the ADR'"'"'s path, the architecture doc'"'"'s path (or `none recorded`), the file that holds the project'"'"'s principles, the mockup pages'
+says  references/dispatch-brief.md 'Architecture doc: <the path project_fact.py --architecture-doc prints>, or "none recorded". Principles:'
+says  references/session-cliffs.md 'what it needs to judge the architecture reviewer'"'"'s findings'
+# The placement lives in the adjudicator's file; the PR steps point there.
+says  references/session-cliffs.md 'as "Decide where it goes" in `agents/adjudicator.md` says, for an architecture finding too'
+# Scenario 5: one fact under two lenses is one finding.
+says  agents/adjudicator.md 'Two architecture findings are the same when they report the same fact about the same code, whatever lens each was found under'
+# Scenario 6: the reviewer re-checks only the fixed findings, inside the cap of two.
+never references/session-cliffs.md 'never on a re-verify round'
+never references/dispatch-brief.md 'never on a re-verify round'
+never agents/architecture-reviewer.md 'once per change'
+says  references/session-cliffs.md 'When a fix addressed an architecture finding, send the `architecture-reviewer` in the same message, given the fix diff and only those findings'
+says  references/session-cliffs.md 'a round is the verifier, the architecture reviewer, or both under one round number'
+says  agents/architecture-reviewer.md 'Re-check only those findings'
+says  agents/architecture-reviewer.md 'Run no lens and report nothing else'
+says  references/dispatch-brief.md 'Re-verify: round 1, findings arch-2 and arch-5'
+# Scenario 7: an ADR line and a mockup that disagree go to the person, and the PR waits.
+says  agents/adjudicator.md '**disagreement**: an ADR line and a mockup disagree. For the foreman, unedited'
+says  agents/adjudicator.md 'and each ADR line and mockup that disagree, quoting both'
+says  references/session-cliffs.md 'or an ADR line and a mockup that disagree) goes to the foreman unedited'
+says  skills/work-on/foreman.md 'and an ADR line and a mockup that disagree (its For the foreman section)'
+# Scenario 8: during the trial every architecture finding goes to the person.
+says  agents/adjudicator.md 'every one, kept, merged or thrown out, goes in your verdict'"'"'s Architecture trial section, with its finding id, its `file:line`, its lens (every lens, for a merged one), its smell, its class, the reviewer'"'"'s customer score, its drift answer, and your placement'
+says  agents/adjudicator.md 'The worker fixes only the ones the person sends back'
+says  references/session-cliffs.md 'You fix only the architecture findings the person sends back'
+says  skills/work-on/foreman.md 'the adjudicator'"'"'s Architecture trial section goes to the person too, whole and unedited'
+says  skills/work-on/foreman.md 'every architecture finding the person sent back is fixed in it'
+says  README.md 'every one of its findings reaches you too, kept or thrown out'
+says  docs/explainer.html 'every one of its findings reaches you too, kept or thrown out'
+# Scenario 9: with the trial off, the placement stands with no one in between.
+says  agents/adjudicator.md 'When it reads `off`, the findings go under Fix, Extras and For the foreman as placed, with no one in between'
+says  references/dispatch-brief.md 'Architecture trial: <on or off, as project_fact.py --architecture-trial prints>'
+# Scenario 10: on from the first run (hooks/tests/architecture-trial-test.py proves the fact).
+says  README.md 'The trial is on from the first run until you set `"ARCHITECTURE_TRIAL": "off"`'
+says  references/dispatch-brief.md 'until then it is on, on a new install too'
+# Round 1, fix F1: the "fix only what the person sends back" rule holds only while the trial is on.
+never references/session-cliffs.md 'the person sends back, as step 4 says, and none of the others'
+says  references/session-cliffs.md 'While the trial is on, you fix only the architecture findings the person sends back'
+# Round 1, fix F2: the waiting and the relay are pinned.
+says  references/session-cliffs.md 'who brings it to the user; the PR waits for that answer'
+says  references/session-cliffs.md 'So does its Architecture trial section, while the trial period is on'
+says  skills/work-on/foreman.md 'A PR with one of those unanswered is not queued'
+# Round 1, fix F3: the README says the fix list rule holds once the trial is off.
+says  README.md 'Once the trial is off, an architecture finding that breaks one of the doc'"'"'s seven rules'
+never README.md 'customer score; one where the decision record and a mockup disagree comes to you. That placement'
+# Round 1, extra X3 (scored 8): a build finding carries the path the adjudicator follows.
+says  agents/architecture-reviewer.md '"path": "<for a build finding, the steps from a real entry point to the wrong result in that build>"'
+says  agents/architecture-reviewer.md 'A finding that a build behaves wrongly gives the path'
+# Round 1, arch-1 (Robert: fix): a missing or misspelled trial line is read as on.
+says  agents/adjudicator.md 'When the line is missing, or reads anything but `off`, treat it as `on`'
+# Round 1, arch-2 (Robert: fix): the architecture extra's score and the principle break are written once, in the adjudicator's file.
+never skills/work-on/worker.md 'its score is the architecture reviewer'"'"'s customer score'
+never skills/work-on/worker.md 'A principle break is never an extra'
+says  skills/work-on/worker.md 'is scored as "Decide where it goes" in `agents/adjudicator.md` says'
+# Round 1, arch-3 (Robert: fix): how the trial is turned off is written once, in dispatch-brief.md.
+never references/session-cliffs.md 'until the person sets `ARCHITECTURE_TRIAL` to `off`'
+# Re-verify round 1, fix C4: the worker relays a trial section that lists findings whatever its brief's line said,
+# since the adjudicator reads a missing or misspelled line as on.
+says  references/session-cliffs.md 'whenever that section lists a finding, whatever your brief'"'"'s `Architecture trial:` line said, since the adjudicator reads a missing or misspelled line as on (`references/dispatch-brief.md` has the switch)'
+never references/session-cliffs.md 'the trial period is on, as the brief'"'"'s `Architecture trial:` line says'
+# Re-verify round 1, fix C1: the trial-off half and step 4 are pinned.
+says  references/session-cliffs.md 'once it is off, the section reads "None, the trial is off" and the adjudicator'"'"'s Fix list holds them like any other finding, fixed as step 4 says'
+says  references/session-cliffs.md 'Fix each finding on the adjudicator'"'"'s fix list in this PR, test first'
+# Re-verify round 1, fix C3: the adjudicator follows a build finding's path before keeping it.
+says  agents/adjudicator.md 'One that says a build would behave wrongly holds when the architecture doc names that build and you follow the path the finding gives to the wrong result in that build'
 # MAST-36: /setup brings an existing project in line with its architecture doc,
 # by a targeted review or a full sweep.
 # Scenario 1: setup asks, when there is code and a doc, targeted, sweep or neither.
@@ -1439,7 +1535,6 @@ says  skills/analyze-issues/issue-check.md 'is quoted in the issue with its sour
 # Scenario 5: both issue skills say the Scenarios cover each build the ADR names.
 says  skills/github-issues/SKILL.md 'the Scenarios cover each build the ADR names'
 says  skills/linear-issues/SKILL.md 'the Scenarios cover each build the ADR names'
-# Scenario 6: no architecture doc recorded, the four checks are skipped.
 # Scenario 6 as the foreman narrowed it (MAST-33 comment, November 15): with no doc, only
 # checks 7 to 9 are skipped; the rulings check runs on every issue.
 says  skills/analyze-issues/issue-check.md 'With "Architecture doc: none recorded" above, skip checks 7 to 9'
@@ -1459,5 +1554,31 @@ says  skills/analyze-issues/issue-check.md 'check 7 fails naming that record'
 says  skills/analyze-issues/issue-check.md 'the architecture doc named above, in full'
 # F1 test point: the line that makes a failing check 7 or 10 quote the missing line.
 says  skills/analyze-issues/issue-check.md 'Check 7 or 10 fails: quote each missing line, with its source, under the scenario it governs'
+
+# MAST-32: /review-design proves an ADR's architecture alignment is real.
+RD=skills/review-design/SKILL.md
+says  "$RD" '## The architecture alignment'
+says  "$RD" 'project_fact.py --architecture-doc'
+says  "$RD" 'Judge each line as a reader would; do not match words.'
+# Scenario 1: a named module or door is found in the code, or is a finding.
+says  "$RD" 'A module, door or part it names is in the code: find it with `code_locate` and read it. One you cannot find is a finding that quotes the line.'
+# Scenario 2: each build is one the doc names.
+says  "$RD" 'Each build on its `Builds:` line is one the doc names, under "What each build ships" or wherever it lists its builds. A build the doc does not name is a finding.'
+# Scenario 3: a hollow line is a finding the person settles. The foreman, for
+# MAST-31: a why that only repeats the part's name is caught here, not by the gate.
+says  "$RD" 'A line that says "TBD" or "N/A" with no reason, says only "conforms" with no word of how, gives a why that only repeats the part'"'"'s name, or restates the doc without saying how this decision applies it, is hollow. That is a finding, and the person settles it'
+says  "$RD" 'A hollow alignment line is the exception: it always goes to the user.'
+# Scenario 4: a touched part the alignment leaves out is a finding naming it.
+says  "$RD" 'that the alignment does not mention is a finding that names the part.'
+# Scenario 5: stale doc lines are reported before the ADR is reviewed against the doc.
+says  "$RD" 'a module or door it names that the code no longer has, or an app or part the code has that the doc does not name'
+says  "$RD" 'Report each stale line before you review the ADR against the doc'
+# Round 1, F1: a doc recorded but moved or gone is a finding, not "no doc recorded".
+says  "$RD" 'look for `ARCHITECTURE_DOC` in the env block of the main checkout'"'"'s `.claude/settings.local.json` and `.claude/settings.json`'
+says  "$RD" 'When one holds a path, the doc has moved or gone: that is the first finding. Say which path is recorded and that no file is there, and ask the user where the doc is now before the alignment review.'
+# Round 1, F2: the gate asks a why only of a divergence, so a bare conforms is hollow too.
+never "$RD" 'with a verdict and a why on each entry'
+says  "$RD" 'a verdict on each entry, and a why only on a divergence'
+says  "$RD" 'says only "conforms" with no word of how,'
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]

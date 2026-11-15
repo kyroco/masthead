@@ -68,6 +68,8 @@ import shlex
 import subprocess
 import sys
 
+from project_fact import private_dir, private_open, safe_session
+
 EDIT = re.compile(r"(?<![A-Za-z0-9_/.-])gh\s+issue\s+edit\b")
 # gh issue edit flags that take a value, so the value is never read as an issue number.
 VALUE_FLAGS = {
@@ -465,10 +467,13 @@ def connector_edit(tool, tool_input):
 
 
 def record_path(data, repo, ref):
-    """Where this session keeps the body it last read or wrote for one issue."""
-    session = re.sub(r"[^A-Za-z0-9_-]", "", str(data.get("session_id") or "")) or "nosession"
+    """Where this session keeps the body it last read or wrote for one issue: its
+    private state folder (MAST-38), or None when that cannot be trusted."""
+    folder = private_dir("claude-issueedit", safe_session(data.get("session_id")))
+    if not folder:
+        return None
     key = re.sub(r"[^a-z0-9_.-]", "_", "{}#{}".format(repo, ref).lower())
-    return os.path.join(os.environ.get("TMPDIR", "/tmp"), "claude-issueedit", session, key + ".md")
+    return os.path.join(folder, key + ".md")
 
 
 def answered_issue(response, field="body"):
@@ -518,14 +523,18 @@ def record(data):
 
 def keep(data, repo, ref, body):
     path = record_path(data, repo, ref)
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w", encoding="utf-8") as fh:
+    if not path:
+        return
+    with private_open(path) as fh:
         fh.write(body)
 
 
 def recorded(data, repo, ref):
     try:
-        with open(record_path(data, repo, ref), "r", encoding="utf-8") as fh:
+        path = record_path(data, repo, ref)
+        if not path:
+            return None
+        with open(path, "r", encoding="utf-8") as fh:
             return fh.read()
     except Exception:
         return None

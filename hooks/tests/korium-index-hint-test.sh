@@ -70,7 +70,7 @@ hint() {
     '{pattern:$p,path:$d,cwd:$c,state:$s}' \
     | PATH="$T/bin:$PATH" TMPDIR="$T" python3 "$HOOKS/korium-index-hint.py"
 }
-fresh() { : > "$STUB_LOG"; rm -f "$T/claude-engram/korium-cli-signed-in" "$T/state/index-hinted"; }
+fresh() { : > "$STUB_LOG"; rm -f "$T/masthead-$(id -u)/claude-engram/korium-cli-signed-in" "$T/state/index-hinted"; }
 calls() { tr '\n' ',' < "$STUB_LOG" | sed 's/,$//'; }
 
 echo "--- plain words the index holds as names: say where ---"
@@ -130,7 +130,7 @@ echo "--- korium-cli cannot answer: quiet, never a browser ---"
 fresh; check "signed out"                               "" "$(STUB_STATUS=1 hint 'subscription' '')"
 check "  status only, never search"                     "status" "$(calls)"
 fresh; check "search fails"                             "" "$(STUB_SEARCH_EXIT=1 hint 'subscription' '')"
-check "  the good status is forgotten"                  absent "$([ -e "$T/claude-engram/korium-cli-signed-in" ] && echo present || echo absent)"
+check "  the good status is forgotten"                  absent "$([ -e "$T/masthead-$(id -u)/claude-engram/korium-cli-signed-in" ] && echo present || echo absent)"
 : > "$STUB_LOG"; hint 'subscription' '' > /dev/null
 check "  and the word is asked again next time"         "status,search subscription" "$(calls)"
 fresh; check "search prints something that is not JSON" "" "$(STUB_ROWS="$T/garbage.txt" hint 'subscription' '')"
