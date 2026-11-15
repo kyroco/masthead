@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # irreversible-action-gate.sh - PreToolUse Bash: refuse a command nothing can undo (force push, hard reset, git clean, --no-verify, tofu destroy, state edits or prod apply, dropped data, deleted memory files, recursive deletes outside scratch and build folders, deleted remote branches, gh repo, release and API deletes).
-# Appends every match to a record file in the session directory, fails open on a payload it cannot parse, reads the call with python3 when jq is missing, and always exits 0 printing a deny decision as JSON or nothing.
+# Appends every match to a record file in the session directory, refuses a call it cannot read, reads the call with python3 when jq is missing, and always exits 0 printing a deny decision as JSON or nothing.
 
 set -uo pipefail
 
@@ -11,10 +11,12 @@ INPUT="$(cat 2>/dev/null || true)"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd -P)" || HERE="$(dirname "$0")"
 if command -v jq >/dev/null 2>&1; then
   field() { printf '%s' "$INPUT" | jq -r "$1" 2>/dev/null || true; }
+  is_object() { printf '%s' "$INPUT" | jq -e 'type == "object"' >/dev/null 2>&1; }
   deny_json() { jq -n --arg r "$1" '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: $r}}' 2>/dev/null; }
 # python3 must run, not only be found: the macOS stub with no Command Line Tools is found and reads nothing.
 elif python3 -I -c 'import json' >/dev/null 2>&1 && [ -r "$HERE/json_field.py" ]; then
   field() { printf '%s' "$INPUT" | python3 -I "$HERE/json_field.py" "$1" 2>/dev/null || true; }
+  is_object() { printf '%s' "$INPUT" | python3 -I "$HERE/json_field.py" --object 2>/dev/null; }
   deny_json() { python3 -I "$HERE/json_field.py" --deny "$1" 2>/dev/null; }
 else
   # Nothing can read the call: refuse one that names a command these rules govern, rather than pass it unread.
@@ -25,11 +27,19 @@ else
   exit 0
 fi
 
+# A call that cannot be read is refused, never passed unread (MAST-37, project rule 2): a payload that is not
+# one JSON object, or a Bash call whose command reads as empty.
+unreadable() {
+  printf '%s\n' '{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "This Bash call could not be read, so the guard against force pushes, hard resets and deletes cannot check it, and it is refused rather than let through unread. Rewrite the command without unusual characters and run it again."}}'
+  exit 0
+}
+is_object || unreadable
+
 TOOL="$(field '.tool_name // empty')"
 [ "$TOOL" = "Bash" ] || exit 0
 
 CMD="$(field '.tool_input.command // empty')"
-[ -n "$CMD" ] || exit 0
+[ -n "$CMD" ] || unreadable
 
 SID="$(field '.session_id // "nosession"')"
 [ -n "$SID" ] || SID="nosession"

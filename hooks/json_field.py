@@ -81,32 +81,46 @@ def reasons(value, found):
             reasons(item, found)
 
 
+def read_in():
+    """stdin as UTF-8 whatever the locale: Claude Code sends UTF-8."""
+    return sys.stdin.buffer.read().decode("utf-8", "surrogateescape")
+
+
+def write_out(text):
+    """UTF-8 out whatever the locale and Python (3.6 has no reconfigure); a lone surrogate, which JSON
+    can carry as \\ud800, is written as that escape rather than stopping the write (MAST-37)."""
+    sys.stdout.buffer.write(text.encode("utf-8", "backslashreplace"))
+    sys.stdout.buffer.flush()
+
+
 def main(argv):
-    # Claude Code sends UTF-8 whatever the locale, so read and write UTF-8; a Latin-1 locale would
-    # otherwise fail on an arrow in a command, and the gate would read nothing (MAST-37).
-    for stream in (sys.stdin, sys.stdout):
-        stream.reconfigure(encoding="utf-8", errors="surrogateescape")
     if len(argv) == 2 and argv[0] == "--deny":
         # ASCII JSON, so no locale or stray byte can stop the refusal being printed.
-        print(json.dumps({"hookSpecificOutput": {
+        write_out(json.dumps({"hookSpecificOutput": {
             "hookEventName": "PreToolUse",
             "permissionDecision": "deny",
-            "permissionDecisionReason": argv[1]}}))
+            "permissionDecisionReason": argv[1]}}) + "\n")
         return 0
+    if argv == ["--object"]:
+        # Exit 0 when stdin is one JSON object, so a gate can tell an unreadable call from an absent field.
+        try:
+            return 0 if isinstance(json.loads(read_in()), dict) else 2
+        except ValueError:
+            return 2
     if argv == ["--reasons"]:
         found = []
         try:
-            for value in values(sys.stdin.read()):
+            for value in values(read_in()):
                 reasons(value, found)
         except ValueError:
             return 2
-        sys.stdout.write("\n\n".join(found))
+        write_out("\n\n".join(found))
         return 0
     if len(argv) != 1:
         return 2
     try:
         steps = parse(argv[0])
-        data = json.load(sys.stdin)
+        data = json.loads(read_in())
     except ValueError:
         return 2
     for i, (kind, arg) in enumerate(steps):
@@ -115,7 +129,7 @@ def main(argv):
         value = arg if kind == "string" else walk(data, arg)
         # The last alternative is printed whatever it holds, as jq does.
         if (value is not None and value is not False) or i == len(steps) - 1:
-            print(show(value))
+            write_out(show(value) + "\n")
             return 0
     return 0
 
