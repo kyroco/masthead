@@ -46,9 +46,8 @@ Who uses this: <the README's opening paragraph, quoted>.
 Mockup: <the mockup page the scenario names>, or "none".
 Verify <the diff command, with the head commit>. Write your findings to
 <state>/review/findings-verifier-<scenario>-<name>.json, where <state> is the
-repo's PROJECT_STATE_DIR fact from the env block of its .claude/settings.json
-(.claude/state when it states none). Write the real path in the brief, never
-the placeholder.
+folder `project_fact.py --state-path` prints. Write the real path in the
+brief, never the placeholder.
 
 Code outside the diff this depends on: <modules, files and functions it calls
 into or is called by>, or "self-contained".
@@ -104,12 +103,12 @@ That line is exact too: it begins `Re-verify: round N` at column zero, N
 the number of this round, with no marker before it; any other spelling is
 refused. A round is the verifier, the architecture reviewer re-checking the
 architecture findings a fix addressed, or both sent under one round number.
-The check counts their re-verify rows already in the dispatch log for this
-session on this branch, a row of one paired with a row of the other under
-the same number as one round, and refuses a third round, whatever the brief
-says; the number only says which round a dispatch joins. The security
-reviewer sent in the same round does not spend one; an agent that died or
-was declined did, since its row was written before it ran.
+The check counts the rounds already in the dispatch log for this change, as
+step 5 of **Opening a PR** in `references/session-cliffs.md` says, and
+refuses a third round, whatever the brief says; the number only says which
+round a dispatch joins. The security reviewer sent in the same round does
+not spend one; an agent that died or was declined did, since its row was
+written before it ran.
 
 **The security reviewer's brief** has the same shape, with the repository's
 security conventions as its claims (its CLAUDE.md and `docs/conventions/`
@@ -287,7 +286,8 @@ the brief. Nothing checks this.
 ## What each check wants
 
 **`dispatch-record-gate.sh` is a record, not a check.** It appends each dispatch
-to the repo's `.claude/state/dispatches.tsv`, with the model from the call's `model` field
+to the checkout's `<state>/dispatches.tsv` (the folder `project_fact.py --state-path`
+prints), with the model from the call's `model` field
 or the agent file's `model:` line, and its outcome: `dispatched`, `refused`
 when a check refused it, or `re-verify round N` for a brief whose line starts
 `Re-verify:`, and the checkout's branch. An optional first non-empty line,
@@ -317,9 +317,9 @@ For the other two, the brief carries a claims list in the one exact form above: 
 that is exactly `Claims:` at column zero, then a `- ` bullet of at least four
 words; a variant is refused with the form. And a verifier's or an architecture
 reviewer's brief with a line that begins `Re-verify: round N` is refused
-when the dispatch log already shows two rounds for this session on this
-branch, unless it joins a round the other agent was sent in alone; a
-re-verify line in any other spelling is refused outright.
+when the change has had its rounds, as step 5 of **Opening a PR** says,
+unless it joins a round the other agent was sent in alone; a re-verify line
+in any other spelling is refused outright.
 `MASTHEAD_BRIEF_GATE=off` in the operator's environment turns it off.
 
 **`skill-review-gate.py`** refuses a dispatch of an agent whose

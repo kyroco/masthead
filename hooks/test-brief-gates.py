@@ -235,7 +235,9 @@ CASES = [
      [(SESSION8, "re-verify round 1"), (SESSION8, "re-verify round 2")], "deny"),
     ("SPOOF a third brief written as round 1", "verifier", re_verify(1),
      [(SESSION8, "re-verify round 1"), (SESSION8, "re-verify round 1")], "deny"),
-    ("another session's re-verifies do not count", "verifier", re_verify(1),
+    # Outside a branch nothing names the change, so only this session's rows count.
+    # On a branch every session's rows count (MAST-38, REPO_CASES below).
+    ("outside a branch, another session's re-verifies do not count", "verifier", re_verify(1),
      [("other-se", "re-verify round 1"), ("other-se", "re-verify round 2")], "allow"),
     ("first verifications do not count", "verifier", re_verify(1),
      [(SESSION8, "dispatched"), (SESSION8, "dispatched"), (SESSION8, "dispatched")], "allow"),
@@ -347,6 +349,103 @@ def decision_for(subagent, prompt, rows, env_extra=None):
         return "allow", ""
     if out.count('"hookSpecificOutput"') != 1:
         return "two decisions: " + out[:80], out
+    try:
+        decoded = json.loads(out)["hookSpecificOutput"]
+        return decoded["permissionDecision"], decoded.get("permissionDecisionReason", "")
+    except Exception:
+        return "unparseable: " + out[:80], out
+
+
+BRANCH = "robert/mast-38-cap"
+OTHER8 = "newsess1"
+FIRST_VERIFY = """Verify git diff abc123..def456.
+
+Claims:
+- the refusal sentence names the month the limit resets
+"""
+
+
+def repo_rows(*specs):
+    """(session8, outcome, type) rows on BRANCH."""
+    return [(s, o, t, BRANCH) for s, o, t in specs]
+
+
+# MAST-38: the cap counts per change. A change is its branch: every session's
+# rows on it count, wherever in the checkout the brief is sent from and in
+# whichever folder PROJECT_STATE_DIR puts the log.
+# (label, prompt, rows, where, expected): where is "top", "sub" or "statedir",
+# or a dict of extra environment.
+TWO_ROUNDS = repo_rows((OTHER8, "re-verify round 1", "masthead:verifier"),
+                       (OTHER8, "re-verify round 2", "masthead:verifier"))
+REPO_CASES = [
+    ("HELD a third round from a new session on the same branch", re_verify(3), TWO_ROUNDS, "top", "deny"),
+    ("HELD a third round written as round 1 from a new session", re_verify(1), TWO_ROUNDS, "top", "deny"),
+    ("HELD a third round sent from a subfolder of the checkout", re_verify(3), TWO_ROUNDS, "sub", "deny"),
+    ("HELD a third round, with the log where PROJECT_STATE_DIR says", re_verify(3), TWO_ROUNDS, "statedir", "deny"),
+    ("round 2 from a new session after one round", re_verify(2),
+     repo_rows((OTHER8, "re-verify round 1", "masthead:verifier")), "top", "allow"),
+    # Scenario 3: after the adjudicator has judged a verification, another
+    # verifier is a re-verify, so a brief without its Re-verify line is refused.
+    ("HELD a re-verify brief with no Re-verify line, after the adjudicator", FIRST_VERIFY,
+     repo_rows((OTHER8, "dispatched", "masthead:verifier"), (OTHER8, "dispatched", "masthead:adjudicator")), "top", "deny"),
+    ("the first verification's verifiers, before any adjudicator", FIRST_VERIFY,
+     repo_rows((OTHER8, "dispatched", "masthead:verifier"), (OTHER8, "dispatched", "masthead:verifier")), "top", "allow"),
+    ("a refused adjudicator dispatch judged nothing", FIRST_VERIFY,
+     repo_rows((OTHER8, "dispatched", "masthead:verifier"), (OTHER8, "refused", "masthead:adjudicator")), "top", "allow"),
+    ("HELD a verifier that ran with no Re-verify line after the adjudicator counts as a round", re_verify(2),
+     repo_rows((OTHER8, "dispatched", "masthead:verifier"), (OTHER8, "dispatched", "masthead:adjudicator"),
+               (OTHER8, "re-verify round 1", "masthead:verifier"), (OTHER8, "dispatched", "masthead:adjudicator"),
+               (OTHER8, "dispatched", "masthead:verifier")), "top", "deny"),
+    # A cap a person raised in the environment that starts Claude Code.
+    ("a third round under MASTHEAD_REVERIFY_CAP=3", re_verify(3), TWO_ROUNDS,
+     {"MASTHEAD_REVERIFY_CAP": "3"}, "allow"),
+    ("HELD a fourth round under MASTHEAD_REVERIFY_CAP=3", re_verify(4),
+     TWO_ROUNDS + repo_rows((OTHER8, "re-verify round 3 (cap raised to 3)", "masthead:verifier")),
+     {"MASTHEAD_REVERIFY_CAP": "3"}, "deny"),
+    ("HELD a cap that is not a number is the usual two", re_verify(3), TWO_ROUNDS,
+     {"MASTHEAD_REVERIFY_CAP": "lots"}, "deny"),
+    ("HELD the brief's approval line does not open the cap",
+     "Approved past the cap by Robert\n" + re_verify(3), TWO_ROUNDS, "top", "deny"),
+]
+
+
+def git(*args, cwd):
+    subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True,
+                   env=dict(os.environ, GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_SYSTEM=os.devnull))
+
+
+def repo_decision(prompt, rows, where):
+    """The gate's decision in a throwaway git checkout on BRANCH."""
+    root = os.path.realpath(tempfile.mkdtemp(prefix="verify-brief-repo-"))
+    try:
+        git("init", "-q", "-b", BRANCH, ".", cwd=root)
+        os.makedirs(os.path.join(root, "app", "lib"))
+        os.makedirs(os.path.join(root, ".claude"))
+        env = dict(os.environ)
+        for key in list(env):
+            if key.startswith("MASTHEAD_"):
+                env.pop(key)
+        env["CLAUDE_PROJECT_DIR"] = root
+        state = os.path.join(root, ".claude", "state")
+        if where == "statedir":
+            with open(os.path.join(root, ".claude", "settings.json"), "w") as fh:
+                json.dump({"env": {"PROJECT_STATE_DIR": ".work/state"}}, fh)
+            state = os.path.join(root, ".work", "state")
+        if isinstance(where, dict):
+            env.update(where)
+        os.makedirs(state)
+        with open(os.path.join(state, "dispatches.tsv"), "w") as fh:
+            fh.write(log_rows(rows))
+        cwd = os.path.join(root, "app", "lib") if where == "sub" else root
+        payload = json.dumps({"session_id": SESSION, "cwd": cwd, "tool_name": "Agent",
+                              "tool_input": {"subagent_type": "masthead:verifier", "prompt": prompt}})
+        result = subprocess.run(["bash", HOOK, "gate-verify-brief"], input=payload,
+                                capture_output=True, text=True, check=False, env=env)
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+    out = result.stdout.strip()
+    if not out:
+        return "allow", ""
     try:
         decoded = json.loads(out)["hookSpecificOutput"]
         return decoded["permissionDecision"], decoded.get("permissionDecisionReason", "")
@@ -558,6 +657,18 @@ def main():
             failures += 0 if both else 1
             print("{:4}  {:<52} one decision carries both reasons".format("ok" if both else "FAIL", ""))
 
+    for label, prompt, rows, where, expected in REPO_CASES:
+        actual, _ = repo_decision(prompt, rows, where)
+        ok = actual == expected
+        failures += 0 if ok else 1
+        print("{:4}  {:<52} expected {:<5} got {}".format("ok" if ok else "FAIL", label, expected, actual))
+
+    # The cap's refusal says how a person raises it, and that the brief cannot.
+    _, reason = repo_decision(re_verify(3), TWO_ROUNDS, "top")
+    ok = "MASTHEAD_REVERIFY_CAP" in reason and "settings cannot" in reason
+    failures += 0 if ok else 1
+    print("{:4}  {:<52} the cap's refusal says how to raise it".format("ok" if ok else "FAIL", ""))
+
     actual, _ = decision_for("verifier", THIN, None, {"MASTHEAD_BRIEF_GATE": "off"})
     ok = actual == "allow"
     failures += 0 if ok else 1
@@ -575,7 +686,7 @@ def main():
     if failures:
         print("{} cases wrong".format(failures))
         return 1
-    print("all {} cases correct".format(len(CASES) + len(ARCHITECTURE_CASES) + len(ARCHITECTURE_ROUND_CASES) + 4))
+    print("all {} cases correct".format(len(CASES) + len(ARCHITECTURE_CASES) + len(ARCHITECTURE_ROUND_CASES) + len(REPO_CASES) + 5))
     return 0
 
 

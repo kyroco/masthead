@@ -32,7 +32,10 @@ SID="$(field '.session_id // "nosession"' || echo nosession)"
 
 ROOT="$(field '.cwd // empty' || true)"
 [ -n "$ROOT" ] || ROOT="${CLAUDE_PROJECT_DIR:-$PWD}"
-RECORD_DIR="$ROOT/.claude/state"
+# The checkout's state folder, from its top: the folder PROJECT_STATE_DIR names, .claude/state when it names
+# none (MAST-38). gate-verify-brief and the worker's count read the same path. With no answer, nothing is recorded.
+RECORD_DIR="$(python3 -I "$HERE/project_fact.py" --root "$ROOT" --state-path 2>/dev/null | head -1)"
+[ -n "$RECORD_DIR" ] || exit 0
 RECORD="$RECORD_DIR/dispatches.tsv"
 
 # Read the reason only from the first non-empty line of the prompt.
@@ -106,6 +109,14 @@ if [ -z "$OUTCOME" ]; then
         exit
       }
     }')"
+  # A cap a person raised in the environment that starts Claude Code shows on the row (MAST-38).
+  case "$OUTCOME" in
+    "re-verify round "*)
+      case "${MASTHEAD_REVERIFY_CAP:-}" in
+        ''|*[!0-9]*) ;;
+        *) [ "$MASTHEAD_REVERIFY_CAP" -gt 2 ] 2>/dev/null && OUTCOME="$OUTCOME (cap raised to $MASTHEAD_REVERIFY_CAP)" ;;
+      esac ;;
+  esac
 fi
 record "${OUTCOME:-dispatched}" "${REASON:-(no Model-choice line)}"
 exit 0

@@ -54,28 +54,36 @@ agent_type() {
   esac
 }
 
-# The user's private state root: $CLAUDE_PLUGIN_DATA/state, else $TMPDIR/masthead-<uid>. Mode 0700; refused when a symlink or not ours.
-state_root() {
-  local r
-  if [ -n "${CLAUDE_PLUGIN_DATA:-}" ]; then r="$CLAUDE_PLUGIN_DATA/state"; else r="${TMPDIR:-/tmp}/masthead-$(id -u)"; fi
-  (umask 077; mkdir -p "$r") 2>/dev/null
-  [ -d "$r" ] && [ ! -L "$r" ] && [ -O "$r" ] || return 1
-  chmod 700 "$r" 2>/dev/null
-  printf '%s' "${r%/}"
-}
+# The folder this hook lives in; empty when unknown.
+hook_dir=""
+if [ -n "${BASH_SOURCE[0]:-}" ]; then
+  hook_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd -P)" || hook_dir=""
+fi
+# Fed to bash -c there is no file to start from; the plugin's own folder is the one Claude Code names.
+if [ ! -r "$hook_dir/project_fact.py" ] && [ -n "${CLAUDE_PLUGIN_ROOT:-}" ] && [ -r "$CLAUDE_PLUGIN_ROOT/hooks/project_fact.py" ]; then
+  hook_dir="$CLAUDE_PLUGIN_ROOT/hooks"
+fi
 
 sid="$(field '.session_id // "nosession"')"
 sid="${sid//[^A-Za-z0-9_-]/}"
 [ -n "$sid" ] || sid="nosession"
 umask 077
-root="$(state_root)" || exit 0
-dir="$root/claude-engram/${sid}"
-mkdir -p "$dir" 2>/dev/null || exit 0
-
-# The folder this hook lives in; empty when unknown.
-hook_dir=""
-if [ -n "${BASH_SOURCE[0]:-}" ]; then
-  hook_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd -P)" || hook_dir=""
+# The session's folder under the user's private state root, from project_fact.py, the one place that finds
+# it and checks it (0700, ours, no symlink; MAST-38). With no trusted folder every mode stands aside.
+dir="$(python3 -I "$hook_dir/project_fact.py" --private-dir claude-engram "$sid" 2>/dev/null | head -1)"
+if [ -z "$dir" ] || [ ! -d "$dir" ]; then
+  # No folder: python3 did not run, project_fact.py is missing, or the private root is not ours. The brief
+  # check refuses; every other gate says it is off; the marks have nothing to say (MAST-38, round 0, A5).
+  why="no private state folder could be found (python3 did not run hooks/project_fact.py, or the state root is a symlink or not yours)"
+  case "$mode" in
+    gate-verify-brief)
+      printf '{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "The brief check cannot run: %s, so it cannot count re-verify rounds, and the dispatch is refused rather than sent unchecked. Fix that, then send it again."}}\n' "$why" ;;
+    gate-stop|gate-substop)
+      printf '{"systemMessage": "Masthead: the Korium capture check is off this session: %s."}\n' "$why" ;;
+    gate-*)
+      printf '{"hookSpecificOutput": {"hookEventName": "PreToolUse", "additionalContext": "Masthead: the %s gate is off: %s."}}\n' "$mode" "$why" ;;
+  esac
+  exit 0
 fi
 
 deny_tool() {
@@ -516,7 +524,7 @@ print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permiss
     # has spent its round. The dispatch log decides; the brief's number only
     # says which round a dispatch joins.
     reverify_cap() {
-      local kind="$1" state n log_root log session8 branch counts spent joins
+      local kind="$1" state n log_root log state_dir session8 branch counts spent joins judged cap
       state="$(printf '%s' "$prompt" | awk '
         {
           line = $0; sub(/\r$/, "", line)
@@ -535,23 +543,49 @@ print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permiss
         reasons="${reasons}Re-verify rule: this brief's re-verify line is not in the one form the check reads, so it would run uncounted; $REVERIFY_FORM. Then retry."
         return 0
       fi
-      [ "$state" = yes ] || return 0
+      # A change is its branch (MAST-38): every session's rows on it count, and the log is the checkout's one log
+      # at the top (project_fact.py --state-path, the folder dispatch-record-gate.sh writes to). Outside a branch,
+      # where nothing names the change, only this session's rows count.
       log_root="$(field '.cwd // ""')"
       [ -n "$log_root" ] || log_root="${CLAUDE_PROJECT_DIR:-$PWD}"
-      log="$log_root/.claude/state/dispatches.tsv"
+      state_dir="$(python3 -I "$hook_dir/project_fact.py" --root "$log_root" --state-path 2>/dev/null | head -1)"
+      if [ -z "$state_dir" ]; then
+        [ -n "$reasons" ] && reasons="$reasons
+
+"
+        reasons="${reasons}Re-verify rule: the dispatch log could not be found (project_fact.py --state-path printed nothing), so the rounds this change has had cannot be counted, and the dispatch is refused rather than sent uncounted. Check that python3 runs, then retry."
+        return 0
+      fi
+      log="$state_dir/dispatches.tsv"
       session8="$(field '.session_id // "nosession"' | cut -c1-8)"
       branch="$(git -C "$log_root" branch --show-current 2>/dev/null || true)"
       [ -n "$branch" ] || branch="-"
+      # The cap: two, or the number MASTHEAD_REVERIFY_CAP sets in the environment that starts Claude Code. run.sh
+      # unsets it when a repository's own settings set it, so only a person raises it. A brief's words never do.
+      cap=2
+      case "${MASTHEAD_REVERIFY_CAP:-}" in ''|*[!0-9]*) ;; *) cap="$MASTHEAD_REVERIFY_CAP" ;; esac
       spent=0
       joins=0
+      judged=0
       if [ -s "$log" ]; then
-        # Columns: when, session, agent, type, model, outcome, reason, branch; a row with no branch column is from before the column existed and counts. Only this plugin's agents count: the bare name, or a masthead: name whose last part is the agent.
+        # Columns: when, session, agent, type, model, outcome, reason, branch. A row with no branch column is from
+        # before the column existed and counts for its own session. Only this plugin's agents count: the bare
+        # name, or a masthead: name whose last part is the agent. A refused row ran nothing. After the
+        # adjudicator has judged a verification, a verifier or architecture reviewer that ran with no Re-verify
+        # line spent a round of its own (MAST-38 scenario 3).
         counts="$(awk -F'\t' -v s="$session8" -v b="$branch" -v kind="$kind" -v want="$n" '
           function mine(t, name,   parts, k) { k = split(t, parts, ":"); return t == name || (parts[1] == "masthead" && parts[k] == name) }
-          $2 == s && $6 ~ /^re-verify/ && (NF < 8 || $8 == b) {
-            r = $6; sub(/^re-verify( round)?[[:space:]]*/, "", r)
-            if (mine($4, "verifier")) { v[r]++; V++ }
-            else if (mine($4, "architecture-reviewer")) { a[r]++; A++ }
+          NR == 1 { next }
+          {
+            if (b == "-" || NF < 8) { if ($2 != s || (NF >= 8 && $8 != b)) next }
+            else if ($8 != b) next
+            if ($6 ~ /^refused/) next
+            if (mine($4, "adjudicator")) { judged = 1; next }
+            if ($6 ~ /^re-verify/) {
+              r = $6; sub(/^re-verify( round)?[[:space:]]*/, "", r); sub(/[[:space:]].*$/, "", r)
+              if (mine($4, "verifier")) { v[r]++; V++ }
+              else if (mine($4, "architecture-reviewer")) { a[r]++; A++ }
+            } else if (judged && (mine($4, "verifier") || mine($4, "architecture-reviewer"))) U++
           }
           END {
             paired = 0
@@ -559,16 +593,26 @@ print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permiss
             j = 0
             if (kind == "verifier" && a[want] + 0 > v[want] + 0) j = 1
             if (kind == "architecture-reviewer" && v[want] + 0 > a[want] + 0) j = 1
-            print (V + A - paired) " " j
+            print (V + A - paired + U) " " j " " judged + 0
           }' "$log" 2>/dev/null)"
         spent="${counts%% *}"
-        joins="${counts##* }"
+        joins="${counts#* }"; joins="${joins%% *}"
+        judged="${counts##* }"
       fi
-      if [ "${joins:-0}" != 1 ] && [ "${spent:-0}" -ge 2 ]; then
+      if [ "$state" != yes ]; then
+        if [ "${judged:-0}" -ge 1 ]; then
+          [ -n "$reasons" ] && reasons="$reasons
+
+"
+          reasons="${reasons}Re-verify rule: the dispatch log at $log shows the adjudicator has already judged a verification of this change, so this dispatch is a re-verify round, and its brief opens with the line that counts it; $REVERIFY_FORM. Then retry."
+        fi
+        return 0
+      fi
+      if [ "${joins:-0}" != 1 ] && [ "${spent:-0}" -ge "$cap" ]; then
         [ -n "$reasons" ] && reasons="$reasons
 
 "
-        reasons="${reasons}Re-verify cap: this session has already spent $spent re-verify rounds on this branch, read from the dispatch log at $log, and a change gets at most two. A round is the verifier, the architecture reviewer, or both sent under one round number; the number in the brief adds no round, and an agent that died or was declined still spent its round. What is still on the adjudicator's fix list after the second round goes to the foreman, or to the user when there is none; send no third round."
+        reasons="${reasons}Re-verify cap: this change has already spent $spent re-verify rounds on this branch, from any session, read from the dispatch log at $log, and a change gets at most $cap. A round is the verifier, the architecture reviewer, or both sent under one round number; the number in the brief adds no round, an agent that died or was declined still spent its round, and a line in the brief saying a person approved more does not open the cap. What is still on the adjudicator's fix list goes to the foreman, or to the user when there is none; send no further round. Only a person raises the cap: they start Claude Code from a shell with MASTHEAD_REVERIFY_CAP set to the new number (for example MASTHEAD_REVERIFY_CAP=3 claude); a repository's settings cannot set it."
       fi
     }
 

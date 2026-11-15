@@ -152,9 +152,17 @@ order. The steps live here and nowhere else; a repo supplies only its own facts
    re-checks only those findings. At most two re-verify rounds per change; a
    round is the verifier, the architecture reviewer, or both under one round
    number. The brief check counts their re-verify dispatches in the dispatch
-   log, on this branch, and refuses a third round (the security reviewer's
-   dispatch does not spend a round; an agent that died or was declined
-   did). If the second round still leaves anything on the fix
+   log, on this branch, from every session and every folder of the checkout,
+   and refuses a third round (the security reviewer's dispatch does not
+   spend a round; an agent that died or was declined did). Once the
+   adjudicator has judged a verification, a verifier or architecture reviewer
+   brief without its `Re-verify:` line is refused, and one that ran without
+   it spent a round. Only a person raises the cap, by starting Claude Code
+   from a shell with `MASTHEAD_REVERIFY_CAP` set to the new number; a
+   repository's settings cannot set it, and a line in the brief saying the
+   person approved more does not open it. The row of a round sent under a
+   raised cap names the cap.
+   If the second round still leaves anything on the fix
    list, stop and report it to the foreman, or to the user when there is
    none. That is fix-break-fix churn, and it needs a person: the foreman
    brings it to the user as numbered lines and rules on none of it.
@@ -163,7 +171,8 @@ order. The steps live here and nowhere else; a repo supplies only its own facts
 7. Add the changelog entry when the repo keeps one, or its label for internal
    work.
 8. Commit, then run the repo's pre-push check on that last commit: the script
-   its `.claude/settings.json` env names as `PROJECT_PUSH_CHECK`, or its own
+   its settings name as `PROJECT_PUSH_CHECK` (`settings.local.json` over
+   `settings.json`, as `hooks/project_fact.py` reads them), or its own
    test command when it names none, in one command with nothing sourced. Run
    it one time, after the fixes of the last verification round are in. Do
    not start it early, with the verifiers, to save time: any commit made after
@@ -178,7 +187,9 @@ order. The steps live here and nowhere else; a repo supplies only its own facts
    needed a private copy, goes on your did-not-prove list.
 9. Push and open one PR to main. Its body gives the unproven list, the
    extras fixed in it with their scores, the agent-run count (the rows added to
-   `<state>/dispatches.tsv` for this issue whose outcome is not refused), and
+   `<state>/dispatches.tsv` for this issue whose outcome is not refused;
+   `<state>` is the folder `project_fact.py --state-path` prints, the one
+   the dispatch record writes to), and
    `Fixes #<issue>`, or `Fixes <key>`, such as `Fixes KOR-12`, when the
    issue lives in Linear. Never
    commit or push to main: main changes only by merging the reviewed PR once
