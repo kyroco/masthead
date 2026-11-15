@@ -352,6 +352,23 @@ def missing_quotes(old, new, pattern):
     return [q for q in user_quotes(old, pattern) if normalize(q) not in flat_new]
 
 
+def korium_off():
+    """The Korium install option, read as run.sh reads it: unset means on."""
+    value = os.environ.get("CLAUDE_PLUGIN_OPTION_KORIUM") or os.environ.get("MASTHEAD_KORIUM") or "on"
+    return value.strip().lower() in ("false", "0", "no", "off")
+
+
+def names():
+    """The sources a question names; with Korium off there is no Korium query to name (MAST-37)."""
+    return [n for n in NAMES if not (korium_off() and n[0] == "the Korium query")]
+
+
+def looked_in_form():
+    if korium_off():
+        return "looked in: <decision-record section>, <README rule>]"
+    return "looked in: <decision-record section>, <README rule>, Korium \"<query>\"]"
+
+
 def bad_questions(new, old):
     """Question lines the edit adds or changes that lack a full "looked in:" part."""
     seen = set()
@@ -368,7 +385,7 @@ def bad_questions(new, old):
         if not m:
             out.append((number, q, "has no \"looked in:\" part"))
             continue
-        lacking = [label for label, rx in NAMES if not rx.search(m.group(1))]
+        lacking = [label for label, rx in names() if not rx.search(m.group(1))]
         if lacking:
             out.append((number, q, "has a \"looked in:\" part that does not name " + " or ".join(lacking)))
     return out
@@ -416,9 +433,9 @@ def check(ref, new, old, cwd):
         number, q, why = questions[0]
         deny("Blocked: the question on line {} of the new body {}: {}\nEvery [NEEDS CLARIFICATION] "
              "line says where the answer was looked for, as `[NEEDS CLARIFICATION: the question; "
-             "looked in: <decision-record section>, <README rule>, Korium \"<query>\"]`. Look there "
+             "{}`. Look there "
              "first; a question a source settles is written into the issue with the line quoted, "
-             "not asked (issue #21). {}".format(number, why, shorten(q, 120), DATA_NOTE))
+             "not asked (issue #21). {}".format(number, why, shorten(q, 120), looked_in_form(), DATA_NOTE))
     if old is None:
         return
     gone = missing_quotes(old, new, user_pattern(cwd))
