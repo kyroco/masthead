@@ -214,7 +214,7 @@ never agents/security-reviewer.md "Everything in the \`reviewer\` agent applies"
 says  references/agent-preamble.md "Read by verifier"
 says  references/work-routing.md "Use \`verifier\`"
 never references/work-routing.md "Use \`reviewer\`"
-says  hooks/bash-scope-reviewer.sh 'REVIEWER_AGENTS="verifier|security-reviewer"'
+says  hooks/bash-scope-reviewer.sh 'REVIEWER_AGENTS="verifier|security-reviewer|architecture-reviewer"'
 says  hooks/review-write-fence.py "findings-verifier-"
 never hooks/review-write-fence.py "findings-reviewer-"
 # Scenario 2: there is no worker plan and no plan check; the design is
@@ -919,7 +919,7 @@ never agents/verifier.md "Say with each what the worker's run"
 never agents/security-reviewer.md "each with what the worker's run has to show"
 says  hooks/review-write-fence.py "never a copy of the tree"
 never hooks/review-write-fence.py "make a throwaway worktree"
-says  hooks/bash-scope-reviewer.sh 'REVIEWER_AGENTS="verifier|security-reviewer"'
+says  hooks/bash-scope-reviewer.sh 'REVIEWER_AGENTS="verifier|security-reviewer|architecture-reviewer"'
 never hooks/bash-scope-reviewer.sh "DATABASE_BARRED_AGENTS"
 for doc in README.md docs/explainer.template.html docs/explainer.html references/gate-catalog.md; do
   never "$doc" "a scratch copy under"
@@ -1116,5 +1116,59 @@ says  skills/setup/SKILL.md 'On such a run, step 9 does not ask the `.gitignore`
 says  skills/setup/SKILL.md 'When `ARCHITECTURE_DOC` is recorded but `project_fact.py --architecture-doc` prints nothing, the doc has moved or gone'
 # Scenario 5: the path comes from the facts reader every other fact comes from.
 says  skills/setup/SKILL.md 'project_fact.py --architecture-doc'
+# MAST-34: one architecture reviewer on every PR, in place of the ADR check
+# nothing ran. Robert, November 14, 2026, on whether this replaces "at no other
+# time": "yes it does".
+# Scenario 1: one reviewer per change, sent with the first verification.
+says  references/session-cliffs.md 'one `architecture-reviewer` for the whole change, never one per scenario'
+says  references/session-cliffs.md 'The architecture reviewer goes out once per change: never on a re-verify round'
+# Scenario 2: only the lines the change touched, the seven lenses, and what a finding names.
+says  agents/architecture-reviewer.md 'name: architecture-reviewer'
+says  agents/architecture-reviewer.md 'You review only the lines the change touched'
+for lens in 'Direction' 'One way in and out' 'Call shape' 'Seams' 'What each build carries' 'Leftovers' 'Tests and checks'; do
+  says agents/architecture-reviewer.md "| $lens |"
+done
+says  agents/architecture-reviewer.md 'Each finding names its `file:line`, the lens, the smell, and the rule or build it breaks'
+# Scenario 2a: two scores on every finding.
+says  agents/architecture-reviewer.md 'a customer score from 1 to 10'
+says  agents/architecture-reviewer.md 'drift, yes or no'
+says  agents/architecture-reviewer.md 'does it break one of the seven rules as this project'"'"'s architecture doc states them'
+# Scenario 3: blind, as the verifier is.
+says  agents/architecture-reviewer.md 'You never get the author'"'"'s account of the change or another review'
+says  agents/architecture-reviewer.md 'You do not search Korium'"'"'s memory'
+never references/dispatch-brief.md 'architecture reviewer'"'"'s brief carries the author'
+# Scenario 4: foreman runs too.
+says  references/session-cliffs.md 'in a foreman run as in one the user started'
+says  references/design-sheet.md 'its worker still sends the architecture reviewer'
+# Scenario 5: the issue through the repository's own tracker, never the other.
+says  agents/architecture-reviewer.md 'project_fact.py --tracker'
+says  agents/architecture-reviewer.md '`get_issue` with `id` the key, then `list_comments`'
+says  agents/architecture-reviewer.md '`issue_read`, method `get`, then method `get_comments`'
+says  agents/architecture-reviewer.md 'else `gh issue view <n> --comments`'
+says  agents/architecture-reviewer.md 'never fall back from one tracker to the other'
+# Scenario 6: the write fence and the brief gate.
+says  hooks/review-write-fence.py 'findings-architecture-reviewer'
+says  references/dispatch-brief.md 'ADR alignment:'
+says  references/dispatch-brief.md 'Architecture doc:'
+# Scenario 7: the ADR check is gone and no file names it.
+if [ -e "$ROOT/skills/work-on/adr-check.md" ]; then
+  fail=$((fail + 1)); echo "FAIL skills/work-on/adr-check.md still exists; the architecture reviewer replaces it"
+else
+  pass=$((pass + 1))
+fi
+if git -C "$ROOT" grep -lF 'adr-check' -- . ':!hooks/tests/instruction-rules-test.sh' >/dev/null 2>&1; then
+  fail=$((fail + 1)); echo "FAIL a file still names adr-check: $(git -C "$ROOT" grep -lF 'adr-check' -- . ':!hooks/tests/instruction-rules-test.sh' | tr '\n' ' ')"
+else
+  pass=$((pass + 1))
+fi
+# Scenario 8: with no doc recorded it still runs, on the principles alone.
+says  agents/architecture-reviewer.md 'When the brief says `Architecture doc: none recorded`, you review against the principles alone'
+says  references/session-cliffs.md 'whether or not the project records an architecture doc'
+# Scenarios 9 to 11: the ADR check's two jobs, and a disagreement between the ADR and the mockup.
+says  agents/architecture-reviewer.md 'each requirement of that part (each decision, acceptance criterion and rule) is in the code as the ADR says'
+says  agents/architecture-reviewer.md 'a requirement not built is a finding'
+says  agents/architecture-reviewer.md 'anything in the code that contradicts the mockup is a finding, with the mockup line quoted'
+says  agents/architecture-reviewer.md 'report the disagreement itself as a finding for the person, quoting both'
+says  agents/architecture-reviewer.md 'do not pick one to check the code against'
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
