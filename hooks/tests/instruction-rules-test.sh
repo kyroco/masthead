@@ -1365,5 +1365,18 @@ says  references/dispatch-brief.md 'Architecture trial: <on or off, as project_f
 # Scenario 10: on from the first run (hooks/tests/architecture-trial-test.py proves the fact).
 says  README.md 'The trial is on from the first run until you set `"ARCHITECTURE_TRIAL": "off"`'
 says  references/dispatch-brief.md 'until then it is on, on a new install too'
+# Round 1, fix F1: the "fix only what the person sends back" rule holds only while the trial is on.
+never references/session-cliffs.md 'the person sends back, as step 4 says, and none of the others'
+says  references/session-cliffs.md 'While the trial is on, you fix only the architecture findings the person sends back'
+# Round 1, fix F2: the waiting and the relay are pinned.
+says  references/session-cliffs.md 'who brings it to the user; the PR waits for that answer'
+says  references/session-cliffs.md 'So does its Architecture trial section, while the trial period is on'
+says  skills/work-on/foreman.md 'A PR with one of those unanswered is not queued'
+# Round 1, fix F3: the README says the fix list rule holds once the trial is off.
+says  README.md 'Once the trial is off, an architecture finding that breaks one of the doc'"'"'s seven rules'
+never README.md 'customer score; one where the decision record and a mockup disagree comes to you. That placement'
+# Round 1, extra X3 (scored 8): a build finding carries the path the adjudicator follows.
+says  agents/architecture-reviewer.md '"path": "<for a build finding, the steps from a real entry point to the wrong result in that build>"'
+says  agents/architecture-reviewer.md 'A finding that a build behaves wrongly gives the path'
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
