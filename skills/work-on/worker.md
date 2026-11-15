@@ -31,7 +31,7 @@ command that fetches or builds:
 
     ${CLAUDE_PLUGIN_ROOT}/skills/work-on/warm-build.sh clone <tree path>
 
-It clones the foreman's built output (on Kyroco, the dependencies, `_build`
+It clones the foreman's built output (for example the dependencies, `_build`
 and the Rust `target` folders) with an APFS clone, which takes a few seconds
 and no extra disk until a file changes, and keeps anything your worktree
 already has. Your first build then compiles only your own code and what

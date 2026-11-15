@@ -8,8 +8,10 @@ description: >-
   paragraph, and each scenario with the decision-record lines it rests on. It
   never reads the author's account of the change, and the author sees only its
   verdict. Diagnose-only: it never edits the code it judges.
-model: haiku
-# Haiku at high effort: enough for judging, and cheap enough to run every round.
+model: opus
+# Opus at high effort: its placement is final and no later step re-checks it,
+# including the findings it throws out. Robert, November 14, 2026: "opus 5.5
+# high" (MAST-41).
 effort: high
 maxTurns: 200
 # ToolSearch is listed because the two Korium tools are deferred: an agent

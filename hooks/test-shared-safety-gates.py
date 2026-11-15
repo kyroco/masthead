@@ -365,7 +365,7 @@ def main():
           edit_gate("k-off", {"MASTHEAD_SEARCH_GATE": "off"}), "allow")
 
     print("\n--- a capture is filed under the name that made it ---")
-    # ADR-0120: source_agent is the one field that answers who decided this.
+    # source_agent is the one field that answers who decided this.
     # MEASURED on 1434 real captures from 2026-08-20: this refuses 0 of them when
     # the name matches and 1076 when it does not, which is the separation the
     # length and importance rules could not produce as a test of who wrote it.

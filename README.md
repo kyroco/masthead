@@ -222,7 +222,7 @@ keep a code index in Korium (off), whether to keep AI attribution out of commits
 before running on the biggest model (off). Then run `/masthead:setup`. It
 asks four questions about the repository, or three when a memory is already
 connected, and one or two more when it finds a folder of decision records or
-no ignore line for its working files, and writes nothing until you say yes: just you or the team
+no ignore line for its working files, and one about the architecture doc (it names the one it finds, or offers to draft one from the code), and writes nothing until you say yes: just you or the team
 (whether the settings are committed with the code), tests before a push
 (it finds your test command), whether its issues live in GitHub or Linear
 (one at a time, never both), and whether to connect a memory now, later or
@@ -288,7 +288,7 @@ reason Claude can act on.
 | Check | Runs | Refuses | Needs |
 |---|---|---|---|
 | `hard-gate.sh` | before `git push`, `gh pr create` or a GitHub connector's `create_pull_request`; the test receipt and the secret scan first, then the stack checks, which are skipped when this exact commit already passed them | a push that carries something shaped like a secret, or fails a changed stack's format, compile, lint or type check; with the test command, a push until the push check reports the tests passed on this exact commit, and a push of any other commit | nothing for the secret scan and the stack checks; the test command from setup (`PROJECT_PUSH_CHECK`) for the test receipt |
-| `adr-sections-gate.py`, `adr-structure-gate.sh`, `wiki-refresh.sh` | before a write; at stop; at session start | a decision record written without its sections; a finish that leaves one with an unchecked claims list; keeps the records folder fresh | a decision records folder: `ADR_DIR`, or `docs/adr` when none is named, for the two gates; the refresh only with `ADR_DIR` set to an absolute path |
+| `adr-sections-gate.py`, `adr-structure-gate.sh`, `wiki-refresh.sh` | before a write; at stop; at session start | a decision record written without the sections in `hooks/adr_shape.py`, or an edit that drops one; a finish that leaves one short of them or with an unchecked claims list; keeps the records folder fresh | the two gates only with a decision records folder named (`ADR_DIR`, which setup writes when you ask for the fixed shape), and nothing is held in a repository that named none; the refresh only with `ADR_DIR` set to an absolute path |
 | `elixir-toolchain-env.sh`, `elixir-format-after-edit.sh` | at session start; after an edit | nothing; pins the Elixir toolchain and formats an edited file | an Elixir root (`PROJECT_ELIXIR_ROOT`) |
 
 Where these three fall short, together: the fact names a file, and the copy
