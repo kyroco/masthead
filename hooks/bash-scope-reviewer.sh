@@ -1,17 +1,24 @@
 #!/usr/bin/env bash
-# bash-scope-reviewer.sh - PreToolUse on Bash: refuse a verifier agent's command that uses a network program, a URL or /dev/tcp; other agents pass. The architecture reviewer may also run `gh issue view`, to read the issue on a GitHub repository with no connector.
+# bash-scope-reviewer.sh - PreToolUse on Bash: hold the verifier's and security reviewer's shell to the exact command shapes in reviewer_shapes.py (MAST-43), and refuse a review agent's command that uses a network program, a URL or /dev/tcp; other agents pass. The architecture reviewer may also run `gh issue view`, to read the issue on a GitHub repository with no connector.
 
 set -uo pipefail
 
 # List the agents this gate covers; the jq path, the no-jq path and review-write-fence.py all read this line.
 REVIEWER_AGENTS="verifier|security-reviewer|architecture-reviewer"
+# The agents whose shell runs only the shapes reviewer_shapes.py lists.
+SHAPE_AGENTS="verifier|security-reviewer"
 
 # Allow everything when REVIEWER_NETWORK_GATE is off.
 [ "${REVIEWER_NETWORK_GATE:-on}" = "off" ] && exit 0
 
-# Without jq, refuse only a call whose raw text names a covered verifier and a network tool; pass everything else.
+# Without jq, refuse every call from the verifier or security reviewer, and the architecture reviewer's call that names a network tool; pass everything else.
 if ! command -v jq >/dev/null 2>&1; then
   RAW="$(cat 2>/dev/null || true)"
+  # The verifier's and security reviewer's shapes cannot be read without jq, so their every command is refused.
+  if printf '%s' "$RAW" | grep -qE "\"(agent_type|subagent_type|agent_name)\"[[:space:]]*:[[:space:]]*\"(masthead:([^\"\\\\]*:)?)?($SHAPE_AGENTS)([-_.:][^\"\\\\]*)?\""; then
+    printf 'jq is not installed, so this gate cannot read which command shape a verifier or security reviewer is running. Refusing it rather than passing it unchecked. Install jq, or set %s=off to reopen this knowingly.\n' REVIEWER_NETWORK_GATE >&2
+    exit 2
+  fi
   # Cover the same verifier list as the jq path.
   # Read the name only from an identity field, so a command that quotes verifier.md is not taken for a verifier.
   if printf '%s' "$RAW" | grep -qE "\"(agent_type|subagent_type|agent_name)\"[[:space:]]*:[[:space:]]*\"(masthead:([^\"\\\\]*:)?)?($REVIEWER_AGENTS)([-_.:][^\"\\\\]*)?\"" \
@@ -57,6 +64,25 @@ if [ "$agent" = "architecture-reviewer" ]; then
   GH_VIEW_RE='^[[:space:]]*gh issue view [0-9]+( --comments)?[[:space:]]*$'
   [[ "$CMD" =~ $GH_VIEW_RE ]] && exit 0
 fi
+
+# The verifier and security reviewer run only the exact shapes reviewer_shapes.py lists (MAST-43): every
+# round of MAST-34 refused one more wrapper or flag and the next found one more spelling. The network checks
+# below still apply to what passes.
+case "$agent" in
+  verifier|security-reviewer)
+    CWD="$(printf '%s' "$INPUT" | jq -r '.cwd // empty')"
+    SHAPES="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd -P)/reviewer_shapes.py"
+    if ! command -v python3 >/dev/null 2>&1 || [ ! -f "$SHAPES" ]; then
+      echo "DENIED: python3 or reviewer_shapes.py is missing, so this gate cannot read which command shape a $agent is running. Refusing it rather than passing it unchecked." >&2
+      exit 2
+    fi
+    if ! why="$(printf '%s' "$CMD" | python3 -I "$SHAPES" --cwd "${CWD:-$PWD}" 2>&1)"; then
+      echo "DENIED by the $agent's shell guard: ${why:-the command is not one of its shapes}" >&2
+      echo "Command: $CMD" >&2
+      echo "Allowed, each command alone or joined by |, && or ;: read-only git (status, diff, log, show, blame, rev-parse, ls-files, merge-base, shortlog, describe, grep); the repository's tests (bash, sh or python3 with a script in the checkout, python3 -m pytest or unittest, mix test, cargo test --offline, GOPROXY=off go test, npm test, make test); semgrep --metrics=off --disable-version-check --config <rules file>; cat, head, tail, wc, ls, grep, rg, jq, find, diff, sort and the like; rm of your own scratch files; 2>&1 and >/dev/null. The full list is in hooks/reviewer_shapes.py. Read files with Read, Glob and Grep, and write your findings with the Write tool." >&2
+      exit 2
+    fi ;;
+esac
 
 deny() {
   echo "DENIED: a verifier's Bash may not reach the network ($1)." >&2

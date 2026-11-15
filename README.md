@@ -143,10 +143,13 @@ Claude's editing tools. The architecture reviewer's shell runs only
 `git diff`, `git show` and `git log` with plain revisions and paths, the
 plugin's `project_fact.py` to ask for the tracker or the architecture doc,
 and `gh issue view` to read its issue, and refuses every other command. The
-verifier's and security reviewer's shells refuse the common network programs
-(curl, wget, ssh, nc and the like), gh and any URL, though one run through a
-wrapper the fence does not see through, such as `timeout 5 curl`, still gets
-through (MAST-43). Then a judge, given the same product
+verifier's and security reviewer's shells run only the command shapes in
+`hooks/reviewer_shapes.py`: read-only git, the repository's own tests,
+semgrep with its calls home turned off, and a few reading tools such as
+`cat`, `grep` and `jq`, each alone or joined by a pipe or `&&`. They refuse
+every other command, a wrapper such as `timeout 5 curl` included, and write
+no file. The fence reads the command the agent types, not what a test or
+probe script it runs then does (MAST-43). Then a judge, given the same product
 context and nothing from the worker, reads the code along each verifier's
 path without running the tests a third time, and places each finding that
 holds: fixed in this pull request when a scenario's Then is false or no
@@ -291,7 +294,7 @@ reason Claude can act on.
 | `agent-brief-gates.sh` | before a helper is sent | a brief to a verifier or security reviewer that leaves out the claims it must check; a third re-verify round; a brief to the architecture reviewer without the decision record's path, its alignment lines or the architecture doc's path | checks the shape of the brief, not whether it's true |
 | `dispatch-record-gate.sh` | before a helper is sent | nothing; records which model each helper ran on, and whether it was a re-verify round | |
 | `review-write-fence.py` | before a file write | a verifier or the architecture reviewer writing anything but its own findings file, or a scratch file under the review folder | a shell write isn't seen |
-| `bash-scope-reviewer.sh` | before a shell command | a verifier, security reviewer or architecture reviewer running a common network program (curl, ssh, gh and the like) or any command with a URL; the architecture reviewer may run `gh issue view <n>` for its issue | a list of programs it refuses: one it doesn't name, or one behind a wrapper it doesn't see through such as `timeout`, gets through for the verifier and security reviewer |
+| `bash-scope-reviewer.sh` | before a shell command | a verifier or security reviewer running any command but the shapes in `reviewer_shapes.py` (read-only git, the repository's tests, semgrep with its calls home off, a few reading tools); an architecture reviewer running a common network program (curl, ssh, gh and the like) or any command with a URL, though it may run `gh issue view <n>` for its issue | reads the command typed, not what a test or script it runs then does; with no jq, the verifier's and security reviewer's every command is refused |
 | `bash-scope-diagnoser.sh` | before a shell command | the diagnoser or reader doing anything but running tests, reading git history and inspecting files; the architecture reviewer running anything but `git diff`, `git show` or `git log` with plain revisions and paths, `project_fact.py --tracker` or `--architecture-doc`, and `gh issue view <n>`, bare or with `--comments` | scoped by the agent's type |
 | `verdict-gate.sh` | when a session or helper stops | a diagnosis case file whose verdict names no file and line, or has fewer than two numbered observations | |
 | `scope-gate.py` | before and after a write | while a scope file exists in the checkout, writes outside its allowed paths; puts back a protected file a command changed | a background command's later writes aren't seen |
