@@ -52,15 +52,16 @@ MAX_BATCHES_PER_SESSION = 6
 # folder named build, target or doc inside the code is code: only tracked files are read, and
 # generated output is rarely tracked.
 NOT_CODE_EXT = {
-    ".md", ".markdown", ".txt", ".rst", ".adoc", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico",
+    ".md", ".markdown", ".rst", ".adoc", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico",
     ".webp", ".bmp", ".pdf", ".woff", ".woff2", ".ttf", ".otf", ".eot", ".zip", ".gz", ".tgz",
     ".tar", ".jar", ".mp3", ".mp4", ".mov", ".wav", ".lock", ".sum",
 }
 LOCK_NAMES = {"package-lock.json", "pnpm-lock.yaml", "yarn.lock", "npm-shrinkwrap.json", "go.sum"}
-NOT_CODE_STEMS = {"license", "licence", "notice", "copying", "changelog", "authors"}
+# Prose left out by name, whatever its extension. Every other .txt counts as code, so a
+# dependency list is read under any name (Robert, November 15, 2026).
+NOT_CODE_STEMS = {"license", "licence", "notice", "copying", "changelog", "authors", "notes", "readme"}
 SKIP = {"node_modules", "vendor", ".git"}
-# A .txt file is prose, except these, which hold builds and dependencies.
-TXT_CODE = re.compile(r"^(cmakelists|requirements.*|constraints.*)\.txt$")
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 
@@ -89,8 +90,6 @@ def is_code(path, data):
         return False
     name = parts[-1]
     stem, ext = os.path.splitext(name.lower())
-    if TXT_CODE.match(name.lower()):
-        return b"\0" not in data[:8192]
     if name in LOCK_NAMES or ext in NOT_CODE_EXT or stem in NOT_CODE_STEMS:
         return False
     return b"\0" not in data[:8192]
