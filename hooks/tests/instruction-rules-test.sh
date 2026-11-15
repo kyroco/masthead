@@ -1125,6 +1125,8 @@ says  references/session-cliffs.md 'The architecture reviewer goes out once per 
 # Scenario 2: only the lines the change touched, the seven lenses, and what a finding names.
 says  agents/architecture-reviewer.md 'name: architecture-reviewer'
 says  agents/architecture-reviewer.md 'You review only the lines the change touched'
+# Round 1, fix F7: what the touched lines are held to.
+says  agents/architecture-reviewer.md 'Hold each touched line to the ADR'"'"'s alignment lines, the architecture doc and the principles'
 for lens in 'Direction' 'One way in and out' 'Call shape' 'Seams' 'What each build carries' 'Leftovers' 'Tests and checks'; do
   says agents/architecture-reviewer.md "| $lens |"
 done
@@ -1136,7 +1138,27 @@ says  agents/architecture-reviewer.md 'does it break one of the seven rules as t
 # Scenario 3: blind, as the verifier is.
 says  agents/architecture-reviewer.md 'You never get the author'"'"'s account of the change or another review'
 says  agents/architecture-reviewer.md 'You do not search Korium'"'"'s memory'
-never references/dispatch-brief.md 'architecture reviewer'"'"'s brief carries the author'
+# Round 1, fix F5: the brief shape itself carries nothing of the author's account.
+says  references/dispatch-brief.md 'nothing of your account of the change: no claims, no did-not-prove list, no summary'
+says  references/session-cliffs.md 'the principles file and the mockup pages, and nothing of your account'
+# Round 1, fix F6: the agent's own tool grant holds no memory search and no tracker write.
+ARCH_TOOLS="$(sed -n 's/^tools: //p' "$ROOT/agents/architecture-reviewer.md" | tr ',' '\n' | tr -d ' ')"
+ARCH_DENY="$(sed -n 's/^disallowedTools: //p' "$ROOT/agents/architecture-reviewer.md" | tr ',' '\n' | tr -d ' ')"
+for tool in mcp__korium__agent_search mcp__claude_ai_korium__agent_search mcp__korium__korium_browse mcp__claude_ai_korium__korium_browse; do
+  if printf '%s\n' "$ARCH_DENY" | grep -qx "$tool" && ! printf '%s\n' "$ARCH_TOOLS" | grep -qx "$tool"; then
+    pass=$((pass + 1))
+  else
+    fail=$((fail + 1)); echo "FAIL agents/architecture-reviewer.md does not deny $tool"
+  fi
+done
+for tool in Edit MultiEdit NotebookEdit Agent WebFetch; do
+  if printf '%s\n' "$ARCH_DENY" | grep -qx "$tool"; then pass=$((pass + 1)); else fail=$((fail + 1)); echo "FAIL agents/architecture-reviewer.md does not deny $tool"; fi
+done
+if printf '%s\n' "$ARCH_TOOLS" | grep -E '__(save_|create_|delete_|update_|issue_write|add_|merge_|push_)' >/dev/null; then
+  fail=$((fail + 1)); echo "FAIL agents/architecture-reviewer.md grants a tracker write: $(printf '%s\n' "$ARCH_TOOLS" | grep -E '__(save_|create_|delete_|update_|issue_write|add_|merge_|push_)' | tr '\n' ' ')"
+else
+  pass=$((pass + 1))
+fi
 # Scenario 4: foreman runs too.
 says  references/session-cliffs.md 'in a foreman run as in one the user started'
 says  references/design-sheet.md 'its worker still sends the architecture reviewer'
@@ -1167,6 +1189,8 @@ says  references/session-cliffs.md 'whether or not the project records an archit
 # Scenarios 9 to 11: the ADR check's two jobs, and a disagreement between the ADR and the mockup.
 says  agents/architecture-reviewer.md 'each requirement of that part (each decision, acceptance criterion and rule) is in the code as the ADR says'
 says  agents/architecture-reviewer.md 'a requirement not built is a finding'
+# Round 1, fix F4: the evidence for each requirement found built.
+says  agents/architecture-reviewer.md 'Quote the ADR line and give the code'"'"'s `file:line`'
 says  agents/architecture-reviewer.md 'anything in the code that contradicts the mockup is a finding, with the mockup line quoted'
 says  agents/architecture-reviewer.md 'report the disagreement itself as a finding for the person, quoting both'
 says  agents/architecture-reviewer.md 'do not pick one to check the code against'
