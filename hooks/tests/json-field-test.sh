@@ -41,5 +41,25 @@ want="$(printf '%s' "$DECISION" | jq -rj '[ .. | objects | select(has("permissio
 got="$(printf '%s' "$DECISION" | python3 -I "$HELPER" --reasons)"
 if [ "$want" = "$got" ]; then pass=$((pass + 1)); else fail=$((fail + 1)); echo "FAIL: --reasons wrote '$got', jq '$want'" >&2; fi
 
+# Python 3.6 (RHEL 8's python3) has no TextIOWrapper.reconfigure: the helper must not need it (MAST-37).
+out="$(printf '%s' "$FULL" | python3 -I -c '
+import io, runpy, sys
+class Old(io.TextIOWrapper):
+    def __getattribute__(self, name):
+        if name == "reconfigure":
+            raise AttributeError(name)
+        return io.TextIOWrapper.__getattribute__(self, name)
+sys.stdin = Old(sys.stdin.buffer, encoding="utf-8")
+sys.stdout = Old(sys.stdout.buffer, encoding="utf-8", line_buffering=True)
+sys.argv = [sys.argv[1], ".tool_input.command"]
+runpy.run_path(sys.argv[0], run_name="__main__")' "$HELPER" 2>&1)"
+if [ "$out" = "git push -f" ]; then pass=$((pass + 1)); else fail=$((fail + 1)); echo "FAIL: with no reconfigure (Python 3.6) the helper printed '$out'" >&2; fi
+
+# A lone surrogate, which JSON can carry as \ud800, must not stop the command being read (MAST-37).
+out="$(printf '%s' '{"tool_input":{"command":"git push --force origin main # \ud800"}}' | python3 -I "$HELPER" '.tool_input.command' 2>/dev/null)"
+case "$out" in "git push --force origin main # "*) pass=$((pass + 1)) ;; *) fail=$((fail + 1)); echo "FAIL: a lone surrogate gave '$out'" >&2 ;; esac
+out="$(python3 -I "$HELPER" --deny "$(printf 'x \355\240\200 y')" 2>/dev/null)"
+case "$out" in *'"deny"'*) pass=$((pass + 1)) ;; *) fail=$((fail + 1)); echo "FAIL: a refusal with a stray byte printed '$out'" >&2 ;; esac
+
 echo "passed $pass, failed $fail"
 [ "$fail" -eq 0 ]

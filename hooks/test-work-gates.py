@@ -1354,13 +1354,11 @@ def main():
               "tool_name": "Bash", "tool_input": {"command": "git push --force origin main"}}),
               env=broken), "deny")
     shutil.rmtree(broken_bin, ignore_errors=True)
-    shutil.rmtree(no_jq_bin, ignore_errors=True)
 
     print("\n--- fail open: every internal failure allows ---")
     print("      (only meaningful because the deny cases above bit first)")
     for label, hook, argv in (
         ("web gate", WEB_GATE, [sys.executable, WEB_GATE, "gate"]),
-        ("irreversible gate", IRREVERSIBLE, ["bash", IRREVERSIBLE]),
         ("skill gate", SKILLGATE, [sys.executable, SKILLGATE, "gate"]),
     ):
         check(label + ": malformed JSON", run(argv, "{not json at all"), "allow")
@@ -1368,6 +1366,21 @@ def main():
         check(label + ": JSON that is not an object", run(argv, "[1,2,3]"), "allow")
         check(label + ": payload with no tool_input",
               run(argv, json.dumps({"tool_name": "Bash"})), "allow")
+
+    # The irreversible gate refuses what it cannot read (MAST-37, project rule 2: a gate never turns itself
+    # off silently), with jq and without; only an empty stdin, which carries no call, goes through.
+    irr = ["bash", IRREVERSIBLE]
+    check("irreversible gate: empty stdin", run(irr, ""), "allow")
+    for label, payload in (
+        ("malformed JSON", "{not json at all"),
+        ("JSON that is not an object", "[1,2,3]"),
+        ("a Bash call with no tool_input", json.dumps({"tool_name": "Bash"})),
+        ("a force push with a lone surrogate", '{"session_id":"s1","tool_name":"Bash",'
+         '"tool_input":{"command":"git push --force origin main # \\ud800"}}'),
+    ):
+        check("irreversible gate, jq: " + label + " is refused", run(irr, payload), "deny")
+        check("irreversible gate, no jq: " + label + " is refused", run(irr, payload, env=no_jq), "deny")
+    shutil.rmtree(no_jq_bin, ignore_errors=True)
 
     # The state file the web gate reads is temp-directory scratch. It can be
     # missing, empty, or a directory where a file was expected, and none of
