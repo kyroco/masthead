@@ -139,9 +139,11 @@ lenses (which way the names point, one way in and out of each body of data,
 the shape of the calls, real seams, what each build carries, leftovers, and
 tests that prove nothing), checks that what the decision record asks is
 built and matches the mockups, and scores each finding for the customer and
-for drift from the doc's seven rules. None of them can edit anything.
-None of them can reach the network, except the architecture reviewer
-reading its issue. Then a judge, given the same product
+for drift from the doc's seven rules. None of them can edit files with
+Claude's editing tools, and the architecture reviewer's shell can only
+read. Their shells refuse the common network programs (curl, wget, ssh, nc
+and the like), gh and any URL; the architecture reviewer may still run
+`gh issue view` to read its issue. Then a judge, given the same product
 context and nothing from the worker, reads the code along each verifier's
 path without running the tests a third time, and places each finding that
 holds: fixed in this pull request when a scenario's Then is false or no
@@ -286,7 +288,7 @@ reason Claude can act on.
 | `agent-brief-gates.sh` | before a helper is sent | a brief to a verifier or security reviewer that leaves out the claims it must check; a third re-verify round; a brief to the architecture reviewer without the decision record's path, its alignment lines or the architecture doc's path | checks the shape of the brief, not whether it's true |
 | `dispatch-record-gate.sh` | before a helper is sent | nothing; records which model each helper ran on, and whether it was a re-verify round | |
 | `review-write-fence.py` | before a file write | a verifier or the architecture reviewer writing anything but its own findings file, or a scratch file under the review folder | a shell write isn't seen |
-| `bash-scope-reviewer.sh` | before a shell command | a verifier or the architecture reviewer reaching the network, except the architecture reviewer reading its issue with `gh issue view` | scoped by the agent's type |
+| `bash-scope-reviewer.sh` | before a shell command | a verifier, security reviewer or architecture reviewer running a common network program (curl, ssh, gh and the like) or any command with a URL; the architecture reviewer may run `gh issue view` for its issue | a list of programs it refuses: one it doesn't name gets through for the verifier and security reviewer |
 | `bash-scope-diagnoser.sh` | before a shell command | the diagnoser or reader doing anything but running tests, reading git history and inspecting files; the architecture reviewer doing anything but reading, with no tests and no writes | scoped by the agent's type |
 | `verdict-gate.sh` | when a session or helper stops | a diagnosis case file whose verdict names no file and line, or has fewer than two numbered observations | |
 | `scope-gate.py` | before and after a write | while a scope file exists in the checkout, writes outside its allowed paths; puts back a protected file a command changed | a background command's later writes aren't seen |

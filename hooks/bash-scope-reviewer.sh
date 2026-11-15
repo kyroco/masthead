@@ -111,7 +111,7 @@ CMD_BARE="$(printf '%s' "$CMD" | awk '
 
 # Refuse a network program as the first word of any command segment. The text is split on ;, &&, ||, |, &, newlines, backticks, $( and parentheses, runs of whitespace (tabs too) collapse, and quotes and backslashes are stripped from each word, so "curl", 'curl' and curl<TAB> are all just curl. A filename or an argument that merely contains the name is not a first word and passes.
 judge_segment() {
-  local seg="$1" w prog sub i j k
+  local seg="$1" w prog sub i j k name
   local -a words clean
   IFS=$' \t' read -ra words <<<"$seg"
   clean=()
@@ -153,7 +153,20 @@ judge_segment() {
       sub="${clean[$j]:-}"
       case "$sub" in
         push|fetch|pull|clone|remote|ls-remote) deny "git $sub" ;;
-      esac ;;
+      esac
+      # git grep -O runs a program on each match, and git takes it bundled (-iO), with the program joined (-Ocurl) or shortened (--open, --op).
+      for ((k = j + 1; k < ${#clean[@]}; k++)); do
+        w="${clean[$k]}"
+        case "$w" in
+          --) break ;;
+          --*)
+            name="${w#--}"; name="${name%%=*}"
+            if [ -n "$name" ]; then
+              case "open-files-in-pager" in "$name"*) deny "git $sub $w runs a program on each match" ;; esac
+            fi ;;
+          -*O*) deny "git $sub $w runs a program on each match" ;;
+        esac
+      done ;;
     sh|bash|zsh|dash|ksh|eval)
       # A shell's -c payload, or eval's argument, is a command wearing quotes: judge it too.
       for ((k = i + 1; k < ${#clean[@]}; k++)); do

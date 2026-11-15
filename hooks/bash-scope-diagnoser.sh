@@ -168,6 +168,28 @@ check_redirect_target() {
   return 0
 }
 
+# A write or run flag is refused in every spelling a program accepts, not only as an exact word: a short letter
+# alone or bundled with others or with its value joined on (-o, -uo, -oFILE), and a long name shortened to any
+# prefix, as git and GNU tools take it (--out for --output). Matching a short letter anywhere after one dash
+# refuses some harmless bundles too, which is the safe way to be wrong.
+# flag_hits <word> <short letters> <long names without dashes>: true when the word is one of those flags.
+flag_hits() {
+  local word="$1" short="$2" long="$3" name n
+  case "$word" in
+    --) return 1 ;;
+    --*)
+      name="${word#--}"; name="${name%%=*}"
+      [ -n "$name" ] || return 1
+      for n in $long; do
+        case "$n" in "$name"*) return 0 ;; esac
+      done ;;
+    -?*)
+      [ -n "$short" ] || return 1
+      case "${word#-}" in *["$short"]*) return 0 ;; esac ;;
+  esac
+  return 1
+}
+
 # --- the allowed commands ---
 ENV_OK=" MIX_ENV CI NODE_ENV RUST_BACKTRACE RUST_LOG TZ LANG LC_ALL DEBUG VERBOSE FORCE_COLOR NO_COLOR PYTHONDONTWRITEBYTECODE "
 
@@ -189,10 +211,10 @@ check_git() {
   esac
   i=$((H + 2))
   while [ "$i" -lt "${#W[@]}" ]; do
-    case "${W[$i]}" in
-      --output|--output=*|-o|--exec|--exec=*|--upload-pack|--upload-pack=*|--ext-diff|--no-index|-O|--open-files-in-pager|--open-files-in-pager=*)
-        deny "'${W[$i]}' can write or execute; the git allowance is read-only" ;;
-    esac
+    [ "${W[$i]}" = "--" ] && break
+    if flag_hits "${W[$i]}" "O" "output exec upload-pack ext-diff no-index open-files-in-pager"; then
+      deny "'${W[$i]}' can write or execute, in this spelling or another; the git allowance is read-only"
+    fi
     i=$((i + 1))
   done
 }
@@ -290,11 +312,16 @@ check_reader() {
   i=$((H + 1))
   while [ "$i" -lt "${#W[@]}" ]; do
     t="${W[$i]}"
+    case "$base" in
+      sort) flag_hits "$t" "o" "output" && deny "'sort $t' writes a file, in this spelling or another" ;;
+      tree) flag_hits "$t" "o" "" && deny "'tree $t' writes a file" ;;
+      file) flag_hits "$t" "C" "compile" && deny "'file $t' writes a compiled magic file" ;;
+      date) flag_hits "$t" "s" "set" && deny "'date $t' sets the clock" ;;
+      rg) flag_hits "$t" "" "pre" && deny "'rg $t' runs a program on each file" ;;
+    esac
     case "$base:$t" in
       find:-delete|find:-exec|find:-execdir|find:-ok|find:-okdir|find:-fprint|find:-fprint0|find:-fprintf|find:-fls)
         deny "find $t can change or execute; only searching is allowed" ;;
-      sort:-o|sort:--output|sort:--output=*|tree:-o|file:-C|date:-s|date:--set|date:--set=*|rg:--pre|rg:--pre=*)
-        deny "'$base $t' writes or executes" ;;
       uniq:-*) ;;
       uniq:*) deny "uniq with a file argument can write its output file; pipe into it instead" ;;
     esac
