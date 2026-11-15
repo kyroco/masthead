@@ -151,6 +151,24 @@ out = subprocess.run([sys.executable, SECTIONS_GATE],
                      capture_output=True, text=True, cwd=repo, env=env).stdout
 check("ADR_DIR in the environment opts in too", '"deny"' in out, True)
 
+# A record whose file name holds a space is held by both gates (judge's fix V2-J1).
+repo = make_repo("opted-in-space", {"ADR_DIR": "docs/adr"})
+spaced = os.path.join(repo, "docs/adr/ADR-0007 use a queue.md")
+check("the write gate asks a spaced name for every section",
+      absent(sections_gate(repo, "Write", {"file_path": spaced, "content": TITLE_ONLY})), names)
+os.makedirs(os.path.dirname(spaced), exist_ok=True)
+with open(spaced, "w") as f:
+    f.write(TITLE_ONLY)
+code, err = structure_gate(repo)
+check("the stop gate holds a spaced name too", code, 2)
+check("and asks it for the same sections", absent(err), names)
+for command in ('echo x > "docs/adr/ADR-0009 new one.md"',
+                "echo x > 'docs/adr/ADR-0009 new one.md'",
+                "echo x > docs/adr/ADR-0009\\ new\\ one.md",
+                'cp draft.md "docs/adr/ADR-0009 new one.md"'):
+    check("a shell write to a spaced name is refused: %s" % command,
+          "through the shell" in sections_gate(repo, "Bash", {"command": command}), True)
+
 # ---------------------------------------------------------------- scenario 3
 print("--- 3. what Masthead says names nothing of Kyroco's ---")
 said = {
