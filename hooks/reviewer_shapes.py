@@ -8,8 +8,9 @@ and prints the reason and exits 2 when one is not.
 Each round of MAST-34 refused one more flag or wrapper, and the next round found
 one more spelling, so this is an allowlist: a program, flag or shell form that
 is not named here is refused, however it is spelled. It holds the command line
-the agent types. A test or probe script it runs is code of the repository under
-review, and what that code does is not checked here.
+the agent types, not code it runs: a test, a test runner, semgrep, or a probe
+script the agent wrote itself in its scratch folder can still do anything
+(Robert, November 15, kept probe scripts open).
 
 The shapes, each command separated by |, &&, || or ; and each judged alone:
   git, read only: status, diff, log, show, blame, rev-parse, ls-files,

@@ -149,9 +149,9 @@ their offline switches, semgrep and opengrep with their calls home turned
 off, a few reading tools such as cat, grep and jq, and rm of the agent's own
 scratch files, one command at a time or several joined by |, &&, || or ;.
 They refuse every other command, a wrapper such as `timeout 5 curl`
-included, and every redirect into a file. The fence reads the command the
-agent types, not what a program it runs then does: a test, a test runner,
-semgrep or a probe script (MAST-43). Then a judge, given the same product
+included, and every redirect into a file. The fence covers the commands the
+agent types, not code it runs: a test, a test runner, semgrep, or a probe
+script it wrote itself in its scratch folder can still do anything (MAST-43). Then a judge, given the same product
 context and nothing from the worker, reads the code along each verifier's
 path without running the tests a third time, and places each finding that
 holds: fixed in this pull request when a scenario's Then is false or no
