@@ -171,9 +171,10 @@ order. The steps live here and nowhere else; a repo supplies only its own facts
    diff and the extra's expected behavior as its claim, its brief opening
    `Re-verify: extra <name>, ...` with the extra's name as one word, then
    the `adjudicator` on its findings file. The brief check lets that round
-   through even when the scenario rounds are spent, and refuses a second
-   round for the same extra; if that round leaves anything on the fix list,
-   stop and report it the same way.
+   through even when the scenario rounds are spent, refuses a second round
+   for the same extra, and refuses any extra's round once the branch has had
+   as many as the cap; if that round leaves anything on the fix list, stop
+   and report it the same way.
 6. Log nothing and file nothing. There is no Nit log: a finding is on the
    fix list and fixed, brought to the user, or dropped.
 7. Add the changelog entry when the repo keeps one, or its label for internal

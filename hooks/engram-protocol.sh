@@ -525,6 +525,8 @@ print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permiss
     # says which round a dispatch joins. A verifier re-checking the fix of one
     # extra scored 8 or more ("Re-verify: extra <name>") spends no round: that
     # extra gets one round of its own, and a second for it is refused (MAST-42).
+    # A branch gets no more extra rounds than the cap, so a made-up name buys
+    # no round past it. The name ends in a letter or digit, so "E1." is E1.
     reverify_cap() {
       local kind="$1" state n log_root log state_dir session8 branch counts spent joins judged cap
       state="$(printf '%s' "$prompt" | awk '
@@ -533,7 +535,7 @@ print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permiss
           bare = line; gsub(/^[[:space:]>*_#`-]+|^[0-9]+\.[[:space:]]*/, "", bare); gsub(/[*_`]+/, "", bare)
           if (tolower(bare) ~ /^re-?verify[[:space:]]*:/) {
             if (match(line, /^Re-verify: round [0-9]+/)) print "yes\t" substr(line, 18, RLENGTH - 17)
-            else if (match(line, /^Re-verify: extra [A-Za-z0-9][A-Za-z0-9_.-]*/)) print "extra\t" tolower(substr(line, 18, RLENGTH - 17))
+            else if (match(line, /^Re-verify: extra [A-Za-z0-9]([A-Za-z0-9_.-]*[A-Za-z0-9])?/)) print "extra\t" tolower(substr(line, 18, RLENGTH - 17))
             else print "variant\t"
             exit
           }
@@ -573,6 +575,7 @@ print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permiss
       joins=0
       judged=0
       extra_done=0
+      extras_spent=0
       if [ -s "$log" ]; then
         # Columns: when, session, agent, type, model, outcome, reason, branch. A row with no branch column is from
         # before the column existed and counts for its own session. Only this plugin's agents count: the bare
@@ -589,7 +592,7 @@ print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permiss
             if (mine($4, "adjudicator")) { judged = 1; next }
             if ($6 ~ /^re-verify extra /) {
               e = $6; sub(/^re-verify extra /, "", e); sub(/[[:space:]].*$/, "", e)
-              if (mine($4, "verifier")) X[e]++
+              if (mine($4, "verifier")) { X[e]++; XT++ }
               next
             }
             if ($6 ~ /^re-verify/) {
@@ -604,9 +607,9 @@ print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permiss
             j = 0
             if (kind == "verifier" && a[want] + 0 > v[want] + 0) j = 1
             if (kind == "architecture-reviewer" && v[want] + 0 > a[want] + 0) j = 1
-            print (V + A - paired + U) " " j " " judged + 0 " " X[want] + 0
+            print (V + A - paired + U) " " j " " judged + 0 " " X[want] + 0 " " XT + 0
           }' "$log" 2>/dev/null)"
-        read -r spent joins judged extra_done <<<"$counts"
+        read -r spent joins judged extra_done extras_spent <<<"$counts"
       fi
       if [ "$state" = extra ]; then
         if [ "${extra_done:-0}" -ge 1 ]; then
@@ -614,6 +617,11 @@ print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permiss
 
 "
           reasons="${reasons}Re-verify rule: extra '$n' has already had its one round of its own on this branch, read from the dispatch log at $log, and an extra gets one. What is still on the adjudicator's fix list for it goes to the foreman, or to the user when there is none; send no further round for it."
+        elif [ "${extras_spent:-0}" -ge "$cap" ]; then
+          [ -n "$reasons" ] && reasons="$reasons
+
+"
+          reasons="${reasons}Re-verify cap: this branch has already spent $extras_spent rounds on extras, read from the dispatch log at $log, and a change gets at most $cap, so a new extra name buys no further round. What is still on the adjudicator's fix list goes to the foreman, or to the user when there is none; send no further round. Only a person raises the cap: they start Claude Code from a shell with MASTHEAD_REVERIFY_CAP set to the new number; a repository's settings cannot set it."
         fi
         return 0
       fi

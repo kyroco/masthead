@@ -108,7 +108,7 @@ if [ -z "$OUTCOME" ]; then
         print "re-verify round " n
         exit
       }
-      if (match(line, /^Re-verify: extra [A-Za-z0-9][A-Za-z0-9_.-]*/)) {
+      if (match(line, /^Re-verify: extra [A-Za-z0-9]([A-Za-z0-9_.-]*[A-Za-z0-9])?/)) {
         print "re-verify extra " tolower(substr(line, 18, RLENGTH - 17))
         exit
       }
