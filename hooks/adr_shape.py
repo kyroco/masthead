@@ -292,8 +292,12 @@ def read_doc(doc):
         return ""
 
 
-def alignment_gaps(text, doc):
-    """The reasons a new record's alignment section falls short of what the issue asks, one per gap."""
+def alignment_gaps(text, doc, verdicts_only=False):
+    """The reasons a new record's alignment section falls short of what the issue asks, one per gap.
+
+    `verdicts_only` asks only for a verdict and a why on each entry, and not that its parts and
+    builds be the doc's as it reads today: a record git already carries may predate a rename.
+    """
     if not has_section(text, ALIGNMENT):
         return []
     doc_text = read_doc(doc)
@@ -302,7 +306,7 @@ def alignment_gaps(text, doc):
     known = doc_builds(doc_text)
     entries, builds, found = alignment(text, parts, known)
     reasons = []
-    if not entries:
+    if not entries and not verdicts_only:
         reasons.append(
             "`## %s` names no part of the architecture doc (%s). Name each part this decision "
             "touches as the doc titles it, and only those. Its parts: %s." % (ALIGNMENT, doc[1], listed))
@@ -316,7 +320,8 @@ def alignment_gaps(text, doc):
         if said_verdict == "diverges" and len(reason_words(why)) < MIN_WHY_WORDS:
             reasons.append("`## %s` says it diverges from `%s` but not why. Say what this "
                            "decision does instead and why." % (ALIGNMENT, part))
-    reasons += build_gaps(builds if found else [], known)
+    if not verdicts_only:
+        reasons += build_gaps(builds if found else [], known)
     return reasons
 
 
@@ -420,17 +425,21 @@ def earlier_names(d, rel):
 def check(path, text):
     """A new record must carry the whole shape; one HEAD already carries must keep the sections it had.
 
-    A record HEAD carries is not asked for the alignment section, but where it has one, the
-    section it is left with is checked as a new record's is.
+    A record HEAD carries is not asked for the alignment section, but where it has one, each
+    entry it is left with still needs a verdict and a why.
     """
     before = committed(path)
     return missing(text) if before is None else removed(before, text) + kept_alignment_gaps(text)
 
 
 def kept_alignment_gaps(text):
-    """The reasons the alignment section a record is left with falls short; none without a doc or a section."""
+    """The entries of a carried record's alignment section left with no verdict or no why.
+
+    Only those: its part and build names are not held to the doc as it reads today, so a
+    later rename in the doc never blocks an edit to an old record.
+    """
     doc = architecture_doc()
-    return alignment_gaps(text, doc) if doc else []
+    return alignment_gaps(text, doc, verdicts_only=True) if doc else []
 
 
 def main(argv):
