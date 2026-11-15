@@ -1075,6 +1075,37 @@ says  agents/security-reviewer.md "A claim that a test covers something is false
 says  agents/security-reviewer.md "Never write that file with a shell command. If the write is refused, put the findings in your final reply and say so"
 says  agents/security-reviewer.md "Quote it as a false claim"
 says  agents/security-reviewer.md "Your final message is the report: each claim with its answer, false ones first"
+# MAST-37: with no gh, the foreman stops and says so for each step that has no connector call, naming that step.
+says  skills/work-on/foreman.md "With no \`gh\` (\`command -v gh\` finds nothing)"
+says  skills/work-on/foreman.md "\"\`gh\` is needed to queue PR #<pr>\""
+says  skills/work-on/foreman.md "\"\`gh\` is needed to list the issues that issue #<n> unblocks\""
+says  skills/work-on/foreman.md "Never skip one of these steps or report it done"
+never skills/work-on/foreman.md "\`gh\` is needed to queue PR #<n>"
+says  skills/github-issues/SKILL.md "stop and say \`gh\` is needed; neither is skipped"
+
+# MAST-37: setup's no-jq row names only what really stays off: the stop gates, capture reports and shell searches now hold without jq.
+says  skills/setup/SKILL.md "the code index gate cannot tell a fresh code_locate answer from a stale one, so any lookup of a name lets a search for it through"
+says  skills/setup/SKILL.md "the two gates that send a repeated search or a whole-file read back to that answer stay off"
+never skills/setup/SKILL.md "every search the code index gate reads is refused"
+
+# MAST-37: on Linear with Korium off, the old text goes to a file the milestone check reads and restores from.
+says  skills/analyze-issues/issue-check.md "the state dir (\`.claude/state\` unless setup named another)"
+says  skills/analyze-issues/milestone-check.md "the state dir (\`.claude/state\` unless setup named another)"
+says  skills/analyze-issues/issue-check.md "With Korium off, write that old text to \`<state dir>/old-text/<key>.md\` before the edit"
+says  skills/analyze-issues/milestone-check.md "With Korium off, read it from \`<state dir>/old-text/<key>.md\` instead"
+says  skills/analyze-issues/milestone-check.md "A line of the user's that the old text holds and the issue lost is restored with a \`patch\`"
+says  skills/analyze-issues/milestone-check.md "cannot be checked or restored, and name it; never call it clean"
+says  skills/analyze-issues/SKILL.md "the check says it cannot restore a dropped line, names the issue, and does not pass it"
+
+# MAST-37: one meaning of Korium off (the install option), handed to agents in the brief.
+says  skills/work-on/SKILL.md "Korium is off when the \`korium\` install option is off"
+says  skills/work-on/SKILL.md "\"Korium is off, so no search.\""
+says  skills/work-on/SKILL.md "put the line \"Korium is off.\" in every brief you send"
+never skills/work-on/SKILL.md "or \`ToolSearch\` finds no Korium tool"
+says  references/agent-preamble.md "When your brief carries the line \"Korium is off.\""
+says  references/agent-preamble.md "\"Korium is off, so nothing was captured\""
+never references/agent-preamble.md "\`ToolSearch\` finds no Korium tool"
+
 # Linear issue MAST-39: the old copies of rules left by the move to one
 # verifier per scenario are gone, and each rule is written once.
 # Scenario 1: no line tells a verifier to report faults outside its claims

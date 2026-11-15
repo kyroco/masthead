@@ -144,7 +144,12 @@ with these changes, each call made through the Linear connector as the
   open issue of the project, for duplicates, contradictions, gaps and order.
   The connector shows no earlier description, so each per-issue agent
   captures in Korium the old text of every part it changed, and the check
-  in step 3 reads those captures in place of GitHub's edit history.
+  in step 3 reads those captures in place of GitHub's edit history. With
+  Korium off, the per-issue agent writes that old text word for word to
+  `<state dir>/old-text/<key>.md` (the state dir is `.claude/state` unless
+  setup named another) before its edit, and the check reads that file; with
+  neither, the check says it cannot restore a dropped line, names the issue,
+  and does not pass it.
 - **Step 4.** An issue waiting on a question has the status `Needs Human`,
   not the label. The answer's agent posts the comment with `save_comment`,
   takes the question line out with a `save_issue` `patch`, and sets the

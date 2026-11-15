@@ -78,6 +78,15 @@ the claims and the findings alone. Error -32029 is the
 limit of 60 searches a minute, not an outage: wait the `retry_after_ms` it
 gives and search again.
 
+Korium is off when the `korium` install option is off: the session then
+starts with no Korium memory protocol, and the gates that ask for a search
+stand down. Skip every step in these files that says to search or capture
+Korium, say so in one line where its result would go: "Korium is off, so no
+search.", and put the line "Korium is off." in every brief you send. Nothing
+else changes, and a question's "looked in:" part names the decision record
+and the README rule without a Korium query. With the option on and no Korium
+tool found, Korium is down, not off: stop and tell the person.
+
 ## What enforces this
 
 These steps are checked by a hook; the README's check list says where each

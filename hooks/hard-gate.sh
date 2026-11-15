@@ -353,7 +353,8 @@ CHANGED="$( {
   git status --porcelain --untracked-files=all 2>/dev/null | awk '{print $NF}'
 } | sort -u | sed "s|^|$TOP/|")"
 
-[ -z "$CHANGED" ] && exit 0
+# With no origin/main an empty list does not mean nothing new is pushed, so the receipt rung still runs (MAST-37).
+[ -z "$CHANGED" ] && [ -n "$BASE" ] && exit 0
 # Warn that uncommitted edits are checked on disk but the push carries the committed copy.
 _DIRTY="$(git diff --name-only HEAD 2>/dev/null | head -5)"
 [ -n "$_DIRTY" ] && echo "WARN: uncommitted edits are checked as they are on disk, but this push carries the committed version of: $(printf '%s' "$_DIRTY" | tr '\n' ' ')" >&2
@@ -720,8 +721,14 @@ each_root() {
 
 # Local tests: require the push-check script's receipt for HEAD, and refuse a push of any other commit.
 gate_local_tests() {
+  check_named="$(project_fact "$TOP" PROJECT_PUSH_CHECK)"
+  [ -n "$check_named" ] || return 0
   check_script="$(project_fact "$TOP" --path PROJECT_PUSH_CHECK)"
-  [ -n "$check_script" ] && [ -f "$check_script" ] || return 0
+  # A named check that is not here refuses, so a branch that lacks the script never pushes untested (MAST-37).
+  if [ -z "$check_script" ] || [ ! -f "$check_script" ]; then
+    block "this repository names a push check, '$check_named', but it is not in this checkout, so the tests cannot be checked. A worktree has only what its branch carries: in the main checkout, run 'git add $check_named' (with the files it reads, such as .claude/push-check.cmd), commit and merge that to main, then bring main into this branch. Or run /masthead:setup to write it again."
+    return 0
+  fi
   check_rel="${check_script#"$TOP"/}"
   sends="$(python3 -c "$_CMD_READER" "$_CMD" "$(git rev-parse --verify -q 'HEAD^{tree}' 2>/dev/null)" 2>/dev/null || echo check)"
   case "$sends" in

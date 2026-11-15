@@ -332,6 +332,38 @@ printf '%s' '{"tool_name":"Bash","tool_input":{"command":"rm -rf lib"}}' | DIAGN
 [ $? -eq 0 ] && pass "DIAGNOSER_BASH_GATE=off stands the gate down (the installer's explicit choice)" \
   || fail "DIAGNOSER_BASH_GATE=off should stand the gate down"
 
+# NO JQ (MAST-37). The project-wide wiring reads every session's Bash call, so without jq it must refuse the
+# diagnoser and reader, as before, and leave every other caller's shell alone.
+JQLESS="$WORK/nojq-bin"
+mkdir -p "$JQLESS"
+for folder in /usr/bin /bin /opt/homebrew/bin /usr/local/bin; do
+  [ -d "$folder" ] || continue
+  for f in "$folder"/*; do
+    n="${f##*/}"
+    [ "$n" = jq ] && continue
+    [ -e "$JQLESS/$n" ] || ln -s "$f" "$JQLESS/$n" 2>/dev/null
+  done
+done
+nojq_rc() { printf '%s' "$2" | env PATH="$JQLESS" bash "$HOOK" $1 >/dev/null 2>&1; echo $?; }
+if env PATH="$JQLESS" bash -c 'command -v jq' >/dev/null 2>&1; then
+  fail "could not build a PATH without jq"
+else
+  [ "$(nojq_rc --project-wide '{"tool_name":"Bash","tool_input":{"command":"ls"}}')" = 0 ] \
+    && pass "no jq: the main session's shell is left alone" \
+    || fail "no jq: the main session's ls should go through"
+  [ "$(nojq_rc --project-wide '{"tool_name":"Bash","agent_type":"masthead:worker","tool_input":{"command":"ls"}}')" = 0 ] \
+    && pass "no jq: another agent's shell is left alone" \
+    || fail "no jq: another agent's ls should go through"
+  for who in masthead:reader masthead:diagnoser reader; do
+    [ "$(nojq_rc --project-wide '{"tool_name":"Bash","agent_type":"'"$who"'","tool_input":{"command":"ls"}}')" = 2 ] \
+      && pass "no jq: $who is refused, since its command cannot be checked" \
+      || fail "no jq: $who should be refused"
+  done
+  [ "$(nojq_rc "" '{"tool_name":"Bash","tool_input":{"command":"ls"}}')" = 2 ] \
+    && pass "no jq: the agent-file wiring still refuses" \
+    || fail "no jq: the agent-file wiring (no --project-wide) should refuse"
+fi
+
 echo "---"
 if [ "$FAILURES" -eq 0 ]; then
   echo "BASH-SCOPE-DIAGNOSER OK: all assertions pass"
