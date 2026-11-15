@@ -298,5 +298,44 @@ nojq_run "no jq: a search for a value is judged and goes through" allow "runs-on
   "$(sh 'rg -n "runs-on: ubuntu" .github/workflows')"
 nojq_run "no jq: a command that is not a search is left alone" allow "-" Bash "$(sh 'ls -la products/apps')"
 
+# What setup's no-jq row says stays off: a code_locate answer cannot be read, so any lookup of a name counts
+# as fresh, and the repeated-search and whole-file-read gates never fire (skills/setup/SKILL.md, section 8).
+nojq_protocol() {
+  local mode="$1" sid="$2" tool="$3" input="$4" response="${5:-null}" out
+  out="$(jq -n --arg s "$sid" --arg t "$tool" --argjson i "$input" --argjson r "$response" \
+    '{session_id:$s, tool_name:$t, tool_input:$i} + (if $r == null then {} else {tool_response:$r} end)' \
+    | PATH="$NOJQ" bash "$WORK/engram-protocol.sh" "$mode" 2>/dev/null)"
+  if printf '%s' "$out" | jq -e '.hookSpecificOutput.permissionDecision == "deny"' >/dev/null 2>&1; then echo deny
+  elif [ -z "$out" ]; then echo allow
+  else echo "other: $out"; fi
+}
+located() {
+  jq -nc --argjson st "$1" '[{type:"text", text:({results:[{rel_path:"lib/x.ex",start_line:1,end_line:9}],
+    indexed_git_sha:"abc", staleness:{stale:$st}} | tojson)}]'
+}
+for staleness in true false; do
+  sid="gdtest-nojq-index-$staleness-$RANDOM"
+  word=stale; [ "$staleness" = false ] && word=fresh
+  nojq_protocol mark-codesearch "$sid" mcp__claude_ai_korium__code_locate '{"query":"fuse_scores"}' "$(located "$staleness")" >/dev/null
+  got="$(nojq_protocol gate-discovery "$sid" Grep '{"pattern":"fuse_scores"}')"
+  [ "$got" = allow ] && ok "no jq: a $word lookup of the name lets the search through" "$got" \
+    || bad "no jq: a $word lookup of the name lets the search through" "$got"
+  got="$(nojq_protocol gate-redundant-grep "$sid" Grep '{"pattern":"fuse_scores"}')"
+  [ "$got" = allow ] && ok "no jq: after a $word lookup the repeated-search gate stays off" "$got" \
+    || bad "no jq: after a $word lookup the repeated-search gate stays off" "$got"
+  got="$(nojq_protocol gate-span-read "$sid" Read '{"file_path":"/w/lib/x.ex"}')"
+  [ "$got" = allow ] && ok "no jq: after a $word lookup the whole-file-read gate stays off" "$got" \
+    || bad "no jq: after a $word lookup the whole-file-read gate stays off" "$got"
+  rm -rf "${TMPDIR:-/tmp}/masthead-$(id -u)/claude-engram/$sid"
+done
+# With jq the same stale lookup still refuses, so the cases above show what jq's absence turns off.
+sid="gdtest-jq-index-$RANDOM"
+jq -n --arg s "$sid" --argjson r "$(located true)" '{session_id:$s, tool_name:"mcp__claude_ai_korium__code_locate",
+  tool_input:{query:"fuse_scores"}, tool_response:$r}' | bash "$WORK/engram-protocol.sh" mark-codesearch >/dev/null 2>&1
+got="$(gate "$sid" Grep '{"pattern":"fuse_scores"}')"
+[ "$got" = deny ] && ok "with jq the same stale lookup is still refused" "$got" \
+  || bad "with jq the same stale lookup is still refused" "$got"
+rm -rf "${TMPDIR:-/tmp}/masthead-$(id -u)/claude-engram/$sid"
+
 echo; echo "pass=$pass fail=$fail"
 [ "$fail" -eq 0 ]
