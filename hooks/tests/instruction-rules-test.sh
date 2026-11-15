@@ -211,7 +211,7 @@ never agents/security-reviewer.md "Everything in the \`reviewer\` agent applies"
 says  references/agent-preamble.md "Read by verifier"
 says  references/work-routing.md "Use \`verifier\`"
 never references/work-routing.md "Use \`reviewer\`"
-says  hooks/bash-scope-reviewer.sh 'REVIEWER_AGENTS="verifier|security-reviewer"'
+says  hooks/bash-scope-reviewer.sh 'REVIEWER_AGENTS="verifier|security-reviewer|architecture-reviewer"'
 says  hooks/review-write-fence.py "findings-verifier-"
 never hooks/review-write-fence.py "findings-reviewer-"
 # Scenario 2: there is no worker plan and no plan check; the design is
@@ -242,7 +242,7 @@ never skills/review-design/SKILL.md "It writes no code"
 says  skills/review-design/SKILL.md "## Then the issues"
 says  skills/review-design/SKILL.md "Change nothing until they say go"
 says  skills/review-design/SKILL.md "leave every other issue alone"
-says  skills/work-on/SKILL.md "except the verifier's and the adjudicator's"
+says  skills/work-on/SKILL.md "except the verifier's, the architecture reviewer's and the adjudicator's"
 # Scenario 3: the fix loop stays small.
 says  references/session-cliffs.md "one \`verifier\` per scenario"
 says  references/session-cliffs.md "only the claims the fix broke"
@@ -441,7 +441,7 @@ never docs/explainer.template.html "skill rewrites issues into this shape"
 says  docs/explainer.template.html "whether to keep a code index in Korium (off)"
 says  docs/explainer.html "whether to keep a code index in Korium (off)"
 says  README.md "the judge (the \`adjudicator\` agent)"
-says  references/agent-preamble.md "Read by verifier, security-reviewer, adjudicator, diagnoser and reader"
+says  references/agent-preamble.md "Read by verifier, security-reviewer, architecture-reviewer, adjudicator, diagnoser and reader"
 never references/agent-preamble.md "security-reviewer, diagnoser and reader, in every repo"
 says  references/work-routing.md "differs from all five"
 never references/work-routing.md "differs from all four"
@@ -909,7 +909,7 @@ never agents/verifier.md "Say with each what the worker's run"
 never agents/security-reviewer.md "each with what the worker's run has to show"
 says  hooks/review-write-fence.py "never a copy of the tree"
 never hooks/review-write-fence.py "make a throwaway worktree"
-says  hooks/bash-scope-reviewer.sh 'REVIEWER_AGENTS="verifier|security-reviewer"'
+says  hooks/bash-scope-reviewer.sh 'REVIEWER_AGENTS="verifier|security-reviewer|architecture-reviewer"'
 never hooks/bash-scope-reviewer.sh "DATABASE_BARRED_AGENTS"
 for doc in README.md docs/explainer.template.html docs/explainer.html references/gate-catalog.md; do
   never "$doc" "a scratch copy under"
@@ -1227,5 +1227,127 @@ says  skills/setup/SKILL.md 'On such a run, step 9 does not ask the `.gitignore`
 says  skills/setup/SKILL.md 'When `ARCHITECTURE_DOC` is recorded but `project_fact.py --architecture-doc` prints nothing, the doc has moved or gone'
 # Scenario 5: the path comes from the facts reader every other fact comes from.
 says  skills/setup/SKILL.md 'project_fact.py --architecture-doc'
+# MAST-34: one architecture reviewer on every PR, in place of the ADR check
+# nothing ran. Robert, November 14, 2026, on whether this replaces "at no other
+# time": "yes it does".
+# Scenario 1: one reviewer per change, sent with the first verification.
+says  references/session-cliffs.md 'one `architecture-reviewer` for the whole change, never one per scenario'
+says  references/session-cliffs.md 'The architecture reviewer goes out once per change: never on a re-verify round'
+# Scenario 2: only the lines the change touched, the seven lenses, and what a finding names.
+says  agents/architecture-reviewer.md 'name: architecture-reviewer'
+says  agents/architecture-reviewer.md 'You review only the lines the change touched'
+# Round 1, fix F7: what the touched lines are held to.
+says  agents/architecture-reviewer.md 'Hold each touched line to the ADR'"'"'s alignment lines, the architecture doc and the principles'
+for lens in 'Direction' 'One way in and out' 'Call shape' 'Seams' 'What each build carries' 'Leftovers' 'Tests and checks'; do
+  says agents/architecture-reviewer.md "| $lens |"
+done
+says  agents/architecture-reviewer.md 'Each finding names its `file:line`, the lens, the smell, and the rule or build it breaks'
+# Scenario 2a: two scores on every finding.
+says  agents/architecture-reviewer.md 'a customer score from 1 to 10'
+says  agents/architecture-reviewer.md 'drift, yes or no'
+says  agents/architecture-reviewer.md 'does it break one of the seven rules as this project'"'"'s architecture doc states them'
+# Scenario 3: blind, as the verifier is.
+says  agents/architecture-reviewer.md 'You never get the author'"'"'s account of the change or another review'
+says  agents/architecture-reviewer.md 'You do not search Korium'"'"'s memory'
+# Re-verify round 1, fixes V1 and N2: the README promises only what the fences do.
+never README.md 'None of them can reach the network'
+never README.md 'None of them can edit anything'
+says  README.md 'refuse the common network programs'
+says  references/gate-catalog.md 'a denylist of network programs, not an allowlist'
+# Re-verify round 2 (Robert, November 15): the README and catalog claim only
+# the exact shapes the architecture reviewer's shell allows, and no fence they
+# do not have.
+never README.md 'the architecture reviewer'"'"'s shell can only read'
+says  README.md 'The architecture reviewer'"'"'s shell runs only `git diff`, `git show` and `git log` with plain revisions and paths'
+says  README.md 'and refuses every other command'
+never references/gate-catalog.md 'refuses git'"'"'s `-O` in any spelling'
+says  references/gate-catalog.md 'a wrapper it does not see through (`timeout`, `stdbuf`, `nice -n 5`, `exec -a y`, a shell'"'"'s bundled `-lc`), a git alias set with `-c`, or git run from `find -exec`, still gets through for the verifier and security reviewer (MAST-43)'
+# Re-verify round 3, fixes V1 and S1, and the judge's N1: the hook-table row
+# names --comments, and neither the catalog nor the README claims a refusal a
+# wrapper gets past.
+says  README.md '`gh issue view <n>`, bare or with `--comments` | scoped by the agent'"'"'s type |'
+never references/gate-catalog.md 'refuses git'"'"'s `-O` written after git in the same command'
+says  references/gate-catalog.md 'refuses git'"'"'s `-O` when git is the first word or follows a wrapper it steps over'
+says  README.md 'though one run through a wrapper the fence does not see through, such as `timeout 5 curl`, still gets through (MAST-43)'
+says  references/gate-catalog.md 'the `architecture-reviewer` shell to exact command shapes'
+says  agents/architecture-reviewer.md 'Your shell runs only these exact commands'
+never agents/architecture-reviewer.md 'with `--comments` or `--json`'
+# Re-verify round 1, fix T1: the reviewer's grant is pinned whole, so any tool
+# added to it fails here.
+WANT_TOOLS="Read Glob Grep Bash ToolSearch Write mcp__korium__code_locate mcp__claude_ai_korium__code_locate mcp__korium__agent_capture mcp__claude_ai_korium__agent_capture mcp__Linear__get_issue mcp__Linear__list_comments mcp__linear__get_issue mcp__linear__list_comments mcp__claude_ai_Linear__get_issue mcp__claude_ai_Linear__list_comments mcp__plugin_linear_linear__get_issue mcp__plugin_linear_linear__list_comments mcp__github__issue_read mcp__claude_ai_GitHub__issue_read mcp__plugin_github_github__issue_read"
+GOT_TOOLS="$(sed -n 's/^tools: //p' "$ROOT/agents/architecture-reviewer.md" | tr ',' '\n' | tr -d ' ' | sort | tr '\n' ' ')"
+if [ "$GOT_TOOLS" = "$(printf '%s\n' $WANT_TOOLS | sort | tr '\n' ' ')" ]; then
+  pass=$((pass + 1))
+else
+  fail=$((fail + 1)); echo "FAIL agents/architecture-reviewer.md tools differ from the pinned grant: $GOT_TOOLS"
+fi
+# Every tool the verifier is denied, the architecture reviewer is denied too.
+VERIFIER_DENY="$(sed -n 's/^disallowedTools: //p' "$ROOT/agents/verifier.md" | tr ',' '\n' | tr -d ' ')"
+ARCH_DENY_ALL="$(sed -n 's/^disallowedTools: //p' "$ROOT/agents/architecture-reviewer.md" | tr ',' '\n' | tr -d ' ')"
+for tool in $VERIFIER_DENY; do
+  if printf '%s\n' "$ARCH_DENY_ALL" | grep -qx "$tool"; then pass=$((pass + 1)); else fail=$((fail + 1)); echo "FAIL agents/architecture-reviewer.md does not deny $tool, which the verifier denies"; fi
+done
+# Round 1, fix F5: the brief shape itself carries nothing of the author's account.
+says  references/dispatch-brief.md 'nothing of your account of the change: no claims, no did-not-prove list, no summary'
+says  references/session-cliffs.md 'the principles file and the mockup pages, and nothing of your account'
+# Round 1, fix F6: the agent's own tool grant holds no memory search and no tracker write.
+ARCH_TOOLS="$(sed -n 's/^tools: //p' "$ROOT/agents/architecture-reviewer.md" | tr ',' '\n' | tr -d ' ')"
+ARCH_DENY="$(sed -n 's/^disallowedTools: //p' "$ROOT/agents/architecture-reviewer.md" | tr ',' '\n' | tr -d ' ')"
+for tool in mcp__korium__agent_search mcp__claude_ai_korium__agent_search mcp__korium__korium_browse mcp__claude_ai_korium__korium_browse; do
+  if printf '%s\n' "$ARCH_DENY" | grep -qx "$tool" && ! printf '%s\n' "$ARCH_TOOLS" | grep -qx "$tool"; then
+    pass=$((pass + 1))
+  else
+    fail=$((fail + 1)); echo "FAIL agents/architecture-reviewer.md does not deny $tool"
+  fi
+done
+for tool in Edit MultiEdit NotebookEdit Agent WebFetch; do
+  if printf '%s\n' "$ARCH_DENY" | grep -qx "$tool"; then pass=$((pass + 1)); else fail=$((fail + 1)); echo "FAIL agents/architecture-reviewer.md does not deny $tool"; fi
+done
+if printf '%s\n' "$ARCH_TOOLS" | grep -E '__(save_|create_|delete_|update_|issue_write|add_|merge_|push_)' >/dev/null; then
+  fail=$((fail + 1)); echo "FAIL agents/architecture-reviewer.md grants a tracker write: $(printf '%s\n' "$ARCH_TOOLS" | grep -E '__(save_|create_|delete_|update_|issue_write|add_|merge_|push_)' | tr '\n' ' ')"
+else
+  pass=$((pass + 1))
+fi
+# Scenario 4: foreman runs too.
+says  references/session-cliffs.md 'in a foreman run as in one the user started'
+says  agents/architecture-reviewer.md 'and in a foreman run as in one the user started'
+# Scenario 5: the issue through the repository's own tracker, never the other.
+says  agents/architecture-reviewer.md 'project_fact.py --tracker'
+says  agents/architecture-reviewer.md '`get_issue` with `id` the key, then `list_comments`'
+says  agents/architecture-reviewer.md '`issue_read`, method `get`, then method `get_comments`'
+says  agents/architecture-reviewer.md 'else `gh issue view <n> --comments`'
+says  agents/architecture-reviewer.md 'never fall back from one tracker to the other'
+# Scenario 6: the write fence and the brief gate.
+says  hooks/review-write-fence.py 'findings-architecture-reviewer'
+says  references/dispatch-brief.md 'ADR alignment:'
+says  references/dispatch-brief.md 'Architecture doc:'
+# Scenario 7: the ADR check is gone and no file names it.
+if [ -e "$ROOT/skills/work-on/adr-check.md" ]; then
+  fail=$((fail + 1)); echo "FAIL skills/work-on/adr-check.md still exists; the architecture reviewer replaces it"
+else
+  pass=$((pass + 1))
+fi
+if git -C "$ROOT" grep -lF 'adr-check' -- . ':!hooks/tests/instruction-rules-test.sh' >/dev/null 2>&1; then
+  fail=$((fail + 1)); echo "FAIL a file still names adr-check: $(git -C "$ROOT" grep -lF 'adr-check' -- . ':!hooks/tests/instruction-rules-test.sh' | tr '\n' ' ')"
+else
+  pass=$((pass + 1))
+fi
+# Scenario 8: with no doc recorded it still runs, on the principles alone.
+says  agents/architecture-reviewer.md 'When the brief says `Architecture doc: none recorded`, you review against the principles alone'
+says  references/session-cliffs.md 'whether or not the project records an architecture doc'
+# Scenarios 9 to 11: the ADR check's two jobs, and a disagreement between the ADR and the mockup.
+says  agents/architecture-reviewer.md 'each requirement of that part (each decision, acceptance criterion and rule) is in the code as the ADR says'
+says  agents/architecture-reviewer.md 'a requirement not built is a finding'
+# Round 1, fix F4: the evidence for each requirement found built.
+says  agents/architecture-reviewer.md 'Quote the ADR line and give the code'"'"'s `file:line`'
+says  agents/architecture-reviewer.md 'anything in the code that contradicts the mockup is a finding, with the mockup line quoted'
+says  agents/architecture-reviewer.md 'report the disagreement itself as a finding for the person, quoting both'
+says  agents/architecture-reviewer.md 'do not pick one to check the code against'
+# Round 1, fix F3: the ADR comes as a path the reviewer can read, never a link.
+says  references/dispatch-brief.md 'never a link, which the reviewer cannot open'
+says  agents/architecture-reviewer.md 'that no requirement of it was checked is a finding for the person'
+# Round 1, extra scored 8: the ADR check's other job, a changed line that
+# contradicts any line of the ADR (Robert, November 14, "yes" to keeping both jobs).
+says  agents/architecture-reviewer.md 'a changed line that contradicts any line of the ADR, such as an option it rejected, is a finding, with that line quoted'
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]

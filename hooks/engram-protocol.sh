@@ -7,7 +7,7 @@
 #   gate-edit         refuses the first edit until a Korium search ran
 #   gate-discovery    refuses a Grep, Glob or shell search for a name the code index holds until a fresh code_locate lookup
 #   gate-redundant-grep, gate-span-read  refuse repeating what code_locate just answered
-#   gate-verify-brief  refuses a verifier or security-reviewer brief with no claims list, and a third re-verify round
+#   gate-verify-brief  refuses a verifier or security-reviewer brief with no claims list, a third re-verify round, and an architecture-reviewer brief without the ADR alignment lines or the architecture doc the project records
 #   gate-capture      refuses a capture over 2,000 characters, a decision with no decider or no word on what it replaces, and a subagent capture filed under another agent's name
 #   gate-stop, gate-substop  refuse one finish with no capture
 # Every refusal happens once per session, then stands down. MASTHEAD_<NAME>_GATE=off in the operator's environment switches a gate off.
@@ -49,7 +49,7 @@ response_text() {
 agent_type() {
   local t; t="$(field '.tool_input.subagent_type // ""')"
   case "$t" in
-    masthead:*) printf '%s' "${t#masthead:}" | awk -F: '{ for (i = NF; i >= 1; i--) if ($i ~ /^(verifier|security-reviewer|adjudicator|diagnoser|reader)$/) { printf "%s", $i; exit } printf "%s", $NF }' ;;
+    masthead:*) printf '%s' "${t#masthead:}" | awk -F: '{ for (i = NF; i >= 1; i--) if ($i ~ /^(verifier|security-reviewer|architecture-reviewer|adjudicator|diagnoser|reader)$/) { printf "%s", $i; exit } printf "%s", $NF }' ;;
     *) printf '%s' "$t" ;;
   esac
 }
@@ -495,14 +495,110 @@ print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permiss
   gate-verify-brief)
     case "${MASTHEAD_BRIEF_GATE:-}" in off|0|false|no) exit 0 ;; esac
 
-    # Only the two agents that verify claims are screened.
+    # Only the two agents that verify claims, and the architecture reviewer, are screened.
     case "$(agent_type)" in
-      verifier|security-reviewer) : ;;
+      verifier|security-reviewer|architecture-reviewer) : ;;
       *) exit 0 ;;
     esac
 
     prompt="$(field '.tool_input.prompt // ""')"
     reasons=""
+
+    # The architecture reviewer (MAST-34 scenario 6): no claims list, but the ADR's alignment lines and the architecture doc the project records, each in one exact form.
+    if [ "$(agent_type)" = architecture-reviewer ]; then
+      ALIGN_FORM="the form is a line that is exactly 'ADR alignment:' at column zero, and the next non-blank line is a bullet starting '- ' of at least four words quoting the ADR's lines on how it applies the architecture doc, one bullet each; when the issue builds no ADR, that line reads 'ADR alignment: none, <why>' with the reason in at least three words"
+      align_state="$(printf '%s' "$prompt" | awk '
+        {
+          line = $0; sub(/\r$/, "", line)
+          if (!seen) {
+            bare = line; gsub(/^[[:space:]>*_#`-]+|^[0-9]+\.[[:space:]]*/, "", bare); gsub(/[*_`]+/, "", bare)
+            if (tolower(bare) ~ /^adr alignment[[:space:]]*:/) {
+              seen = 1
+              if (line ~ /^ADR alignment:[[:space:]]*none,/) {
+                rest = line; sub(/^ADR alignment:[[:space:]]*none,[[:space:]]*/, "", rest)
+                if (split(rest, words, /[[:space:]]+/) >= 3) print "yes"; else print "short"
+                exit
+              }
+              if (line !~ /^ADR alignment:[[:space:]]*$/) { print "variant"; exit }
+            }
+            next
+          }
+          if (line ~ /[^[:space:]]/) {
+            if (line ~ /^- [^[:space:]]/ && split(substr(line, 3), words, /[[:space:]]+/) >= 4) print "yes"; else print "short"
+            exit
+          }
+        }
+        END { if (!seen) print "missing"; else print "empty" }' | head -1)"
+      if [ "$align_state" != yes ]; then
+        reasons="Architecture review brief rule: the reviewer checks the change against the ADR's alignment with the architecture doc, so the brief carries those lines; $ALIGN_FORM. Then retry."
+      fi
+
+      # The ADR line names a path the reviewer can read, or none: it cannot open a link (round 1, fix F3).
+      adr_line="$(printf '%s' "$prompt" | awk '
+        {
+          line = $0; sub(/\r$/, "", line)
+          bare = line; gsub(/^[[:space:]>*_#`-]+|^[0-9]+\.[[:space:]]*/, "", bare); gsub(/[*_`]+/, "", bare)
+          if (tolower(bare) ~ /^adr[[:space:]]*:/) {
+            if (line ~ /^ADR: [^[:space:]]/) { sub(/^ADR: [[:space:]]*/, "", line); print "line\t" line } else print "variant\t"
+            exit
+          }
+        }' | head -1)"
+      case "$adr_line" in
+        line$'\t'*://*|variant*|"")
+          [ -n "$reasons" ] && reasons="$reasons
+
+"
+          reasons="${reasons}Architecture review brief rule: the reviewer reads the ADR from a file and cannot open a link, so the brief has a line that is exactly 'ADR: <path>' at column zero, the ADR's path in this checkout or in the local clone the repo's ADR_DIR fact names (pull it first), or 'ADR: none' when the issue builds no ADR. Then retry." ;;
+      esac
+
+      # The doc line names what the project records: project_fact.py --architecture-doc, read for the checkout the dispatch comes from.
+      cwd="$(field '.cwd // ""')"
+      [ -n "$cwd" ] || cwd="${CLAUDE_PROJECT_DIR:-$PWD}"
+      recorded=""
+      if [ -n "$hook_dir" ] && [ -r "$hook_dir/project_fact.py" ]; then
+        recorded="$(CLAUDE_PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$cwd}" python3 "$hook_dir/project_fact.py" --root "$cwd" --architecture-doc 2>/dev/null | head -1)"
+      fi
+      doc_line="$(printf '%s' "$prompt" | awk '
+        {
+          line = $0; sub(/\r$/, "", line)
+          bare = line; gsub(/^[[:space:]>*_#`-]+|^[0-9]+\.[[:space:]]*/, "", bare); gsub(/[*_`]+/, "", bare)
+          if (tolower(bare) ~ /^architecture doc[[:space:]]*:/) {
+            if (line ~ /^Architecture doc: /) { sub(/^Architecture doc: [[:space:]]*/, "", line); sub(/[[:space:]]+$/, "", line); print "line\t" line }
+            else print "variant\t"
+            exit
+          }
+        }' | head -1)"
+      doc_kind="${doc_line%%$'\t'*}"
+      doc_value="${doc_line#*$'\t'}"
+      doc_value="${doc_value//\`/}"
+      if [ -n "$recorded" ]; then
+        DOC_FORM="this project records its architecture doc at $recorded, so write 'Architecture doc: <that path>' at column zero, as the path from the repository's top or in full"
+      else
+        DOC_FORM="this project records no architecture doc (project_fact.py --architecture-doc prints nothing), so write 'Architecture doc: none recorded' at column zero, and the reviewer works from the project's principles alone"
+      fi
+      doc_ok=0
+      if [ "$doc_kind" = line ] && [ -n "$doc_value" ]; then
+        case "$doc_value" in
+          none*|None*)
+            [ -z "$recorded" ] && doc_ok=1 ;;
+          *)
+            if [ -n "$recorded" ]; then
+              top="$(git -C "$cwd" rev-parse --show-toplevel 2>/dev/null || printf '%s' "$cwd")"
+              case "$doc_value" in /*) named="$doc_value" ;; *) named="$top/$doc_value" ;; esac
+              named="$(python3 -c 'import os, sys; print(os.path.realpath(sys.argv[1]))' "$named" 2>/dev/null)"
+              [ -n "$named" ] && [ "$named" = "$recorded" ] && doc_ok=1
+            fi ;;
+        esac
+      fi
+      if [ "$doc_ok" -ne 1 ]; then
+        [ -n "$reasons" ] && reasons="$reasons
+
+"
+        reasons="${reasons}Architecture review brief rule: the brief names the architecture doc the reviewer holds the change to, and the check reads one exact form; $DOC_FORM. Then retry."
+      fi
+      [ -n "$reasons" ] && deny_tool "$reasons"
+      exit 0
+    fi
 
     # The form is exact, on purpose: a line that is exactly "Claims:" at column zero, whose next non-blank line is a "- " bullet of at least four words; and, on a re-verify, a line that begins "Re-verify: round N" at column zero. Every other spelling of either label is refused with the form to use, so no variant is ever half-read.
     CLAIMS_FORM="the form is a line that is exactly 'Claims:' at column zero (no marker before it, nothing after the colon), and the next non-blank line is a bullet starting '- ' with at least four words; put the claims under the first Claims: line, since only that one is read"

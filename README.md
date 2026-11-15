@@ -93,8 +93,9 @@ Three fresh sessions start, each with its own copy of the repository and a
 branch tied to its issue. Each worker reads its issue, the README and the
 decision record cover to cover, looks up what earlier sessions learned, and
 builds. It writes no plan and waits for no go: the design was reviewed
-before the issues were written, and the verifier checks each scenario once
-the code exists. Where a mockup page has become a template in the app, the
+before the issues were written, the verifier checks each scenario once
+the code exists, and the architecture reviewer checks the code against the
+design. Where a mockup page has become a template in the app, the
 worker starts that screen from the template and keeps its words and layout.
 A worker is done when every scenario has a test that passes, the screens the
 issue touches work, the push check passes and the pull request is open. Then
@@ -130,8 +131,22 @@ the scenario that looks like a real fault a customer could hit, it writes
 one line for the judge, with the file and line, and moves on. A security
 reviewer joins
 when the change touches sign-in, secrets or input from outside, with the
-repository's security rules as its claims. None of them can edit anything.
-None of them can reach the network. Then a judge, given the same product
+repository's security rules as its claims. One architecture reviewer joins
+every change, once: it holds the lines the change touched to the decision
+record, the project's architecture doc and its principles, through seven
+lenses (which way the names point, one way in and out of each body of data,
+the shape of the calls, real seams, what each build carries, leftovers, and
+tests that prove nothing), checks that what the decision record asks is
+built and matches the mockups, and scores each finding for the customer and
+for drift from the doc's seven rules. None of them can edit files with
+Claude's editing tools. The architecture reviewer's shell runs only
+`git diff`, `git show` and `git log` with plain revisions and paths, the
+plugin's `project_fact.py` to ask for the tracker or the architecture doc,
+and `gh issue view` to read its issue, and refuses every other command. The
+verifier's and security reviewer's shells refuse the common network programs
+(curl, wget, ssh, nc and the like), gh and any URL, though one run through a
+wrapper the fence does not see through, such as `timeout 5 curl`, still gets
+through (MAST-43). Then a judge, given the same product
 context and nothing from the worker, reads the code along each verifier's
 path without running the tests a third time, and places each finding that
 holds: fixed in this pull request when a scenario's Then is false or no
@@ -273,11 +288,11 @@ reason Claude can act on.
 | `irreversible-action-gate.sh` | before a shell command | force pushes, hard resets, `git clean`, deleting a remote branch, skipping the checks with `--no-verify`, and destructive data and infrastructure commands | emits a refusal, not a question |
 | `untrusted-domain-deny.py` | before a web fetch or search | requests to paste sites and other hosts code shouldn't reach | the host list is in the script |
 | `web-to-memory-gate.py` | after a web fetch; before a write | copying text fetched from the web into files every session loads, or into memory, without a marker saying the web was read | files inside a git repository are left alone, since a pull request shows them |
-| `agent-brief-gates.sh` | before a helper is sent | a brief to a verifier or security reviewer that leaves out the claims it must check; a third re-verify round | checks the shape of the brief, not whether it's true |
+| `agent-brief-gates.sh` | before a helper is sent | a brief to a verifier or security reviewer that leaves out the claims it must check; a third re-verify round; a brief to the architecture reviewer without the decision record's path, its alignment lines or the architecture doc's path | checks the shape of the brief, not whether it's true |
 | `dispatch-record-gate.sh` | before a helper is sent | nothing; records which model each helper ran on, and whether it was a re-verify round | |
-| `review-write-fence.py` | before a file write | a verifier writing anything but its own findings file, or a scratch file under the review folder | a shell write isn't seen |
-| `bash-scope-reviewer.sh` | before a shell command | a verifier reaching the network | scoped by the agent's type |
-| `bash-scope-diagnoser.sh` | before a shell command | the diagnoser or reader doing anything but running tests, reading git history and inspecting files | scoped by the agent's type |
+| `review-write-fence.py` | before a file write | a verifier or the architecture reviewer writing anything but its own findings file, or a scratch file under the review folder | a shell write isn't seen |
+| `bash-scope-reviewer.sh` | before a shell command | a verifier, security reviewer or architecture reviewer running a common network program (curl, ssh, gh and the like) or any command with a URL; the architecture reviewer may run `gh issue view <n>` for its issue | a list of programs it refuses: one it doesn't name, or one behind a wrapper it doesn't see through such as `timeout`, gets through for the verifier and security reviewer |
+| `bash-scope-diagnoser.sh` | before a shell command | the diagnoser or reader doing anything but running tests, reading git history and inspecting files; the architecture reviewer running anything but `git diff`, `git show` or `git log` with plain revisions and paths, `project_fact.py --tracker` or `--architecture-doc`, and `gh issue view <n>`, bare or with `--comments` | scoped by the agent's type |
 | `verdict-gate.sh` | when a session or helper stops | a diagnosis case file whose verdict names no file and line, or has fewer than two numbered observations | |
 | `scope-gate.py` | before and after a write | while a scope file exists in the checkout, writes outside its allowed paths; puts back a protected file a command changed | a background command's later writes aren't seen |
 | `skill-review-gate.py` | before a skill or helper runs | invoking a changed project skill or agent nobody in the session has read | project files only |
@@ -346,8 +361,8 @@ The skills under `skills/` are the written procedures Claude follows:
 against the code and the mockups before issues are written, and, when you say
 yes, the mockups turned into screens), `analyze-issues`
 (the checks on each issue before a build), `github-issues` (how the tracker is used), `linear-issues` (the same for Linear), `migrate-issues` (moving a set of issues from GitHub to Linear or back), `setup`, and the two
-Korium skills. `agents/` holds the verifier, the security reviewer, the
-judge (the `adjudicator` agent), the diagnoser and the reader. `references/` holds the pull request steps and the brief
+Korium skills. `agents/` holds the verifier, the security reviewer, the architecture
+reviewer, the judge (the `adjudicator` agent), the diagnoser and the reader. `references/` holds the pull request steps and the brief
 format. `bash hooks/run-tests.sh` runs every check's tests, and CI runs them
 on Linux and macOS.
 

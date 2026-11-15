@@ -60,8 +60,8 @@ prints them from the worktree: the repo's own version when its
 `.claude/references/session-cliffs.md` has that lead, otherwise the plugin's,
 the same steps the hook injects. When a step names a
 file this repo does not have, do what the step is for with what the repo has,
-and list in the PR body each check the repo lacks. The `verifier` and
-`security-reviewer` agents live in `${CLAUDE_PLUGIN_ROOT}/agents` and review every repo;
+and list in the PR body each check the repo lacks. The `verifier`,
+`security-reviewer` and `architecture-reviewer` agents live in `${CLAUDE_PLUGIN_ROOT}/agents` and review every repo;
 `/code-review` is not part of the flow.
 
 ## Korium, at every step
@@ -72,8 +72,8 @@ value from `CLAUDE.md`) for code you are about to read or change. For what is
 adopted, use `stance: "position"` with a `limit` of 10, so a ruling that ranks
 low is still read. Every other `agent_search` takes a `limit` of 5: each hit comes
 back whole, and at the default of 10 one search has filled 40,000 characters.
-Use what comes back, and put this rule in every subagent brief except the verifier's
-and the adjudicator's, which hold no memory search and judge from the code,
+Use what comes back, and put this rule in every subagent brief except the verifier's,
+the architecture reviewer's and the adjudicator's, which hold no memory search and judge from the code,
 the claims and the findings alone. Error -32029 is the
 limit of 60 searches a minute, not an outage: wait the `retry_after_ms` it
 gives and search again.
@@ -97,11 +97,13 @@ falls short:
 - `hard-gate.sh` refuses `git push` and `gh pr create` until the repo's local
   test receipt matches the commit, when the repo names a push check.
 - `agent-brief-gates.sh` refuses a verifier brief with no claims list and a third re-verify round,
-  and `dispatch-record-gate.sh` writes the dispatch log the agent count is
-  read from.
-- `review-write-fence.py` keeps a verifier's writes to its own findings file.
+  and an architecture reviewer's brief without the ADR alignment lines or the
+  architecture doc's path, and `dispatch-record-gate.sh` writes the dispatch
+  log the agent count is read from.
+- `review-write-fence.py` keeps a verifier's or the architecture reviewer's
+  writes to its own findings file.
 - `issue-edit-gate.py` refuses an issue edit that drops a line quoted as the
   person's.
 
-The rest, the ADR review included, rests on the text.
+The rest, sending the architecture reviewer included, rests on the text.
 

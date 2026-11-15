@@ -90,7 +90,16 @@ order. The steps live here and nowhere else; a repo supplies only its own facts
    of the code. Its claims are the scenario's Then lines and nothing you add;
    where the diff adds or edits text a customer reads (screen text, a refusal
    sentence, the site's docs, the changelog), every sentence of it is a claim
-   of the scenario it belongs to. Add the `security-reviewer` when
+   of the scenario it belongs to. In the same message send one
+   `architecture-reviewer` for the whole change, never one per scenario,
+   whether or not the project records an architecture doc, and in a foreman
+   run as in one the user started. It checks the lines the change touched
+   against the ADR's alignment lines, the architecture doc and the
+   principles, and that the part of the ADR the issue builds is in the code.
+   Its brief, as `references/dispatch-brief.md` shows, carries the issue, the
+   diff, the ADR and its alignment lines, the doc's path from
+   `project_fact.py --architecture-doc` (or `none recorded`), the principles
+   file and the mockup pages, and nothing of your account. Add the `security-reviewer` when
    the change touches authorization, secrets, untrusted input or privilege,
    or the repo's security conventions call for it, with those conventions as
    its claims. Brief each as `references/dispatch-brief.md` says. You do not
@@ -123,7 +132,8 @@ order. The steps live here and nowhere else; a repo supplies only its own facts
    one `verifier` given those claims and the fix diff, its brief opening
    `Re-verify: round N, claims ...`, and the `security-reviewer` again when a
    security finding was fixed, then the `adjudicator` on that round's
-   findings files as in step 3. At most two re-verify rounds per change;
+   findings files as in step 3. The architecture reviewer goes out once per
+   change: never on a re-verify round. At most two re-verify rounds per change;
    the brief check counts the verifier's re-verify dispatches in the
    dispatch log, on this branch, and refuses a third (the security
    reviewer's dispatch does not spend a round; a verifier that died or was
