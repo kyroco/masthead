@@ -506,6 +506,7 @@ done
 # --- MAST-43 round 1: the judge's fix list -------------------------------------
 mkdir -p "$SHAPES_TREE/tests" "$SHAPES_TREE/victim"
 : > "$SHAPES_TREE/tests/test_x.py"
+: > "$SHAPES_TREE/tests/__init__.py"
 ln -s ../../../../victim "$SHAPES_TREE/.claude/state/review/scratch/link"
 
 # S1-F1: zsh, the Bash tool's shell, turns a word starting with = into the
