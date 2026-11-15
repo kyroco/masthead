@@ -102,7 +102,10 @@ def label_rest(line, lens):
     if not bare.lower().startswith(lens.lower()):
         return None
     rest = bare[len(lens):]
-    if rest and rest[0].isalnum():
+    # A label ends the line (a heading) or is followed by a separator: a period,
+    # colon, dash or table bar. "Seams are where..." or a heading "One way in
+    # and out for each body of data" only starts with the lens's words.
+    if rest.strip() and not re.match(r"^\s*[^\w\s<]", rest):
         return None
     # Drop the separator after the label (a period, colon, dash or table bar), keep a placeholder's "<".
     rest = re.sub(r"\s*\|\s*", " ", rest)
