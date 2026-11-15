@@ -113,10 +113,13 @@ def _plain(text):
 
 
 def doc_parts(doc_text):
-    """The parts an ADR can name: each heading below the title, and each bold label opening a list item."""
+    """The parts an ADR can name: each heading, at any level, and each bold label opening a list item.
+
+    Any level, because setup's own check accepts a doc whose parts are top-level headings.
+    """
     parts = []
     for line in doc_text.splitlines():
-        m = re.match(r"^\s{0,3}#{2,6}\s+(.+?)\s*#*\s*$", line) \
+        m = re.match(r"^\s{0,3}#{1,6}\s+(.+?)\s*#*\s*$", line) \
             or re.match(r"^\s*[-*]\s+(?:\*\*|__)(.+?)(?:\*\*|__)", line)
         if m:
             name = _plain(m.group(1))
