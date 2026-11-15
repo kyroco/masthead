@@ -162,9 +162,29 @@ def user_prompt(data):
     print("\n\n".join(blocks))
 
 
+def show(lead):
+    """Print one procedure exactly as user_prompt would inject it from this folder."""
+    # Only a lead the hook declares, named with or without its closing period.
+    leads = [known for known, _ in CLIFFS if known.rstrip(".") == lead.rstrip(".")]
+    # A worker's Bash tool sets no CLAUDE_PROJECT_DIR, which the hook has. The worker
+    # runs show from its own worktree, so that checkout stands in for the session's
+    # repo; when CLAUDE_PROJECT_DIR is set, the hook's own rule applies unchanged.
+    if not os.environ.get("CLAUDE_PROJECT_DIR"):
+        os.environ["CLAUDE_PROJECT_DIR"] = os.getcwd()
+    text = cliff_source(os.getcwd())
+    block = cliff_block(text, leads[0]) if text and leads else None
+    if block:
+        print(block)
+
+
 def main():
     try:
         mode = sys.argv[1] if len(sys.argv) > 1 else ""
+        # A worker reads the PR steps the hook injects with: prime-context.py show "Opening a PR".
+        if mode == "show":
+            if len(sys.argv) > 2:
+                show(sys.argv[2])
+            sys.exit(0)
         data = json.load(sys.stdin)
         if not isinstance(data, dict):
             return

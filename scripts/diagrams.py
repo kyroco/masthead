@@ -209,7 +209,7 @@ def review():
 
     ox = right(judge) + 60
     fix = c.box(ox, 90, [("the fix list", "title"), ("a Then is false or no test proves it,", "body"), ("something broke, or words a person reads", "body"), ("are wrong; a file and a line", "body")], GOOD)
-    new = c.box(ox, bottom(fix) + 24, [("extras", "title"), ("real, but not this change's to fix: the worker", "body"), ("scores each; 8 or higher is fixed in this PR,", "body"), ("lower is dropped, and nothing is filed", "body")], INK)
+    new = c.box(ox, bottom(fix) + 24, [("extras", "title"), ("real, but not this change's to fix: the worker", "body"), ("scores each; a high score is fixed in this PR,", "body"), ("lower is dropped, and nothing is filed", "body")], INK)
     out = c.box(ox, bottom(new) + 24, [("thrown out", "title"), ("does not hold, or is noise;", "body"), ("gone for good", "body")], OUTBOX)
     c.arrow(right(judge), judge[1] + 30, fix[0] - 2, fix[1] + fix[3] / 2, color=GOOD["stroke"])
     c.arrow(right(judge), judge[1] + 50, new[0] - 2, new[1] + new[3] / 2)

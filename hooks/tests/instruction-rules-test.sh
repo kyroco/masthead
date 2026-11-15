@@ -153,11 +153,8 @@ says  references/session-cliffs.md "Add the changelog entry when the repo keeps 
 # landed while the run was going, because it was started with the verifiers.
 says  references/session-cliffs.md "Run it one time, after the fixes of the last verification round are in"
 says  references/session-cliffs.md "Do not commit while it runs: the run is then thrown away"
-says  references/session-cliffs.md "Do not start the repo's pre-push check now to save time"
+says  references/session-cliffs.md "Do not start it early, with the verifiers, to save time"
 says  references/session-cliffs.md "any commit made after it starts makes its receipt stale"
-says  skills/work-on/worker.md "Run the repo's pre-push check one time: on the last commit, after the fixes of the last verification round are in"
-says  skills/work-on/worker.md "Do not start it when you send out the verifiers, because any later commit makes its receipt stale"
-says  skills/work-on/worker.md "Do not commit while it runs, because the run is then thrown away"
 # The push gate's order and its remembered pass, where a person reads about them.
 for doc in README.md docs/explainer.template.html docs/explainer.html; do
   says "$doc" "the test receipt and the secret scan first, then the stack checks, which are skipped when this exact commit already passed them"
@@ -544,9 +541,9 @@ done
 says  references/gate-catalog.md "except \`gate-verify-brief\`"
 never references/gate-catalog.md "none of these refuses anything"
 # A model named on the call is checked whatever the agent's file says.
-says  README.md "a call that names no model for a helper whose own file names one is not asked"
+says  README.md "a call that names no model is not asked for a helper whose file in the project's or the plugin's agents folder names one"
 never README.md "A helper with no model in its own file"
-says  docs/explainer.template.html "a call that names no model for a helper whose own file names one is not asked"
+says  docs/explainer.template.html "a call that names no model is not asked for a helper whose file in the project's or the plugin's agents folder names one"
 never docs/explainer.template.html "A helper with no model in its own file"
 says  references/gate-catalog.md "are not covered when the call names no model"
 says  references/dispatch-brief.md "Not covered when the call names no model"
@@ -569,21 +566,15 @@ says  docs/explainer.template.html "or three when a memory is already connected"
 # under 8 is dropped, never brought to the person and never filed.
 says  skills/work-on/foreman.md "What the product does, what it says, what it charges, and who may do what are the person's to decide"
 says  skills/work-on/foreman.md "one question at a time; never fill the gap yourself"
-says  skills/work-on/foreman.md "One that scores 8 or more is fixed in the same PR, test first when it is a bug"
-says  skills/work-on/foreman.md "One that scores under 8 is dropped: it is not brought to the person, and nobody files it"
-says  skills/work-on/foreman.md "Never bring the person an extra, and never file one"
-says  skills/work-on/foreman.md "every extra scored 8 or more is fixed in it"
 never skills/work-on/foreman.md "**Proceed**"
 never skills/work-on/foreman.md "This is the only issue a foreman files"
 says  skills/work-on/foreman.md "sessions alive, the ones waiting for the merge queue"
 says  skills/work-on/foreman.md "Some things are not yours to settle and go to the person as they stand"
-says  skills/work-on/foreman.md "The moment filed exceeds closed, stop dispatching"
 says  skills/work-on/foreman.md "and file no issue."
 never skills/work-on/foreman.md "file no issue except"
 never skills/work-on/foreman.md "answer it from the sources above, in order, with the line quoted, or ask the user"
 never skills/work-on/foreman.md "tell the worker to fix it, file it or leave it"
 never skills/work-on/foreman.md "a finding it placed as a new issue is filed"
-says  agents/adjudicator.md "fixes it in this PR when it scores 8 or more, and drops it when it scores under 8"
 never agents/adjudicator.md "the worker decides whether it reaches the person"
 says  agents/adjudicator.md "**Extras**"
 never agents/adjudicator.md "**Seen, not done**"
@@ -597,8 +588,6 @@ says  skills/work-on/worker.md "One that scores under 8 is dropped: you bring it
 never skills/work-on/worker.md "Then the extras you are bringing"
 never skills/work-on/worker.md "Bring them the rest"
 never skills/work-on/worker.md "is filed, blocked by this issue"
-says  references/session-cliffs.md "one that scores 8 or more you fix in this PR"
-says  references/session-cliffs.md "bringing it to no one and filing nothing"
 never references/session-cliffs.md "fix none of them here and file none"
 says  references/session-cliffs.md "Log nothing and file nothing"
 never references/session-cliffs.md "File each finding on its New issue list"
@@ -614,7 +603,7 @@ for doc in README.md docs/explainer.template.html docs/explainer.html; do
   never "$doc" "a follow-up that waited on this one first"
   never "$doc" "answers with the line quoted. Only when nothing settles it"
 done
-says  scripts/diagrams.py "8 or higher is fixed in this PR"
+says  scripts/diagrams.py "a high score is fixed in this PR"
 never docs/images/review.svg "fix later"
 never docs/images/review.svg "seen, not done"
 never docs/images/review.svg "reproduction"
@@ -778,8 +767,7 @@ A=skills/analyze-issues/SKILL.md
 IC=skills/analyze-issues/issue-check.md
 MC=skills/analyze-issues/milestone-check.md
 RD=skills/review-design/SKILL.md
-DS=references/design-sheet.md
-for f in "$A" "$IC" "$MC" "$RD" "$DS"; do
+for f in "$A" "$IC" "$MC" "$RD"; do
   says  "$f" "## On Linear"
   says  "$f" "On a repository whose issues live on GitHub, none of this section applies"
 done
@@ -808,7 +796,6 @@ says  "$MC" "duplicates, contradictions, gaps and order"
 says  "$RD" "the Linear projects whose description names the decision record"
 says  "$RD" "\`list_issues\` with \`project\` each of those projects"
 says  "$RD" "fix each stale issue with \`save_issue\` with \`id\` the key and \`patch\`, after reading it with \`get_issue\`"
-says  "$DS" "append the section with \`save_issue\` with \`id\` the key and a \`patch\` of op \`append\`"
 # Scenario 7: on GitHub, the steps stand as written.
 says  "$A" "On \`github\`, every \`gh\` step below"
 says  "$A" "adds the \`needs-decision\` label"
@@ -816,7 +803,6 @@ says  "$IC" "with every comment (\`gh issue view <n> --comments\`), the project 
 says  "$IC" "Add the needs-decision label when a question is open"
 says  "$MC" "(\`gh issue list --milestone \"<title>\"\`, then \`gh issue view <n> --comments\`)"
 says  "$RD" "\`gh issue edit <n> --body-file <path>\`"
-says  "$DS" "write it back with \`gh issue edit <n> --body-file <file>\`"
 # Review S2-1: a Linear question names the project description rule, and the
 # edit line says the check refuses a question without its "looked in:" part.
 says  "$IC" "<project description rule>"
@@ -1081,17 +1067,107 @@ says  agents/security-reviewer.md "Comments, module docs and internal docs are n
 # Re-verify round 1 fix: the copy left lines out, so the security reviewer's
 # scope grew. It now carries every line it took from the verifier at ac86e48,
 # word for word: what counts as a claim, the stance, and how it reports.
-says  agents/security-reviewer.md "Nothing else is a claim: a fault in code the change did not touch is not a finding"
 says  agents/security-reviewer.md "A breach of the repository's written rules (CLAUDE.md, \`docs/conventions/\`) is a finding only when it makes one of the claims false"
 says  agents/security-reviewer.md "it needs to be adversarial and assume the architecture and code is shit and prove it's right by looking. It's not about always finding something."
 says  agents/security-reviewer.md "A claim you could not make false, with the run that shows it, is as much your result as one you could"
 says  agents/security-reviewer.md "The author's claims are suspect until you prove otherwise"
-says  agents/security-reviewer.md "The scenario's Given, When and Then, as written, are the standard"
-says  agents/security-reviewer.md "When the change adds or edits text a person reads"
 says  agents/security-reviewer.md "A claim that a test covers something is false when no test fails without the change"
 says  agents/security-reviewer.md "Never write that file with a shell command. If the write is refused, put the findings in your final reply and say so"
 says  agents/security-reviewer.md "Quote it as a false claim"
 says  agents/security-reviewer.md "Your final message is the report: each claim with its answer, false ones first"
+# Linear issue MAST-39: the old copies of rules left by the move to one
+# verifier per scenario are gone, and each rule is written once.
+# Scenario 1: no line tells a verifier to report faults outside its claims
+# (October 27 design: "anything outside the claims is a follow-up by construction").
+never references/agent-preamble.md "A bug you find is reported with file:line, even outside your question"
+never references/agent-preamble.md "even outside your question"
+says  references/agent-preamble.md "What you do with a fault outside your question is your agent file's to say"
+says  agents/diagnoser.md "A bug you find outside your case is reported with \`file:line\` too"
+says  agents/verifier.md "Nothing else is a claim: a fault in code the change did not touch is not a finding"
+# Scenario 2: the security reviewer's claims are the repo's security conventions,
+# and nothing in its file makes the scenario's Then lines its only claims.
+never agents/security-reviewer.md "Nothing else is a claim"
+never agents/security-reviewer.md "are the standard"
+never agents/security-reviewer.md "Then true in each state the Given allows"
+says  agents/security-reviewer.md "the repository's security conventions are your claims"
+says  agents/security-reviewer.md "A fault the change brings in that breaks one of your claims is a finding wherever its lines are"
+# Scenario 3: the extras rule is written once, in the worker's "What done is",
+# and the pre-push rule once, in step 8 of Opening a PR; every other file points.
+says  skills/work-on/worker.md "An extra that scores 8 or more is fixed in this PR, test first when it is a bug"
+says  skills/work-on/worker.md "One that scores under 8 is dropped: you bring it to no one"
+for f in references/session-cliffs.md agents/adjudicator.md skills/work-on/foreman.md skills/github-issues/SKILL.md skills/linear-issues/SKILL.md README.md docs/explainer.template.html docs/explainer.html docs/images/review.svg; do
+  never "$f" "8 or more"
+  never "$f" "8 or higher"
+  never "$f" "under 8"
+done
+says  references/session-cliffs.md "as the worker's \"What done is\" says (\`skills/work-on/worker.md\`)"
+says  agents/adjudicator.md "the worker settles it as its \"What done is\" says (\`skills/work-on/worker.md\`)"
+says  skills/work-on/foreman.md "settled by its worker, as \`worker.md\` **What done is** says"
+says  skills/github-issues/SKILL.md "an extra is settled as the worker's \"What done is\" says"
+never skills/linear-issues/SKILL.md "by answering \"fix later\""
+says  skills/linear-issues/SKILL.md "an extra is settled as the worker's \"What done is\" says"
+says  README.md "the rule is in \`skills/work-on/worker.md\`"
+says  docs/explainer.template.html "the rule is in <code>skills/work-on/worker.md</code>"
+says  docs/explainer.html "the rule is in <code>skills/work-on/worker.md</code>"
+says  references/session-cliffs.md "Run it one time, after the fixes of the last verification round are in"
+never skills/work-on/worker.md "Run the repo's pre-push check one time"
+never skills/work-on/worker.md "Do not commit while it runs"
+never skills/work-on/worker.md "Do not start it when you send out the verifiers"
+never references/session-cliffs.md "Do not start the repo's pre-push check now to save time"
+says  references/session-cliffs.md "Step 8 runs the pre-push check, once"
+says  skills/work-on/worker.md "Its step 8 says when to run the pre-push check"
+# Scenario 4: the worker reads the PR steps the hook injects, the repo's own
+# lead when its session-cliffs has one (prime-context.py cliff_source).
+says  skills/work-on/worker.md "prime-context.py show \"Opening a PR\""
+says  skills/work-on/SKILL.md "prime-context.py show \"Opening a PR\""
+never skills/work-on/worker.md "Follow **Opening a PR** in \`\${CLAUDE_PLUGIN_ROOT}/references/session-cliffs.md\`"
+never skills/work-on/SKILL.md "The PR steps themselves are **Opening a PR** in"
+# Scenario 5: a split does not stop a foreman run (reviews file nothing).
+never skills/work-on/foreman.md "filed exceeds closed"
+never skills/work-on/foreman.md "issues filed"
+says  skills/work-on/foreman.md "A split is not a stop"
+says  skills/work-on/foreman.md "start one worker per sub-issue, in blocked-by order"
+# Scenario 6: a thrown-out finding is not saved where the worker searches.
+never agents/adjudicator.md "and so does each thrown-out finding"
+never agents/adjudicator.md "A thrown-out finding's memory"
+says  agents/adjudicator.md "A thrown-out finding is never captured"
+# Round 1 fix: a verifier's and a security reviewer's own capture holds no
+# finding either, since the adjudicator may throw any of them out.
+says  agents/verifier.md "Your capture holds no finding"
+never agents/verifier.md "Capture it to Korium and return the thought id"
+says  agents/security-reviewer.md "one short capture to Korium before you finish, holding no finding"
+never agents/security-reviewer.md "and the report captured to Korium before you finish"
+# Scenario 7: the foreman rules on no disagreement between review rounds.
+never skills/work-on/foreman.md "a disagreement between review rounds"
+never skills/work-on/foreman.md "one round placed a finding on the fix list and the next among its extras"
+says  skills/work-on/foreman.md "what the second re-verify round left on the fix list"
+# The retired design sheet no longer ships.
+if [ -e "$ROOT/references/design-sheet.md" ]; then
+  fail=$((fail + 1)); echo "FAIL references/design-sheet.md still ships"
+else
+  pass=$((pass + 1))
+fi
+# Scenario 8: the docs and option text match the code.
+says  skills/work-on/worker.md "Done is four things"
+never skills/work-on/worker.md "Done is three things"
+never .claude-plugin/plugin.json "Subagents run on Haiku unless"
+says  .claude-plugin/plugin.json "\"title\": \"Ask for a reason before a helper runs on the biggest model\""
+says  .claude-plugin/plugin.json "a call that names no model is not asked for a helper whose file in the project's or the plugin's agents folder names one, or for another plugin's helper"
+never .claude-plugin/plugin.json "for a helper whose own file names one"
+for f in README.md docs/explainer.template.html docs/explainer.html; do
+  says  "$f" "a call that names no model is not asked for a helper whose file in the project's or the plugin's agents folder names one, or for another plugin's helper"
+  never "$f" "for a helper whose own file names one"
+done
+says  docs/explainer.html "<td><code>model-choice-gate.sh</code></td><td>Ask for a reason before a helper runs on the biggest model</td>"
+never .claude-plugin/plugin.json "before a subagent runs on Opus"
+says  README.md "| \`model-choice-gate.sh\` | Ask for a reason before a helper runs on the biggest model |"
+never README.md "Ask for a reason before the biggest model"
+says  docs/explainer.template.html "<td><code>model-choice-gate.sh</code></td><td>Ask for a reason before a helper runs on the biggest model</td>"
+never hooks/run-tests.sh "nothing runs these in CI"
+says  hooks/run-tests.sh "CI runs this on Linux and macOS"
+never skills/work-on/SKILL.md "Nothing else in this skill or its files is checked by a hook"
+says  skills/work-on/SKILL.md "\`agent-brief-gates.sh\` refuses a verifier brief with no claims list and a third re-verify round"
+
 
 # MAST-30: setup finds or starts the architecture doc and records where it lives.
 # Scenario 1: name the doc found, ask, record on yes.

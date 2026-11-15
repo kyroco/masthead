@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run every test suite for the shared hooks in this folder; nothing runs these in CI.
+# Run every test suite for the shared hooks in this folder; CI runs this on Linux and macOS (.github/workflows/tests.yml).
 # Usage: bash hooks/run-tests.sh (CLAUDE_PROJECT_DIR is unset so the calling repo cannot make a hook stand down).
 # RUN_ONLY="<label>" runs that one suite. A suite that exits 77 was skipped: its last line says why, and it is not a failure.
 

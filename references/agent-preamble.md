@@ -34,8 +34,8 @@ boundary.
    last.
 6. If you are blocked or stopping early, hand back what you have and what is
    unfinished.
-7. A bug you find is reported with file:line, even outside your question. You do
-   not fix it; the main session does.
+7. What you do with a fault outside your question is your agent file's to say.
+   You never fix one; the main session does.
 
 </preamble>
 
