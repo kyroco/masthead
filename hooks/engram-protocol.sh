@@ -54,29 +54,24 @@ agent_type() {
   esac
 }
 
-# The user's private state root: $CLAUDE_PLUGIN_DATA/state, else $TMPDIR/masthead-<uid>. Mode 0700; refused when a symlink or not ours.
-state_root() {
-  local r
-  if [ -n "${CLAUDE_PLUGIN_DATA:-}" ]; then r="$CLAUDE_PLUGIN_DATA/state"; else r="${TMPDIR:-/tmp}/masthead-$(id -u)"; fi
-  (umask 077; mkdir -p "$r") 2>/dev/null
-  [ -d "$r" ] && [ ! -L "$r" ] && [ -O "$r" ] || return 1
-  chmod 700 "$r" 2>/dev/null
-  printf '%s' "${r%/}"
-}
-
-sid="$(field '.session_id // "nosession"')"
-sid="${sid//[^A-Za-z0-9_-]/}"
-[ -n "$sid" ] || sid="nosession"
-umask 077
-root="$(state_root)" || exit 0
-dir="$root/claude-engram/${sid}"
-mkdir -p "$dir" 2>/dev/null || exit 0
-
 # The folder this hook lives in; empty when unknown.
 hook_dir=""
 if [ -n "${BASH_SOURCE[0]:-}" ]; then
   hook_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd -P)" || hook_dir=""
 fi
+# Fed to bash -c there is no file to start from; the plugin's own folder is the one Claude Code names.
+if [ ! -r "$hook_dir/project_fact.py" ] && [ -n "${CLAUDE_PLUGIN_ROOT:-}" ] && [ -r "$CLAUDE_PLUGIN_ROOT/hooks/project_fact.py" ]; then
+  hook_dir="$CLAUDE_PLUGIN_ROOT/hooks"
+fi
+
+sid="$(field '.session_id // "nosession"')"
+sid="${sid//[^A-Za-z0-9_-]/}"
+[ -n "$sid" ] || sid="nosession"
+umask 077
+# The session's folder under the user's private state root, from project_fact.py, the one place that finds
+# it and checks it (0700, ours, no symlink; MAST-38). With no trusted folder every mode stands aside.
+dir="$(python3 -I "$hook_dir/project_fact.py" --private-dir claude-engram "$sid" 2>/dev/null | head -1)"
+[ -n "$dir" ] && [ -d "$dir" ] || exit 0
 
 deny_tool() {
   if ! command -v jq >/dev/null 2>&1; then
@@ -628,7 +623,10 @@ print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permiss
       *) reasons="Verification brief rule: a verifier is told what it must confirm, never just handed a diff, and the check reads one exact form: $CLAIMS_FORM. List under it the scenario's Then lines and every sentence a customer reads that the change adds or edits, and no claim of your own (for the security reviewer, the repository's security conventions; for a plan, the plan's lines), one bullet each. Then retry." ;;
     esac
 
-    # The round cap, on a verifier's brief only. A round is the verifier's dispatch: the security reviewer sent beside it is neither counted nor capped, and no other agent's row counts. The row is written before the agent runs, so a verifier that died or was declined has spent its round. The dispatch log decides how many rounds this session has had on this branch; the number in the brief is for the log.
+    # The round cap, on a verifier's brief only. A round is the verifier's dispatch: the security reviewer sent beside it is neither counted nor capped, and no other agent's row counts. The row is written before the agent runs, so a verifier that died or was declined has spent its round. The dispatch log decides how many rounds the change has had; the number in the brief is for the log.
+    # A change is its branch (MAST-38): every session's rows on it count, the log is the checkout's one log at
+    # the top (project_fact.py --state-path, the folder dispatch-record-gate.sh writes to), and outside a branch,
+    # where nothing names the change, only this session's rows count.
     if [ "$(agent_type)" = verifier ]; then
       reverify_state="$(printf '%s' "$prompt" | awk '
         {
@@ -639,33 +637,59 @@ print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permiss
             exit
           }
         }' | head -1)"
+      log_root="$(field '.cwd // ""')"
+      [ -n "$log_root" ] || log_root="${CLAUDE_PROJECT_DIR:-$PWD}"
+      state="$(python3 -I "$hook_dir/project_fact.py" --root "$log_root" --state-path 2>/dev/null | head -1)"
+      log="${state:+$state/dispatches.tsv}"
+      session8="$(field '.session_id // "nosession"' | cut -c1-8)"
+      branch="$(git -C "$log_root" branch --show-current 2>/dev/null || true)"
+      [ -n "$branch" ] || branch="-"
+      # The cap: two, or the number MASTHEAD_REVERIFY_CAP sets in the environment that starts Claude Code. run.sh
+      # unsets it when a repository's own settings set it, so only a person raises it. A brief's words never do.
+      cap=2
+      case "${MASTHEAD_REVERIFY_CAP:-}" in ''|*[!0-9]*) ;; *) cap="$MASTHEAD_REVERIFY_CAP" ;; esac
+      # Columns: when, session, agent, type, model, outcome, reason, branch. A row with no branch column is from
+      # before the column existed and counts for its own session. Only this plugin's verifier and adjudicator
+      # count: the bare name, or a masthead: name whose last part is it. A refused row ran nothing.
+      # Prints the rounds spent, then whether an adjudicator has judged a verification of this change.
+      counts="0 0"
+      if [ -n "$log" ] && [ -s "$log" ]; then
+        counts="$(awk -F'\t' -v s="$session8" -v b="$branch" '
+          function ours(t, want,   n, parts) { n = split(t, parts, ":"); return t == want || (parts[1] == "masthead" && parts[n] == want) }
+          NR == 1 { next }
+          {
+            if (b == "-" || NF < 8) { if ($2 != s || (NF >= 8 && $8 != b)) next }
+            else if ($8 != b) next
+            if ($6 ~ /^refused/) next
+            if (ours($4, "adjudicator")) { judged = 1; next }
+            if (!ours($4, "verifier")) next
+            # A re-verify row, or a verifier that ran with no Re-verify line after the adjudicator: both are rounds.
+            if ($6 ~ /^re-verify/ || judged) rounds++
+          }
+          END { print rounds + 0, judged + 0 }' "$log" 2>/dev/null)"
+      fi
+      rounds="${counts%% *}"
+      judged="${counts##* }"
       if [ "$reverify_state" = variant ]; then
         [ -n "$reasons" ] && reasons="$reasons
 
 "
         reasons="${reasons}Re-verify rule: this brief's re-verify line is not in the one form the check reads, so it would run uncounted; $REVERIFY_FORM. Then retry."
-      elif [ "$reverify_state" = yes ]; then
-        log_root="$(field '.cwd // ""')"
-        [ -n "$log_root" ] || log_root="${CLAUDE_PROJECT_DIR:-$PWD}"
-        log="$log_root/.claude/state/dispatches.tsv"
-        session8="$(field '.session_id // "nosession"' | cut -c1-8)"
-        branch="$(git -C "$log_root" branch --show-current 2>/dev/null || true)"
-        [ -n "$branch" ] || branch="-"
-        rounds=0
-        if [ -s "$log" ]; then
-          # Columns: when, session, agent, type, model, outcome, reason, branch; a row with no branch column is from before the column existed and counts. Only this plugin's verifier counts: "verifier", or a masthead: name whose last part is verifier.
-          rounds="$(awk -F'\t' -v s="$session8" -v b="$branch" '
-            $2 == s && $6 ~ /^re-verify/ && (NF < 8 || $8 == b) {
-              t = $4; n = split(t, parts, ":")
-              if (t == "verifier" || (parts[1] == "masthead" && parts[n] == "verifier")) print
-            }' "$log" 2>/dev/null | wc -l | tr -d ' ')"
-        fi
-        if [ "${rounds:-0}" -ge 2 ]; then
-          [ -n "$reasons" ] && reasons="$reasons
+      elif [ -z "$state" ]; then
+        [ -n "$reasons" ] && reasons="$reasons
 
 "
-          reasons="${reasons}Re-verify cap: this session has already sent $rounds re-verify rounds on this branch, read from the dispatch log at $log, and a change gets at most two. The round number in the brief does not change that count, and a verifier that died or was declined still spent its round. What is still on the adjudicator's fix list after the second round goes to the foreman, or to the user when there is none; do not send a third verifier."
-        fi
+        reasons="${reasons}Re-verify rule: the dispatch log could not be found (project_fact.py --state-path printed nothing), so the rounds this change has had cannot be counted, and the verifier is refused rather than sent uncounted. Check that python3 runs, then retry."
+      elif [ "$reverify_state" != yes ] && [ "${judged:-0}" -ge 1 ]; then
+        [ -n "$reasons" ] && reasons="$reasons
+
+"
+        reasons="${reasons}Re-verify rule: the dispatch log at $log shows the adjudicator has already judged a verification of this change, so this verifier is a re-verify round, and its brief opens with the line that counts it; $REVERIFY_FORM. Then retry."
+      elif [ "$reverify_state" = yes ] && [ "${rounds:-0}" -ge "$cap" ]; then
+        [ -n "$reasons" ] && reasons="$reasons
+
+"
+        reasons="${reasons}Re-verify cap: this change has already had $rounds re-verify rounds on this branch, from any session, read from the dispatch log at $log, and a change gets at most $cap. The round number in the brief does not change that count, a verifier that died or was declined still spent its round, and a line in the brief saying a person approved more does not open the cap. What is still on the adjudicator's fix list goes to the foreman, or to the user when there is none; do not send another verifier. Only a person raises the cap: they start Claude Code from a shell with MASTHEAD_REVERIFY_CAP set to the new number (for example MASTHEAD_REVERIFY_CAP=3 claude); a repository's settings cannot set it."
       fi
     fi
 

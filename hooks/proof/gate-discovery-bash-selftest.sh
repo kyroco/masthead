@@ -16,7 +16,7 @@ HOOKS="${GATE_HOOKS_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
 STUBBIN="$(mktemp -d)/bin"; mkdir -p "$STUBBIN"; printf '#!/bin/sh\nexit 0\n' > "$STUBBIN/korium-cli"; chmod +x "$STUBBIN/korium-cli"; export PATH="$STUBBIN:$PATH"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
-cp "$HOOKS/engram-protocol.sh" "$HOOKS/shell-search-pattern.py" "$WORK/"
+cp "$HOOKS/engram-protocol.sh" "$HOOKS/shell-search-pattern.py" "$HOOKS/project_fact.py" "$WORK/"
 cat > "$WORK/korium-index-judge.py" <<'PY'
 #!/usr/bin/env python3
 import json, os, sys

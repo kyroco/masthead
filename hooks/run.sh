@@ -7,15 +7,13 @@ name="${1:-}"
 shift
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 [ -f "$here/$name" ] || exit 0
-# An off switch the project's own settings env block sets is ignored, so a cloned repository cannot switch a check off.
+# An off switch the repository's own files set is ignored, so a cloned repository cannot switch a check off:
+# its settings.json, and a settings.local.json git tracks (MAST-38). project_fact.py reads both files, in
+# the order Claude Code applies them, so a hook's facts and this list come from the one reader.
 proj="${CLAUDE_PROJECT_DIR:-}"
-if [ -n "$proj" ] && [ -f "$proj/.claude/settings.json" ]; then
-  for key in $(python3 -I -c 'import json, sys
-try:
-    env = json.load(open(sys.argv[1])).get("env") or {}
-except Exception:
-    env = {}
-print(" ".join(k for k in env if k.startswith(("MASTHEAD_", "CLAUDE_PLUGIN_OPTION_")) or k.endswith("_GATE")))' "$proj/.claude/settings.json" 2>/dev/null); do
+if [ -n "$proj" ]; then
+  for key in $(python3 -I "$here/project_fact.py" --repo-switch-keys 2>/dev/null); do
+    case "$key" in *[!A-Za-z0-9_]*|'') continue ;; esac
     unset "$key"
   done
 fi

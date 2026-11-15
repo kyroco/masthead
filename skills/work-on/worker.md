@@ -94,8 +94,9 @@ issue as the github-issues skill says, remove the branch you made, set the
 issue back to Todo, and stop; name the sub-issues to your foreman, or at the
 end of your turn.
 
-Note how many rows `.claude/state/dispatches.tsv` holds now, not counting
-refused ones; your report counts the rows added after it.
+Note how many rows the dispatch log holds now, not counting refused ones;
+your report counts the rows added after it. The log is
+`<state>/dispatches.tsv`, as step 9 of **Opening a PR** says.
 
 ## 5. Build it
 

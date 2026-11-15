@@ -103,10 +103,9 @@ Re-verify: round 1, claims 2 and 3
 That line is exact too: it begins `Re-verify: round N` at column zero, N
 the number of this round, with no marker before it; any other spelling is
 refused. The round number is for the log. The check does not read it: it
-counts the verifier's re-verify rows already in the dispatch log for this
-session on this branch and refuses a third, whatever the brief says. The
-security reviewer sent in the same round does not spend one; a verifier that
-died or was declined did, since its row was written before it ran.
+counts the rounds already in the dispatch log for this change, as step 5 of
+**Opening a PR** in `references/session-cliffs.md` says, and refuses a
+third, whatever the brief says.
 
 **The security reviewer's brief** has the same shape, with the repository's
 security conventions as its claims (its CLAUDE.md and `docs/conventions/`
@@ -210,7 +209,8 @@ the brief. Nothing checks this.
 ## What each check wants
 
 **`dispatch-record-gate.sh` is a record, not a check.** It appends each dispatch
-to the repo's `.claude/state/dispatches.tsv`, with the model from the call's `model` field
+to the checkout's `<state>/dispatches.tsv` (the folder `project_fact.py --state-path`
+prints), with the model from the call's `model` field
 or the agent file's `model:` line, and its outcome: `dispatched`, `refused`
 when a check refused it, or `re-verify round N` for a brief whose line starts
 `Re-verify:`, and the checkout's branch. An optional first non-empty line,
@@ -239,9 +239,9 @@ call is checked whatever the agent.
 For the other two, the brief carries a claims list in the one exact form above: a line
 that is exactly `Claims:` at column zero, then a `- ` bullet of at least four
 words; a variant is refused with the form. And a verifier's brief with a line
-that begins `Re-verify: round N` is refused when the dispatch log already
-holds two of the verifier's re-verify rows for this session on this branch;
-a re-verify line in any other spelling is refused outright.
+that begins `Re-verify: round N` is refused when the change has had its
+rounds, as step 5 of **Opening a PR** says; a re-verify line in any other
+spelling is refused outright.
 `MASTHEAD_BRIEF_GATE=off` in the operator's environment turns it off.
 
 **`skill-review-gate.py`** refuses a dispatch of an agent whose
