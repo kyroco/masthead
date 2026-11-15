@@ -450,7 +450,9 @@ says  references/work-routing.md "differs from all five"
 never references/work-routing.md "differs from all four"
 says  references/dispatch-brief.md "Two hooks read every"
 never references/dispatch-brief.md "Three hooks read every"
-says  references/dispatch-brief.md "the adjudicator and reader name haiku"
+says  references/dispatch-brief.md "diagnoser and adjudicator name opus; the reader names haiku"
+# MAST-41: the adjudicator moved from Haiku to Opus.
+never references/dispatch-brief.md "the adjudicator and reader name haiku"
 never references/dispatch-brief.md "diagnoser name opus; reader names haiku"
 says  references/session-cliffs.md "every sentence of it is a claim of the scenario it belongs to"
 never references/session-cliffs.md "that the diff adds or edits text a customer reads in"
@@ -681,7 +683,8 @@ says  skills/setup/SKILL.md "never both"
 says  skills/setup/SKILL.md "also remove both from settings.local.json"
 says  skills/setup/SKILL.md "leave the shared file alone"
 says  skills/setup/SKILL.md "run \`/masthead:setup\` from the repository's main checkout"
-says  skills/setup/SKILL.md "It needs to know four things about this repository"
+says  skills/setup/SKILL.md "It needs to know five things about this repository"
+never skills/setup/SKILL.md "It needs to know four things about this repository"
 never skills/setup/SKILL.md "It needs to know three things about this repository"
 never skills/setup/SKILL.md "Three short questions"
 says  skills/github-issues/SKILL.md "project_fact.py --tracker"
@@ -1089,5 +1092,33 @@ says  agents/security-reviewer.md "A claim that a test covers something is false
 says  agents/security-reviewer.md "Never write that file with a shell command. If the write is refused, put the findings in your final reply and say so"
 says  agents/security-reviewer.md "Quote it as a false claim"
 says  agents/security-reviewer.md "Your final message is the report: each claim with its answer, false ones first"
+
+# MAST-30: setup finds or starts the architecture doc and records where it lives.
+# Scenario 1: name the doc found, ask, record on yes.
+says  skills/setup/SKILL.md 'architecture-doc.py find'
+says  skills/setup/SKILL.md 'Name the file and ask: "I found `<path>`. Is this the project'"'"'s architecture doc?"'
+says  skills/setup/SKILL.md 'once the doc passes, add `"ARCHITECTURE_DOC": "<path>"`'
+# Scenario 2: offer a draft from the code, show it, write only on yes.
+says  skills/setup/SKILL.md 'Shall I draft one from the code?'
+says  skills/setup/SKILL.md 'the one module each body of data is reached through and what it hands back, the rules between the core and its extensions, and what each build ships'
+says  skills/setup/SKILL.md 'Show the whole draft and ask "Shall I write this to'
+says  skills/setup/SKILL.md 'Write nothing to it, and record nothing, before the person says yes.'
+# Scenarios 3 and 6: the check runs on every doc before it is shown or recorded.
+says  skills/setup/SKILL.md 'Either way, check it before showing it or recording it.'
+says  skills/setup/SKILL.md 'architecture-doc.py check <doc> <principles file>'
+says  skills/setup/SKILL.md 'For a draft you made from the template, run it as `check --draft`'
+says  skills/setup/SKILL.md 'cites the project'"'"'s principles by number, such as P9, and copies none of their text'
+# Re-verify round 1, finding s6.1: a doc that fails the check is never recorded.
+says  skills/setup/SKILL.md 'If they say no, do not record the doc'
+never skills/setup/SKILL.md 'record the doc anyway'
+# Scenario 4: a repository set up before is offered the doc alone.
+says  skills/setup/SKILL.md 'before and no `ARCHITECTURE_DOC` is recorded, offer the architecture doc on its own'
+says  skills/setup/SKILL.md 'ask none of the other questions unless the person asks to change an answer'
+# Round 1, finding s4.j1: the rerun does not ask the .gitignore question again either.
+says  skills/setup/SKILL.md 'On such a run, step 9 does not ask the `.gitignore` question again'
+# Round 1, finding s2.j2: a recorded doc that is no longer there is offered again, not skipped.
+says  skills/setup/SKILL.md 'When `ARCHITECTURE_DOC` is recorded but `project_fact.py --architecture-doc` prints nothing, the doc has moved or gone'
+# Scenario 5: the path comes from the facts reader every other fact comes from.
+says  skills/setup/SKILL.md 'project_fact.py --architecture-doc'
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]

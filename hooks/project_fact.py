@@ -235,6 +235,28 @@ def linear_team(root=None):
     return value if re.fullmatch(r"[A-Z][A-Z0-9]{0,9}", value) else None
 
 
+ARCHITECTURE_DOC_FACT = "ARCHITECTURE_DOC"
+
+
+def architecture_doc(root=None):
+    """The full path of the project's architecture doc, or None.
+
+    The repo-relative path comes from ARCHITECTURE_DOC, read like the tracker
+    (the personal file wins); it resolves in the checkout `root` is in, so a
+    worktree reads its own branch's copy. A path that leaves the repository,
+    or names no file, gives None.
+    """
+    root = root or project_root()
+    value = (personal_first_fact(ARCHITECTURE_DOC_FACT, root) or "").strip()
+    if not value or os.path.isabs(os.path.expanduser(value)):
+        return None
+    top = checkout_top(root)
+    path = os.path.realpath(os.path.join(top, value))
+    if os.path.commonpath([path, top]) != top or not os.path.isfile(path):
+        return None
+    return path
+
+
 def main(argv):
     # --trusted CHECKOUT: exit 0 when the checkout is the session's repository, 1 when not.
     if len(argv) == 2 and argv[0] == "--trusted":
@@ -242,11 +264,12 @@ def main(argv):
     root = None
     if len(argv) >= 2 and argv[0] == "--root":
         root, argv = argv[1], argv[2:]
-    # --tracker prints github or linear; --linear-team prints the team key or nothing.
+    # --tracker prints github or linear; --linear-team prints the team key or nothing;
+    # --architecture-doc prints the architecture doc's full path or nothing.
     # Skills run these through the Bash tool, where Claude Code sets no
     # CLAUDE_PROJECT_DIR (it sets it for hooks only), so there the repository
     # the shell is in is the session's. trusted() still guards --root.
-    if argv in (["--tracker"], ["--linear-team"]) and root is None \
+    if argv in (["--tracker"], ["--linear-team"], ["--architecture-doc"]) and root is None \
             and not os.environ.get("CLAUDE_PROJECT_DIR"):
         os.environ["CLAUDE_PROJECT_DIR"] = checkout_top(os.getcwd())
     if argv == ["--tracker"]:
@@ -254,6 +277,9 @@ def main(argv):
         return 0
     if argv == ["--linear-team"]:
         print(linear_team(root) or "")
+        return 0
+    if argv == ["--architecture-doc"]:
+        print(architecture_doc(root) or "")
         return 0
     as_path = bool(argv) and argv[0] == "--path"
     if as_path:
