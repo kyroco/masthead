@@ -113,6 +113,46 @@ security conventions as its claims (its CLAUDE.md and `docs/conventions/`
 where it has them) and the findings file
 `<state>/review/findings-security-reviewer-<name>.json`.
 
+**The architecture reviewer's brief.** One per change, sent in the same
+message as the first verification's verifiers, never on a re-verify round. It
+gets the issue and the design it is held to, and nothing of your account of
+the change: no claims, no did-not-prove list, no summary.
+
+```
+read_only: true
+This is an architecture review; you change no code.
+
+Issue: <the key, such as MAST-34, or the number>.
+Review <the diff command, with the head commit>. Write your findings to
+<state>/review/findings-architecture-reviewer-<name>.json (the real path).
+ADR: <the path or link of the ADR the issue builds>, or "none".
+ADR alignment:
+- <each line of the ADR on how it applies the architecture doc and which
+  builds it must work in, quoted>
+Architecture doc: <the path project_fact.py --architecture-doc prints>
+Principles: <the file that holds the project's principles, such as CLAUDE.md>.
+Mockup: <the mockup pages the ADR or the issue names>, or "none".
+Who uses this: <the README's opening paragraph, quoted>.
+
+Use code_locate with repo "<repo value>" and branch "<branch>" before
+reading code. Capture your review with agent_capture and return its
+thought_id with your findings.
+```
+
+Two lines are exact, and the brief check refuses the brief without them:
+
+- `ADR alignment:` at column zero, and the next non-blank line a `- ` bullet
+  of at least four words. When the issue builds no ADR, the line reads
+  `ADR alignment: none, <why>`, with the reason in at least three words.
+- `Architecture doc: <path>` at column zero, naming the doc
+  `project_fact.py --architecture-doc` prints, as the path from the
+  repository's top or in full. When it prints nothing, the line is
+  `Architecture doc: none recorded`, and the reviewer works from the
+  principles alone. A doc the project does not record is refused, and so is
+  `none` when it records one.
+
+Like the verifier's, its brief names no Korium memory search.
+
 **A review helper starts no database and copies no code tree.** The
 verifier, the security reviewer and the adjudicator are each told never to
 start a database, a cache or a container, never to run a script that brings
@@ -188,8 +228,10 @@ must judge takes `model: "opus"` and the line), forks, Explore,
 claude-code-guide, statusline-setup and plugin agents. A model named on the
 call is checked whatever the agent.
 
-**`gate-verify-brief` checks briefs to `verifier` and `security-reviewer`
-only.** The brief carries a claims list in the one exact form above: a line
+**`gate-verify-brief` checks briefs to `verifier`, `security-reviewer` and
+`architecture-reviewer` only.** The architecture reviewer's brief needs its
+`ADR alignment:` and `Architecture doc:` lines, as above, and no claims list.
+For the other two, the brief carries a claims list in the one exact form above: a line
 that is exactly `Claims:` at column zero, then a `- ` bullet of at least four
 words; a variant is refused with the form. And a verifier's brief with a line
 that begins `Re-verify: round N` is refused when the dispatch log already

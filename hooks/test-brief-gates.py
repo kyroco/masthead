@@ -440,7 +440,7 @@ def main():
 
     # The refusal names the doc the project records, so the worker can copy it.
     _, reason = architecture_decision("architecture-reviewer", architecture_brief(""), "docs/architecture.md")
-    ok = "docs/architecture.md" in reason and "ADR alignment" in reason
+    ok = "docs/architecture.md" in reason and "Architecture doc:" in reason and "ADR alignment:' at column zero" not in reason
     failures += 0 if ok else 1
     print("{:4}  {:<52} the refusal names the recorded doc".format("ok" if ok else "FAIL", ""))
 

@@ -12,9 +12,10 @@ it built.
   the issue has the `design-sheet` label and builds no ADR. Otherwise its step
   7 brief, which the user approves before any code, does the same job.
 - Never an issue in a foreman run, and never an issue that builds an ADR. The
-  whole ADR is that issue's spec, and a fresh reviewer checks the work
-  against it once before the PR (`skills/work-on/adr-check.md`). The ADR is
-  the source of truth; a sheet never carries a decision the ADR did not make.
+  whole ADR is that issue's spec, and the architecture reviewer checks the
+  work against it, once, in the PR's first verification
+  (`agents/architecture-reviewer.md`). The ADR is the source of truth; a
+  sheet never carries a decision the ADR did not make.
 
 
 ## The worker: write it into the issue, stop
@@ -58,7 +59,10 @@ After step 6's audit (the code read, the plan clear), and before any code:
 A foreman run has no sheets. Each worker builds from its issue and, when the
 issue builds one, the whole ADR, the architecture doc and the mockups, and
 takes a question none of them nor Korium answers to its foreman
-(`skills/work-on/worker.md` step 6, `foreman.md`).
+(`skills/work-on/worker.md` step 6, `foreman.md`). With no sheet, its worker
+still sends the architecture reviewer with its first verification, as
+**Opening a PR** in `references/session-cliffs.md` says: a foreman run is
+where the design drifted before.
 
 
 

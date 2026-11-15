@@ -57,8 +57,8 @@ command, a pre-push check, its changelog or a worktree
 standard, those bind. The PR steps themselves are **Opening a PR** in
 `${CLAUDE_PLUGIN_ROOT}/references/session-cliffs.md`. When a step names a
 file this repo does not have, do what the step is for with what the repo has,
-and list in the PR body each check the repo lacks. The `verifier` and
-`security-reviewer` agents live in `${CLAUDE_PLUGIN_ROOT}/agents` and review every repo;
+and list in the PR body each check the repo lacks. The `verifier`,
+`security-reviewer` and `architecture-reviewer` agents live in `${CLAUDE_PLUGIN_ROOT}/agents` and review every repo;
 `/code-review` is not part of the flow.
 
 ## Korium, at every step
@@ -69,8 +69,8 @@ value from `CLAUDE.md`) for code you are about to read or change. For what is
 adopted, use `stance: "position"` with a `limit` of 10, so a ruling that ranks
 low is still read. Every other `agent_search` takes a `limit` of 5: each hit comes
 back whole, and at the default of 10 one search has filled 40,000 characters.
-Use what comes back, and put this rule in every subagent brief except the verifier's
-and the adjudicator's, which hold no memory search and judge from the code,
+Use what comes back, and put this rule in every subagent brief except the verifier's,
+the architecture reviewer's and the adjudicator's, which hold no memory search and judge from the code,
 the claims and the findings alone. Error -32029 is the
 limit of 60 searches a minute, not an outage: wait the `retry_after_ms` it
 gives and search again.
@@ -80,5 +80,7 @@ gives and search again.
 `gate-edit` refuses the first edit until a Korium search has run, and
 `hard-gate.sh` refuses `git push` and `gh pr create` until the repo's local
 test receipt matches the commit. Nothing else in this skill or its files is
-checked by a hook, including the ADR review; it rests on the text.
+checked by a hook, except that the brief check refuses an architecture
+reviewer's brief without the ADR alignment lines or the architecture doc's
+path; the rest rests on the text.
 

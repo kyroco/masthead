@@ -9,8 +9,8 @@ fork, the only other kind, is covered below.
 
 **A blind context.** A verifier must not see the author's reasoning, and a
 diagnoser must not see anyone's theory of the bug. That cannot be arranged inside
-the window that already holds them. Use `verifier`, `security-reviewer` or
-`diagnoser`.
+the window that already holds them. Use `verifier`, `security-reviewer`,
+`architecture-reviewer` or `diagnoser`.
 
 **A narrower tool grant.** Work that should run without Write, Edit or the
 network. `reader` holds no Write or Edit, its shell is fenced to read-only
@@ -48,7 +48,8 @@ reads them. Give each verifier one scenario and its claims, as
 
 ## Verification
 
-Send `security-reviewer` when the change touches authorization, secrets,
+Send one `architecture-reviewer` on every change, with the first
+verification. Send `security-reviewer` when the change touches authorization, secrets,
 untrusted input or privilege, or when the repo's own security conventions say
 to. The PR steps are **Opening a PR** in
 `references/session-cliffs.md`.

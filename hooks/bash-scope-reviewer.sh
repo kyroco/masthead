@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# bash-scope-reviewer.sh - PreToolUse on Bash: refuse a verifier agent's command that uses a network program, a URL or /dev/tcp; other agents pass.
+# bash-scope-reviewer.sh - PreToolUse on Bash: refuse a verifier agent's command that uses a network program, a URL or /dev/tcp; other agents pass. The architecture reviewer may also run `gh issue view`, to read the issue on a GitHub repository with no connector.
 
 set -uo pipefail
 
 # List the agents this gate covers; the jq path, the no-jq path and review-write-fence.py all read this line.
-REVIEWER_AGENTS="verifier|security-reviewer"
+REVIEWER_AGENTS="verifier|security-reviewer|architecture-reviewer"
 
 # Allow everything when REVIEWER_NETWORK_GATE is off.
 [ "${REVIEWER_NETWORK_GATE:-on}" = "off" ] && exit 0
@@ -30,6 +30,7 @@ INPUT="$(cat 2>/dev/null || true)"
 # Apply only to the verifiers: no identity means the main session and passes, and any identity field naming a verifier puts the call in scope.
 # Claude Code sends this plugin's verifier as masthead:verifier; another plugin's agent of the same name is not ours to police.
 in_scope=0
+agent=""
 for field_value in \
   "$(printf '%s' "$INPUT" | jq -r '.agent_type // empty')" \
   "$(printf '%s' "$INPUT" | jq -r '.subagent_type // empty')" \
@@ -39,6 +40,7 @@ for field_value in \
   case "$field_value" in masthead:*) candidates="$(printf '%s' "${field_value#masthead:}" | tr ':' '\n')" ;; *) candidates="$field_value" ;; esac
   if printf '%s\n' "$candidates" | grep -qE "^($REVIEWER_AGENTS)([-_.:]|$)"; then
     in_scope=1
+    agent="$(printf '%s\n' "$candidates" | grep -E "^($REVIEWER_AGENTS)([-_.:]|$)" | tail -1 | grep -oE "^($REVIEWER_AGENTS)")"
     break
   fi
 done
@@ -129,6 +131,18 @@ judge_segment() {
     curl|wget|nc|ncat|netcat|telnet|ssh|scp|sftp|rsync|ftp|dig|nslookup|host)
       deny "$prog" ;;
     gh)
+      # The architecture reviewer reads its issue with gh where no GitHub connector is loaded (MAST-34 scenario 5); every other gh call stays refused.
+      # Only an issue number and the read flags pass: -R or --repo can name any host, and $ or a quote can carry a substitution.
+      if [ "$agent" = "architecture-reviewer" ] && [ "${clean[$((i + 1))]:-}" = "issue" ] && [ "${clean[$((i + 2))]:-}" = "view" ]; then
+        local rest_ok=1
+        for ((k = i + 3; k < ${#clean[@]}; k++)); do
+          case "${clean[$k]}" in
+            --comments|-c|--json) ;;
+            *) printf '%s' "${clean[$k]}" | grep -qE '^([0-9]+|[A-Za-z]+(,[A-Za-z]+)*)$' || { rest_ok=0; break; } ;;
+          esac
+        done
+        [ "$rest_ok" -eq 1 ] && return 0
+      fi
       deny "gh talks to GitHub" ;;
     git)
       j=$((i + 1))

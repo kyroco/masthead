@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""PreToolUse hook that lets verifier and security-reviewer agents write only their own review file or the review scratch folder, and denies every other write; fails closed."""
+"""PreToolUse hook that lets the verifier, security-reviewer and architecture-reviewer agents write only their own review file or the review scratch folder, and denies every other write; fails closed."""
 
 import json
 import os
@@ -9,10 +9,12 @@ import sys
 FILES = {
     "verifier": re.compile(r"findings-verifier-[a-z0-9][a-z0-9-]*\.json"),
     "security-reviewer": re.compile(r"findings-security-reviewer(-[a-z0-9][a-z0-9-]*)?\.json"),
+    "architecture-reviewer": re.compile(r"findings-architecture-reviewer(-[a-z0-9][a-z0-9-]*)?\.json"),
 }
 WANT = {
     "verifier": "findings-verifier-<claim>-<name>.json",
     "security-reviewer": "findings-security-reviewer-<name>.json",
+    "architecture-reviewer": "findings-architecture-reviewer-<name>.json",
 }
 SCRATCH = "scratch"
 AGENT_LIST_SOURCE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bash-scope-reviewer.sh")
