@@ -150,8 +150,9 @@ and record nothing, before the person says yes.
 
 **A doc was found.** Name the file and ask: "I found
 `<path>`. Is this the project's architecture doc?" With several, list them and
-ask which, if any. On yes, add `"ARCHITECTURE_DOC": "<path>"` (relative to the
-repository's top) to the env block. On no to every one, treat it as none found.
+ask which, if any. On yes, run the check below, and once the doc passes, add
+`"ARCHITECTURE_DOC": "<path>"` (relative to the repository's top) to the env
+block. On no to every one, treat it as none found.
 
 **None found.** Ask: "This repository has no architecture doc. Shall I draft
 one from the code? It names the parts, the one module each body of data is
@@ -182,9 +183,10 @@ anywhere. It passes only when the doc:
 
 Fix a draft until it passes. For a doc the person already has, show each line
 the check printed in plain words, draft the missing rules and the citations,
-show the exact text to add, and add it only on yes. If they say no, record
-the doc anyway and say the architecture reviewer has no stated rules to hold
-pull requests to until the doc has them.
+show the exact text to add, and add it only on yes. Record only a doc that
+passes. If they say no, do not record the doc: say the architecture reviewer
+needs the seven rules stated to hold pull requests to them, and that running
+`/masthead:setup` again brings the question back.
 
 ## 9. Write, then show what is on
 

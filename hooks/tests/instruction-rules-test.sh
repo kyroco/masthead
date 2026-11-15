@@ -1091,7 +1091,7 @@ says  agents/security-reviewer.md "Your final message is the report: each claim 
 # Scenario 1: name the doc found, ask, record on yes.
 says  skills/setup/SKILL.md 'architecture-doc.py find'
 says  skills/setup/SKILL.md 'Name the file and ask: "I found `<path>`. Is this the project'"'"'s architecture doc?"'
-says  skills/setup/SKILL.md 'add `"ARCHITECTURE_DOC": "<path>"`'
+says  skills/setup/SKILL.md 'once the doc passes, add `"ARCHITECTURE_DOC": "<path>"`'
 # Scenario 2: offer a draft from the code, show it, write only on yes.
 says  skills/setup/SKILL.md 'Shall I draft one from the code?'
 says  skills/setup/SKILL.md 'the one module each body of data is reached through and what it hands back, the rules between the core and its extensions, and what each build ships'
