@@ -31,6 +31,10 @@ Quietly gather these, with commands that read and change nothing:
   questions unless the person asks to change an answer. The fact goes to the
   settings file that already holds the other answers. On such a run, step 9
   does not ask the `.gitignore` question again: it was asked the first time.
+  When `ARCHITECTURE_DOC` is recorded but `project_fact.py --architecture-doc`
+  prints nothing, the doc has moved or gone: say which path is recorded and
+  that no file is there, and offer the architecture doc on its own the same
+  way.
 - A test command, from the files present: `package.json` with a `test` script
   means `npm test`; `mix.exs` means `mix test`; `Cargo.toml` means
   `cargo test`; `go.mod` means `go test ./...`; `pyproject.toml`, `pytest.ini`
