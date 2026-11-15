@@ -165,9 +165,11 @@ it, or it is not a finding.
 line with the doc. Your brief then has a `Sweep:` line in place of a diff,
 and these hold in place of steps 1 to 3:
 
-- **What you review.** `Sweep:` names the batch as Glob patterns, at a
-  commit. Read every code file they match, in full, as it is at that commit;
-  a finding sits on any line of them. There is no issue and no ADR to read,
+- **What you review.** `Sweep:` names the file that lists the batch, at a
+  commit: one entry a line, a path, or `<path>#L<a>-<b>` for lines a to b of
+  it. Read the list, then every entry on it in full, as it is at that
+  commit, and nothing the list does not name; a finding sits on any line you
+  read. There is no issue and no ADR to read,
   and no change to hold to one.
 - **Which lenses.** `Lenses:` names the ones you hold the batch to. Use only
   those: two other reviewers have the rest of the seven.

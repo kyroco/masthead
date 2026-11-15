@@ -243,8 +243,8 @@ no ignore line for its working files, and one about the architecture doc (it nam
 (one at a time, never both), and whether to connect a memory now, later or
 not at all. Run it again whenever you want to change an answer.
 
-With an architecture doc recorded, setup then offers to check the code you
-already have against it, since the pull request reviewer only sees the lines
+With an architecture doc recorded and code to check, setup then offers to
+check the code you already have against it, since the pull request reviewer only sees the lines
 a change touches: a targeted review of the parts you name, a full sweep, or
 neither. The same architecture reviewer reads the code, three to a batch,
 and a judge reads the code at each finding, keeps what drifts from the doc,

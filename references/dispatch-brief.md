@@ -215,7 +215,7 @@ Each reviewer's brief:
 read_only: true
 This is an architecture review of existing code; you change no code.
 
-Sweep: <the batch's parts from the ledger, separated by spaces>, at commit <the ledger's head>.
+Sweep: the files listed in <the list path next prints>, at commit <the ledger's head>.
 Lenses: <the family's lenses: Direction, One way in and out; or Call shape, Seams; or What each build carries, Leftovers, Tests and checks>.
 Write your findings to
 <state>/review/findings-architecture-reviewer-sweep-<batch id>-<family>.json (the real path).
@@ -243,9 +243,9 @@ This is a judging job for a review of existing code; you change no code.
 
 The code is <the repository> at <the ledger's head>.
 The reviewed parts are:
-<each part of this run's batches, one per line>
+<each part of the batches those findings files came from, one per line>
 The findings files are:
-<each findings file this run's batches wrote, from the ledger, one per line>
+<each file `findings --ledger <L>` prints, one per line>
 Architecture doc: <the recorded path>
 Principles: <the principles file>, or "none".
 Who uses this: <the README's opening paragraph, quoted>.

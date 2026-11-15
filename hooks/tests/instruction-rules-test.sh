@@ -1326,7 +1326,7 @@ says  skills/setup/SKILL.md 'ask whether the person wants a targeted review, a f
 says  skills/setup/SKILL.md 'Ask on every run of `/masthead:setup`'
 says  skills/setup/SKILL.md 'skills/setup/architecture-review.md'
 says  skills/setup/architecture-review.md 'I can do a targeted review of the parts you name, or a full sweep of the whole codebase, or neither'
-says  skills/setup/architecture-review.md '`parts` exits 3 when it holds none, and then you say nothing of a review'
+says  skills/setup/architecture-review.md '`parts` exits 3 when it holds none'
 # Scenarios 2 and 3: the named parts, or everything, through the same reviewer and lenses.
 says  skills/setup/architecture-review.md 'Only the code under what they named is reviewed'
 says  skills/setup/architecture-review.md 'every code file in the repository is reviewed'

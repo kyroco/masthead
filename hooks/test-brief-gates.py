@@ -349,7 +349,7 @@ Mockup: none
 SWEEP_BRIEF = """read_only: true
 This is an architecture review of existing code; you change no code.
 
-Sweep: lib/billing/** lib/account/**, at commit 824f48c0e7b1d2a3f4e5d6c7b8a9f0e1d2c3b4a5.
+Sweep: the files listed in /repo/.claude/state/architecture-review-batch-1.txt, at commit 824f48c0e7b1d2a3f4e5d6c7b8a9f0e1d2c3b4a5.
 Lenses: Direction, One way in and out.
 Write your findings to
 .claude/state/review/findings-architecture-reviewer-sweep-1-boundaries.json (the real path).

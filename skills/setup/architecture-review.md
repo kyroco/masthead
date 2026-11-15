@@ -18,10 +18,13 @@ change nothing either. Ask one question at a time and wait for the answer.
 ## 1. Ask what they want
 
 Ask only when the repository has code: the script's `parts` exits 3 when it
-holds none, and then you say nothing of a review. When `left --ledger <L>`
-lists parts, a review is part done: name how many parts are left and ask
-"Shall I go on with the review we started?" On yes, run
-`resume --ledger <L>` and go to step 4.
+holds none (it counts everything tracked but docs, media, archives, binaries,
+licences and lock files), and then say you found no code to review, so there
+is nothing to bring in line. When `left --ledger <L>` lists parts, a review
+is part done: name how many parts are left and ask "Shall I go on with the
+review we started?" On yes, run `resume --ledger <L>` and go to step 4. On
+no, ask the question below; the review they choose replaces the part-done
+one.
 
 Otherwise ask: "Would you like me to check the code you already have against
 the architecture doc? I can do a targeted review of the parts you name, or a
@@ -35,15 +38,20 @@ before anything is filed."
 ## 2. A targeted review
 
 Run `parts` and show its lines as a table: each part, its files and its lines
-of code. Ask "Which parts should I review? Name folders or files." Then run
-`plan --ledger <L> <each folder or file they named>`. Only the code under
+of code (a `<folder>/*` row is that folder's own files, without its
+subfolders). Ask "Which parts should I review? Name folders or files." Then
+run `plan --ledger <L> <each folder or file they named>`. Only the code under
 what they named is reviewed. When it prints `no code under:`, say which name
 holds no code and ask again. Go to step 4.
 
 ## 3. A full sweep
 
 Run `plan --ledger <L>` with no part named: every code file in the
-repository is reviewed. When it prints that the other batches wait for the
+repository is reviewed.
+
+In either step, when `plan` exits 4, a review is part done and the person
+chose a new one over it: run `plan` with `--fresh` and the same parts, which
+replaces it. When it prints that the other batches wait for the
 next run, tell the person how many sessions the sweep will take, and that
 running `/masthead:setup` again goes on where it stopped. Go to step 4.
 
@@ -64,9 +72,10 @@ sent fourteen and spent most of its room merging what they all found.
 
 Loop:
 
-1. Run `next --ledger <L>`. It prints the next batch as JSON. Exit 5 means
-   every batch is reviewed and exit 6 means this session has reviewed its
-   share: either way, go to step 5.
+1. Run `next --ledger <L>`. It prints the next batch as JSON, with `list`,
+   the file that names the batch's exact files; the reviewers read that
+   list, never a pattern. Exit 5 means every batch is reviewed and exit 6
+   means this session has reviewed its share: either way, go to step 5.
 2. Send the batch's three reviewers, each with the brief in
    `${CLAUDE_PLUGIN_ROOT}/references/dispatch-brief.md`, **A review of
    existing code**.
@@ -79,8 +88,11 @@ before the first batch, as for any review.
 ## 5. Send the judge
 
 Send one `adjudicator` for the run, with the judging brief in the same
-section of `dispatch-brief.md`: every findings file of this run's batches,
-from the ledger, and what `left` prints. It reads the code at each finding,
+section of `dispatch-brief.md`: every findings file that
+`findings --ledger <L>` prints (each batch reviewed and not yet judged, from
+this run or one that ended before its judge), and what `left` prints. When
+its verdict is back, run `judged --ledger <L>`, so no batch is judged twice.
+When `findings` prints nothing, there is nothing to judge: say so and end. It reads the code at each finding,
 gives each one both scores (customer, 1 to 10, and drift, yes or no against
 the doc's seven rules), keeps or drops it, and groups the kept ones by cause.
 It keeps what is drift, broken today or breaks a build the doc names, and
@@ -123,7 +135,9 @@ those skills give:
 - **Why**: the cause in one or two sentences, with its `file:line`s.
 - **Scenarios**: one for each build the doc names (the script's
   `builds <doc>` lists them), each "Given <that build>, When <...>, Then
-  <...>". Each rests on the doc line the cause breaks, quoted word for word
+  <...>". When `builds` prints nothing, ask the person which builds the
+  project ships, once for the whole filing, and give one scenario for each;
+  a project that ships one build gets one scenario for it. Each rests on the doc line the cause breaks, quoted word for word
   from `rules <doc>`, or the principle it breaks, by number.
 - **Out of scope**: the other causes, by key once filed.
 - **Questions**: what the doc and the code do not settle, as those skills

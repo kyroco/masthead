@@ -182,13 +182,15 @@ read, correcting the reviewer's where the code says otherwise: customer, 1 to
 10, naming who feels it; drift, yes only when it breaks one of the seven
 rules as the architecture doc states them, with that rule quoted.
 
-**Decide where it goes: kept or dropped.** Keep a finding that is drift, that
-breaks a principle the brief's principles file numbers, that is broken today
-(a wrong result a person gets now, with a path from a real entry point), or
-that makes a build the doc names behave wrongly. A build the doc does not
-name is no reason to keep it. Drop design cost with no drift, such as code
-that would be harder to change some day, whatever its customer score, and
-drop the noise named above.
+**Decide where it goes: kept or dropped.** Keep a finding that is drift,
+that is broken today (a wrong result a person gets now, with a path from a
+real entry point), or that makes a build the doc names behave wrongly. A
+build the doc does not name is no reason to keep it. A principle counts
+through the doc: its rules cite the principles they apply, so breaking one
+of those is drift, and design cost alone is dropped even when it quotes a
+principle. Drop design cost with no drift, such as code that would be harder
+to change some day, whatever its customer score, and drop the noise named
+above.
 
 **Merge duplicates, then group by cause.** Findings that one change would
 fix share a cause, even on different files or under different lenses: they
