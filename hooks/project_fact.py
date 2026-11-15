@@ -257,6 +257,21 @@ def architecture_doc(root=None):
     return path
 
 
+ARCHITECTURE_TRIAL_FACT = "ARCHITECTURE_TRIAL"
+TRIAL_OFF_WORDS = ("off", "false", "no", "0")
+
+
+def architecture_trial(root=None):
+    """"on" or "off": whether every architecture finding goes to the person (MAST-35).
+
+    On until the person turns it off, so a new install is on the trial. Read
+    like the tracker (the personal file wins). Only an off word turns it off:
+    a typo keeps the person in the loop.
+    """
+    value = (personal_first_fact(ARCHITECTURE_TRIAL_FACT, root) or "").strip().lower()
+    return "off" if value in TRIAL_OFF_WORDS else "on"
+
+
 def main(argv):
     # --trusted CHECKOUT: exit 0 when the checkout is the session's repository, 1 when not.
     if len(argv) == 2 and argv[0] == "--trusted":
@@ -265,11 +280,12 @@ def main(argv):
     if len(argv) >= 2 and argv[0] == "--root":
         root, argv = argv[1], argv[2:]
     # --tracker prints github or linear; --linear-team prints the team key or nothing;
-    # --architecture-doc prints the architecture doc's full path or nothing.
+    # --architecture-doc prints the architecture doc's full path or nothing;
+    # --architecture-trial prints on or off.
     # Skills run these through the Bash tool, where Claude Code sets no
     # CLAUDE_PROJECT_DIR (it sets it for hooks only), so there the repository
     # the shell is in is the session's. trusted() still guards --root.
-    if argv in (["--tracker"], ["--linear-team"], ["--architecture-doc"]) and root is None \
+    if argv in (["--tracker"], ["--linear-team"], ["--architecture-doc"], ["--architecture-trial"]) and root is None \
             and not os.environ.get("CLAUDE_PROJECT_DIR"):
         os.environ["CLAUDE_PROJECT_DIR"] = checkout_top(os.getcwd())
     if argv == ["--tracker"]:
@@ -280,6 +296,9 @@ def main(argv):
         return 0
     if argv == ["--architecture-doc"]:
         print(architecture_doc(root) or "")
+        return 0
+    if argv == ["--architecture-trial"]:
+        print(architecture_trial(root))
         return 0
     as_path = bool(argv) and argv[0] == "--path"
     if as_path:
