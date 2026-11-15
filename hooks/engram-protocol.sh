@@ -18,6 +18,30 @@ mode="${1:?usage: engram-protocol.sh <mode>}"
 payload="$(cat 2>/dev/null || echo '{}')"
 
 field() { printf '%s' "$payload" | jq -r "$1" 2>/dev/null || echo ""; }
+# With no jq, json_field.py reads a plain path such as '.tool_input.prompt // ""', so the gates that read
+# only plain paths (the brief check among them) hold the same (MAST-37). Any other filter reads as empty.
+if ! command -v jq >/dev/null 2>&1; then
+  _json_field="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd -P)/json_field.py"
+  field() { printf '%s' "$payload" | python3 -I "$_json_field" "$1" 2>/dev/null || echo ""; }
+fi
+
+# A plain path read from JSON other than the payload, such as shell-search-pattern.py's answer, with or without jq.
+json_read() {
+  if command -v jq >/dev/null 2>&1; then
+    printf '%s' "$1" | jq -r "$2" 2>/dev/null
+  else
+    printf '%s' "$1" | python3 -I "$_json_field" "$2" 2>/dev/null
+  fi
+}
+
+# The tool response as one line of text, as jq's tostring gives it; json_field.py prints the same value with no jq.
+response_text() {
+  if command -v jq >/dev/null 2>&1; then
+    printf '%s' "$payload" | jq -r '.tool_response | tostring' 2>/dev/null
+  else
+    field '.tool_response'
+  fi
+}
 
 # The dispatched agent: Claude Code sends this plugin's verifier as masthead:verifier, or masthead:<folder>:verifier for one in a subfolder of agents/, so a masthead: name is matched on the part after the last colon. Another plugin's agent keeps its prefix, so it is never taken for ours.
 # The masthead: namespace is trusted as this plugin's identity. A fork also named masthead would pass as ours, but reading the name from .claude-plugin/plugin.json would not tell it apart either, since a fork's plugin.json says masthead too.
@@ -55,6 +79,10 @@ if [ -n "${BASH_SOURCE[0]:-}" ]; then
 fi
 
 deny_tool() {
+  if ! command -v jq >/dev/null 2>&1; then
+    python3 -I "$_json_field" --deny "$1"
+    return
+  fi
   jq -n --arg r "$1" '{
     hookSpecificOutput: {
       hookEventName: "PreToolUse",
@@ -64,23 +92,32 @@ deny_tool() {
   }'
 }
 
+# A Stop or PostToolUse block carrying the reason; json_field.py writes it when jq is missing (MAST-37).
+block_decision() {
+  if ! command -v jq >/dev/null 2>&1; then
+    python3 -I "$_json_field" --block "$1"
+    return
+  fi
+  jq -n --arg r "$1" '{decision: "block", reason: $r}'
+}
+
 # Block once, then stand down (see FAIL-OPEN above).
 block_stop() {
   local once="$dir/stop-blocked-$2"
   [ -f "$once" ] && exit 0
   : > "$once"
-  jq -n --arg r "$1" '{decision: "block", reason: $r}'
+  block_decision "$1"
 }
 
 # Tell the model, every time, that a capture was refused and why.
 report_refusal() {
-  jq -n --arg r "$1" '{decision: "block", reason: $r}'
+  block_decision "$1"
 }
 
 # Classify a capture's tool_response: stored, unfixable, rejected or unknown.
 capture_outcome() {
   local resp
-  resp="$(printf '%s' "$payload" | jq -r '.tool_response | tostring' 2>/dev/null | tr -d '\\ ')"
+  resp="$(response_text | tr -d '\\ ')"
 
   case "$resp" in
     # stored: the tool returned a thought id.
@@ -99,7 +136,7 @@ case "$mode" in
   mark-search)
     : > "$dir/searched"
     q="$(field '.tool_input.query // ""' | tr '\t\n' '  ')"
-    resp="$(printf '%s' "$payload" | jq -r '.tool_response | tostring' 2>/dev/null | tr -d '\\ ')"
+    resp="$(response_text | tr -d '\\ ')"
     n="$(printf '%s' "$resp" | grep -oE '"result_count":[0-9]+' | head -1 | grep -oE '[0-9]+$')"
     [ -n "$n" ] || n="-"
     printf '%s\t%s\n' "$n" "$q" >> "$dir/searches.tsv" 2>/dev/null || true
@@ -206,8 +243,8 @@ case "$mode" in
         cmd="$(field '.tool_input.command // ""')"
         printf '%s' "$cmd" | grep -qE '(^|[^[:alnum:]_-])(grep|egrep|fgrep|rg)([[:space:]]|$)' || exit 0
         found="$(printf '%s' "$cmd" | python3 "$hook_dir/shell-search-pattern.py" 2>/dev/null)"
-        pat="$(printf '%s' "$found" | jq -r '.pattern // ""' 2>/dev/null)"
-        path="$(printf '%s' "$found" | jq -r '.path // ""' 2>/dev/null)"
+        pat="$(json_read "$found" '.pattern // ""')"
+        path="$(json_read "$found" '.path // ""')"
         # The judge reads a shell search as the Grep it is.
         tool="Grep"
         ;;
@@ -227,10 +264,15 @@ case "$mode" in
       verdict="UNKNOWN"
     else
       # Ask the index judge, with the cwd for a relative path.
-      verdict="$(jq -n --arg t "$tool" --arg p "$pat" --arg d "${path:-}" \
-        --arg c "$(field '.cwd // ""')" \
-        '{tool:$t,pattern:$p,path:$d,cwd:$c}' 2>/dev/null \
-        | python3 "$judge" 2>/dev/null | tr -d '[:space:]')"
+      if command -v jq >/dev/null 2>&1; then
+        question="$(jq -n --arg t "$tool" --arg p "$pat" --arg d "${path:-}" \
+          --arg c "$(field '.cwd // ""')" \
+          '{tool:$t,pattern:$p,path:$d,cwd:$c}' 2>/dev/null)"
+      else
+        question="$(python3 -I "$_json_field" --build tool "$tool" pattern "$pat" path "${path:-}" \
+          cwd "$(field '.cwd // ""')" 2>/dev/null)"
+      fi
+      verdict="$(printf '%s' "$question" | python3 "$judge" 2>/dev/null | tr -d '[:space:]')"
       case "$verdict" in
         SEARCHABLE|NOT_SEARCHABLE) printf '%s' "$verdict" > "$cache" ;;
         *) : > "$dir/judge-down" ;;
@@ -275,6 +317,21 @@ case "$mode" in
       done < "$dir/codesearches.tsv"
     fi
 
+    # A review agent cannot run korium-cli index, so a lagging index would refuse it on every search: it is
+    # refused once a session, then its searches go through (MAST-37). The main session can re-index, so it stays refused.
+    # Only Masthead's own agents, by the rule review-write-fence.py uses: a masthead: name, whose last part that
+    # names one of them is the agent. A bare name such as reader can be a repo's own agent, which can re-index.
+    acting="$(field '.agent_type // .agent_name // ""')"
+    case "$acting" in
+      masthead:*) acting="$(printf '%s' "${acting#masthead:}" | awk -F: '{ for (i = NF; i >= 1; i--) if ($i ~ /^(verifier|security-reviewer|adjudicator|diagnoser|reader)$/) { printf "%s", $i; exit } }')" ;;
+      *) acting="" ;;
+    esac
+    case "$acting" in
+      verifier|security-reviewer|adjudicator|diagnoser|reader)
+        [ -f "$dir/discovery-refused-agent" ] && exit 0
+        : > "$dir/discovery-refused-agent"
+        judge_down="${judge_down}This agent cannot re-index, so this is the only search it is refused this session: ask code_locate once, and if the answer is stale, search again and it goes through. " ;;
+    esac
     printf 'refused\n' >> "$dir/discovery-refused"
     deny_tool "${judge_down}Korium code index first: the index can answer this. Call code_locate (mcp__korium__code_locate, or mcp__claude_ai_korium__code_locate through the claude.ai connector) with the repo value for the checkout you are in, head_sha set to the current HEAD, and a query phrased toward the name you expect. The repo's CLAUDE.md names that value when it has one; if it does not, ask code_locate without repo and, when the answer lists known_repositories, use the one for this repository. It holds code symbols and also YAML keys, SQL and Terraform resources. Read the span it returns instead of the whole file. If it reports itself stale, or holds no index for this branch, run korium-cli index in your checkout (it takes seconds) and ask again with branch set to your checkout's branch; without branch it reads the trunk, which is still stale. If korium-cli says this Mac is not signed in, stop and tell the person rather than wait on a browser sign-in. Without the MCP tool, korium-cli search \"<name>\" asks the same index. Once a fresh lookup of this name has been made, whatever it found, this search goes through, so a search for its callers is not blocked."
     ;;

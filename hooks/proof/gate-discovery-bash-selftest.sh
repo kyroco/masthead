@@ -117,6 +117,54 @@ got="$(gate "$sid" Bash "$(sh 'rg handle_call products/')")"
   || bad "a korium-cli search counts as the lookup" "$got"
 rm -rf "${TMPDIR:-/tmp}/masthead-$(id -u)/claude-engram/$sid"
 
+echo "== an agent that cannot re-index is refused once, then let through (MAST-37) =="
+# The verifier, adjudicator and reader cannot run korium-cli index, so a lagging index would refuse them
+# on every search. The first refusal says how; after it, their searches go through for the session.
+for who in masthead:verifier masthead:adjudicator masthead:reader masthead:review:verifier; do
+  sid="gdtest-agent-$RANDOM"; : > "$JUDGE_LOG"
+  record_search "$sid" empty stale
+  agent_gate() {
+    jq -n --arg s "$sid" --arg a "$who" --argjson i "$(sh "$1")" \
+      '{session_id:$s, agent_type:$a, tool_name:"Bash", tool_input:$i}' \
+      | bash "$WORK/engram-protocol.sh" gate-discovery 2>/dev/null | grep -c '"deny"'
+  }
+  first="$(agent_gate 'rg fuse_scores products/')"
+  second="$(agent_gate 'rg handle_call products/')"
+  third="$(agent_gate 'rg fuse_scores products/')"
+  if [ "$first" = 1 ] && [ "$second" = 0 ] && [ "$third" = 0 ]; then
+    ok "$who: refused once on a stale index, then allowed" "refusals $first $second $third"
+  else
+    bad "$who: refused once on a stale index, then allowed" "refusals $first $second $third"
+  fi
+  rm -rf "${TMPDIR:-/tmp}/masthead-$(id -u)/claude-engram/$sid"
+done
+# Only Masthead's own agents: a repo's own agent named reader, or another plugin's, can re-index, so it stays refused.
+for who in reader verifier other:reader; do
+  sid="gdtest-notours-$RANDOM"; : > "$JUDGE_LOG"
+  record_search "$sid" empty stale
+  refusals=""
+  for pat in fuse_scores handle_call fuse_scores; do
+    out="$(jq -n --arg s "$sid" --arg a "$who" --argjson i "$(sh "rg $pat products/")" \
+      '{session_id:$s, agent_type:$a, tool_name:"Bash", tool_input:$i}' \
+      | bash "$WORK/engram-protocol.sh" gate-discovery 2>/dev/null | grep -c '"deny"')"
+    refusals="$refusals$out "
+  done
+  if [ "$refusals" = "1 1 1 " ]; then
+    ok "$who (not Masthead's): refused every time on a stale index" "refusals $refusals"
+  else
+    bad "$who (not Masthead's): refused every time on a stale index" "refusals $refusals"
+  fi
+  rm -rf "${TMPDIR:-/tmp}/masthead-$(id -u)/claude-engram/$sid"
+done
+# The main session can re-index, so it stays refused until it does.
+sid="gdtest-main-$RANDOM"; : > "$JUDGE_LOG"
+record_search "$sid" empty stale
+gate "$sid" Bash "$(sh 'rg fuse_scores products/')" >/dev/null
+got="$(gate "$sid" Bash "$(sh 'rg handle_call products/')")"
+[ "$got" = deny ] && ok "the main session is still refused a second time on a stale index" "$got" \
+  || bad "the main session is still refused a second time on a stale index" "$got"
+rm -rf "${TMPDIR:-/tmp}/masthead-$(id -u)/claude-engram/$sid"
+
 echo "== a judge that is down =="
 # Since 2026-10-09 a judge that cannot be read refuses (the way through is a
 # fresh lookup), so the second search is denied; it must still cost no second
@@ -214,6 +262,79 @@ if [ "$judged_path" = "infra/ (files: *.tf)" ]; then
 else
   bad "-g reaches the judge with the path" "[$judged_path]"
 fi
+rm -rf "${TMPDIR:-/tmp}/masthead-$(id -u)/claude-engram/$sid"
+
+echo "== no jq: a shell search is read and judged the same (MAST-37) =="
+# Without jq the pattern of a shell search read as empty and the search went through unjudged.
+cp "$HOOKS/json_field.py" "$WORK/"
+NOJQ="$WORK/nojq-bin"; mkdir -p "$NOJQ"
+IFS=: read -ra dirs <<< "$PATH"
+for d in "${dirs[@]}"; do
+  [ -d "$d" ] || continue
+  for f in "$d"/*; do
+    n="${f##*/}"
+    [ "$n" = jq ] || [ -e "$NOJQ/$n" ] || { [ -f "$f" ] && [ -x "$f" ] && ln -s "$f" "$NOJQ/$n"; }
+  done
+done
+[ -e "$NOJQ/jq" ] && bad "no jq: the stub PATH has no jq" "jq found" || ok "no jq: the stub PATH has no jq" "-"
+nojq_run() {
+  local name="$1" want="$2" want_pat="$3" tool="$4" input="$5" sid="gdtest-nojq-$RANDOM$RANDOM" out got judged
+  : > "$JUDGE_LOG"
+  out="$(jq -n --arg s "$sid" --arg t "$tool" --argjson i "$input" '{session_id:$s, tool_name:$t, tool_input:$i}' \
+    | PATH="$NOJQ" bash "$WORK/engram-protocol.sh" gate-discovery 2>/dev/null)"
+  if printf '%s' "$out" | jq -e '.hookSpecificOutput.permissionDecision == "deny"' >/dev/null 2>&1; then got=deny
+  elif [ -z "$out" ]; then got=allow
+  else got="other: $out"; fi
+  judged="$(cut -f2 "$JUDGE_LOG" | head -1)"; [ -n "$judged" ] || judged="-"
+  if [ "$got" = "$want" ] && [ "$judged" = "$want_pat" ]; then ok "$name" "$got, judged [$judged]"
+  else bad "$name" "got $got judged [$judged], want $want judged [$want_pat]"; fi
+  rm -rf "${TMPDIR:-/tmp}/masthead-$(id -u)/claude-engram/$sid"
+}
+nojq_run "no jq: Bash rg for a function name is refused" deny "def fuse_scores" Bash \
+  "$(sh 'rg -n "def fuse_scores" products/apps')"
+nojq_run "no jq: Bash grep -e reads its pattern" deny "fuse_scores" Bash "$(sh 'grep -rn -e fuse_scores products/')"
+nojq_run "no jq: the Grep tool is judged, not refused unasked" deny "fuse_scores" Grep '{"pattern":"fuse_scores"}'
+nojq_run "no jq: a search for a value is judged and goes through" allow "runs-on: ubuntu" Bash \
+  "$(sh 'rg -n "runs-on: ubuntu" .github/workflows')"
+nojq_run "no jq: a command that is not a search is left alone" allow "-" Bash "$(sh 'ls -la products/apps')"
+
+# What setup's no-jq row says stays off: a code_locate answer cannot be read, so any lookup of a name counts
+# as fresh, and the repeated-search and whole-file-read gates never fire (skills/setup/SKILL.md, section 9).
+nojq_protocol() {
+  local mode="$1" sid="$2" tool="$3" input="$4" response="${5:-null}" out
+  out="$(jq -n --arg s "$sid" --arg t "$tool" --argjson i "$input" --argjson r "$response" \
+    '{session_id:$s, tool_name:$t, tool_input:$i} + (if $r == null then {} else {tool_response:$r} end)' \
+    | PATH="$NOJQ" bash "$WORK/engram-protocol.sh" "$mode" 2>/dev/null)"
+  if printf '%s' "$out" | jq -e '.hookSpecificOutput.permissionDecision == "deny"' >/dev/null 2>&1; then echo deny
+  elif [ -z "$out" ]; then echo allow
+  else echo "other: $out"; fi
+}
+located() {
+  jq -nc --argjson st "$1" '[{type:"text", text:({results:[{rel_path:"lib/x.ex",start_line:1,end_line:9}],
+    indexed_git_sha:"abc", staleness:{stale:$st}} | tojson)}]'
+}
+for staleness in true false; do
+  sid="gdtest-nojq-index-$staleness-$RANDOM"
+  word=stale; [ "$staleness" = false ] && word=fresh
+  nojq_protocol mark-codesearch "$sid" mcp__claude_ai_korium__code_locate '{"query":"fuse_scores"}' "$(located "$staleness")" >/dev/null
+  got="$(nojq_protocol gate-discovery "$sid" Grep '{"pattern":"fuse_scores"}')"
+  [ "$got" = allow ] && ok "no jq: a $word lookup of the name lets the search through" "$got" \
+    || bad "no jq: a $word lookup of the name lets the search through" "$got"
+  got="$(nojq_protocol gate-redundant-grep "$sid" Grep '{"pattern":"fuse_scores"}')"
+  [ "$got" = allow ] && ok "no jq: after a $word lookup the repeated-search gate stays off" "$got" \
+    || bad "no jq: after a $word lookup the repeated-search gate stays off" "$got"
+  got="$(nojq_protocol gate-span-read "$sid" Read '{"file_path":"/w/lib/x.ex"}')"
+  [ "$got" = allow ] && ok "no jq: after a $word lookup the whole-file-read gate stays off" "$got" \
+    || bad "no jq: after a $word lookup the whole-file-read gate stays off" "$got"
+  rm -rf "${TMPDIR:-/tmp}/masthead-$(id -u)/claude-engram/$sid"
+done
+# With jq the same stale lookup still refuses, so the cases above show what jq's absence turns off.
+sid="gdtest-jq-index-$RANDOM"
+jq -n --arg s "$sid" --argjson r "$(located true)" '{session_id:$s, tool_name:"mcp__claude_ai_korium__code_locate",
+  tool_input:{query:"fuse_scores"}, tool_response:$r}' | bash "$WORK/engram-protocol.sh" mark-codesearch >/dev/null 2>&1
+got="$(gate "$sid" Grep '{"pattern":"fuse_scores"}')"
+[ "$got" = deny ] && ok "with jq the same stale lookup is still refused" "$got" \
+  || bad "with jq the same stale lookup is still refused" "$got"
 rm -rf "${TMPDIR:-/tmp}/masthead-$(id -u)/claude-engram/$sid"
 
 echo; echo "pass=$pass fail=$fail"
