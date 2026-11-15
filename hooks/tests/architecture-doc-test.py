@@ -315,6 +315,28 @@ code, out = check_draft(write(root, "section-cites.md", SECTIONS + uncited_rules
 expect("a draft section that cites a principle passes", (code, out), (0, ""))
 expect("the template's intro names no principle number", "P1" in open(TEMPLATE).read(), False)
 
+# Round 1, finding s3.j1: principles numbered in other common forms are read,
+# and a file that names P-numbers in a form the check cannot read fails loudly.
+uncited = write(root, "uncited-again.md", uncited_rules)
+for form, text in (
+        ("heading", "## P1. Tenants apart\n\nTenants are kept apart at two layers of the system always.\n\n"
+                    "## P9. One way in and out\n\nA body of data is reached through one module only and nothing else.\n"),
+        ("hyphen", "- P1 - Tenants are kept apart at two layers of the system always.\n"
+                   "- P9 - A body of data is reached through one module only and nothing else.\n"),
+        ("bold", "**P1** Tenants are kept apart at two layers of the system always.\n\n"
+                 "**P9** A body of data is reached through one module only and nothing else.\n")):
+    other = write(root, "principles-{}.md".format(form), "# Rules\n\n" + text)
+    code, out = check(uncited, other)
+    expect("principles as {}: an uncited doc fails".format(form), (code, "cites none" in out), (1, True))
+    copied = write(root, "copied-{}.md".format(form), GOOD + "\nA body of data is reached through one module only and nothing else.\n")
+    code, out = check(copied, other)
+    expect("principles as {}: copied text fails".format(form), (code, "P9" in out), (1, True))
+odd = write(root, "principles-odd.md", "# Rules\n\nP1 => tenants are kept apart.\nP9 => one way in and out.\n")
+code, out = check(uncited, odd)
+expect("P-numbers the check cannot read as principles fail loudly", (code, "principles-odd.md" in out), (1, True))
+code, out = check(good, write(root, "no-principles.md", "# Project\n\nNo numbered rules here.\n"))
+expect("a file with no P-numbers at all has no principles to cite", code, 0)
+
 code, out = check(TEMPLATE, principles)
 expect("the unfilled template fails", code, 1)
 expect("the template names all seven lenses", all(lens in open(TEMPLATE).read() for lens in (
