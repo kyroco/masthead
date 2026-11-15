@@ -169,6 +169,38 @@ for command in ('echo x > "docs/adr/ADR-0009 new one.md"',
     check("a shell write to a spaced name is refused: %s" % command,
           "through the shell" in sections_gate(repo, "Bash", {"command": command}), True)
 
+# A folder named with a leading "~", in a wiki clone of its own, is held, as Kyroco
+# names it: "ADR_DIR": "~/projects/kyroco.wiki/ADR".
+home = os.path.join(T, "tilde-home")
+wiki = os.path.join(home, "projects", "wiki")
+os.makedirs(os.path.join(wiki, "ADR"))
+git(wiki, "init", "-q")
+with open(os.path.join(wiki, "README.md"), "w") as f:
+    f.write("x\n")
+git(wiki, "add", ".")
+git(wiki, "commit", "-q", "-m", "first")
+repo = make_repo("opted-in-tilde", {"ADR_DIR": "~/projects/wiki/ADR"})
+record = os.path.join(wiki, "ADR", "ADR-0010-use-a-queue.md")
+tilde_env = dict(BASE_ENV, CLAUDE_PROJECT_DIR=repo, HOME=home)
+out = subprocess.run([sys.executable, SECTIONS_GATE],
+                     input=json.dumps({"tool_name": "Write",
+                                       "tool_input": {"file_path": record, "content": TITLE_ONLY}}),
+                     capture_output=True, text=True, cwd=repo, env=tilde_env).stdout
+check("a ~ folder: the write gate asks for every section",
+      absent(json.loads(out)["hookSpecificOutput"]["permissionDecisionReason"]) if out.strip() else [],
+      names)
+out = subprocess.run([sys.executable, SECTIONS_GATE],
+                     input=json.dumps({"tool_name": "Bash", "tool_input": {
+                         "command": "echo x > ~/projects/wiki/ADR/ADR-0011-new.md"}}),
+                     capture_output=True, text=True, cwd=repo, env=tilde_env).stdout
+check("a ~ folder: a shell write named with ~ is refused", "through the shell" in out, True)
+with open(record, "w") as f:
+    f.write(TITLE_ONLY)
+r = subprocess.run(["bash", STRUCTURE_GATE], input="{}", capture_output=True, text=True,
+                   cwd=repo, env=tilde_env)
+check("a ~ folder: the stop gate holds the record in the wiki clone", r.returncode, 2)
+check("a ~ folder: and asks it for the same sections", absent(r.stderr), names)
+
 # ---------------------------------------------------------------- scenario 3
 print("--- 3. what Masthead says names nothing of Kyroco's ---")
 said = {
