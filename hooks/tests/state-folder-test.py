@@ -117,6 +117,31 @@ with open(os.path.join(ROOT, "references", "session-cliffs.md")) as handle:
 expect("worker.md no longer counts rows of .claude/state/dispatches.tsv", ".claude/state/dispatches.tsv" in worker, False)
 expect("session-cliffs says which folder <state> is", "project_fact.py --state-path" in cliffs, True)
 
+
+def section(text, start, stop):
+    """The text from the heading `start` up to the next heading `stop`."""
+    begin = text.find(start)
+    end = text.find(stop, begin + 1) if begin >= 0 else -1
+    return text[begin:end] if begin >= 0 and end > begin else ""
+
+
+# Round 0, A1: step 4 names the log the count is taken from, and step 7 counts from step 4's number.
+step4 = section(worker, "## 4. What done is", "## 5.")
+step7 = section(worker, "## 7. Report", "## A question")
+expect("worker.md step 4 names <state>/dispatches.tsv", "`<state>/dispatches.tsv`" in step4, True)
+expect("worker.md step 4 notes how many rows the log holds", "how many rows the dispatch log holds" in step4, True)
+expect("worker.md step 7 counts from the number noted in step 4", "since the count you noted in\nstep 4" in step7 or "since the count you noted in step 4" in step7, True)
+step9 = section(cliffs, "9. Push and open one PR", "10. Once it merges")
+expect("session-cliffs step 9 counts rows of <state>/dispatches.tsv", "`<state>/dispatches.tsv`" in step9, True)
+
+# Round 0, A6: no instruction says a fact comes from settings.json alone, now that the personal file wins.
+with open(os.path.join(ROOT, "references", "dispatch-brief.md")) as handle:
+    brief = handle.read()
+expect("dispatch-brief.md does not say <state> comes from settings.json alone",
+       "PROJECT_STATE_DIR fact from the env block of its .claude/settings.json" in brief, False)
+expect("session-cliffs.md does not say the push check comes from settings.json alone",
+       "its `.claude/settings.json` env names as `PROJECT_PUSH_CHECK`" in cliffs, False)
+
 # A raised cap shows on the row: the dispatch record names it.
 root = repo()
 dispatch(root, root, prompt="Re-verify: round 3, claim 2\nVerify the fix.\n\nClaims:\n- the gate refuses the third round",
@@ -132,7 +157,7 @@ expect("a round under the usual cap is logged as before", got[-1], "re-verify ro
 # Scenario 4: one function finds the private state root. No hook other than
 # project_fact.py names CLAUDE_PLUGIN_DATA, builds the masthead-<uid> root, or
 # keeps a state folder of its own in TMPDIR.
-OWN_ROOT = re.compile(r"CLAUDE_PLUGIN_DATA|masthead-\$\(id -u\)|masthead-\{\}|masthead-%")
+OWN_ROOT = re.compile(r"CLAUDE_PLUGIN_DATA|masthead-\$\(id -u\)|masthead-\{\}|masthead-%|rev-parse --git-path|rev-parse --absolute-git-dir")
 TMP_STATE = re.compile(r"(TMPDIR|/tmp|gettempdir).*(claude-[a-z]+|\.skipped)")
 for name in sorted(os.listdir(HOOKS)):
     path = os.path.join(HOOKS, name)
@@ -251,6 +276,74 @@ expect("--repo-switch-keys lists the tracked file's switch", out, ["CLAUDE_PLUGI
 with open(RUN) as handle:
     run_text = handle.read()
 expect("run.sh asks project_fact.py which keys to unset", "--repo-switch-keys" in run_text, True)
+
+# Round 0, A2: state in the checkout's own git folder comes from project_fact.py too.
+root = repo()
+out = subprocess.run([sys.executable, FACT, "--root", os.path.join(root, "app"), "--git-state", "masthead-push-gate-pass"],
+                     env=clean_env(), capture_output=True, text=True).stdout.strip()
+expect("--git-state names the file in the checkout's own git folder", out, os.path.join(root, ".git", "masthead-push-gate-pass"))
+out = subprocess.run([sys.executable, FACT, "--root", root, "--git-state", "../escape"],
+                     env=clean_env(), capture_output=True, text=True).stdout.strip()
+expect("--git-state keeps a name inside the git folder", out, os.path.join(root, ".git", "escape"))
+wt_main = repo()
+git("-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-q", "--allow-empty", "-m", "init", cwd=wt_main)
+wt = os.path.join(wt_main, "wt2")
+git("worktree", "add", "-q", "-b", "wt2", wt, cwd=wt_main)
+out = subprocess.run([sys.executable, FACT, "--root", wt, "--git-state", "korium-index-stop.pid"],
+                     env=clean_env(), capture_output=True, text=True).stdout.strip()
+expect("in a worktree, --git-state names the worktree's own git folder",
+       out, os.path.join(wt_main, ".git", "worktrees", "wt2", "korium-index-stop.pid"))
+
+
+# Round 0, A3: when the person's untracked settings.local.json sets a switch the shared file
+# also sets, Claude Code uses the person's value, and so do the hook and run.sh.
+root = repo()
+settings(root, {"CLAUDE_PLUGIN_OPTION_STRICT_COMMITS": "true"})
+settings(root, {"CLAUDE_PLUGIN_OPTION_STRICT_COMMITS": "false"}, "settings.local.json")
+expect("the hook's fact is the person's value", subprocess.run(
+    [sys.executable, FACT, "CLAUDE_PLUGIN_OPTION_STRICT_COMMITS"], cwd=root, env=clean_env(CLAUDE_PROJECT_DIR=root),
+    capture_output=True, text=True).stdout.strip(), "false")
+expect("run.sh keeps the person's value when the shared file names the same switch", through_run(root), "allow")
+settings(root, {"CLAUDE_PLUGIN_OPTION_STRICT_COMMITS": "false"})
+os.remove(os.path.join(root, ".claude", "settings.local.json"))
+expect("the shared file alone still cannot switch the gate off", through_run(root), "deny")
+
+
+# Round 0, A4: a key the printer cannot write does not hide the others.
+root = repo()
+with open(os.path.join(root, ".claude", "settings.local.json"), "w") as handle:
+    handle.write('{"env": {"CLAUDE_PLUGIN_OPTION_A\\ud800": "x", "CLAUDE_PLUGIN_OPTION_STRICT_COMMITS": "false"}}')
+git("add", "-f", ".claude/settings.local.json", cwd=root)
+expect("a tracked file with an unprintable key still cannot switch a gate off", through_run(root), "deny")
+
+# And when the reader fails, run.sh does not leave the switches set: it unsets every switch and says so.
+lone = os.path.realpath(tempfile.mkdtemp(prefix="state-noreader-"))
+shutil.copy(RUN, os.path.join(lone, "run.sh"))
+with open(os.path.join(lone, "envprobe.sh"), "w") as handle:
+    handle.write('printf "%s" "${MASTHEAD_BRIEF_GATE:-unset}"\n')
+res = subprocess.run(["bash", os.path.join(lone, "run.sh"), "envprobe.sh"], input="{}", capture_output=True, text=True,
+                     env=clean_env(CLAUDE_PROJECT_DIR=root, MASTHEAD_BRIEF_GATE="off"), check=False)
+expect("with no reader, run.sh unsets the switches rather than keep them", res.stdout, "unset")
+expect("and says why", "project_fact.py" in res.stderr, True)
+
+
+# Round 0, A5: python3 that does not run is a refusal, never a silent allow.
+stub = os.path.realpath(tempfile.mkdtemp(prefix="state-nopython-"))
+with open(os.path.join(stub, "python3"), "w") as handle:
+    handle.write("#!/bin/sh\nexit 1\n")
+os.chmod(os.path.join(stub, "python3"), 0o755)
+root = repo()
+brief = json.dumps({"session_id": "nopy", "cwd": root, "tool_name": "Agent", "tool_input": {
+    "subagent_type": "masthead:verifier", "description": "probe",
+    "prompt": "Re-verify: round 3, claim 1\nVerify it.\n\nClaims:\n- the gate refuses the third round"}})
+broken = clean_env(CLAUDE_PROJECT_DIR=root, PATH=stub + os.pathsep + os.environ.get("PATH", ""))
+res = subprocess.run(["bash", os.path.join(HOOKS, "agent-brief-gates.sh")], input=brief, capture_output=True,
+                     text=True, env=broken, check=False)
+expect("a dispatch is refused when python3 does not run, jq or not", '"deny"' in res.stdout, True)
+expect("and the refusal names python3", "python3" in res.stdout, True)
+res = subprocess.run(["bash", os.path.join(HOOKS, "engram-protocol.sh"), "gate-verify-brief"], input=brief,
+                     capture_output=True, text=True, env=broken, check=False)
+expect("gate-verify-brief alone refuses when it cannot find its folder", '"deny"' in res.stdout, True)
 
 print("{} passed, {} failed".format(passed, failed))
 sys.exit(1 if failed else 0)
