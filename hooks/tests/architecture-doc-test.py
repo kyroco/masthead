@@ -252,6 +252,54 @@ expect("all seven lenses are named as missing", all(lens in out for lens in (
     "Direction", "One way in and out", "Call shape", "Seams", "What each build carries",
     "Leftovers", "Tests and checks")), True)
 
+# Round 1, finding s2.c1: a draft must fill the template's four sections too.
+SECTIONS = """# Shop architecture
+
+Shop sells boxes online. This doc is the target shape every decision record and
+pull request is checked against.
+
+## The parts
+
+The core app lives in apps/core; billing in apps/billing is an extension.
+
+## One way in and out for each body of data
+
+Orders are reached only through Shop.Orders, which hands back an Order struct (P9).
+
+## Core and extensions
+
+The core never names billing; billing registers itself with the core at start.
+
+## What each build ships
+
+The open build ships the core alone; the hosted build adds billing.
+
+"""
+full_draft = SECTIONS + GOOD.split("\n", 2)[2]
+
+
+def check_draft(doc, principles=None):
+    args = [sys.executable, DOC, "check", "--draft", doc] + ([principles] if principles else [])
+    out = subprocess.run(args, env=clean_env(), capture_output=True, text=True)
+    return out.returncode, out.stdout
+
+
+code, out = check_draft(write(root, "draft.md", full_draft), principles)
+expect("a full draft passes the draft check", (code, out), (0, ""))
+bad = write(root, "draft-placeholder.md", full_draft.replace(
+    "The open build ships the core alone; the hosted build adds billing.",
+    "<Each build or edition this project ships, one line each.>"))
+code, out = check_draft(bad, principles)
+expect("a draft with a section left as a placeholder fails", code, 1)
+expect("the failure names the section", "What each build ships" in out, True)
+bad = write(root, "draft-dropped.md", full_draft.replace(
+    "## Core and extensions\n\nThe core never names billing; billing registers itself with the core at start.\n\n", ""))
+code, out = check_draft(bad, principles)
+expect("a draft missing a section fails", code, 1)
+expect("the failure names the missing section", "Core and extensions" in out, True)
+code, out = check(write(root, "existing.md", GOOD), principles)
+expect("an existing doc is not held to the template's sections", code, 0)
+
 code, out = check(TEMPLATE, principles)
 expect("the unfilled template fails", code, 1)
 expect("the template names all seven lenses", all(lens in open(TEMPLATE).read() for lens in (
