@@ -40,7 +40,7 @@
     "haiku_default": {
       "type": "boolean",
       "title": "Ask for a reason before a helper runs on the biggest model",
-      "description": "A helper sent to the big model (Opus), by the call or by inheriting this session's, runs there only when the first line of its brief says why; a call that names no model is not asked for a helper whose own file names one, or for another plugin's helper. Keeps parallel work cheap.",
+      "description": "A helper sent to the big model (Opus), by the call or by inheriting this session's, runs there only when the first line of its brief says why; a call that names no model is not asked for a helper whose file in the project's or the plugin's agents folder names one, or for another plugin's helper. Keeps parallel work cheap.",
       "default": false
     }
   }
