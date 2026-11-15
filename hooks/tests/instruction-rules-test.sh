@@ -896,9 +896,15 @@ says  references/dispatch-brief.md "Nothing enforces this"
 never references/dispatch-brief.md "ensure-substrates"
 says  references/session-cliffs.md "lists as not proven here"
 # Round 1 fix F1: the network hook already refuses two of the copy commands for two of the helpers, and the text says so.
-says  agents/verifier.md "except that the network hook, while it is on and the machine has jq, refuses \`git clone\` and \`rsync\`"
-says  agents/security-reviewer.md "except that the network hook, while it is on and the machine has jq, refuses \`git clone\` and \`rsync\`"
-says  references/dispatch-brief.md "except that the network hook, while it is on and the machine has jq, refuses a verifier's or a security reviewer's \`git clone\` and \`rsync\`"
+# MAST-43: the verifier's shell now runs only exact shapes, none of which copies, compiles or starts anything.
+says  agents/verifier.md "except that your shell runs only the command shapes \`hooks/reviewer_shapes.py\` lists, and none of them copies, compiles or starts anything; a test you run can still do any of these"
+says  agents/security-reviewer.md "except that your shell runs only the command shapes \`hooks/reviewer_shapes.py\` lists, and none of them copies, compiles or starts anything; a test you run can still do any of these"
+says  references/dispatch-brief.md "except that a verifier's or a security reviewer's shell runs only the command shapes \`hooks/reviewer_shapes.py\` lists, none of which copies, compiles or starts anything; a test it runs can"
+says  agents/security-reviewer.md "\`semgrep --metrics=off --disable-version-check --config .claude/semgrep/sentinel-triggers.yml\`"
+says  agents/security-reviewer.md "\`opengrep --disable-version-check --config .claude/semgrep/sentinel-taint.yml\`"
+for doc in agents/verifier.md agents/security-reviewer.md references/dispatch-brief.md; do
+  never "$doc" "the network hook, while it is on"
+done
 never references/dispatch-brief.md "no hook checks it"
 # Round 1 fix F2: no run takes the change out, so a claim that needed a private copy is settled by nobody and is listed as not proven.
 says  references/session-cliffs.md "This run settles each claim the verdict lists as not proven here for want of a database"
@@ -1252,8 +1258,22 @@ says  agents/architecture-reviewer.md 'You do not search Korium'"'"'s memory'
 # Re-verify round 1, fixes V1 and N2: the README promises only what the fences do.
 never README.md 'None of them can reach the network'
 never README.md 'None of them can edit anything'
-says  README.md 'refuse the common network programs'
-says  references/gate-catalog.md 'a denylist of network programs, not an allowlist'
+# MAST-43: the README and catalog say the verifiers' shells run exact shapes, and what that leaves open.
+never README.md 'refuse the common network programs'
+says  README.md 'shells run only the command shapes in `hooks/reviewer_shapes.py`'
+says  README.md 'They refuse every other command, a wrapper such as `timeout 5 curl` included, and every redirect into a file.'
+# Round 1 arch-1, Robert, November 15: probe scripts stay, and the text says the fence covers the
+# commands typed, not code run, a probe script the agent wrote itself included.
+says  README.md 'The fence covers the commands the agent types, not code it runs: a test, a test runner, semgrep, or a probe script it wrote itself in its scratch folder can still do anything (MAST-43)'
+says  references/gate-catalog.md 'It covers the commands the agent types, not code it runs: a test, a test runner, semgrep, or a probe script the agent wrote itself in its scratch folder can still do anything'
+never references/gate-catalog.md 'a test or probe script it runs is the repository'"'"'s code'
+never hooks/reviewer_shapes.py 'A test or probe script it runs is code of the repository'
+# Round 1, S2-F1: the README's list is the fence's own summary (bash-scope-reviewer-test.sh holds them together).
+never README.md 'joined by a pipe or `&&`'
+never references/gate-catalog.md 'the reviewer network gate refuses a reviewer call naming a network tool'
+never references/gate-catalog.md 'a denylist of network programs, not an allowlist'
+says  references/gate-catalog.md 'Holds the `verifier` and `security-reviewer` shells to the exact command shapes `hooks/reviewer_shapes.py` lists'
+says  references/gate-catalog.md 'For the architecture reviewer it is a denylist of network programs'
 # Re-verify round 2 (Robert, November 15): the README and catalog claim only
 # the exact shapes the architecture reviewer's shell allows, and no fence they
 # do not have.
@@ -1261,14 +1281,14 @@ never README.md 'the architecture reviewer'"'"'s shell can only read'
 says  README.md 'The architecture reviewer'"'"'s shell runs only `git diff`, `git show` and `git log` with plain revisions and paths'
 says  README.md 'and refuses every other command'
 never references/gate-catalog.md 'refuses git'"'"'s `-O` in any spelling'
-says  references/gate-catalog.md 'a wrapper it does not see through (`timeout`, `stdbuf`, `nice -n 5`, `exec -a y`, a shell'"'"'s bundled `-lc`), a git alias set with `-c`, or git run from `find -exec`, still gets through for the verifier and security reviewer (MAST-43)'
+never references/gate-catalog.md 'still gets through for the verifier and security reviewer (MAST-43)'
 # Re-verify round 3, fixes V1 and S1, and the judge's N1: the hook-table row
 # names --comments, and neither the catalog nor the README claims a refusal a
 # wrapper gets past.
 says  README.md '`gh issue view <n>`, bare or with `--comments` | scoped by the agent'"'"'s type |'
 never references/gate-catalog.md 'refuses git'"'"'s `-O` written after git in the same command'
-says  references/gate-catalog.md 'refuses git'"'"'s `-O` when git is the first word or follows a wrapper it steps over'
-says  README.md 'though one run through a wrapper the fence does not see through, such as `timeout 5 curl`, still gets through (MAST-43)'
+never references/gate-catalog.md 'refuses git'"'"'s `-O` when git is the first word or follows a wrapper it steps over'
+never README.md 'still gets through (MAST-43)'
 says  references/gate-catalog.md 'the `architecture-reviewer` shell to exact command shapes'
 says  agents/architecture-reviewer.md 'Your shell runs only these exact commands'
 never agents/architecture-reviewer.md 'with `--comments` or `--json`'
