@@ -79,13 +79,18 @@ def body_file(cmd, cwd):
 
 
 def edited(path, old, new, every):
-    """The file as this Edit would leave it, or None when that cannot be told."""
+    """The file as this Edit would leave it, or None when that cannot be told.
+
+    An empty old string on a missing or empty file creates the file with the new text.
+    """
     try:
         with open(path) as handle:
             text = handle.read()
     except OSError:
-        return None
-    if not old or old not in text:
+        text = None
+    if not old:
+        return new if not (text or "").strip() else None
+    if text is None or old not in text:
         return None
     return text.replace(old, new) if every else text.replace(old, new, 1)
 
