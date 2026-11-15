@@ -80,7 +80,7 @@ a question that could have been asked earlier.
 ## Warm up the build
 
 Six workers that each fetch and compile the repo from nothing, all at once,
-fill the disk and the processors: on Kyroco, November 12, 2026, six workers
+fill the disk and the processors: in one repository on November 12, 2026, six workers
 wrote about 18 GB of dependencies between them and drove the load to 22 on
 18 cores. So when the repo names a warm-up, you build once and each worker
 clones your build.
@@ -186,13 +186,10 @@ agent-run count. One that does not skipped the README: send it back to read it
 before you queue its PR.
 
 Some things are not yours to settle and go to the person as they stand, one at
-a time: a disagreement between review rounds (one round placed a finding on
-the fix list and the next among its extras, or the second
-re-verify round left something on the fix list), and a security finding the
-adjudicator could not settle (its For the foreman section, 300 words or less).
-A PR with one of those unanswered is not queued. Everything else the
-adjudicator placed is final for the worker and for you, and an extra is
-settled by its score (**Merge and clean up**), never by the person.
+a time: what the second re-verify round left on the fix list, and a security finding the adjudicator could not settle (its For the
+foreman section, 300 words or less). A PR with one of those unanswered is not
+queued. Everything else the adjudicator placed is final for the worker and for
+you, whichever round placed it, and you rule on none of it.
 
 Permission prompts belong to the person: tell them which session and what it
 asks (`claude attach <id>` in the terminal; in the desktop app, a link to the
@@ -207,15 +204,13 @@ conflict, a dependency, or changes that interact. Say which.
 
 ## Merge and clean up
 
-An extra, whoever found it, is settled by the score its worker gave it, from
-1 to 10. One that scores 8 or more is fixed in the same PR, test first when
-it is a bug. One that scores under 8 is dropped: it is not brought to the
-person, and nobody files it. When a worker reports its PR with an extra it
-scored 8 or more and did not fix, send it back to fix it, without asking the
-person. Never bring the person an extra, and never file one.
+An extra, whoever found it, is settled by its worker, as `worker.md` **What
+done is** says, never by you or the person. When a worker reports its PR with
+an extra that rule says to fix and it did not fix, send it back to fix it,
+without asking the person.
 
 Queue the PR when all of these hold: CI is green; nothing is left on the
-adjudicator's fix list; every extra scored 8 or more is fixed in it; the PR body's
+adjudicator's fix list; every extra the worker's rule says to fix is fixed in it; the PR body's
 unproven list holds nothing a customer would see; and the worker, told you are
 ready to queue, has answered "cleaned up" (its test stack and code index are
 gone; its worktree and branch stay). Otherwise park it with the reason. Auto
@@ -243,9 +238,9 @@ Then give that worker its next ready issue, those first. In the terminal, stop
 the worker's session (its id and worktree come from `claude agents --json`,
 not from memory) and start the next issue in a new one.
 
-Every report to the person carries two counts for the run: issues closed by a
-merge, and issues filed. The moment filed exceeds closed, stop dispatching, say
-so, and wait for the person.
+Every report to the person carries the count of issues closed by a merge in
+the run. A split is not a stop: its sub-issues join the run like any other
+issue.
 
 ## End the run
 
@@ -254,7 +249,7 @@ desktop app, archive them, which also removes their worktrees), remove the
 warm trees with `${CLAUDE_PLUGIN_ROOT}/skills/work-on/warm-build.sh end`, capture one
 Korium handoff (what merged, what parked and why, and the person's answers,
 verbatim), and tell the person: one line per issue with its outcome, what each
-parked issue needs, and the two counts.
+parked issue needs, and the count of issues merged.
 
 ## On Linear
 

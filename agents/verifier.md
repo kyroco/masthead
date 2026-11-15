@@ -254,5 +254,11 @@ Quote it as a false claim.
 ## Done
 
 Your final message is the report: each claim with its answer, false ones and
-no answers first, then your `For the judge` lines. Capture it to Korium and return the
-thought id.
+no answers first, then your `For the judge` lines.
+
+Before you finish, capture one short memory to Korium and return its thought
+id: the commit range, the scenario, how many claims you found true and how
+many false, and the findings file's path. Your capture holds no finding, no
+claim text and no `For the judge` line: the adjudicator may throw any of them
+out, what it throws out is gone, and the worker searches Korium before each
+step.

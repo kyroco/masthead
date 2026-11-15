@@ -52,7 +52,7 @@ capture gate names. If nothing durable happened, capture that and say why."""
 
 
 def cliff_source(cwd):
-    """Return the repo's own procedures followed by the user folder's general ones."""
+    """Return the repo's own procedures followed by the plugin's general ones."""
     # Read a repo's own procedures only from the session's own repository.
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     # Read from the top of the checkout so a package unpacked inside the repo cannot supply procedures.
@@ -72,9 +72,9 @@ def cliff_source(cwd):
                 texts.append(open(path).read())
                 break
     root = os.environ.get("CLAUDE_PLUGIN_ROOT") or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    user = os.path.join(root, "references", "session-cliffs.md")
-    if os.path.isfile(user):
-        texts.append(open(user).read())
+    plugin = os.path.join(root, "references", "session-cliffs.md")
+    if os.path.isfile(plugin):
+        texts.append(open(plugin).read())
     return "\n\n## \n\n".join(texts) or None
 
 
@@ -118,9 +118,9 @@ def held_worktree_notice(cwd):
         pass
     return (
         "THIS WORKTREE IS CURRENTLY THE MERGE BASE, NOT THE BRANCH.\n"
-        "check-tests-bite is running (pid %s, since %s). It has reverted every\n"
-        "products/apps lib and test/support file for the length of its run, and\n"
-        "DELETED the ones this branch added.\n\n"
+        "check-tests-bite is running (pid %s, since %s). It has reverted the\n"
+        "files this branch changed for the length of its run, and DELETED the\n"
+        "ones this branch added.\n\n"
         "So: do not commit, do not stage, do not git checkout anything, and treat\n"
         "any test number you take now as measuring the merge base rather than this\n"
         "branch. A file that looks deleted or rewritten is that run, not a\n"
@@ -128,89 +128,10 @@ def held_worktree_notice(cwd):
     )
 
 
-# The gates every repo shares run from the user folder, not from this repo.
-SHARED_GATES = [
-    ("engram-protocol.sh", "a Korium search before the first edit, and a capture before finishing"),
-    ("commit-attribution-gate.py", "no AI attribution in a commit or PR"),
-    ("block-secret-fetches.py", "no fetching a credential out of a secret store"),
-    ("agent-brief-gates.sh", "the checks on a subagent brief"),
-    ("untrusted-domain-deny.py", "no fetching from a host on the deny list"),
-    ("scan-tool-output-for-secrets.py", "the scan of command output for a secret"),
-    ("review-write-fence.py", "a reviewer writes only its findings file"),
-    ("bash-scope-reviewer.sh", "a reviewer's shell is read-only"),
-    ("bash-scope-diagnoser.sh", "a diagnoser's shell is read-only"),
-    ("irreversible-action-gate.sh", "no action that nothing undoes"),
-    ("hard-gate.sh", "the checks before a push or a PR"),
-    ("scope-gate.py", "edits stay inside a task's scope file"),
-    ("web-to-memory-gate.py", "no copied web text in memory"),
-    ("block-em-dash-write.py", "no dashes in written files"),
-    ("adr-sections-gate.py", "a new ADR carries its required sections"),
-    ("wiki-refresh.sh", "the local ADR wiki copy is pulled at session start"),
-    ("adr-structure-gate.sh", "a changed ADR keeps its structure"),
-    ("verdict-gate.sh", "a diagnosis names a located cause"),
-    ("elixir-toolchain-env.sh", "the pinned Elixir is first on PATH"),
-]
-
-
-def shared_gates_notice(home=None, config_dir=None):
-    """Return a notice naming the shared gates that are not wired in this session, else None."""
-    home = home or os.path.expanduser("~")
-    hooks = os.path.join(home, ".claude", "hooks")
-    config = config_dir or os.environ.get("CLAUDE_CONFIG_DIR") or os.path.join(home, ".claude")
-
-    def commands_in(path, key=None):
-        try:
-            with open(path) as f:
-                wired = json.load(f)
-            if key:
-                wired = wired.get(key) or wired.get("settings", {}).get(key, {})
-            return [h.get("command", "") for groups in wired.values()
-                    for g in groups for h in g.get("hooks", [])]
-        except (OSError, ValueError, AttributeError, TypeError):
-            return []
-
-    commands = (commands_in(os.path.join(config, "settings.json"), "hooks")
-                + commands_in(os.path.join(config, "remote-settings.json"), "hooks"))
-    # In a cloud session read the managed settings from setup/managed-settings.json beside the hooks; a gate missing from older org settings goes unreported.
-    if os.environ.get("CLAUDE_CODE_REMOTE") == "true":
-        managed = os.path.join(os.path.dirname(os.path.realpath(hooks)),
-                               "setup", "managed-settings.json")
-        commands += commands_in(managed, "hooks")
-    expected = commands_in(os.path.join(hooks, "hook-entries.json"))
-
-    def wired(name):
-        call = 'shared-run.sh" ' + name
-        wanted = [c for c in expected if call in c]
-        if wanted:
-            return all(any(c in w for w in commands) for c in wanted)
-        return any(call in c for c in commands)
-
-    runner = os.path.isfile(os.path.join(hooks, "shared-run.sh"))
-    off = [rule for name, rule in SHARED_GATES
-           if not runner
-           or not os.path.isfile(os.path.join(hooks, name))
-           or not wired(name)]
-    if not off:
-        return None
-    return (
-        "THE SHARED GATES ARE NOT ALL RUNNING IN THIS SESSION.\n"
-        "They run from the user folder (~/.claude/hooks, wired in the user\n"
-        "settings), and this machine or account does not have them in place for:\n"
-        + "".join("  - %s\n" % rule for rule in off)
-        + "CLAUDE.md still binds: follow each rule as written, and tell the user the\n"
-        "gates are missing before doing work that relies on them."
-    )
-
-
 def session_start():
     # The memory protocol is an install option; unset means on, so a copy outside a plugin keeps it.
     if os.environ.get("CLAUDE_PLUGIN_OPTION_KORIUM", "on").lower() not in ("false", "0", "no", "off"):
         print(SESSION_START)
-    # As a plugin, hooks.json wires every gate, so there is nothing to report missing.
-    notice = None if os.environ.get("CLAUDE_PLUGIN_ROOT") else shared_gates_notice()
-    if notice:
-        print()
-        print(notice)
 
 
 def user_prompt(data):
@@ -241,9 +162,29 @@ def user_prompt(data):
     print("\n\n".join(blocks))
 
 
+def show(lead):
+    """Print one procedure exactly as user_prompt would inject it from this folder."""
+    # Only a lead the hook declares, named with or without its closing period.
+    leads = [known for known, _ in CLIFFS if known.rstrip(".") == lead.rstrip(".")]
+    # A worker's Bash tool sets no CLAUDE_PROJECT_DIR, which the hook has. The worker
+    # runs show from its own worktree, so that checkout stands in for the session's
+    # repo; when CLAUDE_PROJECT_DIR is set, the hook's own rule applies unchanged.
+    if not os.environ.get("CLAUDE_PROJECT_DIR"):
+        os.environ["CLAUDE_PROJECT_DIR"] = os.getcwd()
+    text = cliff_source(os.getcwd())
+    block = cliff_block(text, leads[0]) if text and leads else None
+    if block:
+        print(block)
+
+
 def main():
     try:
         mode = sys.argv[1] if len(sys.argv) > 1 else ""
+        # A worker reads the PR steps the hook injects with: prime-context.py show "Opening a PR".
+        if mode == "show":
+            if len(sys.argv) > 2:
+                show(sys.argv[2])
+            sys.exit(0)
         data = json.load(sys.stdin)
         if not isinstance(data, dict):
             return

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run every test suite for the shared hooks in this folder; nothing runs these in CI.
+# Run every test suite for the shared hooks in this folder; CI runs this on Linux and macOS (.github/workflows/tests.yml).
 # Usage: bash hooks/run-tests.sh (CLAUDE_PROJECT_DIR is unset so the calling repo cannot make a hook stand down).
 # RUN_ONLY="<label>" runs that one suite. A suite that exits 77 was skipped: its last line says why, and it is not a failure.
 
@@ -48,6 +48,7 @@ run "secret read gate"       python3 "$here/test-secret-gate.py"
 run "masked reader"          python3 "$here/tests/read-redacted-test.py"
 run "work gates"             python3 "$here/test-work-gates.py"
 run "ADR structure gate"     bash "$here/tests/adr-structure-gate-test.sh"
+run "generic parts"          python3 "$here/tests/generic-parts-test.py"
 run "Elixir hooks"           bash "$here/tests/elixir-hooks-test.sh"
 run "wiki refresh"           bash "$here/tests/wiki-refresh-test.sh"
 run "push gate"              bash "$here/tests/hard-gate-test.sh"
@@ -60,6 +61,7 @@ run "tool output scan"       python3 "$here/tests/run-scan-tool-output-cases.py"
 run "tool output incident"   python3 "$here/tests/incident-shape-probe.py"
 run "instruction rules"      bash "$here/tests/instruction-rules-test.sh"
 run "issue tracker fact"     python3 "$here/tests/tracker-fact-test.py"
+run "architecture doc"       python3 "$here/tests/architecture-doc-test.py"
 run "migrate issues"         python3 "$here/tests/migrate-issues-test.py"
 run "migrate copy"           python3 "$here/tests/migrate-copy-test.py"
 run "migrate structure"      python3 "$here/tests/migrate-structure-test.py"
@@ -67,6 +69,7 @@ run "migrate copy to github" python3 "$here/tests/migrate-copy-github-test.py"
 run "pictures fit"           python3 "$here/../scripts/svgcheck.py" "$here"/../docs/images/*.svg
 run "issue edit gate"        python3 "$here/tests/issue-edit-gate-test.py"
 run "connector commit gate"  python3 "$here/tests/connector-commit-gate-test.py"
+run "adjudicator model"      bash "$here/tests/adjudicator-model-test.sh"
 run "proof: brief gates"     bash "$here/proof/brief-gates-selftest.sh"
 run "proof: discovery"       bash "$here/proof/gate-discovery-bash-selftest.sh"
 run "proof: mark codesearch" bash "$here/proof/mark-codesearch-selftest.sh"

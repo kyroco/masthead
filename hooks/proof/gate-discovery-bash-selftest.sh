@@ -299,7 +299,7 @@ nojq_run "no jq: a search for a value is judged and goes through" allow "runs-on
 nojq_run "no jq: a command that is not a search is left alone" allow "-" Bash "$(sh 'ls -la products/apps')"
 
 # What setup's no-jq row says stays off: a code_locate answer cannot be read, so any lookup of a name counts
-# as fresh, and the repeated-search and whole-file-read gates never fire (skills/setup/SKILL.md, section 8).
+# as fresh, and the repeated-search and whole-file-read gates never fire (skills/setup/SKILL.md, section 9).
 nojq_protocol() {
   local mode="$1" sid="$2" tool="$3" input="$4" response="${5:-null}" out
   out="$(jq -n --arg s "$sid" --arg t "$tool" --argjson i "$input" --argjson r "$response" \
