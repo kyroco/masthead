@@ -17,9 +17,10 @@ The shapes, each command separated by |, &&, || or ; and each judged alone:
     merge-base, shortlog, describe and grep, with the flags below and plain
     revisions and paths; nothing between git and the subcommand but --no-pager.
   the repository's tests, each runner with its offline switch where it has
-    one, and every path, module or package it is given in the checkout: bash,
-    sh or python3 with a script path inside the checkout; ./<script>; python3
-    -m pytest or -m unittest; pytest; mix test (MIX_ENV=test may come first);
+    one, and every path or package it is given in the checkout: bash, sh or
+    python3 with a script path inside the checkout; ./<script>; python3 -m
+    pytest (not -m unittest, which imports any name it is given; a unittest
+    suite runs through pytest); pytest; mix test (MIX_ENV=test may come first);
     cargo test --offline; GOPROXY=off go test ./<path>; npm, pnpm or yarn
     test; npx --no-install vitest, jest or mocha; make test or make check;
     bundle exec rspec; rspec; swift test --skip-update
@@ -153,7 +154,6 @@ PYTEST = ("qvxsl", "kmr", {"tb", "lf", "last-failed", "ff", "failed-first", "max
                           "no-header", "collect-only", "co", "quiet", "verbose", "exitfirst",
                           "durations", "showlocals", "deselect", "strict-markers",
                           "capture", "no-summary", "color"})
-UNITTEST = ("vqfbc", "", {"verbose", "quiet", "failfast", "buffer", "catch", "locals"})
 MIX_TEST = ("", "", {"only", "exclude", "include", "seed", "max-failures", "trace", "failed",
                      "stale", "warnings-as-errors", "color", "no-color", "slowest",
                      "max-cases", "timeout"})
@@ -380,48 +380,6 @@ def judge_pytest(words, cwd):
         k += 1
 
 
-def checkout_module(name, cwd):
-    """True when python -m, which puts the checkout first on the import path, imports this dotted name from
-    the checkout. A folder with no __init__.py loses to a package of the same name elsewhere, such as the
-    standard library's test, so the first part must be a real package of the checkout, or a top-level
-    module of it when the name has one part."""
-    parts = name.split(".")
-    if not all(p.isidentifier() for p in parts):
-        return False
-    if os.path.isfile(os.path.join(cwd, parts[0], "__init__.py")):
-        return True
-    return len(parts) == 1 and os.path.isfile(os.path.join(cwd, parts[0] + ".py"))
-
-
-def judge_unittest(words, cwd):
-    """unittest imports what it is given, so each name must be the repository's own: discover with a start
-    folder in the checkout, a test file in the checkout, or a dotted name of the checkout's own module."""
-    k = 0
-    while k < len(words):
-        t = words[k]
-        if t in ("-s", "-t", "-p", "-k"):
-            value = take_value("unittest", words, k)
-            if t in ("-s", "-t"):
-                own_path("unittest", value, cwd)
-            k += 2
-            continue
-        if t.startswith("-"):
-            judge_flags("unittest", [t], UNITTEST)
-        elif t == "discover" and k == 0:
-            pass
-        elif t.endswith(".py"):
-            # unittest turns a file path into a dotted name and imports that, so it must be the checkout's.
-            full = inside(t, cwd)
-            name = os.path.relpath(full, cwd)[:-3].replace(os.sep, ".") if full else ""
-            if full is None or not os.path.isfile(full) or not checkout_module(name, cwd):
-                refuse(f"'unittest {t}' is not a test file of the checkout's own package (a folder with "
-                       "__init__.py, or a file at the top)")
-        elif not checkout_module(t, cwd):
-            refuse(f"'unittest {t}' is not a module of the checkout; unittest imports it, and a standard "
-                   "library module such as antigravity can open the browser")
-        k += 1
-
-
 def judge_single_words(prog, words, novalue, value, cwd, paths):
     """Runners whose flags are whole words (no bundles): each flag is listed, a value flag takes the next word,
     and what is left is returned. With paths, what is left must be paths in the checkout."""
@@ -589,9 +547,11 @@ def judge_command(w, cwd, state):
             mod = w[2] if len(w) > 2 else ""
             if mod == "pytest":
                 return judge_pytest(w[3:], cwd)
-            if mod == "unittest":
-                return judge_unittest(w[3:], cwd)
-            refuse(f"'python3 -m {mod}' is not allowed; only -m pytest and -m unittest")
+            # Not -m unittest: it turns every name, path and start folder into an import, and each check of
+            # those read the name differently from Python (MAST-43 re-verify round 2; Robert, November 15).
+            # A unittest suite still runs through pytest, or as python3 <test file>.
+            refuse(f"'python3 -m {mod}' is not allowed; only -m pytest. A unittest suite runs through "
+                   "python3 -m pytest, or as python3 <test file in the checkout>")
         if not sub:
             refuse("python3 with no script; this shell runs no interactive interpreter")
         return script_path(prog, sub, cwd)
