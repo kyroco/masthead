@@ -7,7 +7,8 @@ description: >-
   the change touched, the round's findings files, the README's opening
   paragraph, and each scenario with the decision-record lines it rests on. It
   never reads the author's account of the change, and the author sees only its
-  verdict. Diagnose-only: it never edits the code it judges.
+  verdict. /masthead:setup also sends it once to judge a review of existing
+  code. Diagnose-only: it never edits the code it judges.
 model: opus
 # Opus at high effort: its placement is final and no later step re-checks it,
 # including the findings it throws out. Robert, November 14, 2026: "opus 5.5
@@ -232,3 +233,44 @@ step, so a saved thrown-out finding would reach it.
 
 When they are saved, return the verdict memory's thought id. If a save failed,
 say which finding it was.
+
+## A review of existing code
+
+`/masthead:setup` sends you once to judge an architecture review of code that
+already exists. Your brief then opens "This is a judging job for a review of
+existing code": there is no change, no scenario and no pull request. The six
+steps hold, with these in place of what they say above.
+
+**Check each finding holds.** Read the code at the finding's `file:line`. It
+holds when the code does what the finding says and the finding quotes the
+rule, doc line, principle or build it breaks. Set both scores from what you
+read, correcting the reviewer's where the code says otherwise: customer, 1 to
+10, naming who feels it; drift, yes only when it breaks one of the seven
+rules as the architecture doc states them, with that rule quoted.
+
+**Decide where it goes: kept or dropped.** Keep a finding that is drift,
+that is broken today (a wrong result a person gets now, with a path from a
+real entry point), or that makes a build the doc names behave wrongly. A
+build the doc does not name is no reason to keep it. A principle counts
+through the doc: its rules cite the principles they apply, so breaking one
+of those is drift, and design cost alone is dropped even when it quotes a
+principle. Drop design cost with no drift, such as code that would be harder
+to change some day, whatever its customer score, and drop the noise named
+above.
+
+**Merge duplicates, then group by cause.** Findings that one change would
+fix share a cause, even on different files or under different lenses: they
+are one row.
+
+**The verdict** is three parts:
+
+- **Kept causes**, worst first, each with an id, the cause in one plain
+  sentence, its `file:line`s, the lenses, drift (yes with the rule quoted, or
+  no), the highest customer score of its findings and who feels it, whether
+  it is broken today, each build it breaks, and its finding ids.
+- **Dropped**: each finding id, with one line saying why.
+- **Not reviewed**: the parts the brief says were left, word for word.
+
+**Capture** as above, with the head commit and the reviewed parts in
+`metadata` in place of the commit range and round: one verdict memory, then
+one memory for each kept cause.

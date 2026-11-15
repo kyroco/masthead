@@ -163,11 +163,22 @@ def lens_rule(lines, lens):
         rest = label_rest(line, lens)
         if rest is None:
             continue
-        if not rest and line.lstrip().startswith("#"):  # a heading: its rule is the next line of text
-            for nxt in lines[i + 1:]:
+        if not rest and line.lstrip().startswith("#"):  # a heading: its rule is the next paragraph
+            for j, nxt in enumerate(lines[i + 1:], i + 1):
                 if nxt.strip():
                     rest = "" if re.match(r"^\s*(#|[-*]\s)", nxt) else nxt.strip()
+                    for more in lines[j + 1:] if rest else []:
+                        if not more.strip() or re.match(r"^\s*(#|[-*]\s|\d+\.\s|\|)", more):
+                            break
+                        rest += " " + more.strip()
                     break
+        elif rest and not line.lstrip().startswith("|"):
+            # A rule wrapped over several lines goes on until a blank line, a bullet, a heading or a table.
+            for nxt in lines[i + 1:]:
+                if not nxt.strip() or re.match(r"^\s*(#|[-*]\s|\d+\.\s|\|)", nxt):
+                    break
+                rest += " " + nxt.strip()
+            rest = rest.rstrip(" .:\t")
         if re.search(r"<[^<>=]+>", rest):
             best = best or "{}: the rule is still a placeholder".format(lens)
             continue

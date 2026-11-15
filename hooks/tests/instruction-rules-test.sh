@@ -1425,5 +1425,77 @@ says  references/session-cliffs.md 'once it is off, the section reads "None, the
 says  references/session-cliffs.md 'Fix each finding on the adjudicator'"'"'s fix list in this PR, test first'
 # Re-verify round 1, fix C3: the adjudicator follows a build finding's path before keeping it.
 says  agents/adjudicator.md 'One that says a build would behave wrongly holds when the architecture doc names that build and you follow the path the finding gives to the wrong result in that build'
+# MAST-36: /setup brings an existing project in line with its architecture doc,
+# by a targeted review or a full sweep.
+# Scenario 1: setup asks, when there is code and a doc, targeted, sweep or neither.
+says  skills/setup/SKILL.md '## 10. Bring the code in line with the doc'
+says  skills/setup/SKILL.md 'ask whether the person wants a targeted review, a full sweep, or neither'
+says  skills/setup/SKILL.md 'Ask on every run of `/masthead:setup`'
+says  skills/setup/SKILL.md 'skills/setup/architecture-review.md'
+says  skills/setup/architecture-review.md 'I can do a targeted review of the parts you name, or a full sweep of the whole codebase, or neither'
+says  skills/setup/architecture-review.md '`parts` exits 3 when it holds none'
+# Scenarios 2 and 3: the named parts, or everything, through the same reviewer and lenses.
+says  skills/setup/architecture-review.md 'Only the code under what they named is reviewed'
+says  skills/setup/architecture-review.md 'every code file in the repository is reviewed'
+says  skills/setup/architecture-review.md 'the same agent and the same seven lenses and two scores every pull request gets: there is no second set'
+for family in boundaries calls-seams builds-upkeep; do
+  says skills/setup/architecture-review.md "| $family |"
+done
+says  agents/architecture-reviewer.md '## A review of existing code'
+says  agents/architecture-reviewer.md 'Your brief then has a `Sweep:` line in place of a diff'
+says  agents/architecture-reviewer.md '`Lenses:` names the ones you hold the batch to'
+says  references/dispatch-brief.md 'This is an architecture review of existing code; you change no code.'
+says  references/dispatch-brief.md 'findings-architecture-reviewer-sweep-<batch id>-<family>.json'
+# Scenario 4: judged by reading the code, both scores, kept or dropped as project rule 5 says.
+says  agents/adjudicator.md 'This is a judging job for a review of existing code'
+says  references/dispatch-brief.md 'This is a judging job for a review of existing code; you change no code.'
+says  agents/adjudicator.md 'Read the code at the finding'"'"'s `file:line`'
+says  agents/adjudicator.md 'customer, 1 to 10'
+says  agents/adjudicator.md 'drift, yes only when it breaks one of the seven rules as the architecture doc states them'
+says  agents/adjudicator.md 'that is broken today'
+says  agents/adjudicator.md 'that makes a build the doc names behave wrongly'
+says  agents/adjudicator.md 'A build the doc does not name is no reason to keep it'
+says  agents/adjudicator.md 'Drop design cost with no drift'
+# Scenario 5: one row per cause, before anything is filed.
+says  agents/adjudicator.md 'Findings that one change would fix share a cause'
+says  skills/setup/architecture-review.md 'one row per cause, before anything is filed'
+# Scenario 6: one issue per approved cause in the project's tracker, quoting the doc, a scenario per build.
+says  skills/setup/architecture-review.md 'project_fact.py --tracker'
+says  skills/setup/architecture-review.md 'Each approved cause is one issue, never one per finding'
+says  skills/setup/architecture-review.md 'one for each build the doc names'
+says  skills/setup/architecture-review.md 'quoted word for word from `rules <doc>`'
+# Scenario 7: no to every cause, nothing filed.
+says  skills/setup/architecture-review.md 'On none: say "Nothing filed," and end'
+says  skills/setup/architecture-review.md 'You file only what the person names'
+# Scenario 8: one session's share, and what was left unreviewed.
+says  skills/setup/architecture-review.md 'exit 6 means this session has reviewed its share'
+says  skills/setup/architecture-review.md 'say which parts were not reviewed (`left`)'
+says  agents/architecture-reviewer.md 'so the session that sent you keeps its room for the next batch'
+# MAST-36 round 1, F-4: every one of the seven lenses goes to a reviewer, by name.
+for lens in "Direction" "One way in and out" "Call shape" "Seams" "What each build carries" "Leftovers" "Tests and checks"; do
+  if sed -n '/^| Family | Lenses |$/,/^$/p' "$ROOT/skills/setup/architecture-review.md" | grep -qF -- "$lens"; then
+    pass=$((pass + 1)); else fail=$((fail + 1)); echo "FAIL skills/setup/architecture-review.md's family table leaves out the lens: $lens"; fi
+  if grep '^Lenses: ' "$ROOT/references/dispatch-brief.md" | grep -qF -- "$lens"; then
+    pass=$((pass + 1)); else fail=$((fail + 1)); echo "FAIL references/dispatch-brief.md's Lenses: line leaves out the lens: $lens"; fi
+done
+# F-5: a new review over a part-done one replaces it, on purpose.
+says  skills/setup/architecture-review.md 'run `plan` with `--fresh`'
+# F-6: a principle counts through the doc's rules, and design cost alone is dropped even when it quotes one.
+never agents/adjudicator.md 'that breaks a principle the brief'"'"'s principles file numbers'
+says  agents/adjudicator.md 'design cost alone is dropped even when it quotes a principle'
+# F-8: a doc that names no build still gets a scenario for each build.
+says  skills/setup/architecture-review.md 'When `builds` prints nothing, ask the person which builds the project ships'
+# F-10: the judge gets every batch reviewed and not judged, from any run.
+says  skills/setup/architecture-review.md 'findings --ledger <L>'
+says  skills/setup/architecture-review.md 'judged --ledger <L>'
+# F-2 and F-3: the reviewer gets the batch's exact file list, never a pattern.
+says  agents/architecture-reviewer.md 'names the file that lists the batch'
+says  references/dispatch-brief.md 'Sweep: the files listed in <the list path next prints>'
+# F-1: setup says why when there is no code to review.
+says  skills/setup/architecture-review.md 'say you found no code to review'
+# MAST-36 re-verify 1, claim 6: findings left unjudged are judged before anything else.
+says  skills/setup/architecture-review.md 'When `findings --ledger <L>` prints a file, a review was left unjudged'
+# Claim 7: a line that names more than one build is split by the session.
+says  skills/setup/architecture-review.md 'When one line names more than one build'
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
