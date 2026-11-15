@@ -143,19 +143,28 @@ Claude's editing tools. The architecture reviewer's shell runs only
 `git diff`, `git show` and `git log` with plain revisions and paths, the
 plugin's `project_fact.py` to ask for the tracker or the architecture doc,
 and `gh issue view` to read its issue, and refuses every other command. The
-verifier's and security reviewer's shells refuse the common network programs
-(curl, wget, ssh, nc and the like), gh and any URL, though one run through a
-wrapper the fence does not see through, such as `timeout 5 curl`, still gets
-through (MAST-43). Then a judge, given the same product
+verifier's and security reviewer's shells run only the command shapes in
+`hooks/reviewer_shapes.py`: read-only git, the repository's own tests with
+their offline switches, semgrep and opengrep with their calls home turned
+off, a few reading tools such as cat, grep and jq, and rm of the agent's own
+scratch files, one command at a time or several joined by |, &&, || or ;.
+They refuse every other command, a wrapper such as `timeout 5 curl`
+included, and every redirect into a file. The fence covers the commands the
+agent types, not code it runs: a test, a test runner, semgrep, or a probe
+script it wrote itself in its scratch folder can still do anything (MAST-43). Then a judge, given the same product
 context and nothing from the worker, reads the code along each verifier's
 path without running the tests a third time, and places each finding that
 holds: fixed in this pull request when a scenario's Then is false or no
 test proves it, a bug's test did not come first, something
 that worked before broke, or words a person reads are now wrong; otherwise
-an extra, which the worker scores like its own. That placement is final for
-the worker and the foreman; nobody files anything. The worker fixes the
-list, test first again, and only the claims the fix broke go back to a
-verifier, at most twice. The tests run on the final commit and leave a
+an extra, which the worker scores like its own. Once the trial is off, an
+architecture finding that breaks one of the doc's seven rules, a line of the
+decision record or the principles, or a build the doc names goes on the fix
+list whatever its customer score. One where the decision record and a
+mockup disagree always comes to you. That placement is final for the worker and the foreman; nobody files
+anything. The worker fixes the list, test first again, and only the claims
+the fix broke go back to a verifier, and only the architecture findings it
+fixed to the architecture reviewer, at most twice. The tests run on the final commit and leave a
 receipt that names it, and nothing can be pushed until the receipt matches.
 Then one pull request goes up, with `Fixes #41`, the list of what wasn't
 proved, the number of agent dispatches it took, and the issue moves to In
@@ -175,8 +184,13 @@ happened, and the run goes on without it.
 
 When a pull request is ready, every extra its worker's rule says to fix is
 already fixed in it, and nothing else reaches you unless a security finding
-could not be settled; that comes one item at a time, and you answer it. No
-issue is ever filed from a review. When its checks pass, its review
+could not be settled or the decision record and a mockup disagree; that
+comes one item at a time, and you answer it. While the architecture
+reviewer is on trial, every one of its findings reaches you too, kept or
+thrown out, with its lens, smell, class, scores and the judge's placement,
+and the worker fixes only the ones you send back. The trial is on from the
+first run until you set `"ARCHITECTURE_TRIAL": "off"` in the env block of
+`.claude/settings.json`. No issue is ever filed from a review. When its checks pass, its review
 is clean, every line is answered and the worker has cleaned up after itself,
 the foreman queues it to be merged. It closes the issue, and any big issue
 whose pieces are now all done, then starts the next issue, one that waited on
@@ -301,7 +315,7 @@ reason Claude can act on.
 | `agent-brief-gates.sh` | before a helper is sent | a brief to a verifier or security reviewer that leaves out the claims it must check; a third re-verify round; a brief to the architecture reviewer without the decision record's path, its alignment lines or the architecture doc's path | checks the shape of the brief, not whether it's true |
 | `dispatch-record-gate.sh` | before a helper is sent | nothing; records which model each helper ran on, and whether it was a re-verify round | |
 | `review-write-fence.py` | before a file write | a verifier or the architecture reviewer writing anything but its own findings file, or a scratch file under the review folder | a shell write isn't seen |
-| `bash-scope-reviewer.sh` | before a shell command | a verifier, security reviewer or architecture reviewer running a common network program (curl, ssh, gh and the like) or any command with a URL; the architecture reviewer may run `gh issue view <n>` for its issue | a list of programs it refuses: one it doesn't name, or one behind a wrapper it doesn't see through such as `timeout`, gets through for the verifier and security reviewer |
+| `bash-scope-reviewer.sh` | before a shell command | a verifier or security reviewer running any command but the shapes in `reviewer_shapes.py` (read-only git, the repository's tests, semgrep and opengrep with their calls home off, a few reading tools, rm of its own scratch files); an architecture reviewer running a common network program (curl, ssh, gh and the like) or any command with a URL, though it may run `gh issue view <n>` for its issue | reads the command typed, not what a test or script it runs then does; with no jq, the verifier's and security reviewer's every command is refused |
 | `bash-scope-diagnoser.sh` | before a shell command | the diagnoser or reader doing anything but running tests, reading git history and inspecting files; the architecture reviewer running anything but `git diff`, `git show` or `git log` with plain revisions and paths, `project_fact.py --tracker` or `--architecture-doc`, and `gh issue view <n>`, bare or with `--comments` | scoped by the agent's type |
 | `verdict-gate.sh` | when a session or helper stops | a diagnosis case file whose verdict names no file and line, or has fewer than two numbered observations | |
 | `scope-gate.py` | before and after a write | while a scope file exists in the checkout, writes outside its allowed paths; puts back a protected file a command changed | a background command's later writes aren't seen |

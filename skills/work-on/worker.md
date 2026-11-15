@@ -87,15 +87,18 @@ they care? 1 is nope, and 10 is if we don't do this, we will cause a
 catastrophic failure. Judge it on its own merit, even if it might contradict
 something written. An extra that scores 8 or more is fixed in this PR, test
 first when it is a bug. One that scores under 8 is dropped: you bring it to
-no one, not your foreman and not the person, and you file nothing.
+no one, not your foreman and not the person, and you file nothing. An
+architecture finding the adjudicator lists as an extra is scored as "Decide
+where it goes" in `agents/adjudicator.md` says.
 
 If the scenarios cannot all be done and proven in this session, split the
 issue as the github-issues skill says, remove the branch you made, set the
 issue back to Todo, and stop; name the sub-issues to your foreman, or at the
 end of your turn.
 
-Note how many rows `.claude/state/dispatches.tsv` holds now, not counting
-refused ones; your report counts the rows added after it.
+Note how many rows the dispatch log holds now, not counting refused ones;
+your report counts the rows added after it. The log is
+`<state>/dispatches.tsv`, as step 9 of **Opening a PR** says.
 
 ## 5. Build it
 

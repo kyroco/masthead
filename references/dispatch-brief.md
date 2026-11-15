@@ -46,9 +46,8 @@ Who uses this: <the README's opening paragraph, quoted>.
 Mockup: <the mockup page the scenario names>, or "none".
 Verify <the diff command, with the head commit>. Write your findings to
 <state>/review/findings-verifier-<scenario>-<name>.json, where <state> is the
-repo's PROJECT_STATE_DIR fact from the env block of its .claude/settings.json
-(.claude/state when it states none). Write the real path in the brief, never
-the placeholder.
+folder `project_fact.py --state-path` prints. Write the real path in the
+brief, never the placeholder.
 
 Code outside the diff this depends on: <modules, files and functions it calls
 into or is called by>, or "self-contained".
@@ -102,11 +101,14 @@ Re-verify: round 1, claims 2 and 3
 
 That line is exact too: it begins `Re-verify: round N` at column zero, N
 the number of this round, with no marker before it; any other spelling is
-refused. The round number is for the log. The check does not read it: it
-counts the verifier's re-verify rows already in the dispatch log for this
-session on this branch and refuses a third, whatever the brief says. The
-security reviewer sent in the same round does not spend one; a verifier that
-died or was declined did, since its row was written before it ran.
+refused. A round is the verifier, the architecture reviewer re-checking the
+architecture findings a fix addressed, or both sent under one round number.
+The check counts the rounds already in the dispatch log for this change, as
+step 5 of **Opening a PR** in `references/session-cliffs.md` says, and
+refuses a third round, whatever the brief says; the number only says which
+round a dispatch joins. The security reviewer sent in the same round does
+not spend one; an agent that died or was declined did, since its row was
+written before it ran.
 
 **The security reviewer's brief** has the same shape, with the repository's
 security conventions as its claims (its CLAUDE.md and `docs/conventions/`
@@ -114,9 +116,10 @@ where it has them) and the findings file
 `<state>/review/findings-security-reviewer-<name>.json`.
 
 **The architecture reviewer's brief.** One per change, sent in the same
-message as the first verification's verifiers, never on a re-verify round. It
-gets the issue and the design it is held to, and nothing of your account of
-the change: no claims, no did-not-prove list, no summary.
+message as the first verification's verifiers, and on a re-verify round only
+when a fix addressed an architecture finding. It gets the issue and the
+design it is held to, and nothing of your account of the change: no claims,
+no did-not-prove list, no summary.
 
 ```
 read_only: true
@@ -155,6 +158,18 @@ Three lines are exact, and the brief check refuses the brief without them:
   principles alone. A doc the project does not record is refused, and so is
   `none` when it records one.
 
+**Its re-check brief**, on a re-verify round, is the same brief with one
+line before everything else, in the same exact form as the verifier's:
+
+```
+Re-verify: round 1, findings arch-2 and arch-5
+```
+
+Its `Review` line gives the fix commits' diff, and under a
+`Findings to re-check:` line it gives each of those findings as the
+adjudicator's verdict placed it, one bullet each. It keeps the `ADR:`,
+`ADR alignment:` and `Architecture doc:` lines.
+
 Like the verifier's, its brief names no Korium memory search. Its shell is
 read-only (`bash-scope-diagnoser.sh`), so never ask it to run a test.
 
@@ -169,9 +184,10 @@ the code in a copy. A claim only a database test could prove comes back
 as "not proven here, needs the database run", and your one pre-push run, or
 CI, settles it. A claim only a broken copy could prove comes back as "not
 proven here"; no run settles that one, so it goes on your did-not-prove
-list. Nothing enforces this, except that the network hook, while it is on and
-the machine has jq, refuses a verifier's or a security reviewer's `git clone` and
-`rsync`: the rest is in each helper's instructions.
+list. Nothing enforces this, except that a verifier's or a security reviewer's
+shell runs only the command shapes `hooks/reviewer_shapes.py` lists, none of
+which copies, compiles or starts anything; a test it runs can, so the rest is
+in each helper's instructions.
 
 ## The adjudicator's brief
 
@@ -193,7 +209,18 @@ Who uses this: <the README's opening paragraph, quoted>.
 Scenarios:
 <each scenario of the round, word for word, each followed by its Rests on:
 line as the verifier's brief gives it>
+ADR: <the path the architecture reviewer's brief gave>, or "none".
+Architecture doc: <the path project_fact.py --architecture-doc prints>, or
+"none recorded".
+Principles: <the file that holds the project's principles>.
+Mockup: <the mockup pages the ADR or the issue names>, or "none".
+Architecture trial: <on or off, as project_fact.py --architecture-trial prints>
 ```
+
+The `Architecture trial:` line comes from the fact as it is when you send
+the brief. The person turns the trial off by setting `ARCHITECTURE_TRIAL` to
+`off` in the env block of `.claude/settings.json`; until then it is on, on a
+new install too.
 
 The reviewed files are the first verification's on every round, re-verify
 rounds included, so a fix that reached a new file cannot widen what counts as
@@ -260,7 +287,8 @@ the brief. Nothing checks this.
 ## What each check wants
 
 **`dispatch-record-gate.sh` is a record, not a check.** It appends each dispatch
-to the repo's `.claude/state/dispatches.tsv`, with the model from the call's `model` field
+to the checkout's `<state>/dispatches.tsv` (the folder `project_fact.py --state-path`
+prints), with the model from the call's `model` field
 or the agent file's `model:` line, and its outcome: `dispatched`, `refused`
 when a check refused it, or `re-verify round N` for a brief whose line starts
 `Re-verify:`, and the checkout's branch. An optional first non-empty line,
@@ -288,10 +316,11 @@ call is checked whatever the agent.
 `ADR alignment:` and `Architecture doc:` lines, as above, and no claims list.
 For the other two, the brief carries a claims list in the one exact form above: a line
 that is exactly `Claims:` at column zero, then a `- ` bullet of at least four
-words; a variant is refused with the form. And a verifier's brief with a line
-that begins `Re-verify: round N` is refused when the dispatch log already
-holds two of the verifier's re-verify rows for this session on this branch;
-a re-verify line in any other spelling is refused outright.
+words; a variant is refused with the form. And a verifier's or an architecture
+reviewer's brief with a line that begins `Re-verify: round N` is refused
+when the change has had its rounds, as step 5 of **Opening a PR** says,
+unless it joins a round the other agent was sent in alone; a re-verify line
+in any other spelling is refused outright.
 `MASTHEAD_BRIEF_GATE=off` in the operator's environment turns it off.
 
 **`skill-review-gate.py`** refuses a dispatch of an agent whose

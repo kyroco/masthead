@@ -53,12 +53,14 @@ unfetched='^(\*\* \(Mix\) .*(Unknown dependency|could not be found|Could not fin
 session="$(printf '%s' "$payload" | jq -r '.session_id // "nosession"' 2>/dev/null | tr -cd 'A-Za-z0-9_-')"
 skipped_once() {
   # $1 = which step could not load, $2 = a note that must still reach the session.
-  marker="${TMPDIR:-/tmp}/elixir-format-after-edit.${session:-nosession}.skipped"
-  if [ -e "$marker" ]; then
+  # The once-a-session mark sits in the session's private state folder, from project_fact.py (MAST-38).
+  folder="$(python3 -I "$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd -P)/project_fact.py" --private-dir elixir-format-after-edit "${session:-nosession}" 2>/dev/null | head -1)"
+  marker="${folder:+$folder/skipped}"
+  if [ -n "$marker" ] && [ -e "$marker" ]; then
     [ -n "${2:-}" ] && emit "" "$2"
     exit 0
   fi
-  : > "$marker"
+  [ -n "$marker" ] && (umask 077; : > "$marker") 2>/dev/null
   emit "" "${2:+$2 }The per-edit format and lint check is not running in this checkout: its Elixir deps are missing or out of date ($1). Run 'mix deps.get' in $root to turn it back on. The push gate and CI still run the full check."
   exit 0
 }

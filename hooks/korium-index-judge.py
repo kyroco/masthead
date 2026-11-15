@@ -10,6 +10,8 @@ import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor
 
+from project_fact import private_dir, private_open
+
 LOOKUP_TIMEOUT_S = 10
 STATUS_TIMEOUT_S = 8
 STATUS_TRUSTED_S = 600
@@ -101,13 +103,16 @@ def search_root(path, cwd):
 
 
 def status_mark():
-    return os.path.join(os.environ.get("TMPDIR") or "/tmp", "claude-engram", "korium-cli-signed-in")
+    """The mark that korium-cli answered its status, in the user's private state
+    folder (MAST-38), or None when that cannot be trusted."""
+    folder = private_dir("claude-engram")
+    return os.path.join(folder, "korium-cli-signed-in") if folder else None
 
 
 def signed_in(cli):
     mark = status_mark()
     try:
-        if time.time() - os.path.getmtime(mark) < STATUS_TRUSTED_S:
+        if mark and time.time() - os.path.getmtime(mark) < STATUS_TRUSTED_S:
             return True
     except OSError:
         pass
@@ -120,9 +125,9 @@ def signed_in(cli):
     if r.returncode != 0:
         return False
     try:
-        os.makedirs(os.path.dirname(mark), exist_ok=True)
-        with open(mark, "w"):
-            pass
+        if mark:
+            with private_open(mark):
+                pass
     except OSError:
         pass
     return True
@@ -130,7 +135,9 @@ def signed_in(cli):
 
 def forget_status():
     try:
-        os.remove(status_mark())
+        mark = status_mark()
+        if mark:
+            os.remove(mark)
     except OSError:
         pass
 

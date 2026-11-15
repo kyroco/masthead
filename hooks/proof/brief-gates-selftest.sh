@@ -67,7 +67,7 @@ echo "engram-protocol selftest: the hook still answers when fed to bash -c"
 # denies an unsearched edit, so it has to produce output.
 hookless_verdict() {
   local out
-  out="$(printf '%s' "$1" | bash -c "$(cat "$HOOK")" _ "$2" 2>/dev/null)"
+  out="$(printf '%s' "$1" | CLAUDE_PLUGIN_ROOT="$(cd "$(dirname "$HOOK")/.." && pwd)" bash -c "$(cat "$HOOK")" _ "$2" 2>/dev/null)"
   if printf '%s' "$out" | grep -q '"permissionDecision"[[:space:]]*:[[:space:]]*"deny"'; then
     echo deny
   else

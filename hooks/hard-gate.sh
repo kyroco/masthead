@@ -347,7 +347,7 @@ print(seen.hexdigest())' 2>/dev/null)" || return 0
 # Take the key before the changed files are listed, so a commit that lands after this line shows up at the
 # end as a key that no longer matches, and that run is not remembered.
 PASS_KEY="$(pass_key)"
-PASS_RECORD="$(git rev-parse --git-path masthead-push-gate-pass 2>/dev/null || true)"
+PASS_RECORD="$(python3 -I "$_HOOK_DIR/project_fact.py" --root "$PWD" --git-state masthead-push-gate-pass 2>/dev/null || true)"
 CHANGED="$( {
   [ -n "$BASE" ] && git diff --name-only "$BASE" HEAD 2>/dev/null
   git status --porcelain --untracked-files=all 2>/dev/null | awk '{print $NF}'

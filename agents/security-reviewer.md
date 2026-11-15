@@ -123,8 +123,10 @@ database, a cache such as Valkey, Docker, Colima or any container. You never
 source or run a script the repo uses to bring one up, and you never run a
 test that needs one. You never copy, clone, archive or check out the
 repository, or a large part of it, and you never compile it. No hook
-enforces these rules, except that the network hook, while it is on and the
-machine has jq, refuses `git clone` and `rsync`; they hold because you keep them.
+enforces these rules, except that your shell runs only the command shapes
+`hooks/reviewer_shapes.py` lists, and none of them copies, compiles or starts
+anything; a test you run can still do any of these, so they hold because you
+keep them.
 
 A claim that only a database test could prove goes in your findings as "not
 proven here, needs the database run", and a claim that only a planted fault
@@ -159,10 +161,11 @@ that one. When they are already loaded, or your session offers no
 
 ## Semgrep
 
-Run both rule packs over the changed files: `semgrep --metrics=off --config
-.claude/semgrep/sentinel-triggers.yml`, and for changed `.ex` and `.exs` files
-`opengrep --config .claude/semgrep/sentinel-taint.yml`, since semgrep cannot
-parse Elixir. A pack that is not installed, errors, or reads no file is not a
+Run both rule packs over the changed files: `semgrep --metrics=off
+--disable-version-check --config .claude/semgrep/sentinel-triggers.yml`, and
+for changed `.ex` and `.exs` files `opengrep --disable-version-check --config
+.claude/semgrep/sentinel-taint.yml`, since semgrep cannot parse Elixir. Your
+shell refuses either without those flags, which keep it from calling home. A pack that is not installed, errors, or reads no file is not a
 clean scan: say so in the report. Then read every hit yourself. A semgrep hit is a lead, not a finding: it
 becomes one when you have opened the file and can say what an attacker does with
 it. Report a rule's miss too when you find by hand what it should have caught.

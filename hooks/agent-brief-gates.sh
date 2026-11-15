@@ -8,6 +8,14 @@ INPUT="$(cat 2>/dev/null || true)"
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd -P)" || HERE="$(dirname "$0")"
 
+# The brief check and the dispatch record find the dispatch log through project_fact.py, so python3 must run,
+# jq or not (MAST-38, round 0, A5). The macOS stub with no Command Line Tools is found and reads nothing. A missing
+# project_fact.py is the brief check's own refusal: it cannot find its folder.
+if ! python3 -I -c 'import json' >/dev/null 2>&1; then
+  printf '%s\n' '{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "python3 does not run, so the brief checks on the Agent tool cannot find the dispatch log or count re-verify rounds, and the dispatch is refused rather than sent unchecked. Install python3 (on macOS: xcode-select --install) and send it again."}}'
+  exit 0
+fi
+
 # The payload goes to each check unparsed. The refusals are joined with jq when it is installed and with
 # python3 when it is not, so a machine without jq is refused the same (MAST-37). With neither, every
 # dispatch is refused, since no check could be read.

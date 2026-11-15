@@ -6,6 +6,8 @@ import re
 import subprocess
 import sys
 
+from project_fact import private_dir, private_open, safe_session
+
 # Where a project skill and a project agent live.
 SKILL_PATH = ".claude/skills/{}/SKILL.md"
 AGENT_PATH = ".claude/agents/{}.md"
@@ -15,8 +17,8 @@ GIT_TIMEOUT_SECONDS = 5
 
 
 def state_dir(data):
-    session = re.sub(r"[^A-Za-z0-9_-]", "", str(data.get("session_id") or "")) or "nosession"
-    return os.path.join(os.environ.get("TMPDIR", "/tmp"), "claude-skillreview", session)
+    """The session's private state folder, or None when the state root cannot be trusted (MAST-38)."""
+    return private_dir("claude-skillreview", safe_session(data.get("session_id")))
 
 
 def project_root(data):
@@ -30,13 +32,17 @@ def record_read(data):
     if not path:
         return
     directory = state_dir(data)
-    os.makedirs(directory, exist_ok=True)
-    with open(os.path.join(directory, "read.txt"), "a") as handle:
+    if not directory:
+        return
+    with private_open(os.path.join(directory, "read.txt"), append=True) as handle:
         handle.write(os.path.abspath(path) + "\n")
 
 
 def has_been_read(data, absolute_path):
-    path = os.path.join(state_dir(data), "read.txt")
+    directory = state_dir(data)
+    if not directory:
+        return False
+    path = os.path.join(directory, "read.txt")
     if not os.path.exists(path):
         return False
     with open(path) as handle:
