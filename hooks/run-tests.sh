@@ -66,6 +66,7 @@ run "migrate copy to github" python3 "$here/tests/migrate-copy-github-test.py"
 run "pictures fit"           python3 "$here/../scripts/svgcheck.py" "$here"/../docs/images/*.svg
 run "issue edit gate"        python3 "$here/tests/issue-edit-gate-test.py"
 run "connector commit gate"  python3 "$here/tests/connector-commit-gate-test.py"
+run "adjudicator model"      bash "$here/tests/adjudicator-model-test.sh"
 run "proof: brief gates"     bash "$here/proof/brief-gates-selftest.sh"
 run "proof: discovery"       bash "$here/proof/gate-discovery-bash-selftest.sh"
 run "proof: mark codesearch" bash "$here/proof/mark-codesearch-selftest.sh"
