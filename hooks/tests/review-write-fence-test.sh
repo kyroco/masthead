@@ -85,6 +85,7 @@ case_ deny  "verifier writes a named security file"    "$(p Write agent_type ver
 # MAST-34 scenario 6: the architecture reviewer writes only its own findings file.
 case_ allow "architecture-reviewer writes its findings" "$(p Write agent_type architecture-reviewer "$R/findings-architecture-reviewer-mast34.json")"
 case_ allow "masthead's architecture reviewer too"      "$(p Write agent_type masthead:architecture-reviewer "$R/findings-architecture-reviewer.json")"
+case_ allow "a sweep batch's findings file (MAST-36)"   "$(p Write agent_type masthead:architecture-reviewer "$R/findings-architecture-reviewer-sweep-1-boundaries.json")"
 case_ deny  "architecture-reviewer writes source"       "$(p Write agent_type architecture-reviewer "$W/repo/lib/a.ex")"
 case_ deny  "architecture-reviewer edits source"        "$(p Edit agent_type masthead:architecture-reviewer "$W/repo/lib/a.ex")"
 case_ deny  "architecture-reviewer writes a verifier's" "$(p Write agent_type architecture-reviewer "$R/findings-verifier-contract.json")"

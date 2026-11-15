@@ -248,6 +248,16 @@ no ignore line for its working files, and one about the architecture doc (it nam
 (one at a time, never both), and whether to connect a memory now, later or
 not at all. Run it again whenever you want to change an answer.
 
+With an architecture doc recorded and code to check, setup then offers to
+check the code you already have against it, since the pull request reviewer only sees the lines
+a change touches: a targeted review of the parts you name, a full sweep, or
+neither. The same architecture reviewer reads the code, three to a batch,
+and a judge reads the code at each finding, keeps what drifts from the doc,
+is broken today or breaks a build the doc names, and groups what is left by
+cause. You see one row per cause and choose which become issues; nothing is
+filed unless you say so. A sweep too big for one session stops, says what it
+did not review, and the next `/masthead:setup` goes on from there.
+
 To change an install option later, run `/plugin configure masthead@masthead`:
 
 | Option | Default | What it does |

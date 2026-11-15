@@ -203,6 +203,56 @@ this PR.
 No `Korium:` line and no Korium ids, the verifiers' included: the adjudicator
 judges from the code and the findings alone and holds no memory search.
 
+## A review of existing code
+
+`/masthead:setup` step 10 (`skills/setup/architecture-review.md`) sends
+three architecture reviewers a batch, one per lens family, then one
+adjudicator for the run. Nothing of yours goes in either brief: no summary
+of the code and no opinion of it.
+
+Each reviewer's brief:
+
+```
+read_only: true
+This is an architecture review of existing code; you change no code.
+
+Sweep: the files listed in <the list path next prints>, at commit <the ledger's head>.
+Lenses: <the family's lenses: Direction, One way in and out; or Call shape, Seams; or What each build carries, Leftovers, Tests and checks>.
+Write your findings to
+<state>/review/findings-architecture-reviewer-sweep-<batch id>-<family>.json (the real path).
+ADR: none
+ADR alignment: none, this reviews existing code against the doc
+Architecture doc: <the path project_fact.py --architecture-doc prints>
+Principles: <the file that holds the project's principles>, or "none".
+Mockup: none.
+Who uses this: <the README's opening paragraph, quoted>.
+
+Use code_locate with repo "<repo value>" before reading code. Capture your
+review with agent_capture and return its thought_id with your findings.
+```
+
+It passes the same brief check as a pull request's: `ADR: none`, the
+alignment line with its reason, and the recorded doc. The family is
+`boundaries`, `calls-seams` or `builds-upkeep`, so the three files of a
+batch never overwrite each other.
+
+The judge's brief:
+
+```
+read_only: true
+This is a judging job for a review of existing code; you change no code.
+
+The code is <the repository> at <the ledger's head>.
+The reviewed parts are:
+<each part of the batches those findings files came from, one per line>
+The findings files are:
+<each file `findings --ledger <L>` prints, one per line>
+Architecture doc: <the recorded path>
+Principles: <the principles file>, or "none".
+Who uses this: <the README's opening paragraph, quoted>.
+Not reviewed: <what the script's left prints, or "nothing">.
+```
+
 **Index before you dispatch.** A verifier has a read-only shell and cannot
 re-index, so a stale index sends it to `rg`. Run `korium-cli index` in the
 checkout after the last commit and before the dispatch, and give the branch in
