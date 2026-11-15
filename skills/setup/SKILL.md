@@ -139,8 +139,10 @@ decision records (on if a folder was named). With a push check, say to commit
 cannot push. Check the tools the gates need with `command -v jq`, `command -v
 python3` and, where issues live on GitHub, `command -v gh`, and add one row for
 each one missing, saying what stays off until it is installed: no jq, the
-diagnoser and reader agents are refused every shell command, and mix format
-and credo no longer run after an Elixir edit; no python3, Masthead's gates
+diagnoser and reader agents are refused every shell command, mix format
+and credo no longer run after an Elixir edit, and, with the code index option
+on, every search the code index gate reads is refused, since it cannot ask
+the index; no python3, Masthead's gates
 cannot run, so install it first; no gh, the foreman stops before queueing a
 PR or listing what a merge unblocks and says `gh` is needed, and with no
 GitHub connector either, no issue, status or pull request call can be made
