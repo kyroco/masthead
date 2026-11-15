@@ -187,9 +187,10 @@ the code in a copy. A claim only a database test could prove comes back
 as "not proven here, needs the database run", and your one pre-push run, or
 CI, settles it. A claim only a broken copy could prove comes back as "not
 proven here"; no run settles that one, so it goes on your did-not-prove
-list. Nothing enforces this, except that the network hook, while it is on and
-the machine has jq, refuses a verifier's or a security reviewer's `git clone` and
-`rsync`: the rest is in each helper's instructions.
+list. Nothing enforces this, except that a verifier's or a security reviewer's
+shell runs only the command shapes `hooks/reviewer_shapes.py` lists, none of
+which copies, compiles or starts anything; a test it runs can, so the rest is
+in each helper's instructions.
 
 ## The adjudicator's brief
 

@@ -103,7 +103,7 @@ never docs/explainer.html "writes a plan, one line per scenario"
 never docs/explainer.html "its plan, one line per scenario"
 never docs/images/day-5-workers.svg "its plan, one line per scenario"
 never scripts/diagrams.py "its plan, one line per scenario"
-says  .claude-plugin/plugin.json '"version": "0.2.1"'
+says  .claude-plugin/plugin.json '"version": "0.3.0"'
 
 never_phrase() {
   local hit
@@ -896,9 +896,15 @@ says  references/dispatch-brief.md "Nothing enforces this"
 never references/dispatch-brief.md "ensure-substrates"
 says  references/session-cliffs.md "lists as not proven here"
 # Round 1 fix F1: the network hook already refuses two of the copy commands for two of the helpers, and the text says so.
-says  agents/verifier.md "except that the network hook, while it is on and the machine has jq, refuses \`git clone\` and \`rsync\`"
-says  agents/security-reviewer.md "except that the network hook, while it is on and the machine has jq, refuses \`git clone\` and \`rsync\`"
-says  references/dispatch-brief.md "except that the network hook, while it is on and the machine has jq, refuses a verifier's or a security reviewer's \`git clone\` and \`rsync\`"
+# MAST-43: the verifier's shell now runs only exact shapes, none of which copies, compiles or starts anything.
+says  agents/verifier.md "except that your shell runs only the command shapes \`hooks/reviewer_shapes.py\` lists, and none of them copies, compiles or starts anything; a test you run can still do any of these"
+says  agents/security-reviewer.md "except that your shell runs only the command shapes \`hooks/reviewer_shapes.py\` lists, and none of them copies, compiles or starts anything; a test you run can still do any of these"
+says  references/dispatch-brief.md "except that a verifier's or a security reviewer's shell runs only the command shapes \`hooks/reviewer_shapes.py\` lists, none of which copies, compiles or starts anything; a test it runs can"
+says  agents/security-reviewer.md "\`semgrep --metrics=off --disable-version-check --config .claude/semgrep/sentinel-triggers.yml\`"
+says  agents/security-reviewer.md "\`opengrep --disable-version-check --config .claude/semgrep/sentinel-taint.yml\`"
+for doc in agents/verifier.md agents/security-reviewer.md references/dispatch-brief.md; do
+  never "$doc" "the network hook, while it is on"
+done
 never references/dispatch-brief.md "no hook checks it"
 # Round 1 fix F2: no run takes the change out, so a claim that needed a private copy is settled by nobody and is listed as not proven.
 says  references/session-cliffs.md "This run settles each claim the verdict lists as not proven here for want of a database"
@@ -1252,8 +1258,22 @@ says  agents/architecture-reviewer.md 'You do not search Korium'"'"'s memory'
 # Re-verify round 1, fixes V1 and N2: the README promises only what the fences do.
 never README.md 'None of them can reach the network'
 never README.md 'None of them can edit anything'
-says  README.md 'refuse the common network programs'
-says  references/gate-catalog.md 'a denylist of network programs, not an allowlist'
+# MAST-43: the README and catalog say the verifiers' shells run exact shapes, and what that leaves open.
+never README.md 'refuse the common network programs'
+says  README.md 'shells run only the command shapes in `hooks/reviewer_shapes.py`'
+says  README.md 'They refuse every other command, a wrapper such as `timeout 5 curl` included, and every redirect into a file.'
+# Round 1 arch-1, Robert, November 15: probe scripts stay, and the text says the fence covers the
+# commands typed, not code run, a probe script the agent wrote itself included.
+says  README.md 'The fence covers the commands the agent types, not code it runs: a test, a test runner, semgrep, or a probe script it wrote itself in its scratch folder can still do anything (MAST-43)'
+says  references/gate-catalog.md 'It covers the commands the agent types, not code it runs: a test, a test runner, semgrep, or a probe script the agent wrote itself in its scratch folder can still do anything'
+never references/gate-catalog.md 'a test or probe script it runs is the repository'"'"'s code'
+never hooks/reviewer_shapes.py 'A test or probe script it runs is code of the repository'
+# Round 1, S2-F1: the README's list is the fence's own summary (bash-scope-reviewer-test.sh holds them together).
+never README.md 'joined by a pipe or `&&`'
+never references/gate-catalog.md 'the reviewer network gate refuses a reviewer call naming a network tool'
+never references/gate-catalog.md 'a denylist of network programs, not an allowlist'
+says  references/gate-catalog.md 'Holds the `verifier` and `security-reviewer` shells to the exact command shapes `hooks/reviewer_shapes.py` lists'
+says  references/gate-catalog.md 'For the architecture reviewer it is a denylist of network programs'
 # Re-verify round 2 (Robert, November 15): the README and catalog claim only
 # the exact shapes the architecture reviewer's shell allows, and no fence they
 # do not have.
@@ -1261,14 +1281,14 @@ never README.md 'the architecture reviewer'"'"'s shell can only read'
 says  README.md 'The architecture reviewer'"'"'s shell runs only `git diff`, `git show` and `git log` with plain revisions and paths'
 says  README.md 'and refuses every other command'
 never references/gate-catalog.md 'refuses git'"'"'s `-O` in any spelling'
-says  references/gate-catalog.md 'a wrapper it does not see through (`timeout`, `stdbuf`, `nice -n 5`, `exec -a y`, a shell'"'"'s bundled `-lc`), a git alias set with `-c`, or git run from `find -exec`, still gets through for the verifier and security reviewer (MAST-43)'
+never references/gate-catalog.md 'still gets through for the verifier and security reviewer (MAST-43)'
 # Re-verify round 3, fixes V1 and S1, and the judge's N1: the hook-table row
 # names --comments, and neither the catalog nor the README claims a refusal a
 # wrapper gets past.
 says  README.md '`gh issue view <n>`, bare or with `--comments` | scoped by the agent'"'"'s type |'
 never references/gate-catalog.md 'refuses git'"'"'s `-O` written after git in the same command'
-says  references/gate-catalog.md 'refuses git'"'"'s `-O` when git is the first word or follows a wrapper it steps over'
-says  README.md 'though one run through a wrapper the fence does not see through, such as `timeout 5 curl`, still gets through (MAST-43)'
+never references/gate-catalog.md 'refuses git'"'"'s `-O` when git is the first word or follows a wrapper it steps over'
+never README.md 'still gets through (MAST-43)'
 says  references/gate-catalog.md 'the `architecture-reviewer` shell to exact command shapes'
 says  agents/architecture-reviewer.md 'Your shell runs only these exact commands'
 never agents/architecture-reviewer.md 'with `--comments` or `--json`'
@@ -1497,5 +1517,68 @@ says  skills/setup/architecture-review.md 'say you found no code to review'
 says  skills/setup/architecture-review.md 'When `findings --ledger <L>` prints a file, a review was left unjudged'
 # Claim 7: a line that names more than one build is split by the session.
 says  skills/setup/architecture-review.md 'When one line names more than one build'
+
+# MAST-33: every issue carries the ADR's target shape and a scenario for each build.
+# Scenario 1: the issue quotes the alignment lines it builds toward, or the check names them.
+says  skills/analyze-issues/issue-check.md 'Target shape: the issue quotes the alignment lines it builds toward'
+says  skills/analyze-issues/issue-check.md 'Fails naming each alignment line the work builds toward and the issue leaves out'
+says  skills/analyze-issues/issue-check.md 'Architecture doc: <its path, or none recorded>'
+# Scenario 2: a scenario for each build the work reaches.
+says  skills/analyze-issues/issue-check.md 'the issue has a scenario for each build its work reaches'
+says  skills/analyze-issues/issue-check.md 'Fails naming each build with neither'
+# Scenario 3: a pattern to copy is held to the alignment, and a break names the line.
+says  skills/analyze-issues/issue-check.md 'Patterns to copy: where the issue tells the worker to do it "the same way"'
+says  skills/analyze-issues/issue-check.md 'naming the alignment or doc line and the file:line that breaks it'
+# Scenario 4: each governing ruling is quoted with its source.
+says  skills/analyze-issues/issue-check.md 'run agent_search with stance "position" and limit 10'
+says  skills/analyze-issues/issue-check.md 'is quoted in the issue with its source'
+# Scenario 5: both issue skills say the Scenarios cover each build the ADR names.
+says  skills/github-issues/SKILL.md 'the Scenarios cover each build the ADR names'
+says  skills/linear-issues/SKILL.md 'the Scenarios cover each build the ADR names'
+# Scenario 6 as the foreman narrowed it (MAST-33 comment, November 15): with no doc, only
+# checks 7 to 9 are skipped; the rulings check runs on every issue.
+says  skills/analyze-issues/issue-check.md 'With "Architecture doc: none recorded" above, skip checks 7 to 9'
+says  skills/analyze-issues/issue-check.md 'Check 10 runs on every issue'
+says  skills/analyze-issues/SKILL.md 'With no doc recorded, those three are skipped'
+says  skills/analyze-issues/SKILL.md 'every issue, doc or none'
+never skills/analyze-issues/issue-check.md 'skip all four'
+says  skills/analyze-issues/SKILL.md 'project_fact.py --architecture-doc'
+never skills/analyze-issues/issue-check.md 'Run these six checks'
+# MAST-33 round 1, F2: the README says what check 8 asks, a build not reached named in Out of scope.
+says  README.md 'a scenario for each build the ADR names that its work reaches, or that build named in Out of scope'
+never README.md 'does it have a scenario for each build the ADR names, does'
+# F3: an issue that builds ADR work but names no record fails check 7, naming the record.
+says  skills/analyze-issues/issue-check.md 'An issue that names no decision record'
+says  skills/analyze-issues/issue-check.md 'check 7 fails naming that record'
+# Extra scored 8: the agent reads the architecture doc, which check 9 holds code to.
+says  skills/analyze-issues/issue-check.md 'the architecture doc named above, in full'
+# F1 test point: the line that makes a failing check 7 or 10 quote the missing line.
+says  skills/analyze-issues/issue-check.md 'Check 7 or 10 fails: quote each missing line, with its source, under the scenario it governs'
+
+# MAST-32: /review-design proves an ADR's architecture alignment is real.
+RD=skills/review-design/SKILL.md
+says  "$RD" '## The architecture alignment'
+says  "$RD" 'project_fact.py --architecture-doc'
+says  "$RD" 'Judge each line as a reader would; do not match words.'
+# Scenario 1: a named module or door is found in the code, or is a finding.
+says  "$RD" 'A module, door or part it names is in the code: find it with `code_locate` and read it. One you cannot find is a finding that quotes the line.'
+# Scenario 2: each build is one the doc names.
+says  "$RD" 'Each build on its `Builds:` line is one the doc names, under "What each build ships" or wherever it lists its builds. A build the doc does not name is a finding.'
+# Scenario 3: a hollow line is a finding the person settles. The foreman, for
+# MAST-31: a why that only repeats the part's name is caught here, not by the gate.
+says  "$RD" 'A line that says "TBD" or "N/A" with no reason, says only "conforms" with no word of how, gives a why that only repeats the part'"'"'s name, or restates the doc without saying how this decision applies it, is hollow. That is a finding, and the person settles it'
+says  "$RD" 'A hollow alignment line is the exception: it always goes to the user.'
+# Scenario 4: a touched part the alignment leaves out is a finding naming it.
+says  "$RD" 'that the alignment does not mention is a finding that names the part.'
+# Scenario 5: stale doc lines are reported before the ADR is reviewed against the doc.
+says  "$RD" 'a module or door it names that the code no longer has, or an app or part the code has that the doc does not name'
+says  "$RD" 'Report each stale line before you review the ADR against the doc'
+# Round 1, F1: a doc recorded but moved or gone is a finding, not "no doc recorded".
+says  "$RD" 'look for `ARCHITECTURE_DOC` in the env block of the main checkout'"'"'s `.claude/settings.local.json` and `.claude/settings.json`'
+says  "$RD" 'When one holds a path, the doc has moved or gone: that is the first finding. Say which path is recorded and that no file is there, and ask the user where the doc is now before the alignment review.'
+# Round 1, F2: the gate asks a why only of a divergence, so a bare conforms is hollow too.
+never "$RD" 'with a verdict and a why on each entry'
+says  "$RD" 'a verdict on each entry, and a why only on a divergence'
+says  "$RD" 'says only "conforms" with no word of how,'
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
