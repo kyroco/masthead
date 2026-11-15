@@ -320,6 +320,14 @@ deny_case  architecture-reviewer 'export GH_REPO=evil.example/o/r; gh issue view
 deny_case  architecture-reviewer 'cd lib && gh issue view 12'
 deny_case  architecture-reviewer 'command gh issue view 12'
 allow_case architecture-reviewer '  gh issue view 41 --comments  '
+# Re-verify round 1, fix N1: git grep -O runs a program on each match, so any
+# spelling of it is refused for every reviewer.
+deny_case  verifier 'git grep -Ocurl Billing'
+deny_case  security-reviewer 'git grep -iOcurl Billing'
+deny_case  architecture-reviewer 'git grep --open-files=curl Billing'
+deny_case  verifier 'git grep --op=curl Billing'
+allow_case verifier 'git grep -in Billing'
+allow_case verifier 'git log --oneline -5'
 deny_case  verifier 'gh issue view 41 --comments'
 deny_case  security-reviewer 'gh issue view 41 --comments'
 allow_case architecture-reviewer 'git diff origin/main...HEAD'

@@ -1138,6 +1138,26 @@ says  agents/architecture-reviewer.md 'does it break one of the seven rules as t
 # Scenario 3: blind, as the verifier is.
 says  agents/architecture-reviewer.md 'You never get the author'"'"'s account of the change or another review'
 says  agents/architecture-reviewer.md 'You do not search Korium'"'"'s memory'
+# Re-verify round 1, fixes V1 and N2: the README promises only what the fences do.
+never README.md 'None of them can reach the network'
+never README.md 'None of them can edit anything'
+says  README.md 'refuse the common network programs'
+says  references/gate-catalog.md 'a denylist of network programs, not an allowlist'
+# Re-verify round 1, fix T1: the reviewer's grant is pinned whole, so any tool
+# added to it fails here.
+WANT_TOOLS="Read Glob Grep Bash ToolSearch Write mcp__korium__code_locate mcp__claude_ai_korium__code_locate mcp__korium__agent_capture mcp__claude_ai_korium__agent_capture mcp__Linear__get_issue mcp__Linear__list_comments mcp__linear__get_issue mcp__linear__list_comments mcp__claude_ai_Linear__get_issue mcp__claude_ai_Linear__list_comments mcp__plugin_linear_linear__get_issue mcp__plugin_linear_linear__list_comments mcp__github__issue_read mcp__claude_ai_GitHub__issue_read mcp__plugin_github_github__issue_read"
+GOT_TOOLS="$(sed -n 's/^tools: //p' "$ROOT/agents/architecture-reviewer.md" | tr ',' '\n' | tr -d ' ' | sort | tr '\n' ' ')"
+if [ "$GOT_TOOLS" = "$(printf '%s\n' $WANT_TOOLS | sort | tr '\n' ' ')" ]; then
+  pass=$((pass + 1))
+else
+  fail=$((fail + 1)); echo "FAIL agents/architecture-reviewer.md tools differ from the pinned grant: $GOT_TOOLS"
+fi
+# Every tool the verifier is denied, the architecture reviewer is denied too.
+VERIFIER_DENY="$(sed -n 's/^disallowedTools: //p' "$ROOT/agents/verifier.md" | tr ',' '\n' | tr -d ' ')"
+ARCH_DENY_ALL="$(sed -n 's/^disallowedTools: //p' "$ROOT/agents/architecture-reviewer.md" | tr ',' '\n' | tr -d ' ')"
+for tool in $VERIFIER_DENY; do
+  if printf '%s\n' "$ARCH_DENY_ALL" | grep -qx "$tool"; then pass=$((pass + 1)); else fail=$((fail + 1)); echo "FAIL agents/architecture-reviewer.md does not deny $tool, which the verifier denies"; fi
+done
 # Round 1, fix F5: the brief shape itself carries nothing of the author's account.
 says  references/dispatch-brief.md 'nothing of your account of the change: no claims, no did-not-prove list, no summary'
 says  references/session-cliffs.md 'the principles file and the mockup pages, and nothing of your account'

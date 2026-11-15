@@ -70,6 +70,13 @@ else
 fi
 
 # --- allowed: reproducing a failure ---------------------------------------------
+# Re-verify round 1, fix V1: the diagnoser and reader get the same spellings refused.
+run_case 2 "sort with its output file joined is denied" "sort -olib/a.ex lib/a.ex"
+run_case 2 "sort with -o bundled is denied" "sort -uo lib/a.ex lib/a.ex"
+run_case 2 "sort with --output shortened is denied" "sort --outp=lib/a.ex lib/a.ex"
+run_case 2 "git grep with a program joined to -O is denied" "git grep -Orm foo"
+run_case 2 "git grep with --open-files shortened is denied" "git grep --open-f=rm foo"
+run_case 0 "sort with ordinary flags is allowed" "sort -u lib/a.ex"
 run_case 0 "mix test on one test is allowed" "mix test test/a_test.exs:12"
 run_case 0 "an allowlisted setting before the runner is allowed" "MIX_ENV=test mix test"
 run_case 0 "timeout around the runner is allowed" "timeout 120 mix test"
@@ -247,6 +254,19 @@ arch 2 "a test run, which writes build output"   'mix test'
 arch 2 "python running another script"           'python3 /tmp/evil.py'
 arch 2 "project_fact.py with another flag"       "python3 $FACT --root /tmp --tracker"
 arch 2 "a GH_REPO setting before gh"             'GH_REPO=evil.example/o/r gh issue view 41'
+# Re-verify round 1, fix V1: sort and git take a write or run flag joined to its
+# value, bundled with other letters, or shortened, and each spelling is refused.
+arch 2 "sort with its output file joined"        'sort -oREADME.md README.md'
+arch 2 "sort with -o bundled"                    'sort -uo README.md README.md'
+arch 2 "sort with --output shortened"            'sort --out=README.md README.md'
+arch 2 "git grep with a program joined to -O"    'git grep -Orm Billing'
+arch 2 "git grep with -O bundled"                'git grep -iOrm Billing'
+arch 2 "git grep with --open-files shortened"    'git grep --open=rm foo'
+arch 2 "git diff with --output shortened"        'git diff --out=README.md HEAD'
+arch 2 "git log with --exec shortened"           'git log --exe=rm'
+arch 0 "git log with ordinary flags"             'git log --oneline --no-color -5'
+arch 0 "git diff with --stat"                    'git diff --stat HEAD~1'
+arch 0 "git grep with ordinary flags"            'git grep -in Billing'
 arch 0 "a redirect into /dev/null"               'git diff HEAD~1 2>/dev/null'
 arch 0 "read-only git"                           'git diff 1e105da..b58f714'
 arch 0 "reading a file"                          'cat lib/a.ex'
