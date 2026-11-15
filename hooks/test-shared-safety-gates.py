@@ -481,6 +481,62 @@ def main():
           str("deny" in sized_raw("x" * 2001, "adjudicator",
                                   {**no_jq, "MASTHEAD_CAPTURE_GATE": "off"})), "False")
 
+    print("\n--- no jq: the stop gates and the capture reports still speak (MAST-37) ---")
+    # Without jq these printed nothing, so a session ended with no capture and a refused capture went unreported.
+    check("no jq: the stub PATH really has no jq",
+          str(os.path.exists(os.path.join(NO_JQ, "jq"))), "False")
+    nojq_state = tempfile.mkdtemp(prefix="stop-no-jq-")
+    nojq_env = dict(os.environ, PATH=NO_JQ, TMPDIR=nojq_state)
+    nojq_env.pop("CLAUDE_PROJECT_DIR", None)
+    nojq_env.pop("CLAUDE_PLUGIN_DATA", None)
+
+    def protocol_raw(mode, payload):
+        return subprocess.run(["bash", PROTOCOL, mode], input=json.dumps(payload),
+                              capture_output=True, text=True, check=False,
+                              env=nojq_env).stdout.strip()
+
+    def stop_decision(out):
+        try:
+            return json.loads(out).get("decision") or "unparseable"
+        except ValueError:
+            return "allow" if not out else "unparseable: " + out[:70]
+
+    def capture_response(body):
+        return [{"type": "text", "text": json.dumps(body)}]
+
+    for mode in ("gate-stop", "gate-substop"):
+        sid = "nojq-" + mode
+        first = protocol_raw(mode, {"session_id": sid})
+        check(f"no jq: {mode} refuses a session that captured nothing", stop_decision(first), "block")
+        check(f"no jq: {mode} says why, in the jq words",
+              str("captured nothing" in first or "without writing to Korium" in first), "True")
+        check(f"no jq: {mode} then lets the session end",
+              stop_decision(protocol_raw(mode, {"session_id": sid})), "allow")
+
+    protocol_raw("mark-capture", {"session_id": "nojq-stored", "tool_name": "mcp__korium__agent_capture",
+                                  "tool_response": capture_response({"thought_id": "t-1"})})
+    check("no jq: a stored capture is read, so the stop gate stands aside",
+          stop_decision(protocol_raw("gate-stop", {"session_id": "nojq-stored"})), "allow")
+
+    rejected = protocol_raw("mark-capture", {
+        "session_id": "nojq-rejected", "tool_name": "mcp__korium__agent_capture",
+        "tool_response": capture_response({"status": "rejected", "reason": "too long"})})
+    check("no jq: a rejected capture is reported", stop_decision(rejected), "block")
+    check("no jq: the report says Korium refused it", str("Korium refused that capture" in rejected), "True")
+
+    quota = protocol_raw("mark-capture", {
+        "session_id": "nojq-quota", "tool_name": "mcp__korium__agent_capture",
+        "tool_response": capture_response({"status": "rejected", "class": "quota"})})
+    check("no jq: a capture refused for a plan limit is reported", str("plan limit" in quota), "True")
+    check("no jq: and the stop gate then stands aside, since it cannot capture",
+          stop_decision(protocol_raw("gate-stop", {"session_id": "nojq-quota"})), "allow")
+
+    protocol_raw("mark-search", {"session_id": "nojq-search", "tool_name": "mcp__korium__agent_search",
+                                 "tool_input": {"query": "stop gate"},
+                                 "tool_response": capture_response({"result_count": 3})})
+    edit = protocol_raw("gate-edit", {"session_id": "nojq-search", "tool_name": "Edit"})
+    check("no jq: a search that found something lets the first edit through", edit, "")
+
     print("\n--- the adjudicator saves one memory per finding ---")
     # Issue #63: what the agent is told to do, read from the file it runs on, since
     # nothing in this suite can run the model.

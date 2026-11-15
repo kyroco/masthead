@@ -264,5 +264,39 @@ else
 fi
 rm -rf "${TMPDIR:-/tmp}/masthead-$(id -u)/claude-engram/$sid"
 
+echo "== no jq: a shell search is read and judged the same (MAST-37) =="
+# Without jq the pattern of a shell search read as empty and the search went through unjudged.
+cp "$HOOKS/json_field.py" "$WORK/"
+NOJQ="$WORK/nojq-bin"; mkdir -p "$NOJQ"
+IFS=: read -ra dirs <<< "$PATH"
+for d in "${dirs[@]}"; do
+  [ -d "$d" ] || continue
+  for f in "$d"/*; do
+    n="${f##*/}"
+    [ "$n" = jq ] || [ -e "$NOJQ/$n" ] || { [ -f "$f" ] && [ -x "$f" ] && ln -s "$f" "$NOJQ/$n"; }
+  done
+done
+[ -e "$NOJQ/jq" ] && bad "no jq: the stub PATH has no jq" "jq found" || ok "no jq: the stub PATH has no jq" "-"
+nojq_run() {
+  local name="$1" want="$2" want_pat="$3" tool="$4" input="$5" sid="gdtest-nojq-$RANDOM$RANDOM" out got judged
+  : > "$JUDGE_LOG"
+  out="$(jq -n --arg s "$sid" --arg t "$tool" --argjson i "$input" '{session_id:$s, tool_name:$t, tool_input:$i}' \
+    | PATH="$NOJQ" bash "$WORK/engram-protocol.sh" gate-discovery 2>/dev/null)"
+  if printf '%s' "$out" | jq -e '.hookSpecificOutput.permissionDecision == "deny"' >/dev/null 2>&1; then got=deny
+  elif [ -z "$out" ]; then got=allow
+  else got="other: $out"; fi
+  judged="$(cut -f2 "$JUDGE_LOG" | head -1)"; [ -n "$judged" ] || judged="-"
+  if [ "$got" = "$want" ] && [ "$judged" = "$want_pat" ]; then ok "$name" "$got, judged [$judged]"
+  else bad "$name" "got $got judged [$judged], want $want judged [$want_pat]"; fi
+  rm -rf "${TMPDIR:-/tmp}/masthead-$(id -u)/claude-engram/$sid"
+}
+nojq_run "no jq: Bash rg for a function name is refused" deny "def fuse_scores" Bash \
+  "$(sh 'rg -n "def fuse_scores" products/apps')"
+nojq_run "no jq: Bash grep -e reads its pattern" deny "fuse_scores" Bash "$(sh 'grep -rn -e fuse_scores products/')"
+nojq_run "no jq: the Grep tool is judged, not refused unasked" deny "fuse_scores" Grep '{"pattern":"fuse_scores"}'
+nojq_run "no jq: a search for a value is judged and goes through" allow "runs-on: ubuntu" Bash \
+  "$(sh 'rg -n "runs-on: ubuntu" .github/workflows')"
+nojq_run "no jq: a command that is not a search is left alone" allow "-" Bash "$(sh 'ls -la products/apps')"
+
 echo; echo "pass=$pass fail=$fail"
 [ "$fail" -eq 0 ]

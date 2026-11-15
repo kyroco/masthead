@@ -35,6 +35,23 @@ want="$(jq -cn --arg r 'no "claims" here' '{hookSpecificOutput: {hookEventName: 
 got="$(python3 -I "$HELPER" --deny 'no "claims" here' | jq -c .)"
 if [ "$want" = "$got" ]; then pass=$((pass + 1)); else fail=$((fail + 1)); echo "FAIL: --deny wrote $got" >&2; fi
 
+# The Stop decision it writes is the one jq writes, so the stop gate and the capture reports hold without jq.
+want="$(jq -cn --arg r 'captured "nothing"' '{decision: "block", reason: $r}')"
+got="$(python3 -I "$HELPER" --block 'captured "nothing"' | jq -c .)"
+if [ "$want" = "$got" ]; then pass=$((pass + 1)); else fail=$((fail + 1)); echo "FAIL: --block wrote $got" >&2; fi
+
+# The object it builds is the one jq -n --arg builds, so the code index judge is asked without jq.
+want="$(jq -cn --arg t Grep --arg p 'def "x"' --arg d '' '{tool:$t,pattern:$p,path:$d}')"
+got="$(python3 -I "$HELPER" --build tool Grep pattern 'def "x"' path '' | jq -c .)"
+if [ "$want" = "$got" ]; then pass=$((pass + 1)); else fail=$((fail + 1)); echo "FAIL: --build wrote $got" >&2; fi
+
+# A whole value, the way the gates read a tool response with jq's tostring.
+for payload in '{"tool_response":[{"type":"text","text":"{\"thought_id\":\"t1\"}"}]}' '{"tool_response":"plain"}' '{}'; do
+  want="$(printf '%s' "$payload" | jq -r '.tool_response | tostring' | tr -d '\\ ')"
+  got="$(printf '%s' "$payload" | python3 -I "$HELPER" '.tool_response' | tr -d '\\ ')"
+  if [ "$want" = "$got" ]; then pass=$((pass + 1)); else fail=$((fail + 1)); echo "FAIL: .tool_response on $payload: jq '$want', json_field '$got'" >&2; fi
+done
+
 # Every reason in a decision, at any depth, as the brief wrapper's jq program joins them.
 DECISION='{"hookSpecificOutput":{"permissionDecisionReason":"first"},"more":[{"permissionDecisionReason":"second"}]}'
 want="$(printf '%s' "$DECISION" | jq -rj '[ .. | objects | select(has("permissionDecisionReason")) | .permissionDecisionReason ] | join("\n\n")')"

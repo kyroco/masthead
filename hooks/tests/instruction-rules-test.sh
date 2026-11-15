@@ -1093,8 +1093,10 @@ says  skills/work-on/foreman.md "Never skip one of these steps or report it done
 never skills/work-on/foreman.md "\`gh\` is needed to queue PR #<n>"
 says  skills/github-issues/SKILL.md "stop and say \`gh\` is needed; neither is skipped"
 
-# MAST-37: setup's no-jq row names the code index refusal too.
-says  skills/setup/SKILL.md "with the code index option on, every search the code index gate reads is refused"
+# MAST-37: setup's no-jq row names only what really stays off: the stop gates, capture reports and shell searches now hold without jq.
+says  skills/setup/SKILL.md "the code index gate cannot tell a fresh code_locate answer from a stale one, so any lookup of a name lets a search for it through"
+says  skills/setup/SKILL.md "the two gates that send a repeated search or a whole-file read back to that answer stay off"
+never skills/setup/SKILL.md "every search the code index gate reads is refused"
 
 # MAST-37: on Linear with Korium off, the old text goes to a file the milestone check reads and restores from.
 says  skills/analyze-issues/issue-check.md "the state dir (\`.claude/state\` unless setup named another)"
