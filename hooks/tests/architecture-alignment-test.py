@@ -489,6 +489,36 @@ check("1: and so is one that creates the file", "`## Architecture Alignment` is 
 why = gate(r, "Edit", {"file_path": path, "old_string": "", "new_string": adr(ALIGNED)})
 check("1: an Edit that creates it with the whole shape is allowed", why == "", why)
 
+# ------------------------------------------------------------------ round 3: the part's name in another case is not a why
+r = make_repo("r3-part-case")
+why = write_adr(r, section("- `Core and extensions`: diverges from core and extensions."))
+check("2: a divergence whose only words are the part's name in lower case is refused for no why",
+      "diverges from `Core and extensions` but not why" in why, why)
+why = write_adr(r, section("- `One way in and out for each body of data`: diverges from one way in and out "
+                           "for each body of data."))
+check("2: and so is a long part's name in lower case", "but not why" in why, why)
+
+# ------------------------------------------------------------------ round 3: an ADR in git history that has the section
+r = make_repo("r3-committed")
+path = os.path.join(r, "docs/adr/ADR-0007-take-orders.md")
+commit(r, {"docs/adr/ADR-0007-take-orders.md": adr(ALIGNED)}, "Write ADR-0007")
+OLD_ENTRY = "- `Core and extensions`: conforms. Billing plugs in through the hook the core offers."
+NO_VERDICT = "- `Core and extensions`: this decision now diverges, because reports read orders straight from billing."
+why = gate(r, "Edit", {"file_path": path, "old_string": OLD_ENTRY, "new_string": NO_VERDICT})
+check("2: an Edit that leaves a committed ADR's entry with no verdict at its opening is refused",
+      "`Core and extensions` with no verdict" in why, why)
+why = write_adr(r, adr(ALIGNED).replace(OLD_ENTRY, NO_VERDICT))
+check("2: and so is a Write that leaves it so", "`Core and extensions` with no verdict" in why, why)
+why = gate(r, "Edit", {"file_path": path, "old_string": OLD_ENTRY,
+                       "new_string": "- `Core and extensions`: diverges from core and extensions."})
+check("2: an Edit that leaves it diverging with no why is refused", "but not why" in why, why)
+why = gate(r, "Edit", {"file_path": path, "old_string": "Proposed", "new_string": "Accepted"})
+check("4: an Edit of a committed ADR that keeps a sound section is allowed", why == "", why)
+why = gate(r, "Edit", {"file_path": path, "old_string": OLD_ENTRY,
+                       "new_string": "- `Core and extensions`: diverges, because reports read orders from billing."})
+check("6: an Edit that states the divergence at its opening is allowed, for the pull request to hold",
+      why == "", why)
+
 shutil.rmtree(T, ignore_errors=True)
 print()
 print("%d passed, %d failed" % (passed, failed))
