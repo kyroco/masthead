@@ -21,8 +21,13 @@ keeps for the record; the code each decision touches, found with
 record's subject, for each decision, and for the user's earlier answers.
 Read the older records a decision changes, too. The architecture doc is the
 one `python3 ${CLAUDE_PLUGIN_ROOT}/hooks/project_fact.py --architecture-doc`
-prints; when it prints nothing, no doc is recorded, so say so in the report
-and skip **The architecture alignment** below.
+prints. When it prints nothing, look for `ARCHITECTURE_DOC` in the env block
+of the main checkout's `.claude/settings.local.json` and `.claude/settings.json`.
+When neither holds it, no doc is recorded: say so in the report and skip
+**The architecture alignment** below. When one holds a path, the doc has moved
+or gone: that is the first finding. Say which path is recorded and that no
+file is there, and ask the user where the doc is now before the alignment
+review.
 
 ## What you are looking for
 
@@ -45,8 +50,9 @@ way" are not findings.
 ## The architecture alignment
 
 The ADR gate proves only that the record's Architecture Alignment section is
-there, with a verdict and a why on each entry. It cannot tell a real why from
-an empty one. You can, because you read the doc and the code too. Judge each
+there, with a verdict on each entry, and a why only on a divergence. It
+cannot tell a real why from an empty one, and it lets a bare "conforms"
+through. You can, because you read the doc and the code too. Judge each
 line as a reader would; do not match words.
 
 First, the doc against the code, because the ADR is held to it. A doc older
@@ -63,9 +69,9 @@ Then each alignment line:
 - Each build on its `Builds:` line is one the doc names, under "What each
   build ships" or wherever it lists its builds. A build the doc does not name
   is a finding.
-- A line that says "TBD" or "N/A" with no reason, gives a why that only
-  repeats the part's name, or restates the doc without saying how this
-  decision applies it, is hollow. That is a finding, and the person settles
+- A line that says "TBD" or "N/A" with no reason, says only "conforms"
+  with no word of how, gives a why that only repeats the part's name, or restates the doc without
+  saying how this decision applies it, is hollow. That is a finding, and the person settles
   it: never fill in how the decision applies the doc yourself.
 - A part of the doc the decision's work touches, judged from the decisions
   and the code they change, that the alignment does not mention is a finding

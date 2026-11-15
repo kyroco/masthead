@@ -1433,7 +1433,7 @@ says  "$RD" 'A module, door or part it names is in the code: find it with `code_
 says  "$RD" 'Each build on its `Builds:` line is one the doc names, under "What each build ships" or wherever it lists its builds. A build the doc does not name is a finding.'
 # Scenario 3: a hollow line is a finding the person settles. The foreman, for
 # MAST-31: a why that only repeats the part's name is caught here, not by the gate.
-says  "$RD" 'A line that says "TBD" or "N/A" with no reason, gives a why that only repeats the part'"'"'s name, or restates the doc without saying how this decision applies it, is hollow. That is a finding, and the person settles it'
+says  "$RD" 'A line that says "TBD" or "N/A" with no reason, says only "conforms" with no word of how, gives a why that only repeats the part'"'"'s name, or restates the doc without saying how this decision applies it, is hollow. That is a finding, and the person settles it'
 says  "$RD" 'A hollow alignment line is the exception: it always goes to the user.'
 # Scenario 4: a touched part the alignment leaves out is a finding naming it.
 says  "$RD" 'that the alignment does not mention is a finding that names the part.'
