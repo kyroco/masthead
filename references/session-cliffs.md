@@ -166,6 +166,15 @@ order. The steps live here and nowhere else; a repo supplies only its own facts
    list, stop and report it to the foreman, or to the user when there is
    none. That is fix-break-fix churn, and it needs a person: the foreman
    brings it to the user as numbered lines and rules on none of it.
+   An extra you fixed is no scenario claim, so it gets
+   one round of its own, outside those two: one `verifier` given the fix
+   diff and the extra's expected behavior as its claim, its brief opening
+   `Re-verify: extra <name>, ...` with the extra's name as one word, then
+   the `adjudicator` on its findings file. The brief check lets that round
+   through even when the scenario rounds are spent, refuses a second round
+   for the same extra, and refuses any extra's round once the branch has had
+   as many as the cap; if that round leaves anything on the fix list, stop
+   and report it the same way.
 6. Log nothing and file nothing. There is no Nit log: a finding is on the
    fix list and fixed, brought to the user, or dropped.
 7. Add the changelog entry when the repo keeps one, or its label for internal

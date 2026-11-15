@@ -108,7 +108,10 @@ step 5 of **Opening a PR** in `references/session-cliffs.md` says, and
 refuses a third round, whatever the brief says; the number only says which
 round a dispatch joins. The security reviewer sent in the same round does
 not spend one; an agent that died or was declined did, since its row was
-written before it ran.
+written before it ran. A verifier re-checking the fix of one extra opens
+with `Re-verify: extra <name>, ...` instead, the extra's name one word,
+and carries the extra's expected behavior as its claim; that round is the
+extra's own, as the same step 5 says.
 
 **The security reviewer's brief** has the same shape, with the repository's
 security conventions as its claims (its CLAUDE.md and `docs/conventions/`

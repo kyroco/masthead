@@ -131,6 +131,15 @@ Claims:
 """.format(n)
 
 
+def re_verify_extra(name):
+    return """Re-verify: extra {}, a saved file is no longer cut short
+Verify git diff def456..0a1b2c, the extra's fix commits only.
+
+Claims:
+- a save that fails halfway leaves the old file whole
+""".format(name)
+
+
 NO_CLAIMS_THIRD_ROUND = """Re-verify: round 3
 Verify the fix commits.
 """
@@ -406,6 +415,39 @@ REPO_CASES = [
      {"MASTHEAD_REVERIFY_CAP": "lots"}, "deny"),
     ("HELD the brief's approval line does not open the cap",
      "Approved past the cap by Robert\n" + re_verify(3), TWO_ROUNDS, "top", "deny"),
+    # MAST-42: an extra scored 8 or more and fixed in the PR gets one round of
+    # its own, outside the two the scenario claims spend.
+    ("an extra's round after a first verification", re_verify_extra("E1"),
+     repo_rows((OTHER8, "dispatched", "masthead:verifier"), (OTHER8, "dispatched", "masthead:adjudicator")),
+     "top", "allow"),
+    ("an extra's round after both scenario rounds", re_verify_extra("E1"),
+     TWO_ROUNDS + repo_rows((OTHER8, "dispatched", "masthead:adjudicator")), "top", "allow"),
+    ("HELD a second round for the same extra", re_verify_extra("E1"),
+     TWO_ROUNDS + repo_rows((OTHER8, "re-verify extra e1", "masthead:verifier")), "top", "deny"),
+    ("HELD a second round for the same extra, spelled in other letter case", re_verify_extra("e1"),
+     repo_rows((OTHER8, "re-verify extra e1", "masthead:verifier")), "top", "deny"),
+    ("another extra's round after one extra had its own", re_verify_extra("E2"),
+     TWO_ROUNDS + repo_rows((OTHER8, "re-verify extra e1", "masthead:verifier")), "top", "allow"),
+    ("a refused extra round spent nothing", re_verify_extra("E1"),
+     repo_rows((OTHER8, "refused", "masthead:verifier")), "top", "allow"),
+    ("an extra's round spends no scenario round", re_verify(2),
+     repo_rows((OTHER8, "re-verify round 1", "masthead:verifier"),
+               (OTHER8, "re-verify extra e1", "masthead:verifier")), "top", "allow"),
+    # Round 1 fixes: a name read with a trailing period is the same extra (F2),
+    # and a branch gets no more extra rounds than the cap, so a made-up name
+    # cannot buy rounds past it (F1).
+    ("HELD a second round for the same extra, its name followed by a period",
+     "Re-verify: extra E1. a saved file is no longer cut short\nVerify.\n\nClaims:\n- a save that fails halfway leaves the old file whole\n",
+     repo_rows((OTHER8, "re-verify extra e1", "masthead:verifier")), "top", "deny"),
+    ("HELD a third extra's round once two extras had theirs", re_verify_extra("E3"),
+     TWO_ROUNDS + repo_rows((OTHER8, "re-verify extra e1", "masthead:verifier"),
+                            (OTHER8, "re-verify extra e2", "masthead:verifier")), "top", "deny"),
+    ("a third extra's round under MASTHEAD_REVERIFY_CAP=3", re_verify_extra("E3"),
+     TWO_ROUNDS + repo_rows((OTHER8, "re-verify extra e1", "masthead:verifier"),
+                            (OTHER8, "re-verify extra e2", "masthead:verifier")),
+     {"MASTHEAD_REVERIFY_CAP": "3"}, "allow"),
+    ("HELD an extra line with no name for the extra", "Re-verify: extra\nVerify.\n\nClaims:\n- the extra's fix keeps the saved file whole\n",
+     [], "top", "deny"),
 ]
 
 

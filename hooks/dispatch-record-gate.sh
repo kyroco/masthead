@@ -98,7 +98,7 @@ fi
 OUTCOME=""
 [ -n "$REFUSED" ] && OUTCOME="refused"
 if [ -z "$OUTCOME" ]; then
-  # One exact form, the same one gate-verify-brief reads: a line that begins "Re-verify: round N" at column zero. Any other spelling is not a re-verify (the gate refuses it before it runs).
+  # One exact form, the same one gate-verify-brief reads: a line that begins "Re-verify: round N" (or, for one extra's own round, "Re-verify: extra <name>") at column zero. Any other spelling is not a re-verify (the gate refuses it before it runs).
   OUTCOME="$(printf '%s' "$PROMPT" | awk '
     {
       line = $0
@@ -106,6 +106,10 @@ if [ -z "$OUTCOME" ]; then
       if (match(line, /^Re-verify: round [0-9]+/)) {
         n = substr(line, 18, RLENGTH - 17)
         print "re-verify round " n
+        exit
+      }
+      if (match(line, /^Re-verify: extra [A-Za-z0-9]([A-Za-z0-9_.-]*[A-Za-z0-9])?/)) {
+        print "re-verify extra " tolower(substr(line, 18, RLENGTH - 17))
         exit
       }
     }')"
