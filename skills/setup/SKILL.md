@@ -29,8 +29,7 @@ Quietly gather these, with commands that read and change nothing:
   before and no `ARCHITECTURE_DOC` is recorded, offer the architecture doc on
   its own: go straight to step 8, then step 9, and ask none of the other
   questions unless the person asks to change an answer. The fact goes to the
-  settings file that already holds the other answers. On such a run, step 9
-  does not ask the `.gitignore` question again: it was asked the first time.
+  settings file that already holds the other answers.
   When `ARCHITECTURE_DOC` is recorded but `project_fact.py --architecture-doc`
   prints nothing, the doc has moved or gone: say which path is recorded and
   that no file is there, and offer the architecture doc on its own the same
