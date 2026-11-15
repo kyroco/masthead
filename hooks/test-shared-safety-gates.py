@@ -582,7 +582,7 @@ def main():
     FAN_USER = tempfile.mkdtemp()
 
     def fan_out(prompt, hook=BRIEF_GATES, subagent="general-purpose", raw=None,
-                model="haiku"):
+                model="haiku", path=None):
         # model haiku by default, so model-choice-gate stays out of the cases
         # that are about the other checks; model=None leaves it unset.
         payload = raw
@@ -596,6 +596,8 @@ def main():
                 "tool_input": tool_input})
         env = dict(os.environ, TMPDIR=FAN_TMP + "/", CLAUDE_CONFIG_DIR=FAN_USER)
         env.pop("CLAUDE_PROJECT_DIR", None)
+        if path:
+            env["PATH"] = path
         return subprocess.run(["bash", hook], input=payload, capture_output=True,
                               text=True, check=False, env=env).stdout.strip()
 
@@ -635,6 +637,43 @@ def main():
              "List every hook file that carries a shebang.")
     check("a brief with nothing wrong is allowed", fan_out(CLEAN), "")
     check("empty stdin allows", fan_out(None, raw=""), "")
+
+    # NO JQ (MAST-37). A PATH holding every tool on this one but jq: the brief
+    # check must refuse the same brief it refuses with jq, not let it through.
+    FAN_NO_JQ = tempfile.mkdtemp(prefix="brief-no-jq-")
+    for folder in os.environ.get("PATH", "").split(os.pathsep):
+        if not os.path.isdir(folder):
+            continue
+        for name in os.listdir(folder):
+            target = os.path.join(FAN_NO_JQ, name)
+            source = os.path.join(folder, name)
+            if name != "jq" and not os.path.lexists(target) and \
+                    os.path.isfile(source) and os.access(source, os.X_OK):
+                os.symlink(source, target)
+    check("no jq: the stub PATH really has no jq",
+          subprocess.run(["bash", "-c", "command -v jq"], env={"PATH": FAN_NO_JQ},
+                         capture_output=True).returncode != 0, True)
+    nojq_out = fan_out(TWO_PROBLEMS, subagent="verifier", path=FAN_NO_JQ)
+    check("no jq: a verifier brief with no claims list is refused",
+          '"deny"' in nojq_out, True)
+    nojq_reason = reason_of(nojq_out)
+    check("no jq: the refusal names the brief check and says what it wants",
+          "] gate-verify-brief\n" in nojq_reason and "Claims:" in nojq_reason, True)
+    check("no jq: and counts the checks the same way",
+          "refused by 1 of the 3 brief checks" in nojq_reason, True)
+    check("no jq: a namespaced verifier with no claims is refused too",
+          '"deny"' in fan_out(TWO_PROBLEMS, subagent="masthead:verifier", path=FAN_NO_JQ), True)
+    nojq_claims = ("Verify git diff abc123..def456.\n\nClaims:\n"
+                   "- the refusal sentence names the month\n")
+    check("no jq: a verifier brief with its claims goes through",
+          fan_out(nojq_claims, subagent="verifier", path=FAN_NO_JQ), "")
+    check("no jq: a brief with nothing wrong is allowed", fan_out(CLEAN, path=FAN_NO_JQ), "")
+    check("no jq: an Opus dispatch with no Model-choice line is refused, as with jq",
+          '"deny"' in fan_out(CLEAN, model="opus", path=FAN_NO_JQ), True)
+    nojq_rows = open(record).read().splitlines()
+    check("no jq: the dispatch is still recorded",
+          len([r for r in nojq_rows if "\tfan-out-case\t" in r]) >= 6, True)
+    shutil.rmtree(FAN_NO_JQ, ignore_errors=True)
 
     # A CHECK THAT CANNOT RUN IS A REFUSAL. The fan-out copied somewhere with
     # no checks beside it must say so rather than allow everything.

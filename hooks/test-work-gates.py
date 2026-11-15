@@ -1293,6 +1293,44 @@ def main():
     check("unproven push does not revalidate admission", push_decision("git push origin main"), "allow")
     check("merge does not revalidate admission", push_decision("gh pr merge 123 --squash"), "allow")
 
+    print("\n--- no jq: the irreversible guards still refuse (MAST-37) ---")
+    # A PATH holding every tool on this one but jq, so the hook meets a machine without it.
+    no_jq_bin = tempfile.mkdtemp(prefix="irreversible-no-jq-")
+    for folder in os.environ.get("PATH", "").split(os.pathsep):
+        if not os.path.isdir(folder):
+            continue
+        for name in os.listdir(folder):
+            target = os.path.join(no_jq_bin, name)
+            if name == "jq" or os.path.lexists(target):
+                continue
+            source = os.path.join(folder, name)
+            if os.path.isfile(source) and os.access(source, os.X_OK):
+                os.symlink(source, target)
+    no_jq = {"PATH": no_jq_bin}
+    check("no jq: the stub PATH really has no jq",
+          subprocess.run(["bash", "-c", "command -v jq"], env={"PATH": no_jq_bin},
+                         capture_output=True).returncode != 0, True)
+
+    def no_jq_decision(command):
+        return run(["bash", IRREVERSIBLE], json.dumps({
+            "session_id": "test-safety-gates", "cwd": UNPROVEN_TREE,
+            "tool_name": "Bash", "tool_input": {"command": command}}), env=no_jq)
+
+    for label, command in (
+        ("a force push", "git push --force origin main"),
+        ("a force push by -f", "git push -f origin main"),
+        ("a hard reset", "git reset --hard HEAD~1"),
+        ("a remote branch delete", "git push origin --delete old-branch"),
+        ("a remote branch delete by refspec", "git push origin :old-branch"),
+    ):
+        check("no jq: " + label + " is refused", no_jq_decision(command), "deny")
+    check("no jq: an ordinary push still goes through",
+          no_jq_decision("git push origin main"), "allow")
+    check("no jq: a command that is not a Bash call is left alone",
+          run(["bash", IRREVERSIBLE], json.dumps({"tool_name": "Read",
+              "tool_input": {"command": "git reset --hard"}}), env=no_jq), "allow")
+    shutil.rmtree(no_jq_bin, ignore_errors=True)
+
     print("\n--- fail open: every internal failure allows ---")
     print("      (only meaningful because the deny cases above bit first)")
     for label, hook, argv in (
