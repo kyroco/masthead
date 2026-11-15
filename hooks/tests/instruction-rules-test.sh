@@ -1328,7 +1328,6 @@ says  agents/adjudicator.md '**drift**: it breaks one of the seven rules as the 
 says  agents/adjudicator.md 'A finding of class drift, rule or build is never noise'
 says  agents/adjudicator.md '**none**: none of these. Placed by the rules above, as any other finding is; as an extra, its score is the architecture reviewer'"'"'s customer score'
 says  agents/adjudicator.md 'Design cost alone, code that would only be harder to change some day, is thrown out'
-says  skills/work-on/worker.md 'its score is the architecture reviewer'"'"'s customer score'
 says  agents/adjudicator.md 'A build the doc does not name is no reason to keep a finding'
 says  agents/adjudicator.md 'the ADR'"'"'s path, the architecture doc'"'"'s path (or `none recorded`), the file that holds the project'"'"'s principles, the mockup pages'
 says  references/dispatch-brief.md 'Architecture doc: <the path project_fact.py --architecture-doc prints>, or "none recorded". Principles:'
@@ -1378,5 +1377,14 @@ never README.md 'customer score; one where the decision record and a mockup disa
 # Round 1, extra X3 (scored 8): a build finding carries the path the adjudicator follows.
 says  agents/architecture-reviewer.md '"path": "<for a build finding, the steps from a real entry point to the wrong result in that build>"'
 says  agents/architecture-reviewer.md 'A finding that a build behaves wrongly gives the path'
+# Round 1, arch-1 (Robert: fix): a missing or misspelled trial line is read as on.
+says  agents/adjudicator.md 'When the line is missing, or reads anything but `off`, treat it as `on`'
+# Round 1, arch-2 (Robert: fix): the architecture extra's score and the principle break are written once, in the adjudicator's file.
+never skills/work-on/worker.md 'its score is the architecture reviewer'"'"'s customer score'
+never skills/work-on/worker.md 'A principle break is never an extra'
+says  skills/work-on/worker.md 'is scored as "Decide where it goes" in `agents/adjudicator.md` says'
+# Round 1, arch-3 (Robert: fix): how the trial is turned off is written once, in dispatch-brief.md.
+never references/session-cliffs.md 'until the person sets `ARCHITECTURE_TRIAL` to `off`'
+says  references/session-cliffs.md 'the trial period is on, as the brief'"'"'s `Architecture trial:` line says (`references/dispatch-brief.md`)'
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
