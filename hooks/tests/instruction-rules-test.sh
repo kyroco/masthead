@@ -1386,5 +1386,9 @@ says  agents/architecture-reviewer.md 'names the file that lists the batch'
 says  references/dispatch-brief.md 'Sweep: the files listed in <the list path next prints>'
 # F-1: setup says why when there is no code to review.
 says  skills/setup/architecture-review.md 'say you found no code to review'
+# MAST-36 re-verify 1, claim 6: findings left unjudged are judged before anything else.
+says  skills/setup/architecture-review.md 'When `findings --ledger <L>` prints a file, a review was left unjudged'
+# Claim 7: a line that names more than one build is split by the session.
+says  skills/setup/architecture-review.md 'When one line names more than one build'
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]

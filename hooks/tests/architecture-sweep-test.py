@@ -142,6 +142,9 @@ expect("next says when every batch is reviewed", (code, out.strip()), (5, "every
 code, out = run(big, "left", "--ledger", ledger)
 expect("left says when nothing is left", out.strip(), "nothing left")
 code, out = run(big, "plan", "--ledger", ledger, "--budget", "50")
+expect("a review reviewed and not judged is not planned over", code, 4)
+run(big, "judged", "--ledger", ledger)
+code, out = run(big, "plan", "--ledger", ledger, "--budget", "50")
 expect("a finished review can be planned again", code, 0)
 
 # Round 1, F-9: a file over the budget is split into line ranges, so no batch is over it.
@@ -302,6 +305,66 @@ with open(table, "w") as handle:
 code, out = run(root, "builds", table)
 expect("a build table gives its rows, not its header", out.splitlines(),
        ["Hosted: core and billing", "Marketplace: core only"])
+
+# Re-verify 1, claim 4: a folder named build, target, dist, deps, vendor or doc inside the code
+# is code; only dependencies the repository keeps are left out.
+nested = repo({"lib/shop/build/release.ex": 10, "lib/shop/target/campaign.ex": 10,
+               "src/doc/render.py": 10, "lib/shop.ex": 10, "assets/node_modules/x/index.js": 50,
+               "vendor/lib/a.go": 50, "CMakeLists.txt": 12, "requirements.txt": 5, "notes.txt": 9})
+ledger = os.path.join(nested, ".claude", "state", "architecture-review.json")
+run(nested, "plan", "--ledger", ledger)
+covered, _ = ledger_files(nested, ledger)
+expect("a sweep reviews code in folders named like build output, and build files",
+       covered, {"lib/shop/build/release.ex", "lib/shop/target/campaign.ex", "src/doc/render.py",
+                 "lib/shop.ex", "CMakeLists.txt", "requirements.txt"})
+
+# Re-verify 1, claim 6: every batch reviewed, the session ended before its judge.
+ended = repo({"src/a.py": 10})
+ledger = os.path.join(ended, ".claude", "state", "architecture-review.json")
+run(ended, "plan", "--ledger", ledger)
+code, out = run(ended, "next", "--ledger", ledger)
+run(ended, "done", "--ledger", ledger, "1", "f-1.json")
+code, out = run(ended, "left", "--ledger", ledger)
+expect("left says nothing is left to review", out.strip(), "nothing left")
+code, out = run(ended, "findings", "--ledger", ledger)
+expect("findings still names what is not judged", out.split(), ["f-1.json"])
+code, out = run(ended, "plan", "--ledger", ledger)
+expect("a new review is refused over findings not judged", code, 4)
+
+# Re-verify 1, claim 7: builds one line each, numbered, with + bullets or sub-bullets, and a
+# rule wrapped under a lens heading.
+def builds_of(text):
+    path = os.path.join(root, "docs", "shape.md")
+    with open(path, "w") as handle:
+        handle.write("## What each build ships\n\n" + text)
+    return run(root, "builds", path)[1].splitlines()
+
+expect("builds one line each, as the template asks, are each a build",
+       builds_of("Hosted: core and billing; billing must meter every save.\nMarketplace: core only.\n"),
+       ["Hosted: core and billing; billing must meter every save.", "Marketplace: core only."])
+expect("a numbered list of builds",
+       builds_of("1. Hosted: core and billing.\n2. Marketplace: core only.\n"),
+       ["Hosted: core and billing.", "Marketplace: core only."])
+expect("a + list of builds", builds_of("+ Hosted\n+ Marketplace\n"), ["Hosted", "Marketplace"])
+expect("sub-bullets belong to their build",
+       builds_of("- Hosted carries:\n  - core\n  - billing\n- Marketplace carries the core.\n"),
+       ["Hosted carries: core, billing", "Marketplace carries the core."])
+headed = os.path.join(root, "docs", "headed.md")
+with open(headed, "w") as handle:
+    handle.write("""## The seven rules
+
+### Direction
+
+The core never names the billing app, and no extension names
+another extension.
+
+### One way in and out
+
+Billing data is reached only through Billing.Accounts.
+""")
+code, out = run(root, "rules", headed)
+expect("a wrapped rule under a lens heading is quoted whole", out.splitlines()[0],
+       "Direction: The core never names the billing app, and no extension names another extension.")
 
 print("{} passed, {} failed".format(passed, failed))
 sys.exit(1 if failed else 0)
