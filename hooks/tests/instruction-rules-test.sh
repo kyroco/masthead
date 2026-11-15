@@ -1150,7 +1150,14 @@ never README.md 'the architecture reviewer'"'"'s shell can only read'
 says  README.md 'The architecture reviewer'"'"'s shell runs only `git diff`, `git show` and `git log` with plain revisions and paths'
 says  README.md 'and refuses every other command'
 never references/gate-catalog.md 'refuses git'"'"'s `-O` in any spelling'
-says  references/gate-catalog.md 'a git alias set with `-c`, or git run from `find -exec`, still gets through for the verifier and security reviewer (MAST-43)'
+says  references/gate-catalog.md 'a wrapper it does not see through (`timeout`, `stdbuf`, `nice -n 5`, `exec -a y`, a shell'"'"'s bundled `-lc`), a git alias set with `-c`, or git run from `find -exec`, still gets through for the verifier and security reviewer (MAST-43)'
+# Re-verify round 3, fixes V1 and S1, and the judge's N1: the hook-table row
+# names --comments, and neither the catalog nor the README claims a refusal a
+# wrapper gets past.
+says  README.md '`gh issue view <n>`, bare or with `--comments` | scoped by the agent'"'"'s type |'
+never references/gate-catalog.md 'refuses git'"'"'s `-O` written after git in the same command'
+says  references/gate-catalog.md 'refuses git'"'"'s `-O` when git is the first word or follows a wrapper it steps over'
+says  README.md 'though one run through a wrapper the fence does not see through, such as `timeout 5 curl`, still gets through (MAST-43)'
 says  references/gate-catalog.md 'the `architecture-reviewer` shell to exact command shapes'
 says  agents/architecture-reviewer.md 'Your shell runs only these exact commands'
 never agents/architecture-reviewer.md 'with `--comments` or `--json`'
