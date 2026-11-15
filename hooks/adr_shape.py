@@ -48,7 +48,7 @@ MIN_CRITERIA = 2
 ALIGNMENT = "Architecture Alignment"
 ALIGNMENT_WANT = (
     "one list item or heading for each part of the architecture doc (%s) this decision touches, "
-    "named as the doc titles it, saying it conforms, or diverges and why; then a `Builds:` line listing every "
+    "named as the doc titles it and followed by its verdict: conforms, or diverges and why; then a `Builds:` line listing every "
     "build this decision's work must work in. Leave out the parts it does not touch")
 # Words of reason a divergence needs after the word that declares it.
 MIN_WHY_WORDS = 3
