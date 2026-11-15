@@ -52,7 +52,11 @@ scenario it rules on? Does each scenario cite a source line that exists, one
 the agent opens and quotes: a decision that was made, a rule in the README,
 something you actually said? Can a test show it, "Given this, When that,
 Then this is true"? Does it say what has to be true when it's done, or does
-it tell the builder how to do its job? Does it fit one worker session? An
+it tell the builder how to do its job? Does it fit one worker session? Is each
+ruling of yours on its area quoted with where you said it? Where the project
+has an architecture doc, three more: does the issue quote the ADR's alignment
+lines it builds toward, does it have a scenario for each build the ADR names that its work reaches, or that build named in Out of scope, and does a
+pattern it says to copy keep to that shape? An
 issue that passes is left alone: no edit, no comment. One that fails gets
 only the failing part fixed, on GitHub, and a check in front of the edit
 refuses a body that drops a line quoted as yours (three or more words in
