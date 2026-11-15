@@ -125,7 +125,8 @@ This is an architecture review; you change no code.
 Issue: <the key, such as MAST-34, or the number>.
 Review <the diff command, with the head commit>. Write your findings to
 <state>/review/findings-architecture-reviewer-<name>.json (the real path).
-ADR: <the path or link of the ADR the issue builds>, or "none".
+ADR: <the ADR's path in this checkout, or in the local clone the repo's
+ADR_DIR fact names, pulled first>, or "none"; never a link, which the reviewer cannot open.
 ADR alignment:
 - <each line of the ADR on how it applies the architecture doc and which
   builds it must work in, quoted>
@@ -139,7 +140,10 @@ reading code. Capture your review with agent_capture and return its
 thought_id with your findings.
 ```
 
-Two lines are exact, and the brief check refuses the brief without them:
+Three lines are exact, and the brief check refuses the brief without them:
+
+- `ADR: <path>` at column zero, or `ADR: none`; a link is refused, since the
+  reviewer reads files and cannot open one.
 
 - `ADR alignment:` at column zero, and the next non-blank line a `- ` bullet
   of at least four words. When the issue builds no ADR, the line reads
@@ -151,7 +155,8 @@ Two lines are exact, and the brief check refuses the brief without them:
   principles alone. A doc the project does not record is refused, and so is
   `none` when it records one.
 
-Like the verifier's, its brief names no Korium memory search.
+Like the verifier's, its brief names no Korium memory search. Its shell is
+read-only (`bash-scope-diagnoser.sh`), so never ask it to run a test.
 
 **A review helper starts no database and copies no code tree.** The
 verifier, the security reviewer and the adjudicator are each told never to

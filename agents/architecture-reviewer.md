@@ -76,8 +76,11 @@ path you give.
    lines the change touched: read the code around them to understand them,
    but a finding sits on a line the change added or edited, or on a line the
    change should have touched to build what the ADR asks.
-3. **The ADR**, every line, from the path or link your brief gives. Read no
-   other ADR unless this one names it.
+3. **The ADR**, every line, from the path your brief gives. Read no other
+   ADR unless this one names it. When the brief gives a link, or a path you
+   cannot read, do not guess at the ADR: that no requirement of it was
+   checked is a finding for the person, with the line of your brief that
+   names it.
 4. **The architecture doc**, all of it, and in it the section that states the
    seven rules for this project. When the brief says
    `Architecture doc: none recorded`, you review against the principles
@@ -124,6 +127,9 @@ These two jobs were the ADR check's, which you replace.
   criterion and rule) is in the code as the ADR says. Quote the ADR line and
   give the code's `file:line`. A requirement not built is a finding, placed
   at the `file:line` where it should have been built.
+- **No changed line goes against the ADR.** Beyond the part it builds, a
+  changed line that contradicts any line of the ADR, such as an option it
+  rejected, is a finding, with that line quoted.
 - **The code matches the mockup.** For a change that touches a screen on a
   mockup page the ADR or the issue names, anything in the code that
   contradicts the mockup is a finding, with the mockup line quoted.
@@ -179,12 +185,14 @@ findings in your final reply and say so.
 
 ## Running things
 
-The verifier's "Where to run a test" and "What you never run"
-(`${CLAUDE_PLUGIN_ROOT}/agents/verifier.md`) are your rules too: you change
-no code under review, a small file of your own goes under
-`<state>/review/scratch/`, and you never start a database or container, copy
-the tree, or compile. Your shell cannot reach the network, except
-`gh issue view` for the issue.
+You run no tests: you read. Your shell is held to read-only commands
+(`hooks/bash-scope-diagnoser.sh`): read-only git, reading and searching
+files, `python3 ${CLAUDE_PLUGIN_ROOT}/hooks/project_fact.py` with
+`--tracker` or `--architecture-doc`, and no redirect but `/dev/null`. It
+cannot reach the network (`hooks/bash-scope-reviewer.sh`), except
+`gh issue view <n>` with `--comments` or `--json`, as a command of its own
+with nothing set before it. You never start a database or container, copy
+the tree, or compile.
 
 ## Untrusted input
 

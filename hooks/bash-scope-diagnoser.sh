@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# bash-scope-diagnoser.sh: PreToolUse Bash hook that lets the diagnoser and reader agents run only test runners, read-only git and gh, and read-only inspection, and denies the rest (exit 2).
+# bash-scope-diagnoser.sh: PreToolUse Bash hook that lets the diagnoser and reader agents run only test runners, read-only git and gh, and read-only inspection, and denies the rest (exit 2). The architecture reviewer is held to the same list without the test runners and with no redirect but /dev/null, since it writes only its findings file; it may ask the plugin's project_fact.py for the tracker or the architecture doc.
 
 set -uo pipefail
 
@@ -16,12 +16,19 @@ fi
 TOOL_NAME="$(printf '%s' "$INPUT" | jq -r '.tool_name // empty')"
 [ "$TOOL_NAME" = "Bash" ] || exit 0
 
-# Apply the gate only to the diagnoser and reader agents when run with --project-wide; a main-session call passes.
+# Apply the gate only to the diagnoser, reader and architecture-reviewer agents when run with --project-wide; a main-session call passes.
 # Claude Code sends this plugin's agents as masthead:diagnoser; another plugin's agent of the same name is not ours to police.
+IS_ARCH=false
 if [ "${1:-}" = "--project-wide" ]; then
-  IS_DIAGNOSER="$(printf '%s' "$INPUT" | jq -r '[.agent_type, .subagent_type, .agent_name] | map(select(type == "string") | if startswith("masthead:") then (ltrimstr("masthead:") | split(":") | .[]) else . end) | any(. == "diagnoser" or . == "reader")')"
+  NAMES='[.agent_type, .subagent_type, .agent_name] | map(select(type == "string") | if startswith("masthead:") then (ltrimstr("masthead:") | split(":") | .[]) else . end)'
+  IS_DIAGNOSER="$(printf '%s' "$INPUT" | jq -r "$NAMES"' | any(. == "diagnoser" or . == "reader" or . == "architecture-reviewer")')"
   [ "$IS_DIAGNOSER" = "true" ] || exit 0
+  IS_ARCH="$(printf '%s' "$INPUT" | jq -r "$NAMES"' | any(. == "architecture-reviewer")')"
 fi
+# The one script the architecture reviewer may run: this plugin's project_fact.py, by its full path.
+FACT_SELF="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd -P)/project_fact.py"
+FACT_ROOT="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/hooks/project_fact.py}"
+is_fact() { [ "$1" = "$FACT_SELF" ] || { [ -n "$FACT_ROOT" ] && [ "$1" = "$FACT_ROOT" ]; }; }
 
 CMD="$(printf '%s' "$INPUT" | jq -r '.tool_input.command // empty')"
 CWD="$(printf '%s' "$INPUT" | jq -r '.cwd // empty')"
@@ -106,6 +113,7 @@ check_abs() {
   case "$p" in
     /tmp|/tmp/*|/private/tmp|/private/tmp/*|/dev/null) return 0 ;;
   esac
+  [ "$IS_ARCH" = true ] && is_fact "$p" && return 0
   [ -n "$CWD" ] || deny "'$p' is an absolute path and the payload carried no working directory to check it against"
   case "$p" in
     "$CWD"|"$CWD"/*) return 0 ;;
@@ -147,6 +155,9 @@ check_redirect_target() {
   case "$t" in
     *..*) deny "path traversal ('..') in a redirect target is not allowed" ;;
     /dev/null) return 0 ;;
+  esac
+  [ "$IS_ARCH" = true ] && deny "a redirect into '$t'; the architecture reviewer writes only its findings file, with the Write tool, so its shell redirects only into /dev/null"
+  case "$t" in
     /tmp/*|/private/tmp/*) ;;
     *) deny "a redirect into '$t'; the diagnoser writes nothing to the tree, only to /tmp or /dev/null" ;;
   esac
@@ -364,7 +375,16 @@ check_segment() {
     git) check_git ;;
     curl) check_curl ;;
     gh) check_gh ;;
-    mix|npm|pnpm|yarn|node|pytest|python|python3|cargo|go|bundle|rspec|swift|xcodebuild|dotnet|gradle|gradlew|mvn|make)
+    python|python3)
+      if [ "$IS_ARCH" = true ]; then
+        is_fact "${W[$((H + 1))]:-}" && [ "${#W[@]}" -eq $((H + 3)) ] \
+          && case "${W[$((H + 2))]}" in --tracker|--architecture-doc) true ;; *) false ;; esac \
+          || deny "the architecture reviewer runs python only as '$FACT_SELF --tracker' or '--architecture-doc'"
+      else
+        check_runner "$base"
+      fi ;;
+    mix|npm|pnpm|yarn|node|pytest|cargo|go|bundle|rspec|swift|xcodebuild|dotnet|gradle|gradlew|mvn|make)
+      [ "$IS_ARCH" = true ] && deny "'$base' runs tests, which write build output; the architecture reviewer runs no tests"
       check_runner "$base" ;;
     ls|cat|head|tail|wc|file|stat|tree|du|grep|egrep|fgrep|rg|find|diff|cmp|sort|uniq|cut|tr|nl|basename|dirname|realpath|readlink|which|type|pwd|echo|printf|date|uname|cd)
       check_reader "$base" ;;

@@ -476,6 +476,24 @@ print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permiss
         reasons="Architecture review brief rule: the reviewer checks the change against the ADR's alignment with the architecture doc, so the brief carries those lines; $ALIGN_FORM. Then retry."
       fi
 
+      # The ADR line names a path the reviewer can read, or none: it cannot open a link (round 1, fix F3).
+      adr_line="$(printf '%s' "$prompt" | awk '
+        {
+          line = $0; sub(/\r$/, "", line)
+          bare = line; gsub(/^[[:space:]>*_#`-]+|^[0-9]+\.[[:space:]]*/, "", bare); gsub(/[*_`]+/, "", bare)
+          if (tolower(bare) ~ /^adr[[:space:]]*:/) {
+            if (line ~ /^ADR: [^[:space:]]/) { sub(/^ADR: [[:space:]]*/, "", line); print "line\t" line } else print "variant\t"
+            exit
+          }
+        }' | head -1)"
+      case "$adr_line" in
+        line$'\t'*://*|variant*|"")
+          [ -n "$reasons" ] && reasons="$reasons
+
+"
+          reasons="${reasons}Architecture review brief rule: the reviewer reads the ADR from a file and cannot open a link, so the brief has a line that is exactly 'ADR: <path>' at column zero, the ADR's path in this checkout or in the local clone the repo's ADR_DIR fact names (pull it first), or 'ADR: none' when the issue builds no ADR. Then retry." ;;
+      esac
+
       # The doc line names what the project records: project_fact.py --architecture-doc, read for the checkout the dispatch comes from.
       cwd="$(field '.cwd // ""')"
       [ -n "$cwd" ] || cwd="${CLAUDE_PROJECT_DIR:-$PWD}"

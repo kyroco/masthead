@@ -49,6 +49,15 @@ done
 CMD="$(printf '%s' "$INPUT" | jq -r '.tool_input.command // empty')"
 [ -n "$CMD" ] || exit 0
 
+# The architecture reviewer reads its issue with gh where no GitHub connector is loaded (MAST-34 scenario 5).
+# Only the whole command `gh issue view <n>`, with --comments, -c or --json and a field list, passes: gh reads
+# GH_REPO, GH_HOST and the proxy settings from its environment as -R does from its flags, so nothing may be set
+# before it, wrapped around it or chained to it. Every other gh call is refused below.
+if [ "$agent" = "architecture-reviewer" ]; then
+  GH_VIEW_RE='^[[:space:]]*gh issue view [0-9]+( (--comments|-c|--json [A-Za-z]+(,[A-Za-z]+)*))*[[:space:]]*$'
+  [[ "$CMD" =~ $GH_VIEW_RE ]] && exit 0
+fi
+
 deny() {
   echo "DENIED: a verifier's Bash may not reach the network ($1)." >&2
   echo "Command: $CMD" >&2
@@ -131,18 +140,6 @@ judge_segment() {
     curl|wget|nc|ncat|netcat|telnet|ssh|scp|sftp|rsync|ftp|dig|nslookup|host)
       deny "$prog" ;;
     gh)
-      # The architecture reviewer reads its issue with gh where no GitHub connector is loaded (MAST-34 scenario 5); every other gh call stays refused.
-      # Only an issue number and the read flags pass: -R or --repo can name any host, and $ or a quote can carry a substitution.
-      if [ "$agent" = "architecture-reviewer" ] && [ "${clean[$((i + 1))]:-}" = "issue" ] && [ "${clean[$((i + 2))]:-}" = "view" ]; then
-        local rest_ok=1
-        for ((k = i + 3; k < ${#clean[@]}; k++)); do
-          case "${clean[$k]}" in
-            --comments|-c|--json) ;;
-            *) printf '%s' "${clean[$k]}" | grep -qE '^([0-9]+|[A-Za-z]+(,[A-Za-z]+)*)$' || { rest_ok=0; break; } ;;
-          esac
-        done
-        [ "$rest_ok" -eq 1 ] && return 0
-      fi
       deny "gh talks to GitHub" ;;
     git)
       j=$((i + 1))
