@@ -184,7 +184,10 @@ anywhere. It passes only when the doc:
 Fix a draft until it passes. For a doc the person already has, show each line
 the check printed in plain words, draft the missing rules and the citations,
 show the exact text to add, and add it only on yes. Record only a doc that
-passes. If they say no, do not record the doc: say the architecture reviewer
+passes. Once it is recorded, in a repository that also named an ADR folder, each
+new ADR must say how it applies the parts of the doc it touches and which builds
+it must work in, and a pull request whose ADR diverges from the doc must edit
+the doc too. If they say no, do not record the doc: say the architecture reviewer
 needs the seven rules stated to hold pull requests to them, and that running
 `/masthead:setup` again brings the question back.
 
