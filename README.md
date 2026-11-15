@@ -152,11 +152,11 @@ path without running the tests a third time, and places each finding that
 holds: fixed in this pull request when a scenario's Then is false or no
 test proves it, a bug's test did not come first, something
 that worked before broke, or words a person reads are now wrong; otherwise
-an extra, which the worker scores like its own. An architecture finding
-that breaks one of the doc's seven rules, a line of the decision record or
-the principles, or a build the doc names goes on the fix list whatever its
-customer score; one where the decision record and a mockup disagree comes to
-you. That placement is final for the worker and the foreman; nobody files
+an extra, which the worker scores like its own. Once the trial is off, an
+architecture finding that breaks one of the doc's seven rules, a line of the
+decision record or the principles, or a build the doc names goes on the fix
+list whatever its customer score. One where the decision record and a
+mockup disagree always comes to you. That placement is final for the worker and the foreman; nobody files
 anything. The worker fixes the list, test first again, and only the claims
 the fix broke go back to a verifier, and only the architecture findings it
 fixed to the architecture reviewer, at most twice. The tests run on the final commit and leave a

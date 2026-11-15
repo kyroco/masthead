@@ -156,6 +156,10 @@ Each finding carries two scores:
   project's architecture doc states them? Quote the rule when yes. With no
   doc recorded, it is "no".
 
+A finding that a build behaves wrongly gives the path: the steps from a
+real entry point in that build to the wrong result, each with its
+`file:line`. The adjudicator keeps it only by following that path.
+
 A reviewer asked for gaps will usually report some even when the work is
 sound, so every finding quotes the line it breaks and the code that breaks
 it, or it is not a finding.
@@ -175,6 +179,7 @@ object:
      "smell": "<smell>", "breaks": "<the rule or build, quoted>",
      "source": "<where that line is>", "problem": "<one plain sentence>",
      "customer": <1 to 10>, "who": "<who runs into it>", "drift": "yes|no",
+     "path": "<for a build finding, the steps from a real entry point to the wrong result in that build>",
      "for_the_person": <true only for an ADR and mockup disagreement>}
   ],
   "built": [{"adr": "<the ADR line, quoted>", "code": "<file:line>"}],
