@@ -82,11 +82,16 @@ def reasons(value, found):
 
 
 def main(argv):
+    # Claude Code sends UTF-8 whatever the locale, so read and write UTF-8; a Latin-1 locale would
+    # otherwise fail on an arrow in a command, and the gate would read nothing (MAST-37).
+    for stream in (sys.stdin, sys.stdout):
+        stream.reconfigure(encoding="utf-8", errors="surrogateescape")
     if len(argv) == 2 and argv[0] == "--deny":
+        # ASCII JSON, so no locale or stray byte can stop the refusal being printed.
         print(json.dumps({"hookSpecificOutput": {
             "hookEventName": "PreToolUse",
             "permissionDecision": "deny",
-            "permissionDecisionReason": argv[1]}}, ensure_ascii=False))
+            "permissionDecisionReason": argv[1]}}))
         return 0
     if argv == ["--reasons"]:
         found = []

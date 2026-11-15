@@ -13,10 +13,11 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd -P)" || HERE="$(d
 # dispatch is refused, since no check could be read.
 if command -v jq >/dev/null 2>&1; then
   HAVE_JQ=yes
-elif command -v python3 >/dev/null 2>&1 && [ -r "$HERE/json_field.py" ]; then
+# python3 must run, not only be found: the macOS stub with no Command Line Tools is found and reads nothing.
+elif python3 -I -c 'import json' >/dev/null 2>&1 && [ -r "$HERE/json_field.py" ]; then
   HAVE_JQ=""
 else
-  printf '%s\n' '{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "Neither jq nor python3 is installed, so the brief checks on the Agent tool cannot run, and the dispatch is refused rather than sent unchecked. Install jq (brew install jq) and send it again."}}'
+  printf '%s\n' '{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "Neither jq nor a working python3 is installed, so the brief checks on the Agent tool cannot run, and the dispatch is refused rather than sent unchecked. Install jq (brew install jq) and send it again."}}'
   exit 0
 fi
 PROTOCOL="$HERE/engram-protocol.sh"

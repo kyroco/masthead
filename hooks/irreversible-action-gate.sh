@@ -12,14 +12,15 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd -P)" || HERE="$(d
 if command -v jq >/dev/null 2>&1; then
   field() { printf '%s' "$INPUT" | jq -r "$1" 2>/dev/null || true; }
   deny_json() { jq -n --arg r "$1" '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: $r}}' 2>/dev/null; }
-elif command -v python3 >/dev/null 2>&1 && [ -r "$HERE/json_field.py" ]; then
+# python3 must run, not only be found: the macOS stub with no Command Line Tools is found and reads nothing.
+elif python3 -I -c 'import json' >/dev/null 2>&1 && [ -r "$HERE/json_field.py" ]; then
   field() { printf '%s' "$INPUT" | python3 -I "$HERE/json_field.py" "$1" 2>/dev/null || true; }
   deny_json() { python3 -I "$HERE/json_field.py" --deny "$1" 2>/dev/null; }
 else
   # Nothing can read the call: refuse one that names a command these rules govern, rather than pass it unread.
   case "$INPUT" in
     *git*|*rm*|*tofu*|*terraform*|*terragrunt*|*psql*|*mysql*|*mix*|*sql*|*gh*)
-      printf '%s\n' '{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "Neither jq nor python3 is installed, so the guard against force pushes, hard resets and deletes cannot read this command, and it is refused rather than let through unread. Install jq (brew install jq) and run it again."}}' ;;
+      printf '%s\n' '{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "Neither jq nor a working python3 is installed, so the guard against force pushes, hard resets and deletes cannot read this command, and it is refused rather than let through unread. Install jq (brew install jq) and run it again."}}' ;;
   esac
   exit 0
 fi
@@ -376,7 +377,10 @@ deny() {
     printf '%s\t%s\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$1" "$CMD" \
     >> "$RECORD_DIR/attempts.tsv" 2>/dev/null) || true
 
-  deny_json "$1"$'\n\n'"$2"$'\n\nCommand: '"$CMD"
+  out="$(deny_json "$1"$'\n\n'"$2"$'\n\nCommand: '"$CMD")"
+  # A refusal that could not be written is still a refusal.
+  [ -n "$out" ] || out='{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "This command would do something nothing can undo, and the full refusal could not be written. Run it in your own terminal if you mean it."}}'
+  printf '%s\n' "$out"
   exit 0
 }
 
