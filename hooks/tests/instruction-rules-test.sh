@@ -1105,7 +1105,8 @@ says  skills/setup/SKILL.md 'cites the project'"'"'s principles by number, such 
 # Scenario 4: a repository set up before is offered the doc alone.
 says  skills/setup/SKILL.md 'before and no `ARCHITECTURE_DOC` is recorded, offer the architecture doc on its own'
 says  skills/setup/SKILL.md 'ask none of the other questions unless the person asks to change an answer'
-# Scenario 5: the path comes from the facts reader every other fact comes from.
+# Round 1, finding s4.j1: the rerun does not ask the .gitignore question again either.
+says  skills/setup/SKILL.md 'On such a run, step 9 does not ask the `.gitignore` question again'# Scenario 5: the path comes from the facts reader every other fact comes from.
 says  skills/setup/SKILL.md 'project_fact.py --architecture-doc'
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
