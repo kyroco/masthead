@@ -503,6 +503,79 @@ for reviewer in verifier security-reviewer; do
   shape_allow "$reviewer" 'pwd'
 done
 
+# --- MAST-43 round 1: the judge's fix list -------------------------------------
+mkdir -p "$SHAPES_TREE/tests" "$SHAPES_TREE/victim"
+: > "$SHAPES_TREE/tests/test_x.py"
+ln -s ../../../../victim "$SHAPES_TREE/.claude/state/review/scratch/link"
+
+# S1-F1: zsh, the Bash tool's shell, turns a word starting with = into the
+# full path of a program on PATH, outside the checkout.
+shape_deny verifier 'bash =brew update'
+shape_deny verifier 'python3 =pip3 download requests'
+shape_deny security-reviewer 'cat =curl'
+# S1-F2: a module or package name is imported or built, so it must be the
+# repository's own, never one from the standard library or the network.
+shape_deny verifier 'python3 -m unittest antigravity'
+shape_deny verifier 'python3 -m unittest this'
+shape_deny security-reviewer 'GOPROXY=off go test net/http'
+shape_allow verifier 'python3 -m unittest tests.test_x'
+shape_allow verifier 'python3 -m unittest tests/test_x.py'
+shape_allow verifier 'python3 -m unittest discover -s tests'
+# SR1: uniq writes its second file name, and a lone - is a file name (standard input).
+shape_deny security-reviewer 'echo planted | uniq - hooks/out'
+shape_deny verifier 'uniq -c - hooks/out'
+shape_allow verifier 'sort README.md | uniq -c'
+shape_allow verifier 'sort README.md | uniq -c -'
+# SR2: semgrep reads -c glued into a bundle as --config, so a registry pack is fetched.
+shape_deny security-reviewer 'semgrep -qcp/default --metrics=off --disable-version-check --config .claude/semgrep/sentinel-triggers.yml .'
+shape_deny security-reviewer 'semgrep -qc p/default --metrics=off --disable-version-check --config .claude/semgrep/sentinel-triggers.yml .'
+shape_deny security-reviewer 'opengrep -qcp/default --disable-version-check --config .claude/semgrep/sentinel-taint.yml .'
+shape_deny security-reviewer 'semgrep --conf=p/default --metrics=off --disable-version-check --config .claude/semgrep/sentinel-triggers.yml .'
+# SR3: a symlink under scratch must not let rm reach past it.
+shape_deny verifier 'rm -r -f .claude/state/review/scratch/link/'
+shape_deny verifier 'rm .claude/state/review/scratch/link/../victim'
+shape_deny verifier 'rm .claude/state/review/scratch/link'
+# SR4: semgrep runs only as a scan.
+shape_deny security-reviewer 'semgrep ci --metrics=off --disable-version-check --config .claude/semgrep/sentinel-triggers.yml'
+shape_deny security-reviewer 'semgrep login --metrics=off --disable-version-check --config .claude/semgrep/sentinel-triggers.yml'
+shape_deny security-reviewer 'opengrep install-semgrep-pro --disable-version-check --config .claude/semgrep/sentinel-taint.yml'
+shape_allow security-reviewer 'semgrep scan --metrics=off --disable-version-check --config .claude/semgrep/sentinel-triggers.yml hooks'
+# S3-F1: the test runners Masthead serves elsewhere pass, with their offline switch.
+for reviewer in verifier security-reviewer; do
+  shape_allow "$reviewer" 'swift test --skip-update --disable-automatic-resolution'
+  shape_allow "$reviewer" 'swift test --skip-update --disable-automatic-resolution --filter AppTests'
+  shape_allow "$reviewer" 'xcodebuild test -scheme App -skipPackageUpdates -disableAutomaticPackageResolution'
+  shape_allow "$reviewer" "xcodebuild test -scheme App -destination 'platform=macOS' -skipPackageUpdates -disableAutomaticPackageResolution"
+  shape_allow "$reviewer" 'dotnet test --no-restore'
+  shape_allow "$reviewer" 'mvn -o test'
+  shape_allow "$reviewer" 'mvn --offline -q test -Dtest=BillingTest'
+  shape_allow "$reviewer" 'gradle test --offline'
+  shape_allow "$reviewer" 'npx --no-install vitest run'
+  shape_allow "$reviewer" 'npx --no jest hooks'
+  shape_allow "$reviewer" "python3 -m pytest -m 'not integration'"
+  shape_allow "$reviewer" "pytest -m 'not db' -q"
+done
+shape_deny verifier 'swift test'
+shape_deny verifier 'swift build'
+shape_deny verifier 'xcodebuild test -scheme App'
+shape_deny verifier 'dotnet test'
+shape_deny verifier 'mvn test'
+shape_deny verifier 'mvn -o exec:exec'
+shape_deny verifier 'gradle test'
+shape_deny verifier 'npx vitest run'
+shape_deny verifier 'npx --no-install curl example.com'
+# S2-F1 and S2-T1: what the README says the fence allows is the fence's own
+# summary, and each part of it holds.
+shape_allow verifier 'ls ; cat README.md'
+shape_allow verifier 'ls || cat README.md'
+SUMMARY="$(python3 "$DIR/reviewer_shapes.py" --summary 2>/dev/null | tr -s '[:space:]' ' ' | sed 's/^ //; s/ $//')"
+README_FLAT="$(tr -s '[:space:]' ' ' < "$DIR/../README.md")"
+if [ -n "$SUMMARY" ] && case "$README_FLAT" in *"$SUMMARY"*) true ;; *) false ;; esac; then ok
+else bad "MAST-43 S2: the README does not carry reviewer_shapes.py's own summary of the shapes" "summary: ${SUMMARY:-(none printed)}"; fi
+REFUSAL="$(printf '{"tool_name":"Bash","subagent_type":"verifier","tool_input":{"command":"timeout 5 curl x"}}' | bash "$HOOK" 2>&1 >/dev/null | tr -s '[:space:]' ' ')"
+if [ -n "$SUMMARY" ] && case "$REFUSAL" in *"$SUMMARY"*) true ;; *) false ;; esac; then ok
+else bad "MAST-43 S2: the refusal does not carry reviewer_shapes.py's own summary of the shapes" "refusal: $REFUSAL"; fi
+
 rm -rf "$SHAPES_TREE"
 
 printf '[bash-scope-reviewer-test] %d passed, %d failed\n' "$pass" "$fail"
