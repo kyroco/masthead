@@ -288,6 +288,30 @@ CASES = [
     # Two markdown prefixes at once (a quoted list item).
     ("HELD a third round as a quoted list item is still refused", "verifier", re_verify_quoted(3),
      [(SESSION8, "re-verify round 1"), (SESSION8, "re-verify round 2")], "deny"),
+    # MAST-35 scenario 6: the architecture reviewer re-checks a fixed finding
+    # inside the same cap of two rounds. A round is spent by the verifier, the
+    # architecture reviewer, or both sent in it under one round number.
+    ("the round-1 verifier joins the architecture re-check's round", "verifier", re_verify(1),
+     [(SESSION8, "re-verify round 1", "architecture-reviewer")], "allow"),
+    ("round 2 after an architecture-only round 1", "verifier", re_verify(2),
+     [(SESSION8, "re-verify round 1", "architecture-reviewer")], "allow"),
+    ("HELD a third round after a verifier round and an architecture round", "verifier", re_verify(3),
+     [(SESSION8, "re-verify round 1", "verifier"), (SESSION8, "re-verify round 2", "architecture-reviewer")], "deny"),
+    ("SPOOF that third round written as round 1", "verifier", re_verify(1),
+     [(SESSION8, "re-verify round 1", "verifier"), (SESSION8, "re-verify round 2", "architecture-reviewer")], "deny"),
+    ("HELD a third round after two architecture-only rounds", "verifier", re_verify(3),
+     [(SESSION8, "re-verify round 1", "architecture-reviewer"), (SESSION8, "re-verify round 2", "architecture-reviewer")], "deny"),
+    ("rounds shared by both agents count once each", "verifier", re_verify(2),
+     [(SESSION8, "re-verify round 1", "verifier"), (SESSION8, "re-verify round 1", "architecture-reviewer")], "allow"),
+    ("HELD a third round after two shared rounds", "verifier", re_verify(3),
+     [(SESSION8, "re-verify round 1", "verifier"), (SESSION8, "re-verify round 1", "architecture-reviewer"),
+      (SESSION8, "re-verify round 2", "architecture-reviewer"), (SESSION8, "re-verify round 2", "verifier")], "deny"),
+    ("the architecture reviewer's rows count under the name Claude Code sends", "verifier", re_verify(3),
+     [(SESSION8, "re-verify round 1", "masthead:architecture-reviewer"), (SESSION8, "re-verify round 2", "masthead:architecture-reviewer")], "deny"),
+    ("another plugin's architecture reviewer rows do not count", "verifier", re_verify(1),
+     [(SESSION8, "re-verify round 1", "otherplugin:architecture-reviewer"), (SESSION8, "re-verify round 2", "otherplugin:architecture-reviewer")], "allow"),
+    ("the first architecture review does not count", "verifier", re_verify(2),
+     [(SESSION8, "dispatched", "architecture-reviewer"), (SESSION8, "re-verify round 1", "verifier")], "allow"),
     # Another plugin's verifier is not masthead's; its rows do not count.
     ("another plugin's verifier rows do not count", "verifier", re_verify(1),
      [(SESSION8, "re-verify round 1", "otherplugin:verifier"), (SESSION8, "re-verify round 2", "otherplugin:verifier")], "allow"),
@@ -531,16 +555,51 @@ ARCHITECTURE_CASES = [
 ]
 
 
-def architecture_decision(subagent, prompt, doc):
+def arch_re_verify(n, marker=""):
+    """An architecture reviewer's re-verify brief: the fixed findings only (MAST-35 scenario 6)."""
+    return marker + "Re-verify: round {}, findings arch-2\n".format(n) + architecture_brief(
+        "Architecture doc: docs/architecture.md")
+
+
+# (label, subagent_type, prompt, log rows, expected decision); the doc is recorded.
+ARCHITECTURE_ROUND_CASES = [
+    ("an architecture re-check with an empty log", "architecture-reviewer", arch_re_verify(1), [], "allow"),
+    ("an architecture re-check beside the round-1 verifier", "architecture-reviewer", arch_re_verify(1),
+     [(SESSION8, "re-verify round 1", "verifier")], "allow"),
+    ("an architecture-only round 2", "architecture-reviewer", arch_re_verify(2),
+     [(SESSION8, "re-verify round 1", "verifier")], "allow"),
+    ("HELD an architecture re-check in a third round", "architecture-reviewer", arch_re_verify(3),
+     [(SESSION8, "re-verify round 1", "verifier"), (SESSION8, "re-verify round 2", "verifier")], "deny"),
+    ("HELD a third architecture-only round", "architecture-reviewer", arch_re_verify(3),
+     [(SESSION8, "re-verify round 1", "architecture-reviewer"), (SESSION8, "re-verify round 2", "architecture-reviewer")], "deny"),
+    ("SPOOF a third architecture re-check written as round 1", "architecture-reviewer", arch_re_verify(1),
+     [(SESSION8, "re-verify round 1", "architecture-reviewer"), (SESSION8, "re-verify round 1", "verifier"),
+      (SESSION8, "re-verify round 2", "verifier"), (SESSION8, "re-verify round 2", "architecture-reviewer")], "deny"),
+    ("masthead's architecture reviewer is capped too", "masthead:architecture-reviewer", arch_re_verify(3),
+     [(SESSION8, "re-verify round 1", "verifier"), (SESSION8, "re-verify round 2", "verifier")], "deny"),
+    ("another branch's rounds do not count", "architecture-reviewer", arch_re_verify(1),
+     [(SESSION8, "re-verify round 1", "verifier", "robert/9-last-issue"), (SESSION8, "re-verify round 2", "verifier", "robert/9-last-issue")], "allow"),
+    ("HELD an architecture re-verify line as a list item is not the form", "architecture-reviewer",
+     arch_re_verify(1, marker="- "), [], "deny"),
+    ("HELD a bold architecture Re-verify label is not the form", "architecture-reviewer",
+     arch_re_verify(1).replace("Re-verify:", "**Re-verify**:", 1), [], "deny"),
+]
+
+
+def architecture_decision(subagent, prompt, doc, rows=None):
     """The gate's decision in a throwaway repository that records `doc` (or none)."""
     root = os.path.realpath(tempfile.mkdtemp(prefix="arch-brief-"))
     try:
         os.makedirs(os.path.join(root, ".git"))
+        if rows is not None:
+            os.makedirs(os.path.join(root, ".claude", "state"))
+            with open(os.path.join(root, ".claude", "state", "dispatches.tsv"), "w") as fh:
+                fh.write(log_rows(rows))
         os.makedirs(os.path.join(root, "docs"))
         for name in ("architecture.md", "other.md"):
             with open(os.path.join(root, "docs", name), "w") as fh:
                 fh.write("# Architecture\n")
-        os.makedirs(os.path.join(root, ".claude"))
+        os.makedirs(os.path.join(root, ".claude"), exist_ok=True)
         with open(os.path.join(root, ".claude", "settings.json"), "w") as fh:
             json.dump({"env": {"ARCHITECTURE_DOC": doc}} if doc else {"env": {}}, fh)
         payload = json.dumps({
@@ -572,6 +631,12 @@ def main():
     failures = 0
     for label, subagent, prompt, doc, expected in ARCHITECTURE_CASES:
         actual, _ = architecture_decision(subagent, prompt, doc)
+        ok = actual == expected
+        failures += 0 if ok else 1
+        print("{:4}  {:<52} expected {:<5} got {}".format("ok" if ok else "FAIL", label, expected, actual))
+
+    for label, subagent, prompt, rows, expected in ARCHITECTURE_ROUND_CASES:
+        actual, _ = architecture_decision(subagent, prompt, "docs/architecture.md", rows)
         ok = actual == expected
         failures += 0 if ok else 1
         print("{:4}  {:<52} expected {:<5} got {}".format("ok" if ok else "FAIL", label, expected, actual))
@@ -621,7 +686,7 @@ def main():
     if failures:
         print("{} cases wrong".format(failures))
         return 1
-    print("all {} cases correct".format(len(CASES) + len(ARCHITECTURE_CASES) + len(REPO_CASES) + 5))
+    print("all {} cases correct".format(len(CASES) + len(ARCHITECTURE_CASES) + len(ARCHITECTURE_ROUND_CASES) + len(REPO_CASES) + 5))
     return 0
 
 
