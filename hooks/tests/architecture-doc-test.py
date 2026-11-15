@@ -300,6 +300,21 @@ expect("the failure names the missing section", "Core and extensions" in out, Tr
 code, out = check(write(root, "existing.md", GOOD), principles)
 expect("an existing doc is not held to the template's sections", code, 0)
 
+# Round 1, finding s3.c1: P-numbers in the intro are not citations; a rule or
+# a section must cite one.
+INTRO = ("The principles live in CLAUDE.md; this doc cites them by number (P1, P2 and on) "
+         "and never copies them.\n\n")
+uncited_rules = GOOD.replace(" (P9)", "").replace(" (P4)", "").replace(" (P1)", "")
+bad = write(root, "intro-only.md", INTRO + uncited_rules)
+code, out = check(bad, principles)
+expect("P-numbers only in the intro are not citations", code, 1)
+expect("the failure says none is cited", "cites none" in out, True)
+code, out = check(write(root, "rule-cites.md", INTRO + GOOD), principles)
+expect("a rule that cites a principle passes", code, 0)
+code, out = check_draft(write(root, "section-cites.md", SECTIONS + uncited_rules.split("\n", 2)[2]), principles)
+expect("a draft section that cites a principle passes", (code, out), (0, ""))
+expect("the template's intro names no principle number", "P1" in open(TEMPLATE).read(), False)
+
 code, out = check(TEMPLATE, principles)
 expect("the unfilled template fails", code, 1)
 expect("the template names all seven lenses", all(lens in open(TEMPLATE).read() for lens in (
