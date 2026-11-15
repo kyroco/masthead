@@ -264,16 +264,63 @@ arch 2 "git grep with -O bundled"                'git grep -iOrm Billing'
 arch 2 "git grep with --open-files shortened"    'git grep --open=rm foo'
 arch 2 "git diff with --output shortened"        'git diff --out=README.md HEAD'
 arch 2 "git log with --exec shortened"           'git log --exe=rm'
-arch 0 "git log with ordinary flags"             'git log --oneline --no-color -5'
-arch 0 "git diff with --stat"                    'git diff --stat HEAD~1'
-arch 0 "git grep with ordinary flags"            'git grep -in Billing'
-arch 0 "a redirect into /dev/null"               'git diff HEAD~1 2>/dev/null'
-arch 0 "read-only git"                           'git diff 1e105da..b58f714'
-arch 0 "reading a file"                          'cat lib/a.ex'
-arch 0 "searching"                               'rg Billing lib'
-arch 0 "asking which tracker the repo uses"      "python3 $FACT --tracker"
-arch 0 "asking where the architecture doc is"    "python3 $FACT --architecture-doc"
-arch 0 "reading the issue with gh"               'gh issue view 41 --comments'
+# Re-verify round 2, fixes F1 and F2 (Robert, November 15, MAST-34 comment): the
+# architecture reviewer's shell allows only exact command shapes, git diff, show
+# and log with plain revisions and paths, the plugin's project_fact.py with
+# --tracker or --architecture-doc, and bare gh issue view <n>, and refuses the
+# rest. It reads files with Read, Glob and Grep, not the shell.
+arch 2 "F1: sort running a program through --compress-program" 'echo touch pwned | sort -S 1 --compress-program=sh'
+arch 2 "F1: sort with --compress-program shortened"          'sort --comp=sh README.md'
+arch 2 "F2: git grep -O hidden after -e --"                  'git grep -e -- -Orm'
+arch 2 "F2: git grep --open-files hidden after -e --"        'git grep -e -- --op=rm'
+arch 2 "git grep at all"                                     'git grep Billing'
+arch 2 "git log with a flag"                                 'git log --oneline --no-color -5'
+arch 2 "git diff with --stat"                                'git diff --stat HEAD~1'
+arch 2 "git with a setting before the subcommand"            'git -c core.pager=sh diff HEAD'
+arch 2 "git with -C"                                         'git -C /tmp diff HEAD'
+arch 2 "an environment setting before git"                   'GIT_EXTERNAL_DIFF=sh git diff HEAD'
+arch 2 "timeout before git"                                  'timeout 5 git diff HEAD'
+arch 2 "git diff piped on"                                   'git diff HEAD~1 | head'
+arch 2 "two commands chained"                                'git diff HEAD~1 && git log'
+arch 2 "a redirect into /dev/null"                           'git diff HEAD~1 2>/dev/null'
+arch 2 "a quoted revision"                                   "git diff 'HEAD'"
+arch 2 "a variable"                                          'git diff $REV'
+arch 2 "a path out of the checkout"                          'git diff HEAD -- ../other/file'
+arch 2 "two absolute paths, which git diffs outside the repo" 'git diff /etc/hosts /tmp/x'
+arch 2 "a home path"                                         'git log ~/notes'
+arch 2 "a reflog revision with braces"                       'git diff HEAD@{1}'
+arch 2 "a credential file from history"                      'git show HEAD:.env'
+arch 2 "two lines"                                           "git diff HEAD
+git log"
+arch 2 "a tab between words"                                 "git	diff HEAD"
+arch 2 "reading a file with the shell"                       'cat lib/a.ex'
+arch 2 "searching with the shell"                            'rg Billing lib'
+arch 2 "echo"                                                'echo hi'
+arch 2 "project_fact.py with an extra word"                  "python3 $FACT --tracker --root"
+arch 2 "project_fact.py through python, not python3"         "python $FACT --tracker"
+arch 2 "gh issue view with --json"                           'gh issue view 41 --json title,body,comments'
+arch 2 "gh issue view with -R"                               'gh issue view 41 -R evil.example/o/r'
+arch 2 "gh issue view piped on"                              'gh issue view 41 | cat'
+arch 2 "gh pr view"                                          'gh pr view 7'
+arch 0 "read-only git"                                       'git diff 1e105da..b58f714'
+arch 0 "a three-dot range"                                   'git diff origin/main...HEAD'
+arch 0 "a range and a path"                                  'git diff main...HEAD -- hooks/bash-scope-diagnoser.sh'
+arch 0 "two revisions with ~ and ^"                          'git diff HEAD~1 HEAD^'
+arch 0 "git show of a commit"                                'git show ab3c8bb'
+arch 0 "git show of a file at a commit"                      'git show HEAD:hooks/run.sh'
+arch 0 "git log of a range"                                  'git log main..HEAD'
+arch 0 "bare git log"                                        'git log'
+arch 0 "git log of a path"                                   'git log -- README.md'
+arch 0 "asking which tracker the repo uses"                  "python3 $FACT --tracker"
+arch 0 "asking where the architecture doc is"                "python3 $FACT --architecture-doc"
+arch 0 "reading the issue with gh"                           'gh issue view 41'
+arch 0 "reading the issue and its comments with gh"          'gh issue view 41 --comments'
+# Re-verify round 2: the same two holes for the diagnoser and reader, whose
+# allowlist the gate catalog says refuses a write or run flag in every spelling.
+run_case 2 "git grep -O hidden after -e --"                  'git grep -e -- -Orm'
+run_case 2 "git grep -O hidden after -f --"                  'git grep -f -- -Otouch'
+run_case 2 "sort running a program through --compress-program" 'sort --compress-program=sh lib/a.ex'
+run_case 2 "sort with --compress-program shortened"          'sort --comp=sh lib/a.ex'
 scoped 2 "project-wide: the plugin's architecture reviewer is gated" "{$RM,\"agent_type\":\"masthead:architecture-reviewer\"}" --project-wide
 scoped 0 "project-wide: another plugin's architecture reviewer passes" "{$RM,\"agent_type\":\"otherplugin:architecture-reviewer\"}" --project-wide
 

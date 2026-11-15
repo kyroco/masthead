@@ -1143,6 +1143,17 @@ never README.md 'None of them can reach the network'
 never README.md 'None of them can edit anything'
 says  README.md 'refuse the common network programs'
 says  references/gate-catalog.md 'a denylist of network programs, not an allowlist'
+# Re-verify round 2 (Robert, November 15): the README and catalog claim only
+# the exact shapes the architecture reviewer's shell allows, and no fence they
+# do not have.
+never README.md 'the architecture reviewer'"'"'s shell can only read'
+says  README.md 'The architecture reviewer'"'"'s shell runs only `git diff`, `git show` and `git log` with plain revisions and paths'
+says  README.md 'and refuses every other command'
+never references/gate-catalog.md 'refuses git'"'"'s `-O` in any spelling'
+says  references/gate-catalog.md 'a git alias set with `-c`, or git run from `find -exec`, still gets through for the verifier and security reviewer (MAST-43)'
+says  references/gate-catalog.md 'the `architecture-reviewer` shell to exact command shapes'
+says  agents/architecture-reviewer.md 'Your shell runs only these exact commands'
+never agents/architecture-reviewer.md 'with `--comments` or `--json`'
 # Re-verify round 1, fix T1: the reviewer's grant is pinned whole, so any tool
 # added to it fails here.
 WANT_TOOLS="Read Glob Grep Bash ToolSearch Write mcp__korium__code_locate mcp__claude_ai_korium__code_locate mcp__korium__agent_capture mcp__claude_ai_korium__agent_capture mcp__Linear__get_issue mcp__Linear__list_comments mcp__linear__get_issue mcp__linear__list_comments mcp__claude_ai_Linear__get_issue mcp__claude_ai_Linear__list_comments mcp__plugin_linear_linear__get_issue mcp__plugin_linear_linear__list_comments mcp__github__issue_read mcp__claude_ai_GitHub__issue_read mcp__plugin_github_github__issue_read"
