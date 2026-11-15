@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # irreversible-action-gate.sh - PreToolUse Bash: refuse a command nothing can undo (force push, hard reset, git clean, --no-verify, tofu destroy, state edits or prod apply, dropped data, deleted memory files, recursive deletes outside scratch and build folders, deleted remote branches, gh repo, release and API deletes).
-# Appends every match to a record file in the session directory, fails open on any internal error, and always exits 0 printing a deny decision as JSON or nothing.
+# Appends every match to a record file in the session directory, fails open on a payload it cannot parse, reads the call with python3 when jq is missing, and always exits 0 printing a deny decision as JSON or nothing.
 
 set -uo pipefail
 

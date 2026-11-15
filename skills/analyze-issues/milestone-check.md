@@ -67,6 +67,11 @@ their GitHub ones:
 - The old text: Linear keeps no earlier description the connector can read,
   so for each issue edited today, read the old text of each changed part
   from the per-issue agent's Korium capture (`agent_search` with the key).
+  With Korium off, read it from `<state dir>/old-text/<key>.md` instead. A
+  line of the user's that the old text holds and the issue lost is restored
+  with a `patch`. Where neither the capture nor the file is there, say in
+  your report that the dropped lines of that issue cannot be checked or
+  restored, and name it; never call it clean.
 - A fix: fix it with `save_issue` with `id` the key and `patch`, after
   reading the issue with `get_issue`. A blocked-by link is added with
   `blockedBy` and taken away with `removeBlockedBy`.

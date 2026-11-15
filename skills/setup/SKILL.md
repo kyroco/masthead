@@ -134,7 +134,14 @@ Finish with a table: each guard rail, on or off, and the one way to change it.
 Keep it to the rails this repository has: dangerous-command and secret
 refusals (always on), blind review (always on), push check (on if set), where
 issues live (GitHub or Linear, with the team key), memory (on if connected),
-decision records (on if a folder was named). Then name the
+decision records (on if a folder was named). With a push check, say to commit
+`.claude/push-check.sh` and `.claude/push-check.cmd`: a branch without them
+cannot push. Check the tools the gates need with `command -v jq`, `command -v
+python3` and, where issues live on GitHub, `command -v gh`, and add one row for
+each one missing, saying what stays off until it is installed: no jq, the
+diagnoser and reader agents are refused every shell command; no python3,
+Masthead's gates cannot run, so install it first; no gh, the foreman stops before queueing a PR or listing
+what a merge unblocks and says `gh` is needed. Then name the
 four install options and their defaults, because a terminal install never
 asked them: connect Korium memory (off), keep a code index in Korium (off),
 keep AI attribution out of commits (on), ask for a reason before a helper runs

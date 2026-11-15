@@ -75,6 +75,12 @@ the claims and the findings alone. Error -32029 is the
 limit of 60 searches a minute, not an outage: wait the `retry_after_ms` it
 gives and search again.
 
+When Korium is off (the `korium` install option is off, or `ToolSearch`
+finds no Korium tool), skip every step in these files that says to search or
+capture Korium, and say so in one line where its result would go: "Korium is
+off, so no search." Nothing else changes, and a question's "looked in:" part
+names the decision record and the README rule without a Korium query.
+
 ## What enforces this
 
 `gate-edit` refuses the first edit until a Korium search has run, and
