@@ -235,7 +235,9 @@ CASES = [
      [(SESSION8, "re-verify round 1"), (SESSION8, "re-verify round 2")], "deny"),
     ("SPOOF a third brief written as round 1", "verifier", re_verify(1),
      [(SESSION8, "re-verify round 1"), (SESSION8, "re-verify round 1")], "deny"),
-    ("another session's re-verifies do not count", "verifier", re_verify(1),
+    # Outside a branch nothing names the change, so only this session's rows count.
+    # On a branch every session's rows count (MAST-38, REPO_CASES below).
+    ("outside a branch, another session's re-verifies do not count", "verifier", re_verify(1),
      [("other-se", "re-verify round 1"), ("other-se", "re-verify round 2")], "allow"),
     ("first verifications do not count", "verifier", re_verify(1),
      [(SESSION8, "dispatched"), (SESSION8, "dispatched"), (SESSION8, "dispatched")], "allow"),
@@ -286,6 +288,30 @@ CASES = [
     # Two markdown prefixes at once (a quoted list item).
     ("HELD a third round as a quoted list item is still refused", "verifier", re_verify_quoted(3),
      [(SESSION8, "re-verify round 1"), (SESSION8, "re-verify round 2")], "deny"),
+    # MAST-35 scenario 6: the architecture reviewer re-checks a fixed finding
+    # inside the same cap of two rounds. A round is spent by the verifier, the
+    # architecture reviewer, or both sent in it under one round number.
+    ("the round-1 verifier joins the architecture re-check's round", "verifier", re_verify(1),
+     [(SESSION8, "re-verify round 1", "architecture-reviewer")], "allow"),
+    ("round 2 after an architecture-only round 1", "verifier", re_verify(2),
+     [(SESSION8, "re-verify round 1", "architecture-reviewer")], "allow"),
+    ("HELD a third round after a verifier round and an architecture round", "verifier", re_verify(3),
+     [(SESSION8, "re-verify round 1", "verifier"), (SESSION8, "re-verify round 2", "architecture-reviewer")], "deny"),
+    ("SPOOF that third round written as round 1", "verifier", re_verify(1),
+     [(SESSION8, "re-verify round 1", "verifier"), (SESSION8, "re-verify round 2", "architecture-reviewer")], "deny"),
+    ("HELD a third round after two architecture-only rounds", "verifier", re_verify(3),
+     [(SESSION8, "re-verify round 1", "architecture-reviewer"), (SESSION8, "re-verify round 2", "architecture-reviewer")], "deny"),
+    ("rounds shared by both agents count once each", "verifier", re_verify(2),
+     [(SESSION8, "re-verify round 1", "verifier"), (SESSION8, "re-verify round 1", "architecture-reviewer")], "allow"),
+    ("HELD a third round after two shared rounds", "verifier", re_verify(3),
+     [(SESSION8, "re-verify round 1", "verifier"), (SESSION8, "re-verify round 1", "architecture-reviewer"),
+      (SESSION8, "re-verify round 2", "architecture-reviewer"), (SESSION8, "re-verify round 2", "verifier")], "deny"),
+    ("the architecture reviewer's rows count under the name Claude Code sends", "verifier", re_verify(3),
+     [(SESSION8, "re-verify round 1", "masthead:architecture-reviewer"), (SESSION8, "re-verify round 2", "masthead:architecture-reviewer")], "deny"),
+    ("another plugin's architecture reviewer rows do not count", "verifier", re_verify(1),
+     [(SESSION8, "re-verify round 1", "otherplugin:architecture-reviewer"), (SESSION8, "re-verify round 2", "otherplugin:architecture-reviewer")], "allow"),
+    ("the first architecture review does not count", "verifier", re_verify(2),
+     [(SESSION8, "dispatched", "architecture-reviewer"), (SESSION8, "re-verify round 1", "verifier")], "allow"),
     # Another plugin's verifier is not masthead's; its rows do not count.
     ("another plugin's verifier rows do not count", "verifier", re_verify(1),
      [(SESSION8, "re-verify round 1", "otherplugin:verifier"), (SESSION8, "re-verify round 2", "otherplugin:verifier")], "allow"),
@@ -323,6 +349,103 @@ def decision_for(subagent, prompt, rows, env_extra=None):
         return "allow", ""
     if out.count('"hookSpecificOutput"') != 1:
         return "two decisions: " + out[:80], out
+    try:
+        decoded = json.loads(out)["hookSpecificOutput"]
+        return decoded["permissionDecision"], decoded.get("permissionDecisionReason", "")
+    except Exception:
+        return "unparseable: " + out[:80], out
+
+
+BRANCH = "robert/mast-38-cap"
+OTHER8 = "newsess1"
+FIRST_VERIFY = """Verify git diff abc123..def456.
+
+Claims:
+- the refusal sentence names the month the limit resets
+"""
+
+
+def repo_rows(*specs):
+    """(session8, outcome, type) rows on BRANCH."""
+    return [(s, o, t, BRANCH) for s, o, t in specs]
+
+
+# MAST-38: the cap counts per change. A change is its branch: every session's
+# rows on it count, wherever in the checkout the brief is sent from and in
+# whichever folder PROJECT_STATE_DIR puts the log.
+# (label, prompt, rows, where, expected): where is "top", "sub" or "statedir",
+# or a dict of extra environment.
+TWO_ROUNDS = repo_rows((OTHER8, "re-verify round 1", "masthead:verifier"),
+                       (OTHER8, "re-verify round 2", "masthead:verifier"))
+REPO_CASES = [
+    ("HELD a third round from a new session on the same branch", re_verify(3), TWO_ROUNDS, "top", "deny"),
+    ("HELD a third round written as round 1 from a new session", re_verify(1), TWO_ROUNDS, "top", "deny"),
+    ("HELD a third round sent from a subfolder of the checkout", re_verify(3), TWO_ROUNDS, "sub", "deny"),
+    ("HELD a third round, with the log where PROJECT_STATE_DIR says", re_verify(3), TWO_ROUNDS, "statedir", "deny"),
+    ("round 2 from a new session after one round", re_verify(2),
+     repo_rows((OTHER8, "re-verify round 1", "masthead:verifier")), "top", "allow"),
+    # Scenario 3: after the adjudicator has judged a verification, another
+    # verifier is a re-verify, so a brief without its Re-verify line is refused.
+    ("HELD a re-verify brief with no Re-verify line, after the adjudicator", FIRST_VERIFY,
+     repo_rows((OTHER8, "dispatched", "masthead:verifier"), (OTHER8, "dispatched", "masthead:adjudicator")), "top", "deny"),
+    ("the first verification's verifiers, before any adjudicator", FIRST_VERIFY,
+     repo_rows((OTHER8, "dispatched", "masthead:verifier"), (OTHER8, "dispatched", "masthead:verifier")), "top", "allow"),
+    ("a refused adjudicator dispatch judged nothing", FIRST_VERIFY,
+     repo_rows((OTHER8, "dispatched", "masthead:verifier"), (OTHER8, "refused", "masthead:adjudicator")), "top", "allow"),
+    ("HELD a verifier that ran with no Re-verify line after the adjudicator counts as a round", re_verify(2),
+     repo_rows((OTHER8, "dispatched", "masthead:verifier"), (OTHER8, "dispatched", "masthead:adjudicator"),
+               (OTHER8, "re-verify round 1", "masthead:verifier"), (OTHER8, "dispatched", "masthead:adjudicator"),
+               (OTHER8, "dispatched", "masthead:verifier")), "top", "deny"),
+    # A cap a person raised in the environment that starts Claude Code.
+    ("a third round under MASTHEAD_REVERIFY_CAP=3", re_verify(3), TWO_ROUNDS,
+     {"MASTHEAD_REVERIFY_CAP": "3"}, "allow"),
+    ("HELD a fourth round under MASTHEAD_REVERIFY_CAP=3", re_verify(4),
+     TWO_ROUNDS + repo_rows((OTHER8, "re-verify round 3 (cap raised to 3)", "masthead:verifier")),
+     {"MASTHEAD_REVERIFY_CAP": "3"}, "deny"),
+    ("HELD a cap that is not a number is the usual two", re_verify(3), TWO_ROUNDS,
+     {"MASTHEAD_REVERIFY_CAP": "lots"}, "deny"),
+    ("HELD the brief's approval line does not open the cap",
+     "Approved past the cap by Robert\n" + re_verify(3), TWO_ROUNDS, "top", "deny"),
+]
+
+
+def git(*args, cwd):
+    subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True,
+                   env=dict(os.environ, GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_SYSTEM=os.devnull))
+
+
+def repo_decision(prompt, rows, where):
+    """The gate's decision in a throwaway git checkout on BRANCH."""
+    root = os.path.realpath(tempfile.mkdtemp(prefix="verify-brief-repo-"))
+    try:
+        git("init", "-q", "-b", BRANCH, ".", cwd=root)
+        os.makedirs(os.path.join(root, "app", "lib"))
+        os.makedirs(os.path.join(root, ".claude"))
+        env = dict(os.environ)
+        for key in list(env):
+            if key.startswith("MASTHEAD_"):
+                env.pop(key)
+        env["CLAUDE_PROJECT_DIR"] = root
+        state = os.path.join(root, ".claude", "state")
+        if where == "statedir":
+            with open(os.path.join(root, ".claude", "settings.json"), "w") as fh:
+                json.dump({"env": {"PROJECT_STATE_DIR": ".work/state"}}, fh)
+            state = os.path.join(root, ".work", "state")
+        if isinstance(where, dict):
+            env.update(where)
+        os.makedirs(state)
+        with open(os.path.join(state, "dispatches.tsv"), "w") as fh:
+            fh.write(log_rows(rows))
+        cwd = os.path.join(root, "app", "lib") if where == "sub" else root
+        payload = json.dumps({"session_id": SESSION, "cwd": cwd, "tool_name": "Agent",
+                              "tool_input": {"subagent_type": "masthead:verifier", "prompt": prompt}})
+        result = subprocess.run(["bash", HOOK, "gate-verify-brief"], input=payload,
+                                capture_output=True, text=True, check=False, env=env)
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+    out = result.stdout.strip()
+    if not out:
+        return "allow", ""
     try:
         decoded = json.loads(out)["hookSpecificOutput"]
         return decoded["permissionDecision"], decoded.get("permissionDecisionReason", "")
@@ -432,16 +555,51 @@ ARCHITECTURE_CASES = [
 ]
 
 
-def architecture_decision(subagent, prompt, doc):
+def arch_re_verify(n, marker=""):
+    """An architecture reviewer's re-verify brief: the fixed findings only (MAST-35 scenario 6)."""
+    return marker + "Re-verify: round {}, findings arch-2\n".format(n) + architecture_brief(
+        "Architecture doc: docs/architecture.md")
+
+
+# (label, subagent_type, prompt, log rows, expected decision); the doc is recorded.
+ARCHITECTURE_ROUND_CASES = [
+    ("an architecture re-check with an empty log", "architecture-reviewer", arch_re_verify(1), [], "allow"),
+    ("an architecture re-check beside the round-1 verifier", "architecture-reviewer", arch_re_verify(1),
+     [(SESSION8, "re-verify round 1", "verifier")], "allow"),
+    ("an architecture-only round 2", "architecture-reviewer", arch_re_verify(2),
+     [(SESSION8, "re-verify round 1", "verifier")], "allow"),
+    ("HELD an architecture re-check in a third round", "architecture-reviewer", arch_re_verify(3),
+     [(SESSION8, "re-verify round 1", "verifier"), (SESSION8, "re-verify round 2", "verifier")], "deny"),
+    ("HELD a third architecture-only round", "architecture-reviewer", arch_re_verify(3),
+     [(SESSION8, "re-verify round 1", "architecture-reviewer"), (SESSION8, "re-verify round 2", "architecture-reviewer")], "deny"),
+    ("SPOOF a third architecture re-check written as round 1", "architecture-reviewer", arch_re_verify(1),
+     [(SESSION8, "re-verify round 1", "architecture-reviewer"), (SESSION8, "re-verify round 1", "verifier"),
+      (SESSION8, "re-verify round 2", "verifier"), (SESSION8, "re-verify round 2", "architecture-reviewer")], "deny"),
+    ("masthead's architecture reviewer is capped too", "masthead:architecture-reviewer", arch_re_verify(3),
+     [(SESSION8, "re-verify round 1", "verifier"), (SESSION8, "re-verify round 2", "verifier")], "deny"),
+    ("another branch's rounds do not count", "architecture-reviewer", arch_re_verify(1),
+     [(SESSION8, "re-verify round 1", "verifier", "robert/9-last-issue"), (SESSION8, "re-verify round 2", "verifier", "robert/9-last-issue")], "allow"),
+    ("HELD an architecture re-verify line as a list item is not the form", "architecture-reviewer",
+     arch_re_verify(1, marker="- "), [], "deny"),
+    ("HELD a bold architecture Re-verify label is not the form", "architecture-reviewer",
+     arch_re_verify(1).replace("Re-verify:", "**Re-verify**:", 1), [], "deny"),
+]
+
+
+def architecture_decision(subagent, prompt, doc, rows=None):
     """The gate's decision in a throwaway repository that records `doc` (or none)."""
     root = os.path.realpath(tempfile.mkdtemp(prefix="arch-brief-"))
     try:
         os.makedirs(os.path.join(root, ".git"))
+        if rows is not None:
+            os.makedirs(os.path.join(root, ".claude", "state"))
+            with open(os.path.join(root, ".claude", "state", "dispatches.tsv"), "w") as fh:
+                fh.write(log_rows(rows))
         os.makedirs(os.path.join(root, "docs"))
         for name in ("architecture.md", "other.md"):
             with open(os.path.join(root, "docs", name), "w") as fh:
                 fh.write("# Architecture\n")
-        os.makedirs(os.path.join(root, ".claude"))
+        os.makedirs(os.path.join(root, ".claude"), exist_ok=True)
         with open(os.path.join(root, ".claude", "settings.json"), "w") as fh:
             json.dump({"env": {"ARCHITECTURE_DOC": doc}} if doc else {"env": {}}, fh)
         payload = json.dumps({
@@ -477,6 +635,12 @@ def main():
         failures += 0 if ok else 1
         print("{:4}  {:<52} expected {:<5} got {}".format("ok" if ok else "FAIL", label, expected, actual))
 
+    for label, subagent, prompt, rows, expected in ARCHITECTURE_ROUND_CASES:
+        actual, _ = architecture_decision(subagent, prompt, "docs/architecture.md", rows)
+        ok = actual == expected
+        failures += 0 if ok else 1
+        print("{:4}  {:<52} expected {:<5} got {}".format("ok" if ok else "FAIL", label, expected, actual))
+
     # The refusal names the doc the project records, so the worker can copy it.
     _, reason = architecture_decision("architecture-reviewer", architecture_brief(""), "docs/architecture.md")
     ok = "docs/architecture.md" in reason and "Architecture doc:" in reason and "ADR alignment:' at column zero" not in reason
@@ -492,6 +656,18 @@ def main():
             both = "claims" in reason.lower() and "round" in reason.lower()
             failures += 0 if both else 1
             print("{:4}  {:<52} one decision carries both reasons".format("ok" if both else "FAIL", ""))
+
+    for label, prompt, rows, where, expected in REPO_CASES:
+        actual, _ = repo_decision(prompt, rows, where)
+        ok = actual == expected
+        failures += 0 if ok else 1
+        print("{:4}  {:<52} expected {:<5} got {}".format("ok" if ok else "FAIL", label, expected, actual))
+
+    # The cap's refusal says how a person raises it, and that the brief cannot.
+    _, reason = repo_decision(re_verify(3), TWO_ROUNDS, "top")
+    ok = "MASTHEAD_REVERIFY_CAP" in reason and "settings cannot" in reason
+    failures += 0 if ok else 1
+    print("{:4}  {:<52} the cap's refusal says how to raise it".format("ok" if ok else "FAIL", ""))
 
     actual, _ = decision_for("verifier", THIN, None, {"MASTHEAD_BRIEF_GATE": "off"})
     ok = actual == "allow"
@@ -510,7 +686,7 @@ def main():
     if failures:
         print("{} cases wrong".format(failures))
         return 1
-    print("all {} cases correct".format(len(CASES) + len(ARCHITECTURE_CASES) + 4))
+    print("all {} cases correct".format(len(CASES) + len(ARCHITECTURE_CASES) + len(ARCHITECTURE_ROUND_CASES) + len(REPO_CASES) + 5))
     return 0
 
 

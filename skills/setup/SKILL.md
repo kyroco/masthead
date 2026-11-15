@@ -86,7 +86,8 @@ On yes:
 
 1. Copy `${CLAUDE_PLUGIN_ROOT}/skills/setup/push-check.sh` to
    `.claude/push-check.sh` in the repository, replacing `__STATE_DIR__` with
-   `.claude/state`. Write the command, exactly as the user gave it, as the one
+   the state folder (the `PROJECT_STATE_DIR` answer, `.claude/state` when
+   there is none). Write the command, exactly as the user gave it, as the one
    line of `.claude/push-check.cmd`; the script runs that file, so quotes and
    `$( )` in the command stay as written.
 2. Add `"PROJECT_PUSH_CHECK": ".claude/push-check.sh"` to the env block.
@@ -184,7 +185,10 @@ anywhere. It passes only when the doc:
 Fix a draft until it passes. For a doc the person already has, show each line
 the check printed in plain words, draft the missing rules and the citations,
 show the exact text to add, and add it only on yes. Record only a doc that
-passes. If they say no, do not record the doc: say the architecture reviewer
+passes. Once it is recorded, in a repository that also named an ADR folder, each
+new ADR must say how it applies the parts of the doc it touches and which builds
+it must work in, and a pull request whose ADR diverges from the doc must edit
+the doc too. If they say no, do not record the doc: say the architecture reviewer
 needs the seven rules stated to hold pull requests to them, and that running
 `/masthead:setup` again brings the question back.
 

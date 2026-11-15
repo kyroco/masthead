@@ -4,6 +4,7 @@ import json
 import os
 import re
 import stat
+import subprocess
 import sys
 import tempfile
 
@@ -66,7 +67,7 @@ def private_dir(*parts):
 def private_open(path, append=False):
     """Open `path` for text writing with mode 0600, never following a symlink at the path."""
     flags = os.O_WRONLY | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0) | (os.O_APPEND if append else os.O_TRUNC)
-    return os.fdopen(os.open(path, flags, 0o600), "a" if append else "w")
+    return os.fdopen(os.open(path, flags, 0o600), "a" if append else "w", encoding="utf-8")
 
 
 def project_root():
@@ -110,15 +111,28 @@ def main_checkout(root):
     return None if os.path.realpath(main) == os.path.realpath(root) else main
 
 
+# The order Claude Code itself applies a project's two settings files in: the
+# personal settings.local.json over the shared settings.json (Claude Code's
+# settings docs, "Settings precedence"). Every fact is read in this order.
+SETTINGS_LEAVES = ("settings.local.json", "settings.json")
+
+
+def settings_env(path):
+    """The env block of one settings file as a dict, or {} when it has none or cannot be read."""
+    try:
+        with open(path) as handle:
+            env = (json.load(handle) or {}).get("env") or {}
+    except Exception:
+        return {}
+    return env if isinstance(env, dict) else {}
+
+
 def settings_fact(root, name):
-    for leaf in ("settings.json", "settings.local.json"):
-        try:
-            with open(os.path.join(root, ".claude", leaf)) as handle:
-                env = (json.load(handle) or {}).get("env") or {}
-        except Exception:
-            continue
-        if env.get(name):
-            return str(env[name])
+    """NAME from the env blocks of `root`'s settings files, the personal file first."""
+    for leaf in SETTINGS_LEAVES:
+        value = settings_env(os.path.join(root, ".claude", leaf)).get(name)
+        if value:
+            return str(value)
     return None
 
 
@@ -170,7 +184,9 @@ def fact(name, default=None, root=None):
         return default
     # A worktree's working tree is branch content, so only the main checkout's
     # settings supply a fact; a relative value still resolves in the worktree.
-    value = settings_fact(main_checkout(root) or root, name)
+    # A subfolder reads the settings at the top of its checkout.
+    top = checkout_top(root)
+    value = settings_fact(main_checkout(top) or top, name)
     return value if value is not None else default
 
 
@@ -200,27 +216,101 @@ def state_dir(root=None):
     return value or STATE_DIR_DEFAULT
 
 
+def state_path(root=None):
+    """The full path of that folder in the checkout `root` is in, from its top
+    folder, so a subfolder and the top of a checkout name one folder."""
+    root = root or project_root()
+    return os.path.join(checkout_top(root), state_dir(root))
+
+
+# The env keys that switch a Masthead gate or option off, which a repository's
+# own files may not set (run.sh unsets them).
+SWITCH_PREFIXES = ("MASTHEAD_", "CLAUDE_PLUGIN_OPTION_")
+SWITCH_SUFFIXES = ("_GATE",)
+
+
+ENV_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+
+
+def is_switch(key):
+    """A gate or option switch. Only a real environment variable name counts: a key no
+    shell could hold is never in a hook's environment, and is never printed (round 0, A4)."""
+    return isinstance(key, str) and ENV_NAME.fullmatch(key) is not None and \
+        (key.startswith(SWITCH_PREFIXES) or key.endswith(SWITCH_SUFFIXES))
+
+
+def tracked(folder, relative):
+    """Whether git tracks `relative` in the repository at `folder`. When git
+    cannot answer inside a repository, the file counts as tracked, so a file git
+    cannot vouch for is treated as the repository's."""
+    try:
+        r = subprocess.run(["git", "-C", folder, "ls-files", "--error-unmatch", "--", relative],
+                           capture_output=True, text=True, timeout=5)
+    except Exception:
+        return True
+    if r.returncode == 0:
+        return True
+    # A folder that is no repository was not cloned, so its file is the person's own.
+    if not os.path.exists(os.path.join(checkout_top(folder), ".git")):
+        return False
+    # Inside a repository, 1 with git's own "did not match" is "not tracked"; anything else is git failing.
+    return not (r.returncode == 1 and "did not match" in r.stderr)
+
+
+def repo_switch_keys(root=None):
+    """The gate and option switches a repository's own settings files set, for
+    run.sh to unset: every one in the shared settings.json, and every one in a
+    settings.local.json that git tracks, which a clone brings with it (MAST-38,
+    from MAST-37's SEC-1). A settings.local.json git does not track is the
+    person's own and keeps its switches. Claude Code reads the shared file from
+    the session's folder and the personal file from the top of the repository
+    (the main checkout's, in a worktree), so each of those places is read."""
+    root = root or project_root()
+    top = checkout_top(root)
+    main = main_checkout(top) or top
+    keys, own = set(), set()
+    for folder in dict.fromkeys((root, top, main)):
+        keys.update(k for k in settings_env(os.path.join(folder, ".claude", "settings.json")) if is_switch(k))
+        local = os.path.join(folder, ".claude", "settings.local.json")
+        if not os.path.exists(local):
+            continue
+        found = {k for k in settings_env(local) if is_switch(k)}
+        if tracked(folder, os.path.join(".claude", "settings.local.json")):
+            keys.update(found)
+        else:
+            own.update(found)
+    # A switch the person's own file sets is the value Claude Code applies, over the
+    # shared file's, so it stays (round 0, A3).
+    return sorted(keys - own)
+
+
+def git_state_path(root, name):
+    """A file in the checkout's own git folder (a worktree's own, not the main
+    checkout's), which no clone can commit or plant: where the push gate keeps its
+    pass record and the Stop hook its index lock. None outside a repository."""
+    leaf = re.sub(r"[^A-Za-z0-9._-]", "", os.path.basename(name or ""))
+    if leaf in ("", ".", ".."):
+        return None
+    try:
+        r = subprocess.run(["git", "-C", root or project_root(), "rev-parse", "--absolute-git-dir"],
+                           capture_output=True, text=True, timeout=5)
+    except Exception:
+        return None
+    folder = r.stdout.strip()
+    if r.returncode != 0 or not folder:
+        return None
+    return os.path.join(folder, leaf)
+
+
 TRACKER_FACT = "ISSUE_TRACKER"
 TRACKERS = ("github", "linear")
 LINEAR_TEAM_FACT = "LINEAR_TEAM_KEY"
 
 
 def personal_first_fact(name, root=None):
-    """Like fact(), but settings.local.json wins over settings.json, the order
-    Claude Code itself uses, so a "just me" answer holds over a shared one."""
-    root = root or project_root()
-    if not trusted(root):
-        return None
-    base = main_checkout(root) or root
-    for leaf in ("settings.local.json", "settings.json"):
-        try:
-            with open(os.path.join(base, ".claude", leaf)) as handle:
-                env = (json.load(handle) or {}).get("env") or {}
-        except Exception:
-            continue
-        if isinstance(env, dict) and env.get(name):
-            return str(env[name])
-    return None
+    """fact() with no default; kept for its callers. Every fact reads the
+    personal settings.local.json over the shared settings.json."""
+    return fact(name, None, root)
 
 
 def tracker(root=None):
@@ -257,6 +347,21 @@ def architecture_doc(root=None):
     return path
 
 
+ARCHITECTURE_TRIAL_FACT = "ARCHITECTURE_TRIAL"
+TRIAL_OFF_WORDS = ("off", "false", "no", "0")
+
+
+def architecture_trial(root=None):
+    """"on" or "off": whether every architecture finding goes to the person (MAST-35).
+
+    On until the person turns it off, so a new install is on the trial. Read
+    like the tracker (the personal file wins). Only an off word turns it off:
+    a typo keeps the person in the loop.
+    """
+    value = (personal_first_fact(ARCHITECTURE_TRIAL_FACT, root) or "").strip().lower()
+    return "off" if value in TRIAL_OFF_WORDS else "on"
+
+
 def main(argv):
     # --trusted CHECKOUT: exit 0 when the checkout is the session's repository, 1 when not.
     if len(argv) == 2 and argv[0] == "--trusted":
@@ -265,13 +370,39 @@ def main(argv):
     if len(argv) >= 2 and argv[0] == "--root":
         root, argv = argv[1], argv[2:]
     # --tracker prints github or linear; --linear-team prints the team key or nothing;
-    # --architecture-doc prints the architecture doc's full path or nothing.
+    # --architecture-doc prints the architecture doc's full path or nothing;
+    # --architecture-trial prints on or off.
     # Skills run these through the Bash tool, where Claude Code sets no
     # CLAUDE_PROJECT_DIR (it sets it for hooks only), so there the repository
     # the shell is in is the session's. trusted() still guards --root.
-    if argv in (["--tracker"], ["--linear-team"], ["--architecture-doc"]) and root is None \
+    if argv in (["--tracker"], ["--linear-team"], ["--architecture-doc"], ["--architecture-trial"], ["--state-path"]) and root is None \
             and not os.environ.get("CLAUDE_PROJECT_DIR"):
         os.environ["CLAUDE_PROJECT_DIR"] = checkout_top(os.getcwd())
+    # --state-path prints the full path of the checkout's state folder; the
+    # dispatch log is dispatches.tsv in it.
+    if argv == ["--state-path"]:
+        print(state_path(root))
+        return 0
+    # --private-dir PART...: the 0700 folder under the user's private state root,
+    # made when missing. Exit 1 and print nothing when it cannot be trusted.
+    if argv and argv[0] == "--private-dir":
+        path = private_dir(*[safe_session(part) for part in argv[1:]]) if len(argv) > 1 else None
+        if not path:
+            return 1
+        print(path)
+        return 0
+    # --git-state NAME: the full path of NAME in the checkout's own git folder; exit 1 outside a repository.
+    if len(argv) == 2 and argv[0] == "--git-state":
+        path = git_state_path(root, argv[1])
+        if not path:
+            return 1
+        print(path)
+        return 0
+    # --repo-switch-keys: the switches run.sh unsets, one per line.
+    if argv == ["--repo-switch-keys"]:
+        for key in repo_switch_keys(root):
+            print(key)
+        return 0
     if argv == ["--tracker"]:
         print(tracker(root))
         return 0
@@ -280,6 +411,9 @@ def main(argv):
         return 0
     if argv == ["--architecture-doc"]:
         print(architecture_doc(root) or "")
+        return 0
+    if argv == ["--architecture-trial"]:
+        print(architecture_trial(root))
         return 0
     as_path = bool(argv) and argv[0] == "--path"
     if as_path:

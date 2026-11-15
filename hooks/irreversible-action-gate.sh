@@ -43,19 +43,11 @@ CMD="$(field '.tool_input.command // empty')"
 
 SID="$(field '.session_id // "nosession"')"
 [ -n "$SID" ] || SID="nosession"
-# The user's private state root: $CLAUDE_PLUGIN_DATA/state, else $TMPDIR/masthead-<uid>. Mode 0700; refused when a symlink or not ours.
-state_root() {
-  local r
-  if [ -n "${CLAUDE_PLUGIN_DATA:-}" ]; then r="$CLAUDE_PLUGIN_DATA/state"; else r="${TMPDIR:-/tmp}/masthead-$(id -u)"; fi
-  (umask 077; mkdir -p "$r") 2>/dev/null
-  [ -d "$r" ] && [ ! -L "$r" ] && [ -O "$r" ] || return 1
-  chmod 700 "$r" 2>/dev/null
-  printf '%s' "${r%/}"
-}
 SID="${SID//[^A-Za-z0-9_-]/}"
 [ -n "$SID" ] || SID="nosession"
-RECORD_DIR=""
-if _root="$(state_root)"; then RECORD_DIR="$_root/claude-irreversible/$SID"; fi
+# The session's folder under the user's private state root, from project_fact.py, the one place that finds and
+# checks it (0700, ours, no symlink; MAST-38). Empty when it cannot be trusted, and then nothing is recorded.
+RECORD_DIR="$(python3 -I "$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd -P)/project_fact.py" --private-dir claude-irreversible "$SID" 2>/dev/null | head -1)"
 
 # Return the segment's real command: strip leading VAR=value assignments, wrappers and quoted-assignment fragments.
 segment_command() {

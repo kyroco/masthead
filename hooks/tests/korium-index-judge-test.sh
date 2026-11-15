@@ -65,7 +65,7 @@ judge() {
     '{tool:$t,pattern:$p,path:$d,cwd:$c}' \
     | PATH="$T/bin:$PATH" TMPDIR="$T" python3 "$HOOKS/korium-index-judge.py"
 }
-fresh() { : > "$STUB_LOG"; rm -f "$T/claude-engram/korium-cli-signed-in"; }
+fresh() { : > "$STUB_LOG"; rm -f "$T/masthead-$(id -u)/claude-engram/korium-cli-signed-in"; }
 calls() { tr '\n' ' ' < "$STUB_LOG" | sed 's/ $//'; }
 
 echo "--- the index holds the name: refuse until the agent asks it ---"
@@ -99,7 +99,7 @@ echo "--- korium-cli cannot answer: UNKNOWN, which the gate refuses on ---"
 fresh; check "signed out (status fails)"                UNKNOWN "$(STUB_STATUS=1 judge Grep 'def handle_call' '')"
 check "  never searched, so no browser sign-in"         "status" "$(calls)"
 fresh; check "search fails"                             UNKNOWN "$(STUB_SEARCH_EXIT=1 judge Grep 'def handle_call' '')"
-check "  and the good status is forgotten"              "absent" "$([ -e "$T/claude-engram/korium-cli-signed-in" ] && echo present || echo absent)"
+check "  and the good status is forgotten"              "absent" "$([ -e "$T/masthead-$(id -u)/claude-engram/korium-cli-signed-in" ] && echo present || echo absent)"
 fresh; check "search prints something that is not JSON" UNKNOWN "$(STUB_ROWS="$T/garbage.txt" judge Grep 'def handle_call' '')"
 
 echo "--- a good status is trusted for ten minutes ---"

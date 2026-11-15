@@ -157,10 +157,14 @@ path without running the tests a third time, and places each finding that
 holds: fixed in this pull request when a scenario's Then is false or no
 test proves it, a bug's test did not come first, something
 that worked before broke, or words a person reads are now wrong; otherwise
-an extra, which the worker scores like its own. That placement is final for
-the worker and the foreman; nobody files anything. The worker fixes the
-list, test first again, and only the claims the fix broke go back to a
-verifier, at most twice. The tests run on the final commit and leave a
+an extra, which the worker scores like its own. Once the trial is off, an
+architecture finding that breaks one of the doc's seven rules, a line of the
+decision record or the principles, or a build the doc names goes on the fix
+list whatever its customer score. One where the decision record and a
+mockup disagree always comes to you. That placement is final for the worker and the foreman; nobody files
+anything. The worker fixes the list, test first again, and only the claims
+the fix broke go back to a verifier, and only the architecture findings it
+fixed to the architecture reviewer, at most twice. The tests run on the final commit and leave a
 receipt that names it, and nothing can be pushed until the receipt matches.
 Then one pull request goes up, with `Fixes #41`, the list of what wasn't
 proved, the number of agent dispatches it took, and the issue moves to In
@@ -180,8 +184,13 @@ happened, and the run goes on without it.
 
 When a pull request is ready, every extra its worker's rule says to fix is
 already fixed in it, and nothing else reaches you unless a security finding
-could not be settled; that comes one item at a time, and you answer it. No
-issue is ever filed from a review. When its checks pass, its review
+could not be settled or the decision record and a mockup disagree; that
+comes one item at a time, and you answer it. While the architecture
+reviewer is on trial, every one of its findings reaches you too, kept or
+thrown out, with its lens, smell, class, scores and the judge's placement,
+and the worker fixes only the ones you send back. The trial is on from the
+first run until you set `"ARCHITECTURE_TRIAL": "off"` in the env block of
+`.claude/settings.json`. No issue is ever filed from a review. When its checks pass, its review
 is clean, every line is answered and the worker has cleaned up after itself,
 the foreman queues it to be merged. It closes the issue, and any big issue
 whose pieces are now all done, then starts the next issue, one that waited on
@@ -318,7 +327,7 @@ reason Claude can act on.
 | Check | Runs | Refuses | Needs |
 |---|---|---|---|
 | `hard-gate.sh` | before `git push`, `gh pr create` or a GitHub connector's `create_pull_request`; the test receipt and the secret scan first, then the stack checks, which are skipped when this exact commit already passed them | a push that carries something shaped like a secret, or fails a changed stack's format, compile, lint or type check; with the test command, a push until the push check reports the tests passed on this exact commit, and a push of any other commit | nothing for the secret scan and the stack checks; the test command from setup (`PROJECT_PUSH_CHECK`) for the test receipt |
-| `adr-sections-gate.py`, `adr-structure-gate.sh`, `wiki-refresh.sh` | before a write; at stop; at session start | a decision record written without the sections in `hooks/adr_shape.py`, or an edit that drops one; a finish that leaves one short of them or with an unchecked claims list; keeps the records folder fresh | the two gates only with a decision records folder named (`ADR_DIR`, which setup writes when you ask for the fixed shape), and nothing is held in a repository that named none; the refresh only with `ADR_DIR` set to an absolute path |
+| `adr-sections-gate.py`, `adr-structure-gate.sh`, `wiki-refresh.sh` | before a write; at stop; at session start | a decision record written without the sections in `hooks/adr_shape.py`, or an edit that drops one; with an architecture doc recorded, a new record that does not say how it applies the doc and which builds it must work in, and a pull request whose record diverges from the doc while leaving the doc unchanged; a finish that leaves one short of them or with an unchecked claims list; keeps the records folder fresh | the two gates only with a decision records folder named (`ADR_DIR`, which setup writes when you ask for the fixed shape), and nothing is held in a repository that named none; the refresh only with `ADR_DIR` set to an absolute path |
 | `elixir-toolchain-env.sh`, `elixir-format-after-edit.sh` | at session start; after an edit | nothing; pins the Elixir toolchain and formats an edited file | an Elixir root (`PROJECT_ELIXIR_ROOT`) |
 
 Where these three fall short, together: the fact names a file, and the copy
