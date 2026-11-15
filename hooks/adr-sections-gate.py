@@ -78,6 +78,18 @@ def body_file(cmd, cwd):
         return ""
 
 
+def edited(path, old, new, every):
+    """The file as this Edit would leave it, or None when that cannot be told."""
+    try:
+        with open(path) as handle:
+            text = handle.read()
+    except OSError:
+        return None
+    if not old or old not in text:
+        return None
+    return text.replace(old, new) if every else text.replace(old, new, 1)
+
+
 def find_by_number(where, number):
     """The record in the folder `where` (or a folder below it) whose name carries `number`."""
     for d, subs, files in os.walk(where):
@@ -179,9 +191,18 @@ def main():
             reasons = adr_shape.check(path, content)
 
         elif tool == "Edit":
-            if not adr_shape.is_adr(ti.get("file_path") or "", where):
+            path = ti.get("file_path") or ""
+            if not adr_shape.is_adr(path, where):
                 return
-            reasons = adr_shape.removed(ti.get("old_string") or "", ti.get("new_string") or "")
+            old, new = ti.get("old_string") or "", ti.get("new_string") or ""
+            after = edited(path, old, new, bool(ti.get("replace_all")))
+            # Where an architecture doc is recorded, a new record is checked whole, as the Edit
+            # would leave it, so an empty Write followed by Edits is held like a Write. Without a
+            # doc the gate stays as it was (MAST-31 scenario 5). A committed one keeps its sections.
+            if after is not None and adr_shape.architecture_doc() and adr_shape.committed(path) is None:
+                reasons = adr_shape.missing(after)
+            else:
+                reasons = adr_shape.removed(old, new)
 
         elif tool == "Bash":
             # Refuse a new ADR created through the shell, since its sections cannot be read there.
