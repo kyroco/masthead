@@ -242,19 +242,19 @@ def is_switch(key):
 def tracked(folder, relative):
     """Whether git tracks `relative` in the repository at `folder`. When git
     cannot answer inside a repository, the file counts as tracked, so a file git
-    cannot vouch for is treated as the repository's."""
-    try:
-        r = subprocess.run(["git", "-C", folder, "ls-files", "--error-unmatch", "--", relative],
-                           capture_output=True, text=True, timeout=5)
-    except Exception:
-        return True
-    if r.returncode == 0:
-        return True
+    cannot vouch for is treated as the repository's. The name is matched in any
+    case: on a disk that ignores case, a committed .claude/Settings.local.json is
+    the file Claude Code opens as settings.local.json (re-verify round 1, SEC-1)."""
     # A folder that is no repository was not cloned, so its file is the person's own.
     if not os.path.exists(os.path.join(checkout_top(folder), ".git")):
         return False
-    # Inside a repository, 1 with git's own "did not match" is "not tracked"; anything else is git failing.
-    return not (r.returncode == 1 and "did not match" in r.stderr)
+    try:
+        r = subprocess.run(["git", "-C", folder, "ls-files", "-z", "--", ":(icase)" + relative],
+                           capture_output=True, text=True, timeout=5)
+    except Exception:
+        return True
+    # Any entry is a tracked file of that name; none is "not tracked"; git failing counts as tracked.
+    return r.returncode != 0 or bool(r.stdout.strip("\0"))
 
 
 def repo_switch_keys(root=None):
