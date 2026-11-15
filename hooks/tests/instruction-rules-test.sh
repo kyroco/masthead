@@ -1101,6 +1101,8 @@ says  references/session-cliffs.md "as the worker's \"What done is\" says (\`ski
 says  agents/adjudicator.md "the worker settles it as its \"What done is\" says (\`skills/work-on/worker.md\`)"
 says  skills/work-on/foreman.md "settled by its worker, as \`worker.md\` **What done is** says"
 says  skills/github-issues/SKILL.md "an extra is settled as the worker's \"What done is\" says"
+never skills/linear-issues/SKILL.md "by answering \"fix later\""
+says  skills/linear-issues/SKILL.md "an extra is settled as the worker's \"What done is\" says"
 says  README.md "the rule is in \`skills/work-on/worker.md\`"
 says  docs/explainer.template.html "the rule is in <code>skills/work-on/worker.md</code>"
 says  docs/explainer.html "the rule is in <code>skills/work-on/worker.md</code>"
