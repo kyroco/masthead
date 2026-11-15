@@ -89,17 +89,50 @@ def words(text):
     return re.findall(r"[a-z0-9']+", text.lower())
 
 
+# What may follow P<n> on a principle's line: a period, colon, bracket, hyphen or dash.
+PRINCIPLE_SEP = "[.:)\\-" + chr(0x2013) + chr(0x2014) + "]"
+
+
+def principle_start(line):
+    """(number, text) when `line` starts a principle, else None.
+
+    Read: "P1. text", "- P1: text", "1. P1) text", "P1 - text", "## P1. Title",
+    "## P1 Title" and "**P1** text". Not read: a sentence such as "P3 and P7
+    are retired", which only names principles.
+    """
+    bare = line.strip()
+    heading = bare.startswith("#")
+    bare = re.sub(r"^(?:#+\s*|[-*]\s+|\d+\.\s+)", "", bare)
+    bold = bare.startswith("**")
+    bare = re.sub(r"\*\*|__", "", bare)
+    found = re.match(r"^P(\d+)\b\s*(.*)$", bare)
+    if not found:
+        return None
+    number, rest = found.groups()
+    if re.match(PRINCIPLE_SEP, rest):
+        return number, re.sub("^" + PRINCIPLE_SEP + r"+\s*", "", rest)
+    if heading or bold:
+        return number, rest
+    return None
+
+
 def principles(path):
-    """{number: text} for each principle written as a line starting P<n>."""
+    """{number: text} for each principle the file numbers P1, P2 and on."""
     found = {}
     current = None
+    under_heading = False
     with open(path) as handle:
         for line in handle:
-            start = re.match(r"^\s*(?:[-*]|\d+\.)?\s*(?:\*\*)?P(\d+)(?:\*\*)?\s*[.:)]\s*(.*)$", line)
+            start = principle_start(line)
             if start:
-                current = start.group(1)
-                found[current] = start.group(2)
-            elif current and line.strip() and line[:1].isspace() and not re.match(r"^\s*[-*]\s", line):
+                current, found[start[0]] = start[0], start[1]
+                under_heading = line.lstrip().startswith("#")
+            elif current and line.lstrip().startswith("#"):
+                current = None
+            elif current and under_heading:
+                if line.strip():
+                    found[current] += " " + line.strip()
+            elif current and line.strip() and not re.match(r"^\s*(?:[-*]|\d+\.)\s", line):
                 found[current] += " " + line.strip()
             else:
                 current = None
@@ -194,6 +227,12 @@ def check(doc, principles_file=None, draft=False):
                 problems.append("a placeholder is left in: {}".format(line.strip()))
     if principles_file:
         known = principles(principles_file)
+        with open(principles_file) as handle:
+            names_some = re.search(r"\bP\d+\b", handle.read())
+        if names_some and not known:
+            problems.append("{} names P-numbers but lists none as a principle (\"P1. text\", "
+                            "\"P1 - text\", \"## P1 Title\"); give the file that lists the principles, "
+                            "or leave it out when the project has none".format(os.path.basename(principles_file)))
         if known:
             cited = set(re.findall(r"\bP(\d+)\b", cites_in))
             if not cited:
