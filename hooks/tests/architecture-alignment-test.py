@@ -434,6 +434,7 @@ why = gate(r, "Edit", {"file_path": path, "old_string": "Proposed", "new_string"
 check("1: a later Edit of a new ADR that keeps the shape is allowed", why == "", why)
 
 # ------------------------------------------------------------------ round 2: the verdict is the entry's first word
+NEW = "docs/adr/ADR-0008-new.md"
 CT_DOC = DOC + "\n## Conformance tests\n\nEvery seam has a contract test.\n"
 r = make_repo("r2-verdict", base_doc=CT_DOC)
 why = write_adr(r, section("- `Conformance tests`: diverges, because the billing seam has no contract test yet."))
@@ -444,11 +445,11 @@ commit(r, {"docs/adr/ADR-0007-take-orders.md":
        "Write ADR-0007")
 why = pr(r)
 check("6: and its divergence holds the pull request", "`Conformance tests`" in why, why)
-why = write_adr(r, section("- `Core and extensions`: non-conforming."))
+why = write_adr(r, section("- `Core and extensions`: non-conforming."), NEW)
 check("2: 'non-conforming' is not a verdict", "`Core and extensions` with no verdict" in why, why)
-why = write_adr(r, section("- `Core and extensions`: no divergence, billing plugs in through the hook."))
+why = write_adr(r, section("- `Core and extensions`: no divergence, billing plugs in through the hook."), NEW)
 check("2: 'no divergence' is not a verdict, so it is asked to say conforms", "with no verdict" in why, why)
-why = write_adr(r, section("- `Core and extensions`: diverges from the architecture doc at docs/architecture.md."))
+why = write_adr(r, section("- `Core and extensions`: diverges from the architecture doc at docs/architecture.md."), NEW)
 check("2: a divergence whose only words name the doc's path is refused for no why", "but not why" in why, why)
 
 shutil.rmtree(T, ignore_errors=True)
