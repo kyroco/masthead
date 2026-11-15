@@ -70,6 +70,13 @@ else
 fi
 
 # --- allowed: reproducing a failure ---------------------------------------------
+# Re-verify round 1, fix V1: the diagnoser and reader get the same spellings refused.
+run_case 2 "sort with its output file joined is denied" "sort -olib/a.ex lib/a.ex"
+run_case 2 "sort with -o bundled is denied" "sort -uo lib/a.ex lib/a.ex"
+run_case 2 "sort with --output shortened is denied" "sort --outp=lib/a.ex lib/a.ex"
+run_case 2 "git grep with a program joined to -O is denied" "git grep -Orm foo"
+run_case 2 "git grep with --open-files shortened is denied" "git grep --open-f=rm foo"
+run_case 0 "sort with ordinary flags is allowed" "sort -u lib/a.ex"
 run_case 0 "mix test on one test is allowed" "mix test test/a_test.exs:12"
 run_case 0 "an allowlisted setting before the runner is allowed" "MIX_ENV=test mix test"
 run_case 0 "timeout around the runner is allowed" "timeout 120 mix test"
@@ -225,6 +232,97 @@ for tool in Write Edit MultiEdit NotebookEdit Agent; do
   printf '%s\n' "$READER_DENY" | grep -qx "$tool" && pass "reader.md denies $tool" \
     || fail "reader.md no longer denies $tool"
 done
+
+# MAST-34 round 1, fix F2: the architecture reviewer writes only its findings
+# file, so its shell is held to this read-only allowlist too, with no test
+# runners and no redirect but /dev/null. It may run the plugin's own
+# project_fact.py to ask which tracker the repo uses.
+FACT="$(cd "$SCRIPT_DIR/.." && pwd -P)/project_fact.py"
+arch() {
+  local want="$1" label="$2" cmd="$3" payload rc
+  payload="$(jq -nc --arg c "$cmd" --arg d "$WORK" '{tool_name:"Bash", agent_type:"masthead:architecture-reviewer", cwd:$d, tool_input:{command:$c}}')"
+  printf '%s' "$payload" | bash "$HOOK" --project-wide >/dev/null 2>&1
+  rc=$?
+  if [ "$rc" -eq "$want" ]; then pass "architecture reviewer: $label (rc=$rc)"; else fail "architecture reviewer: $label: got rc=$rc, expected $want. Command was: $cmd"; fi
+}
+arch 2 "a shell redirect into the tree"          'echo hi > README.md'
+arch 2 "a shell redirect into /tmp"              'echo hi > /tmp/arch-note'
+arch 2 "an append into the tree"                 'printf x >> lib/a.ex'
+arch 2 "tee into the tree"                       'echo hi | tee lib/a.ex'
+arch 2 "a copy over the code"                    'cp lib/a.ex lib/b.ex'
+arch 2 "a test run, which writes build output"   'mix test'
+arch 2 "python running another script"           'python3 /tmp/evil.py'
+arch 2 "project_fact.py with another flag"       "python3 $FACT --root /tmp --tracker"
+arch 2 "a GH_REPO setting before gh"             'GH_REPO=evil.example/o/r gh issue view 41'
+# Re-verify round 1, fix V1: sort and git take a write or run flag joined to its
+# value, bundled with other letters, or shortened, and each spelling is refused.
+arch 2 "sort with its output file joined"        'sort -oREADME.md README.md'
+arch 2 "sort with -o bundled"                    'sort -uo README.md README.md'
+arch 2 "sort with --output shortened"            'sort --out=README.md README.md'
+arch 2 "git grep with a program joined to -O"    'git grep -Orm Billing'
+arch 2 "git grep with -O bundled"                'git grep -iOrm Billing'
+arch 2 "git grep with --open-files shortened"    'git grep --open=rm foo'
+arch 2 "git diff with --output shortened"        'git diff --out=README.md HEAD'
+arch 2 "git log with --exec shortened"           'git log --exe=rm'
+# Re-verify round 2, fixes F1 and F2 (Robert, November 15, MAST-34 comment): the
+# architecture reviewer's shell allows only exact command shapes, git diff, show
+# and log with plain revisions and paths, the plugin's project_fact.py with
+# --tracker or --architecture-doc, and bare gh issue view <n>, and refuses the
+# rest. It reads files with Read, Glob and Grep, not the shell.
+arch 2 "F1: sort running a program through --compress-program" 'echo touch pwned | sort -S 1 --compress-program=sh'
+arch 2 "F1: sort with --compress-program shortened"          'sort --comp=sh README.md'
+arch 2 "F2: git grep -O hidden after -e --"                  'git grep -e -- -Orm'
+arch 2 "F2: git grep --open-files hidden after -e --"        'git grep -e -- --op=rm'
+arch 2 "git grep at all"                                     'git grep Billing'
+arch 2 "git log with a flag"                                 'git log --oneline --no-color -5'
+arch 2 "git diff with --stat"                                'git diff --stat HEAD~1'
+arch 2 "git with a setting before the subcommand"            'git -c core.pager=sh diff HEAD'
+arch 2 "git with -C"                                         'git -C /tmp diff HEAD'
+arch 2 "an environment setting before git"                   'GIT_EXTERNAL_DIFF=sh git diff HEAD'
+arch 2 "timeout before git"                                  'timeout 5 git diff HEAD'
+arch 2 "git diff piped on"                                   'git diff HEAD~1 | head'
+arch 2 "two commands chained"                                'git diff HEAD~1 && git log'
+arch 2 "a redirect into /dev/null"                           'git diff HEAD~1 2>/dev/null'
+arch 2 "a quoted revision"                                   "git diff 'HEAD'"
+arch 2 "a variable"                                          'git diff $REV'
+arch 2 "a path out of the checkout"                          'git diff HEAD -- ../other/file'
+arch 2 "two absolute paths, which git diffs outside the repo" 'git diff /etc/hosts /tmp/x'
+arch 2 "a home path"                                         'git log ~/notes'
+arch 2 "a reflog revision with braces"                       'git diff HEAD@{1}'
+arch 2 "a credential file from history"                      'git show HEAD:.env'
+arch 2 "two lines"                                           "git diff HEAD
+git log"
+arch 2 "a tab between words"                                 "git	diff HEAD"
+arch 2 "reading a file with the shell"                       'cat lib/a.ex'
+arch 2 "searching with the shell"                            'rg Billing lib'
+arch 2 "echo"                                                'echo hi'
+arch 2 "project_fact.py with an extra word"                  "python3 $FACT --tracker --root"
+arch 2 "project_fact.py through python, not python3"         "python $FACT --tracker"
+arch 2 "gh issue view with --json"                           'gh issue view 41 --json title,body,comments'
+arch 2 "gh issue view with -R"                               'gh issue view 41 -R evil.example/o/r'
+arch 2 "gh issue view piped on"                              'gh issue view 41 | cat'
+arch 2 "gh pr view"                                          'gh pr view 7'
+arch 0 "read-only git"                                       'git diff 1e105da..b58f714'
+arch 0 "a three-dot range"                                   'git diff origin/main...HEAD'
+arch 0 "a range and a path"                                  'git diff main...HEAD -- hooks/bash-scope-diagnoser.sh'
+arch 0 "two revisions with ~ and ^"                          'git diff HEAD~1 HEAD^'
+arch 0 "git show of a commit"                                'git show ab3c8bb'
+arch 0 "git show of a file at a commit"                      'git show HEAD:hooks/run.sh'
+arch 0 "git log of a range"                                  'git log main..HEAD'
+arch 0 "bare git log"                                        'git log'
+arch 0 "git log of a path"                                   'git log -- README.md'
+arch 0 "asking which tracker the repo uses"                  "python3 $FACT --tracker"
+arch 0 "asking where the architecture doc is"                "python3 $FACT --architecture-doc"
+arch 0 "reading the issue with gh"                           'gh issue view 41'
+arch 0 "reading the issue and its comments with gh"          'gh issue view 41 --comments'
+# Re-verify round 2: the same two holes for the diagnoser and reader, whose
+# allowlist the gate catalog says refuses a write or run flag in every spelling.
+run_case 2 "git grep -O hidden after -e --"                  'git grep -e -- -Orm'
+run_case 2 "git grep -O hidden after -f --"                  'git grep -f -- -Otouch'
+run_case 2 "sort running a program through --compress-program" 'sort --compress-program=sh lib/a.ex'
+run_case 2 "sort with --compress-program shortened"          'sort --comp=sh lib/a.ex'
+scoped 2 "project-wide: the plugin's architecture reviewer is gated" "{$RM,\"agent_type\":\"masthead:architecture-reviewer\"}" --project-wide
+scoped 0 "project-wide: another plugin's architecture reviewer passes" "{$RM,\"agent_type\":\"otherplugin:architecture-reviewer\"}" --project-wide
 
 printf '%s' '{"tool_name":"Bash","tool_input":{}}' | bash "$HOOK" >/dev/null 2>&1
 [ $? -eq 2 ] && pass "a Bash call with no command string is denied" \

@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# bash-scope-reviewer.sh - PreToolUse on Bash: refuse a verifier agent's command that uses a network program, a URL or /dev/tcp; other agents pass.
+# bash-scope-reviewer.sh - PreToolUse on Bash: refuse a verifier agent's command that uses a network program, a URL or /dev/tcp; other agents pass. The architecture reviewer may also run `gh issue view`, to read the issue on a GitHub repository with no connector.
 
 set -uo pipefail
 
 # List the agents this gate covers; the jq path, the no-jq path and review-write-fence.py all read this line.
-REVIEWER_AGENTS="verifier|security-reviewer"
+REVIEWER_AGENTS="verifier|security-reviewer|architecture-reviewer"
 
 # Allow everything when REVIEWER_NETWORK_GATE is off.
 [ "${REVIEWER_NETWORK_GATE:-on}" = "off" ] && exit 0
@@ -30,6 +30,7 @@ INPUT="$(cat 2>/dev/null || true)"
 # Apply only to the verifiers: no identity means the main session and passes, and any identity field naming a verifier puts the call in scope.
 # Claude Code sends this plugin's verifier as masthead:verifier; another plugin's agent of the same name is not ours to police.
 in_scope=0
+agent=""
 for field_value in \
   "$(printf '%s' "$INPUT" | jq -r '.agent_type // empty')" \
   "$(printf '%s' "$INPUT" | jq -r '.subagent_type // empty')" \
@@ -39,6 +40,7 @@ for field_value in \
   case "$field_value" in masthead:*) candidates="$(printf '%s' "${field_value#masthead:}" | tr ':' '\n')" ;; *) candidates="$field_value" ;; esac
   if printf '%s\n' "$candidates" | grep -qE "^($REVIEWER_AGENTS)([-_.:]|$)"; then
     in_scope=1
+    agent="$(printf '%s\n' "$candidates" | grep -E "^($REVIEWER_AGENTS)([-_.:]|$)" | tail -1 | grep -oE "^($REVIEWER_AGENTS)")"
     break
   fi
 done
@@ -46,6 +48,15 @@ done
 
 CMD="$(printf '%s' "$INPUT" | jq -r '.tool_input.command // empty')"
 [ -n "$CMD" ] || exit 0
+
+# The architecture reviewer reads its issue with gh where no GitHub connector is loaded (MAST-34 scenario 5).
+# Only the whole command `gh issue view <n>`, bare or with --comments (Robert, November 15), passes: gh reads
+# GH_REPO, GH_HOST and the proxy settings from its environment as -R does from its flags, so nothing may be set
+# before it, wrapped around it or chained to it. Every other gh call is refused below.
+if [ "$agent" = "architecture-reviewer" ]; then
+  GH_VIEW_RE='^[[:space:]]*gh issue view [0-9]+( --comments)?[[:space:]]*$'
+  [[ "$CMD" =~ $GH_VIEW_RE ]] && exit 0
+fi
 
 deny() {
   echo "DENIED: a verifier's Bash may not reach the network ($1)." >&2
@@ -100,7 +111,7 @@ CMD_BARE="$(printf '%s' "$CMD" | awk '
 
 # Refuse a network program as the first word of any command segment. The text is split on ;, &&, ||, |, &, newlines, backticks, $( and parentheses, runs of whitespace (tabs too) collapse, and quotes and backslashes are stripped from each word, so "curl", 'curl' and curl<TAB> are all just curl. A filename or an argument that merely contains the name is not a first word and passes.
 judge_segment() {
-  local seg="$1" w prog sub i j k
+  local seg="$1" w prog sub i j k name
   local -a words clean
   IFS=$' \t' read -ra words <<<"$seg"
   clean=()
@@ -142,7 +153,22 @@ judge_segment() {
       sub="${clean[$j]:-}"
       case "$sub" in
         push|fetch|pull|clone|remote|ls-remote) deny "git $sub" ;;
-      esac ;;
+      esac
+      # git grep -O runs a program on each match, and git takes it bundled (-iO), with the program joined (-Ocurl) or shortened (--open, --op).
+      # A lone -- does not end the scan: given to a flag that takes a value (-e --, -f --), git reads it as that
+      # value and keeps reading flags after it.
+      for ((k = j + 1; k < ${#clean[@]}; k++)); do
+        w="${clean[$k]}"
+        case "$w" in
+          --) ;;
+          --*)
+            name="${w#--}"; name="${name%%=*}"
+            if [ -n "$name" ]; then
+              case "open-files-in-pager" in "$name"*) deny "git $sub $w runs a program on each match" ;; esac
+            fi ;;
+          -*O*) deny "git $sub $w runs a program on each match" ;;
+        esac
+      done ;;
     sh|bash|zsh|dash|ksh|eval)
       # A shell's -c payload, or eval's argument, is a command wearing quotes: judge it too.
       for ((k = i + 1; k < ${#clean[@]}; k++)); do

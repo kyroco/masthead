@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# bash-scope-diagnoser.sh: PreToolUse Bash hook that lets the diagnoser and reader agents run only test runners, read-only git and gh, and read-only inspection, and denies the rest (exit 2).
+# bash-scope-diagnoser.sh: PreToolUse Bash hook that lets the diagnoser and reader agents run only test runners, read-only git and gh, and read-only inspection, and denies the rest (exit 2). The architecture reviewer gets only three exact command shapes: git diff, show or log with plain revisions and paths, this plugin's project_fact.py with --tracker or --architecture-doc, and gh issue view <n>.
 
 set -uo pipefail
 
@@ -16,12 +16,18 @@ fi
 TOOL_NAME="$(printf '%s' "$INPUT" | jq -r '.tool_name // empty')"
 [ "$TOOL_NAME" = "Bash" ] || exit 0
 
-# Apply the gate only to the diagnoser and reader agents when run with --project-wide; a main-session call passes.
+# Apply the gate only to the diagnoser, reader and architecture-reviewer agents when run with --project-wide; a main-session call passes.
 # Claude Code sends this plugin's agents as masthead:diagnoser; another plugin's agent of the same name is not ours to police.
+IS_ARCH=false
 if [ "${1:-}" = "--project-wide" ]; then
-  IS_DIAGNOSER="$(printf '%s' "$INPUT" | jq -r '[.agent_type, .subagent_type, .agent_name] | map(select(type == "string") | if startswith("masthead:") then (ltrimstr("masthead:") | split(":") | .[]) else . end) | any(. == "diagnoser" or . == "reader")')"
+  NAMES='[.agent_type, .subagent_type, .agent_name] | map(select(type == "string") | if startswith("masthead:") then (ltrimstr("masthead:") | split(":") | .[]) else . end)'
+  IS_DIAGNOSER="$(printf '%s' "$INPUT" | jq -r "$NAMES"' | any(. == "diagnoser" or . == "reader" or . == "architecture-reviewer")')"
   [ "$IS_DIAGNOSER" = "true" ] || exit 0
+  IS_ARCH="$(printf '%s' "$INPUT" | jq -r "$NAMES"' | any(. == "architecture-reviewer")')"
 fi
+# The one script the architecture reviewer may run: this plugin's project_fact.py, by its full path.
+FACT_SELF="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd -P)/project_fact.py"
+FACT_ROOT="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/hooks/project_fact.py}"
 
 CMD="$(printf '%s' "$INPUT" | jq -r '.tool_input.command // empty')"
 CWD="$(printf '%s' "$INPUT" | jq -r '.cwd // empty')"
@@ -37,6 +43,55 @@ deny() {
   echo "Denied: changing files or git state, the network beyond this machine, credential reads, and anything the guard cannot check (substitution, variables, subshells, braces, input redirects, multi-line commands, path traversal). The diagnoser diagnoses; it does not fix." >&2
   exit 2
 }
+
+# The credential check, applied to every word.
+CRED_RE='(^|[/:=])\.env|\.pgpass|\.netrc|(^|/)\.aws(/|$)|(^|/)\.ssh(/|$)|\.gnupg|\.docker/config|\.kube/config|\.npmrc|\.pypirc|\.git-credentials|id_(rsa|dsa|ecdsa|ed25519)|\.(pem|key|p12|pfx)$|(^|/)credentials(\.json)?$|gh/hosts\.yml|\.config/gcloud|\.azure(/|$)|(^|/)secrets?\.(ya?ml|json|env)$'
+
+# --- 0. the architecture reviewer: exact command shapes, and nothing else ---
+# Robert, November 15 (MAST-34 comment): its shell allows only exact command shapes and refuses everything
+# else, since every list of refused flags left a spelling open. It reads files with Read, Glob and Grep, so it
+# needs only these, each as the whole command, its words split by single spaces:
+#   git diff, git show or git log, then plain revisions and paths: no flag but a lone --, no quote, variable,
+#     glob, pipe, chain or redirect, no path out of the checkout, and nothing set before git or between git and
+#     its subcommand;
+#   python3 <this plugin>/hooks/project_fact.py --tracker, or --architecture-doc;
+#   gh issue view <n>, bare or with --comments.
+if [ "$IS_ARCH" = true ]; then
+  arch_deny() {
+    echo "DENIED by the architecture reviewer's shell guard: $1" >&2
+    echo "Command: $CMD" >&2
+    echo "Allowed, each as the whole command: git diff, git show or git log with plain revisions and paths (no flag but --); python3 $FACT_SELF --tracker, or --architecture-doc; gh issue view <n>, bare or with --comments. Read files with Read, Glob and Grep." >&2
+    exit 2
+  }
+  A="${CMD#"${CMD%%[! ]*}"}"
+  A="${A%"${A##*[! ]}"}"
+  for fact in "$FACT_SELF" "$FACT_ROOT"; do
+    [ -n "$fact" ] || continue
+    case "$A" in
+      "python3 $fact --tracker"|"python3 $fact --architecture-doc") exit 0 ;;
+    esac
+  done
+  [[ "$A" =~ ^gh\ issue\ view\ [0-9]+(\ --comments)?$ ]] && exit 0
+  case "$A" in
+    *[!A-Za-z0-9._/@:^~\ -]*) arch_deny "the command holds a character outside plain revisions and paths (a quote, variable, glob, pipe, chain, redirect, tab or new line)" ;;
+  esac
+  read -r -a AW <<< "$A"
+  [ "${AW[0]:-}" = git ] || arch_deny "'${AW[0]:-}' is not one of its commands"
+  case "${AW[1]:-}" in
+    diff|show|log) ;;
+    *) arch_deny "'git ${AW[1]:-}' is not allowed; only git diff, git show and git log, with nothing between git and the subcommand" ;;
+  esac
+  for w in "${AW[@]:2}"; do
+    case "$w" in
+      --) continue ;;
+      -*) arch_deny "'$w' is a flag; only plain revisions and paths, and a lone --, follow git ${AW[1]}" ;;
+      /*|'~'*) arch_deny "'$w' is a path out of the checkout" ;;
+    esac
+    [[ "$w" =~ (^|[/:])\.\.(/|$) ]] && arch_deny "'$w' climbs out of the checkout with .."
+    printf '%s' "$w" | grep -Eiq "$CRED_RE" && arch_deny "'$w' names a credential file or directory"
+  done
+  exit 0
+fi
 
 # --- 1. what cannot be checked is not allowed ---
 NL='
@@ -95,9 +150,6 @@ S="${S//||/;}"
 S="${S//|/;}"
 S="${S//&/;}"
 
-# --- the credential check, applied to every word ---
-CRED_RE='(^|[/:=])\.env|\.pgpass|\.netrc|(^|/)\.aws(/|$)|(^|/)\.ssh(/|$)|\.gnupg|\.docker/config|\.kube/config|\.npmrc|\.pypirc|\.git-credentials|id_(rsa|dsa|ecdsa|ed25519)|\.(pem|key|p12|pfx)$|(^|/)credentials(\.json)?$|gh/hosts\.yml|\.config/gcloud|\.azure(/|$)|(^|/)secrets?\.(ya?ml|json|env)$'
-
 strip_quotes() { printf '%s' "$1" | tr -d "'\"\\\\"; }
 
 # Allow an absolute path only inside the project or a temp dir.
@@ -147,6 +199,8 @@ check_redirect_target() {
   case "$t" in
     *..*) deny "path traversal ('..') in a redirect target is not allowed" ;;
     /dev/null) return 0 ;;
+  esac
+  case "$t" in
     /tmp/*|/private/tmp/*) ;;
     *) deny "a redirect into '$t'; the diagnoser writes nothing to the tree, only to /tmp or /dev/null" ;;
   esac
@@ -155,6 +209,28 @@ check_redirect_target() {
   esac
   [ -L "$t" ] && deny "the redirect target '$t' is a symlink, which could point back into the tree"
   return 0
+}
+
+# A write or run flag is refused in every spelling a program accepts, not only as an exact word: a short letter
+# alone or bundled with others or with its value joined on (-o, -uo, -oFILE), and a long name shortened to any
+# prefix, as git and GNU tools take it (--out for --output). Matching a short letter anywhere after one dash
+# refuses some harmless bundles too, which is the safe way to be wrong.
+# flag_hits <word> <short letters> <long names without dashes>: true when the word is one of those flags.
+flag_hits() {
+  local word="$1" short="$2" long="$3" name n
+  case "$word" in
+    --) return 1 ;;
+    --*)
+      name="${word#--}"; name="${name%%=*}"
+      [ -n "$name" ] || return 1
+      for n in $long; do
+        case "$n" in "$name"*) return 0 ;; esac
+      done ;;
+    -?*)
+      [ -n "$short" ] || return 1
+      case "${word#-}" in *["$short"]*) return 0 ;; esac ;;
+  esac
+  return 1
 }
 
 # --- the allowed commands ---
@@ -178,10 +254,9 @@ check_git() {
   esac
   i=$((H + 2))
   while [ "$i" -lt "${#W[@]}" ]; do
-    case "${W[$i]}" in
-      --output|--output=*|-o|--exec|--exec=*|--upload-pack|--upload-pack=*|--ext-diff|--no-index|-O|--open-files-in-pager|--open-files-in-pager=*)
-        deny "'${W[$i]}' can write or execute; the git allowance is read-only" ;;
-    esac
+    if flag_hits "${W[$i]}" "O" "output exec upload-pack ext-diff no-index open-files-in-pager"; then
+      deny "'${W[$i]}' can write or execute, in this spelling or another; the git allowance is read-only"
+    fi
     i=$((i + 1))
   done
 }
@@ -279,11 +354,16 @@ check_reader() {
   i=$((H + 1))
   while [ "$i" -lt "${#W[@]}" ]; do
     t="${W[$i]}"
+    case "$base" in
+      sort) flag_hits "$t" "o" "output compress-program" && deny "'sort $t' writes a file, in this spelling or another" ;;
+      tree) flag_hits "$t" "o" "" && deny "'tree $t' writes a file" ;;
+      file) flag_hits "$t" "C" "compile" && deny "'file $t' writes a compiled magic file" ;;
+      date) flag_hits "$t" "s" "set" && deny "'date $t' sets the clock" ;;
+      rg) flag_hits "$t" "" "pre" && deny "'rg $t' runs a program on each file" ;;
+    esac
     case "$base:$t" in
       find:-delete|find:-exec|find:-execdir|find:-ok|find:-okdir|find:-fprint|find:-fprint0|find:-fprintf|find:-fls)
         deny "find $t can change or execute; only searching is allowed" ;;
-      sort:-o|sort:--output|sort:--output=*|tree:-o|file:-C|date:-s|date:--set|date:--set=*|rg:--pre|rg:--pre=*)
-        deny "'$base $t' writes or executes" ;;
       uniq:-*) ;;
       uniq:*) deny "uniq with a file argument can write its output file; pipe into it instead" ;;
     esac

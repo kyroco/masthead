@@ -82,6 +82,16 @@ case_ deny  "a named security file in capitals"        "$(p Write agent_type sec
 case_ deny  "an empty name after the dash"             "$(p Write agent_type security-reviewer "$R/findings-security-reviewer-.json")"
 case_ deny  "verifier writes a named security file"    "$(p Write agent_type verifier "$R/findings-security-reviewer-devop.json")"
 
+# MAST-34 scenario 6: the architecture reviewer writes only its own findings file.
+case_ allow "architecture-reviewer writes its findings" "$(p Write agent_type architecture-reviewer "$R/findings-architecture-reviewer-mast34.json")"
+case_ allow "masthead's architecture reviewer too"      "$(p Write agent_type masthead:architecture-reviewer "$R/findings-architecture-reviewer.json")"
+case_ deny  "architecture-reviewer writes source"       "$(p Write agent_type architecture-reviewer "$W/repo/lib/a.ex")"
+case_ deny  "architecture-reviewer edits source"        "$(p Edit agent_type masthead:architecture-reviewer "$W/repo/lib/a.ex")"
+case_ deny  "architecture-reviewer writes a verifier's" "$(p Write agent_type architecture-reviewer "$R/findings-verifier-contract.json")"
+case_ deny  "verifier writes the architecture findings" "$(p Write agent_type verifier "$R/findings-architecture-reviewer-mast34.json")"
+case_ deny  "architecture-reviewer writes the issue"    "$(p Write agent_type architecture-reviewer "$W/repo/.claude/state/review/validity.json")"
+case_ allow "another plugin's architecture reviewer"    "$(p Write agent_type otherplugin:architecture-reviewer "$W/repo/lib/a.ex")"
+
 # The scratch folder: a throwaway copy a verifier may change to run a test,
 # never the checkout under review.
 mkdir -p "$W/repo/.claude/state/review/scratch/wt/lib"

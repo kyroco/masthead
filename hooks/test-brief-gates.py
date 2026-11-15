@@ -330,8 +330,132 @@ def decision_for(subagent, prompt, rows, env_extra=None):
         return "unparseable: " + out[:80], out
 
 
+def architecture_brief(doc_line, alignment="ADR alignment:\n- \"Billing data is reached only through Billing.Accounts, which hands back an Account.\""):
+    return """read_only: true
+This is an architecture review; you change no code.
+
+Issue: MAST-34.
+Review git diff abc123..def456. Write your findings to .claude/state/review/findings-architecture-reviewer-mast34.json.
+ADR: docs/adr/ADR-0007-billing.md
+{}
+{}
+Principles: CLAUDE.md
+Mockup: none
+""".format(alignment, doc_line)
+
+
+# MAST-34 scenario 6: a brief to the architecture reviewer carries the ADR's
+# alignment lines and the architecture doc's path, the one the project records.
+# (label, subagent_type, prompt, recorded doc path or None, expected decision)
+ARCHITECTURE_CASES = [
+    ("an architecture brief naming the recorded doc", "architecture-reviewer",
+     architecture_brief("Architecture doc: docs/architecture.md"), "docs/architecture.md", "allow"),
+    ("the recorded doc by its full path", "architecture-reviewer",
+     architecture_brief("Architecture doc: {root}/docs/architecture.md"), "docs/architecture.md", "allow"),
+    ("masthead's architecture reviewer is screened", "masthead:architecture-reviewer",
+     architecture_brief("Architecture doc: docs/architecture.md"), "docs/architecture.md", "allow"),
+    ("HELD no architecture doc line", "architecture-reviewer",
+     architecture_brief(""), "docs/architecture.md", "deny"),
+    ("HELD masthead's reviewer with no doc line", "masthead:architecture-reviewer",
+     architecture_brief(""), "docs/architecture.md", "deny"),
+    ("HELD none when the project records a doc", "architecture-reviewer",
+     architecture_brief("Architecture doc: none recorded"), "docs/architecture.md", "deny"),
+    ("HELD another file than the recorded doc", "architecture-reviewer",
+     architecture_brief("Architecture doc: docs/other.md"), "docs/architecture.md", "deny"),
+    ("HELD a bold doc label is not the form", "architecture-reviewer",
+     architecture_brief("**Architecture doc:** docs/architecture.md"), "docs/architecture.md", "deny"),
+    # Scenario 8: with no doc recorded the reviewer still runs, on the principles alone.
+    ("no doc recorded, and the brief says so", "architecture-reviewer",
+     architecture_brief("Architecture doc: none recorded"), None, "allow"),
+    ("HELD no doc recorded, and the brief names one", "architecture-reviewer",
+     architecture_brief("Architecture doc: docs/architecture.md"), None, "deny"),
+    ("HELD no doc recorded, and no doc line", "architecture-reviewer",
+     architecture_brief(""), None, "deny"),
+    ("HELD no ADR alignment line", "architecture-reviewer",
+     architecture_brief("Architecture doc: docs/architecture.md", alignment=""), "docs/architecture.md", "deny"),
+    ("HELD an ADR alignment line with nothing under it", "architecture-reviewer",
+     architecture_brief("Architecture doc: docs/architecture.md", alignment="ADR alignment:\n"), "docs/architecture.md", "deny"),
+    ("HELD a first alignment bullet of three words", "architecture-reviewer",
+     architecture_brief("Architecture doc: docs/architecture.md", alignment="ADR alignment:\n- conforms to doc"),
+     "docs/architecture.md", "deny"),
+    ("an issue that builds no ADR says so, with why", "architecture-reviewer",
+     architecture_brief("Architecture doc: docs/architecture.md",
+                        alignment="ADR alignment: none, the issue builds no ADR"), "docs/architecture.md", "allow"),
+    ("HELD a bare none is no alignment", "architecture-reviewer",
+     architecture_brief("Architecture doc: docs/architecture.md", alignment="ADR alignment: none"),
+     "docs/architecture.md", "deny"),
+    ("HELD a bold alignment label is not the form", "architecture-reviewer",
+     architecture_brief("Architecture doc: docs/architecture.md",
+                        alignment="**ADR alignment:**\n- \"Billing data is reached only through Billing.Accounts.\""),
+     "docs/architecture.md", "deny"),
+    # Round 1, fix F3: the reviewer cannot open a link, so the ADR line names a
+    # path it can read, or "none".
+    ("HELD an ADR given as a link", "architecture-reviewer",
+     architecture_brief("Architecture doc: docs/architecture.md").replace(
+         "ADR: docs/adr/ADR-0007-billing.md", "ADR: https://github.com/o/r/wiki/ADR-0007"), "docs/architecture.md", "deny"),
+    ("HELD no ADR line", "architecture-reviewer",
+     architecture_brief("Architecture doc: docs/architecture.md").replace(
+         "ADR: docs/adr/ADR-0007-billing.md\n", ""), "docs/architecture.md", "deny"),
+    ("an issue that builds no ADR names none", "architecture-reviewer",
+     architecture_brief("Architecture doc: docs/architecture.md",
+                        alignment="ADR alignment: none, the issue builds no ADR").replace(
+         "ADR: docs/adr/ADR-0007-billing.md", "ADR: none"), "docs/architecture.md", "allow"),
+    ("another plugin's architecture reviewer is not masthead's", "otherplugin:architecture-reviewer",
+     THIN, "docs/architecture.md", "allow"),
+]
+
+
+def architecture_decision(subagent, prompt, doc):
+    """The gate's decision in a throwaway repository that records `doc` (or none)."""
+    root = os.path.realpath(tempfile.mkdtemp(prefix="arch-brief-"))
+    try:
+        os.makedirs(os.path.join(root, ".git"))
+        os.makedirs(os.path.join(root, "docs"))
+        for name in ("architecture.md", "other.md"):
+            with open(os.path.join(root, "docs", name), "w") as fh:
+                fh.write("# Architecture\n")
+        os.makedirs(os.path.join(root, ".claude"))
+        with open(os.path.join(root, ".claude", "settings.json"), "w") as fh:
+            json.dump({"env": {"ARCHITECTURE_DOC": doc}} if doc else {"env": {}}, fh)
+        payload = json.dumps({
+            "session_id": SESSION,
+            "cwd": root,
+            "tool_name": "Agent",
+            "tool_input": {"subagent_type": subagent, "prompt": prompt.replace("{root}", root)},
+        })
+        env = dict(os.environ)
+        env.pop("MASTHEAD_BRIEF_GATE", None)
+        env["CLAUDE_PROJECT_DIR"] = root
+        result = subprocess.run(
+            ["bash", HOOK, "gate-verify-brief"],
+            input=payload, capture_output=True, text=True, check=False, env=env,
+        )
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+    out = result.stdout.strip()
+    if not out:
+        return "allow", ""
+    try:
+        decoded = json.loads(out)["hookSpecificOutput"]
+        return decoded["permissionDecision"], decoded.get("permissionDecisionReason", "")
+    except Exception:
+        return "unparseable: " + out[:80], out
+
+
 def main():
     failures = 0
+    for label, subagent, prompt, doc, expected in ARCHITECTURE_CASES:
+        actual, _ = architecture_decision(subagent, prompt, doc)
+        ok = actual == expected
+        failures += 0 if ok else 1
+        print("{:4}  {:<52} expected {:<5} got {}".format("ok" if ok else "FAIL", label, expected, actual))
+
+    # The refusal names the doc the project records, so the worker can copy it.
+    _, reason = architecture_decision("architecture-reviewer", architecture_brief(""), "docs/architecture.md")
+    ok = "docs/architecture.md" in reason and "Architecture doc:" in reason and "ADR alignment:' at column zero" not in reason
+    failures += 0 if ok else 1
+    print("{:4}  {:<52} the refusal names the recorded doc".format("ok" if ok else "FAIL", ""))
+
     for label, subagent, prompt, rows, expected in CASES:
         actual, reason = decision_for(subagent, prompt, rows)
         ok = actual == expected
@@ -359,7 +483,7 @@ def main():
     if failures:
         print("{} cases wrong".format(failures))
         return 1
-    print("all {} cases correct".format(len(CASES) + 3))
+    print("all {} cases correct".format(len(CASES) + len(ARCHITECTURE_CASES) + 4))
     return 0
 
 
