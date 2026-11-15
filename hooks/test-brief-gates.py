@@ -433,6 +433,19 @@ REPO_CASES = [
     ("an extra's round spends no scenario round", re_verify(2),
      repo_rows((OTHER8, "re-verify round 1", "masthead:verifier"),
                (OTHER8, "re-verify extra e1", "masthead:verifier")), "top", "allow"),
+    # Round 1 fixes: a name read with a trailing period is the same extra (F2),
+    # and a branch gets no more extra rounds than the cap, so a made-up name
+    # cannot buy rounds past it (F1).
+    ("HELD a second round for the same extra, its name followed by a period",
+     "Re-verify: extra E1. a saved file is no longer cut short\nVerify.\n\nClaims:\n- a save that fails halfway leaves the old file whole\n",
+     repo_rows((OTHER8, "re-verify extra e1", "masthead:verifier")), "top", "deny"),
+    ("HELD a third extra's round once two extras had theirs", re_verify_extra("E3"),
+     TWO_ROUNDS + repo_rows((OTHER8, "re-verify extra e1", "masthead:verifier"),
+                            (OTHER8, "re-verify extra e2", "masthead:verifier")), "top", "deny"),
+    ("a third extra's round under MASTHEAD_REVERIFY_CAP=3", re_verify_extra("E3"),
+     TWO_ROUNDS + repo_rows((OTHER8, "re-verify extra e1", "masthead:verifier"),
+                            (OTHER8, "re-verify extra e2", "masthead:verifier")),
+     {"MASTHEAD_REVERIFY_CAP": "3"}, "allow"),
     ("HELD an extra line with no name for the extra", "Re-verify: extra\nVerify.\n\nClaims:\n- the extra's fix keeps the saved file whole\n",
      [], "top", "deny"),
 ]

@@ -218,6 +218,10 @@ def main():
                        "subagent_type": "verifier", "model": "opus"})
     extra = open(rec).read().splitlines()[-1].split("\t")
     check("an extra's round is recorded with the extra's name", extra[5], "re-verify extra e1")
+    dispatch_decision({"prompt": "Re-verify: extra E1. the saved file\nVerify the fix commits.\nClaims: x",
+                       "subagent_type": "verifier", "model": "opus"})
+    dotted = open(rec).read().splitlines()[-1].split("\t")
+    check("a period after the extra's name is not part of it", dotted[5], "re-verify extra e1")
     dispatch_decision({"prompt": "Re-verify: claims 1 and 3\nVerify the fix commits.",
                        "subagent_type": "verifier", "model": "opus"})
     unnumbered = open(rec).read().splitlines()[-1].split("\t")
