@@ -19,7 +19,15 @@ mockup's model where there is one; the rubric or test support file the repo
 keeps for the record; the code each decision touches, found with
 `code_locate` first; and Korium, `agent_search` with `limit` 5, for the
 record's subject, for each decision, and for the user's earlier answers.
-Read the older records a decision changes, too.
+Read the older records a decision changes, too. The architecture doc is the
+one `python3 ${CLAUDE_PLUGIN_ROOT}/hooks/project_fact.py --architecture-doc`
+prints. When it prints nothing, look for `ARCHITECTURE_DOC` in the env block
+of the main checkout's `.claude/settings.local.json` and `.claude/settings.json`.
+When neither holds it, no doc is recorded: say so in the report and skip
+**The architecture alignment** below. When one holds a path, the doc has moved
+or gone: that is the first finding. Say which path is recorded and that no
+file is there, and ask the user where the doc is now before the alignment
+review.
 
 ## What you are looking for
 
@@ -39,10 +47,41 @@ A finding names the two lines that disagree, or the state and the decision
 that is silent on it. "Could be clearer" and "I would have done it another
 way" are not findings.
 
+## The architecture alignment
+
+The ADR gate proves only that the record's Architecture Alignment section is
+there, with a verdict on each entry, and a why only on a divergence. It
+cannot tell a real why from an empty one, and it lets a bare "conforms"
+through. You can, because you read the doc and the code too. Judge each
+line as a reader would; do not match words.
+
+First, the doc against the code, because the ADR is held to it. A doc older
+than the code it describes is a finding on each stale line: a module or door
+it names that the code no longer has, or an app or part the code has that the
+doc does not name. Report each stale line before you review the ADR against
+the doc, and settle it like any other finding, so the doc is right before
+anything is measured against it.
+
+Then each alignment line:
+
+- A module, door or part it names is in the code: find it with `code_locate`
+  and read it. One you cannot find is a finding that quotes the line.
+- Each build on its `Builds:` line is one the doc names, under "What each
+  build ships" or wherever it lists its builds. A build the doc does not name
+  is a finding.
+- A line that says "TBD" or "N/A" with no reason, says only "conforms"
+  with no word of how, gives a why that only repeats the part's name, or restates the doc without
+  saying how this decision applies it, is hollow. That is a finding, and the person settles
+  it: never fill in how the decision applies the doc yourself.
+- A part of the doc the decision's work touches, judged from the decisions
+  and the code they change, that the alignment does not mention is a finding
+  that names the part.
+
 ## Questions
 
 Settle each finding from the sources first: the user's words in the record
-and its comments, Korium, the mockup's model. What nothing settles goes to
+and its comments, Korium, the mockup's model. A hollow alignment line is the
+exception: it always goes to the user. What nothing settles goes to
 the user, one at a time, in the order a builder would meet it: what the
 customer sees today, your one recommendation and why, and the question.
 Wait for the answer. Write it down in the user's words. Then the next one.
@@ -60,7 +99,8 @@ asks: the wiki by a push, the repo by a PR.
 ## Report, and capture
 
 One table: each decision, what disagreed or was missing, what the user
-answered, what changed where. Capture the run in Korium with `agent_capture`
+answered, what changed where, with the stale doc lines first and each
+alignment line as its own row. Capture the run in Korium with `agent_capture`
 and give its id.
 
 ## Then the screens

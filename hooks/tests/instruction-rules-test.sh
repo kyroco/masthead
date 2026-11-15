@@ -1517,5 +1517,31 @@ says  skills/setup/architecture-review.md 'say you found no code to review'
 says  skills/setup/architecture-review.md 'When `findings --ledger <L>` prints a file, a review was left unjudged'
 # Claim 7: a line that names more than one build is split by the session.
 says  skills/setup/architecture-review.md 'When one line names more than one build'
+
+# MAST-32: /review-design proves an ADR's architecture alignment is real.
+RD=skills/review-design/SKILL.md
+says  "$RD" '## The architecture alignment'
+says  "$RD" 'project_fact.py --architecture-doc'
+says  "$RD" 'Judge each line as a reader would; do not match words.'
+# Scenario 1: a named module or door is found in the code, or is a finding.
+says  "$RD" 'A module, door or part it names is in the code: find it with `code_locate` and read it. One you cannot find is a finding that quotes the line.'
+# Scenario 2: each build is one the doc names.
+says  "$RD" 'Each build on its `Builds:` line is one the doc names, under "What each build ships" or wherever it lists its builds. A build the doc does not name is a finding.'
+# Scenario 3: a hollow line is a finding the person settles. The foreman, for
+# MAST-31: a why that only repeats the part's name is caught here, not by the gate.
+says  "$RD" 'A line that says "TBD" or "N/A" with no reason, says only "conforms" with no word of how, gives a why that only repeats the part'"'"'s name, or restates the doc without saying how this decision applies it, is hollow. That is a finding, and the person settles it'
+says  "$RD" 'A hollow alignment line is the exception: it always goes to the user.'
+# Scenario 4: a touched part the alignment leaves out is a finding naming it.
+says  "$RD" 'that the alignment does not mention is a finding that names the part.'
+# Scenario 5: stale doc lines are reported before the ADR is reviewed against the doc.
+says  "$RD" 'a module or door it names that the code no longer has, or an app or part the code has that the doc does not name'
+says  "$RD" 'Report each stale line before you review the ADR against the doc'
+# Round 1, F1: a doc recorded but moved or gone is a finding, not "no doc recorded".
+says  "$RD" 'look for `ARCHITECTURE_DOC` in the env block of the main checkout'"'"'s `.claude/settings.local.json` and `.claude/settings.json`'
+says  "$RD" 'When one holds a path, the doc has moved or gone: that is the first finding. Say which path is recorded and that no file is there, and ask the user where the doc is now before the alignment review.'
+# Round 1, F2: the gate asks a why only of a divergence, so a bare conforms is hollow too.
+never "$RD" 'with a verdict and a why on each entry'
+says  "$RD" 'a verdict on each entry, and a why only on a divergence'
+says  "$RD" 'says only "conforms" with no word of how,'
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
