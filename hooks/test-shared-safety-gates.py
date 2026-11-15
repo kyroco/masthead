@@ -678,6 +678,26 @@ def main():
     check("no jq: a brief with nothing wrong is allowed", fan_out(CLEAN, path=FAN_NO_JQ), "")
     check("no jq: an Opus dispatch with no Model-choice line is refused, as with jq",
           '"deny"' in fan_out(CLEAN, model="opus", path=FAN_NO_JQ), True)
+    # A python3 that is found but cannot run reads nothing, so the brief must be refused, not sent.
+    BROKEN_BIN = tempfile.mkdtemp(prefix="brief-broken-python-")
+    with open(os.path.join(BROKEN_BIN, "python3"), "w") as fh:
+        fh.write("#!/bin/sh\nexit 1\n")
+    os.chmod(os.path.join(BROKEN_BIN, "python3"), 0o755)
+    check("no jq, broken python3: a verifier brief with no claims list is refused",
+          '"deny"' in fan_out(TWO_PROBLEMS, subagent="verifier",
+                              path=BROKEN_BIN + os.pathsep + FAN_NO_JQ), True)
+    shutil.rmtree(BROKEN_BIN, ignore_errors=True)
+    # A Latin-1 locale and a brief with an arrow in it: the refusal still reaches Claude Code.
+    latin_env_out = subprocess.run(
+        ["bash", BRIEF_GATES], capture_output=True, check=False,
+        input=json.dumps({"session_id": "brief-fan", "cwd": FAN_CWD, "tool_name": "Agent",
+                          "tool_input": {"prompt": "Verify this diff → report.",
+                                         "subagent_type": "verifier", "model": "haiku",
+                                         "name": "fan-out-case"}}).encode(),
+        env=dict(os.environ, PATH=FAN_NO_JQ, TMPDIR=FAN_TMP + "/", CLAUDE_CONFIG_DIR=FAN_USER,
+                 LANG="en_US.ISO8859-1", LC_ALL="en_US.ISO8859-1")).stdout
+    check("no jq, Latin-1 locale: a verifier brief with an arrow and no claims is refused",
+          b'"deny"' in latin_env_out, True)
     nojq_rows = open(record).read().splitlines()
     check("no jq: the dispatch is still recorded",
           len([r for r in nojq_rows if "\tfan-out-case\t" in r]) >= 6, True)

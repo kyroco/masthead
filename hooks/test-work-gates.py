@@ -1329,6 +1329,31 @@ def main():
     check("no jq: a command that is not a Bash call is left alone",
           run(["bash", IRREVERSIBLE], json.dumps({"tool_name": "Read",
               "tool_input": {"command": "git reset --hard"}}), env=no_jq), "allow")
+
+    # A locale that is not UTF-8 must not make the reader drop the command or the refusal.
+    latin1 = dict(no_jq, LANG="en_US.ISO8859-1", LC_ALL="en_US.ISO8859-1")
+    for label, command in (
+        ("an arrow", "git commit -m 'done →' && git push --force origin main"),
+        ("an emoji", "git commit -m 'ship \U0001F680' && git push --force origin main"),
+        ("an accented letter", "git commit -m 'café' && git reset --hard HEAD~1"),
+    ):
+        check("no jq, Latin-1 locale: a command with " + label + " is still refused",
+              run(["bash", IRREVERSIBLE], json.dumps({
+                  "session_id": "test-safety-gates", "cwd": UNPROVEN_TREE,
+                  "tool_name": "Bash", "tool_input": {"command": command}}), env=latin1), "deny")
+
+    # A python3 that is found but cannot run (the macOS stub with no Command Line Tools) reads nothing.
+    broken_bin = tempfile.mkdtemp(prefix="broken-python-")
+    with open(os.path.join(broken_bin, "python3"), "w") as fh:
+        fh.write("#!/bin/sh\nexit 1\n")
+    os.chmod(os.path.join(broken_bin, "python3"), 0o755)
+    broken = {"PATH": broken_bin + os.pathsep + no_jq_bin}
+    check("no jq, broken python3: a force push is still refused",
+          run(["bash", IRREVERSIBLE], json.dumps({
+              "session_id": "test-safety-gates", "cwd": UNPROVEN_TREE,
+              "tool_name": "Bash", "tool_input": {"command": "git push --force origin main"}}),
+              env=broken), "deny")
+    shutil.rmtree(broken_bin, ignore_errors=True)
     shutil.rmtree(no_jq_bin, ignore_errors=True)
 
     print("\n--- fail open: every internal failure allows ---")
