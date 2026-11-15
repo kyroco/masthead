@@ -390,6 +390,24 @@ check("1: a doc whose parts are top-level headings has parts an ADR can name", w
 why = write_adr(r, adr("## Architecture Alignment\n\nWe follow it.\n\nBuilds: Hosted\n"))
 check("1: and the refusal lists them", "`Direction`" in why and "no headings yet" not in why, why)
 
+# ------------------------------------------------------------------ round 1: an old ADR renamed or moved
+r = make_repo("r1-renamed")
+commit(r, {"docs/adr/ADR-0007-take-orders.md": adr()}, "an ADR from before")
+git(r, "mv", "docs/adr/ADR-0007-take-orders.md", "docs/adr/ADR-0007-take-and-ship-orders.md")
+code, err = stop_gate(r)
+check("4: an old ADR renamed with git mv is not asked for the new section at stop", code == 0, "%s %s" % (code, err))
+why = write_adr(r, adr().replace("Proposed", "Accepted"), "docs/adr/ADR-0007-take-and-ship-orders.md")
+check("4: nor when it is then written under its new name", why == "", why)
+
+r = make_repo("r1-moved")
+commit(r, {"docs/adr/proposed/ADR-0007-take-orders.md": adr()}, "an ADR from before")
+os.makedirs(os.path.join(r, "docs/adr/current"))
+os.rename(os.path.join(r, "docs/adr/proposed/ADR-0007-take-orders.md"),
+          os.path.join(r, "docs/adr/current/ADR-0007-take-orders.md"))
+code, err = stop_gate(r)
+check("4: an old ADR moved to another folder, unstaged, is not asked for the new section",
+      code == 0, "%s %s" % (code, err))
+
 shutil.rmtree(T, ignore_errors=True)
 print()
 print("%d passed, %d failed" % (passed, failed))
