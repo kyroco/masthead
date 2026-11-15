@@ -1141,6 +1141,11 @@ ok "$STATUS" "0" "the checkout that has the script, with a passing check, still 
 rm -f "$d/.claude/push-check.sh"
 run_gate "$d"
 ok "$STATUS" "2" "a named push check missing from the main checkout is refused too"
+# No origin/main and a clean tree: the changed-file list is empty, but the commits are new, so the rung still runs.
+( cd "$TMP/pushcheck-side" && git commit -qam "more notes" ) >/dev/null 2>&1
+run_gate "$TMP/pushcheck-side"
+ok "$STATUS" "2" "a clean worktree with no origin/main is still refused when its branch lacks the push check"
+contains "$ERR" "not in this checkout" "and it says the script is not in this checkout"
 
 echo ""
 echo "passed $pass, failed $fail"
