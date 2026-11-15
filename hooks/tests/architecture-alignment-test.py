@@ -452,6 +452,30 @@ check("2: 'no divergence' is not a verdict, so it is asked to say conforms", "wi
 why = write_adr(r, section("- `Core and extensions`: diverges from the architecture doc at docs/architecture.md."), NEW)
 check("2: a divergence whose only words name the doc's path is refused for no why", "but not why" in why, why)
 
+# ------------------------------------------------------------------ round 2: the build names
+r = make_repo("r2-builds")
+why = write_adr(r, adr("## Architecture Alignment\n\n" + ENTRY + "Builds: Hosted and Cloud\n"))
+check("2: 'Hosted and Cloud' is two builds, and the one the doc does not name is refused", "`Cloud`" in why, why)
+
+LINES_DOC = DOC.replace("- Hosted: core and billing.\n- Self-hosted: core alone, and it still takes orders.",
+                        "Hosted carries core and billing.\nSelf-hosted carries core alone.")
+r = make_repo("r2-builds-lines", base_doc=LINES_DOC)
+why = write_adr(r, adr("## Architecture Alignment\n\n" + ENTRY + "Builds: Cloud\n"))
+check("2: a doc whose builds are plain lines still names them, so an unknown build is refused", "`Cloud`" in why, why)
+why = write_adr(r, adr("## Architecture Alignment\n\n" + ENTRY + "Builds: Hosted, Self-hosted\n"))
+check("3: and the builds it names are accepted", why == "", why)
+
+SENTENCE_DOC = DOC.replace("- Hosted: core and billing.", "- Hosted carries core and billing.")
+r = make_repo("r2-builds-sentence", base_doc=SENTENCE_DOC)
+why = write_adr(r, adr("## Architecture Alignment\n\n" + ENTRY + "Builds: Hosted\n"))
+check("3: a build the doc names in a sentence is accepted by its name", why == "", why)
+
+r = make_repo("r2-builds-then-entry")
+why = write_adr(r, adr("## Architecture Alignment\n\nBuilds:\n\n- Hosted\n"
+                       "- `Core and extensions`:\n  conforms, billing plugs in through the hook.\n"))
+check("3: an entry with its verdict on the next line, after a bulleted Builds list, is read as an entry",
+      why == "", why)
+
 shutil.rmtree(T, ignore_errors=True)
 print()
 print("%d passed, %d failed" % (passed, failed))
