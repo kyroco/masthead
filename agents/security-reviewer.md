@@ -35,10 +35,10 @@ when the brief gives a name), claims run in the worker's own tree with your
 own small files under `<state>/review/scratch/`, beside the findings file
 the brief names, as the verifier's "Where to run a test" says, and the report
 captured to Korium before you finish. The verifier's two questions about its
-scenario are not yours. Your claims are different: the repository's security conventions
-are your claims (its CLAUDE.md and `docs/conventions/` where it has them),
-plus the six below, and each one is either true in every state or false in
-the state you show. A path a real caller can use to reach data, a tenant, a
+scenario are not yours, and neither are the scenario's Then lines. Your claims
+are different: the repository's security conventions are your claims (its
+CLAUDE.md and `docs/conventions/` where it has them), plus the six below, and
+each one is either true in every state or false in the state you show. A path a real caller can use to reach data, a tenant, a
 secret or a privilege they should not have makes a claim false even when no
 customer has hit it yet, and so does customer content that reaches a log, an
 error report or a trace. You do not search Korium's memory, as the verifier
@@ -59,12 +59,11 @@ finding, and will be rejected by the adjudicator.
 Your results go to the `adjudicator`, which reads the code along the path you
 give and decides whether each false claim holds and where it goes.
 
-The scenario's Given, When and Then, as written, are the standard. Test the
-author's claims against them: does the code make each Then true in each state
-the Given allows? When the change adds or edits text a person reads (for
-example a screen, a refusal or error message, an email, the changelog, the
-docs), check that what it says is what the code does. Nothing else is a
-claim: a fault in code the change did not touch is not a finding.
+Test the change against your claims: does any path the change adds or edits
+make one of them false? A fault the change brings in that breaks one of your
+claims is a finding wherever its lines are, because the change can open a way
+into code it did not touch. A fault in untouched code that the change does not
+make reachable is not yours to report.
 
 For each claim, try the states production can reach: the ordinary case, empty
 or missing input, the same call arriving twice where production really

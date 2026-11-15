@@ -153,11 +153,8 @@ says  references/session-cliffs.md "Add the changelog entry when the repo keeps 
 # landed while the run was going, because it was started with the verifiers.
 says  references/session-cliffs.md "Run it one time, after the fixes of the last verification round are in"
 says  references/session-cliffs.md "Do not commit while it runs: the run is then thrown away"
-says  references/session-cliffs.md "Do not start the repo's pre-push check now to save time"
+says  references/session-cliffs.md "Do not start it early, with the verifiers, to save time"
 says  references/session-cliffs.md "any commit made after it starts makes its receipt stale"
-says  skills/work-on/worker.md "Run the repo's pre-push check one time: on the last commit, after the fixes of the last verification round are in"
-says  skills/work-on/worker.md "Do not start it when you send out the verifiers, because any later commit makes its receipt stale"
-says  skills/work-on/worker.md "Do not commit while it runs, because the run is then thrown away"
 # The push gate's order and its remembered pass, where a person reads about them.
 for doc in README.md docs/explainer.template.html docs/explainer.html; do
   says "$doc" "the test receipt and the secret scan first, then the stack checks, which are skipped when this exact commit already passed them"
@@ -563,7 +560,6 @@ says  docs/explainer.template.html "or three when a memory is already connected"
 # under 8 is dropped, never brought to the person and never filed.
 says  skills/work-on/foreman.md "What the product does, what it says, what it charges, and who may do what are the person's to decide"
 says  skills/work-on/foreman.md "one question at a time; never fill the gap yourself"
-says  skills/work-on/foreman.md "Never bring the person an extra, and never file one"
 never skills/work-on/foreman.md "**Proceed**"
 never skills/work-on/foreman.md "This is the only issue a foreman files"
 says  skills/work-on/foreman.md "sessions alive, the ones waiting for the merge queue"
@@ -601,7 +597,7 @@ for doc in README.md docs/explainer.template.html docs/explainer.html; do
   never "$doc" "a follow-up that waited on this one first"
   never "$doc" "answers with the line quoted. Only when nothing settles it"
 done
-says  scripts/diagrams.py "8 or higher is fixed in this PR"
+says  scripts/diagrams.py "a high score is fixed in this PR"
 never docs/images/review.svg "fix later"
 never docs/images/review.svg "seen, not done"
 never docs/images/review.svg "reproduction"
@@ -1129,7 +1125,7 @@ says  agents/adjudicator.md "A thrown-out finding is never captured"
 # Scenario 7: the foreman rules on no disagreement between review rounds.
 never skills/work-on/foreman.md "a disagreement between review rounds"
 never skills/work-on/foreman.md "one round placed a finding on the fix list and the next among its extras"
-says  skills/work-on/foreman.md "the second re-verify round left something on the fix list"
+says  skills/work-on/foreman.md "what the second re-verify round left on the fix list"
 # The retired design sheet no longer ships.
 if [ -e "$ROOT/references/design-sheet.md" ]; then
   fail=$((fail + 1)); echo "FAIL references/design-sheet.md still ships"
@@ -1140,9 +1136,12 @@ fi
 says  skills/work-on/worker.md "Done is four things"
 never skills/work-on/worker.md "Done is three things"
 never .claude-plugin/plugin.json "Subagents run on Haiku unless"
-says  .claude-plugin/plugin.json "Refuse a helper sent to Opus"
-says  README.md "| \`model-choice-gate.sh\` | Ask for a reason before a subagent runs on Opus |"
+says  .claude-plugin/plugin.json "\"title\": \"Ask for a reason before a helper runs on the biggest model\""
+says  .claude-plugin/plugin.json "a call that names no model for a helper whose own file names one is not asked"
+never .claude-plugin/plugin.json "before a subagent runs on Opus"
+says  README.md "| \`model-choice-gate.sh\` | Ask for a reason before a helper runs on the biggest model |"
 never README.md "Ask for a reason before the biggest model"
+says  docs/explainer.template.html "<td><code>model-choice-gate.sh</code></td><td>Ask for a reason before a helper runs on the biggest model</td>"
 never hooks/run-tests.sh "nothing runs these in CI"
 says  hooks/run-tests.sh "CI runs this on Linux and macOS"
 never skills/work-on/SKILL.md "Nothing else in this skill or its files is checked by a hook"

@@ -118,9 +118,7 @@ false, or no test that passes really proves it; a bug fix's test did not
 come first; the change caused something that worked before to break; or text
 a person reads that the change added or edited is now false.
 
-Everything else is an extra. List it in your verdict; the worker scores it
-from 1 to 10, fixes it in this PR when it scores 8 or more, and drops it
-when it scores under 8. Nobody brings it to the person or files it. New code that does what a shared module already
+Everything else is an extra. List it in your verdict; the worker settles it as its "What done is" says (`skills/work-on/worker.md`). New code that does what a shared module already
 does, such as a second way to decide what a person can do, is an extra even
 when nothing is wrong yet.
 
@@ -158,11 +156,11 @@ memory holds up saving for the whole account. All of them are `thought_type`
 2. Capture each finding as its own memory, with the details your verdict gives
    it and where it went, and link it to the verdict with `relations`:
    `[{"target_id": "<the verdict memory's id>", "relation_type": "supports"}]`.
-   Every fix, extra and For the foreman item gets one, and so does each
-   thrown-out finding. A thrown-out finding's memory holds its id, its
-   `file:line`, and one line on why, so a round can be checked for a real
-   finding thrown away; the author never sees these.
+   Every fix, extra and For the foreman item gets one.
+
+A thrown-out finding is never captured: what you throw out is gone, and the
+verdict memory holds only its count. The worker searches Korium before each
+step, so a saved thrown-out finding would reach it.
 
 When they are saved, return the verdict memory's thought id. If a save failed,
-say which finding it was. A thrown-out finding whose save failed is counted,
-never named, since your final message reaches the author.
+say which finding it was.

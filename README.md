@@ -104,10 +104,9 @@ it stops.
 
 Then they build. A bug is fixed test first: a failing test in its own
 commit, then the fix. Anything a worker notices that the issue didn't ask
-for is an extra. It scores each one from 1 to 10, where 10 means leaving it
-would cause a catastrophic failure. What scores 8 or higher it fixes in the
-same pull request, test first when it is a bug. The rest is dropped: it
-reaches no one and is not filed.
+for is an extra. It scores each one, fixes in the same pull request the ones
+that score high enough, and drops the rest without filing them; the rule is
+in `skills/work-on/worker.md`.
 
 When a worker thinks it's done, it doesn't grade its own work. For each
 scenario it sends one verifier the scenario, the decision lines it rests on,
@@ -159,7 +158,7 @@ happened, and the run goes on without it.
 
 ![You have coffee; questions reach you only when nothing settles them](docs/images/day-6-coffee.svg)
 
-When a pull request is ready, every extra its worker scored 8 or higher is
+When a pull request is ready, every extra its worker's rule says to fix is
 already fixed in it, and nothing else reaches you unless a security finding
 could not be settled; that comes one item at a time, and you answer it. No
 issue is ever filed from a review. When its checks pass, its review
@@ -169,7 +168,7 @@ whose pieces are now all done, then starts the next issue, one that waited on
 this one first, in that worker in the desktop app or in a
 fresh session in the terminal. By the end of the day every issue is merged,
 parked or skipped, and you get one line per issue saying which, with how
-many merged and how many were filed.
+many merged.
 
 ![A run: issues checked, a foreman plan, workers in parallel, merges](docs/images/workflow.svg)
 
@@ -320,7 +319,7 @@ own files and its own line.
 | `capture-finding-reminder.py` | Connect Korium memory | nothing; reminders only |
 | `korium-index-on-stop.sh` and the code index gates in `engram-protocol.sh` | Keep a code index in Korium | a grep for a name the code index holds until the index is asked (and every grep while korium-cli is signed out or Korium does not answer), a search that repeats a name it just answered, and, once, a whole-file read of a file it just placed; the index refresh at the end of a session refuses nothing |
 | `commit-attribution-gate.py` | Keep AI attribution out of commits | a commit message or pull request body with an AI co-author line, a session link or a generated-with footer |
-| `model-choice-gate.sh` | Ask for a reason before the biggest model | a helper sent to the big model, by the call or by inheriting this session's, with no reason on the first line of its brief; a call that names no model for a helper whose own file names one is not asked |
+| `model-choice-gate.sh` | Ask for a reason before a helper runs on the biggest model | a helper sent to the big model, by the call or by inheriting this session's, with no reason on the first line of its brief; a call that names no model for a helper whose own file names one is not asked |
 
 The off switches are environment variables read from the check's own
 environment, so a session can't switch a check off for itself:

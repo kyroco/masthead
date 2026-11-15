@@ -485,9 +485,14 @@ def main():
                   "return the verdict memory's thought id"):
         check(f"the adjudicator's capture section says: {words}",
               str(words in " ".join(capture_section.split())), "True")
-    check("a failed save of a thrown-out finding is reported as a count",
-          str("A thrown-out finding whose save failed is counted, never named"
+    # MAST-39: a thrown-out finding is gone, so it is never saved where the
+    # worker searches; only its count is in the verdict memory.
+    check("a thrown-out finding is never captured",
+          str("A thrown-out finding is never captured"
               in " ".join(capture_section.split())), "True")
+    check("and no thrown-out finding gets a memory of its own",
+          str("and so does each thrown-out finding"
+              in " ".join(capture_section.split())), "False")
     check("the adjudicator is no longer told to save the verdict whole",
           str("Capture the verdict to Korium" in capture_section), "False")
 

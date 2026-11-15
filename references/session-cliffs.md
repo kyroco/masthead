@@ -94,10 +94,8 @@ order. The steps live here and nowhere else; a repo supplies only its own facts
    the change touches authorization, secrets, untrusted input or privilege,
    or the repo's security conventions call for it, with those conventions as
    its claims. Brief each as `references/dispatch-brief.md` says. You do not
-   read, merge or drop their results. `/code-review` is not used. Do not
-   start the repo's pre-push check now to save time: any commit made after
-   it starts makes its receipt stale, and the fixes are still to come. Step
-   8 runs it once.
+   read, merge or drop their results. `/code-review` is not used. Step 8
+   runs the pre-push check, once.
 3. Send the `adjudicator` the commit range, the reviewed files (the files the
    change touched before its first verification, the same list on every
    round), the path of every findings file the round wrote, the README's
@@ -106,10 +104,9 @@ order. The steps live here and nowhere else; a repo supplies only its own facts
    not your view of any finding. It reads the code along
    each verifier's path, decides whether the finding holds, and places it:
    fix in this PR, or an extra. That placement is final for you and the
-   foreman. What it throws out is gone: it is not logged or filed. Score its
-   extras as the worker's "What done is" says: one that scores 8 or more you
-   fix in this PR, test first when it is a bug, as step 4 says; one that
-   scores under 8 you drop, bringing it to no one and filing nothing. Its For
+   foreman. What it throws out is gone: it is not logged or filed. Score and
+   settle each of its extras as the worker's "What done is" says
+   (`skills/work-on/worker.md`); one you fix is fixed as step 4 says. Its For
    the foreman section (a security finding it could not
    settle) goes to the foreman unedited (to the user when there is none), who
    brings it to the user; the PR waits for that answer.
@@ -142,7 +139,8 @@ order. The steps live here and nowhere else; a repo supplies only its own facts
    its `.claude/settings.json` env names as `PROJECT_PUSH_CHECK`, or its own
    test command when it names none, in one command with nothing sourced. Run
    it one time, after the fixes of the last verification round are in. Do
-   not commit while it runs: the run is then thrown away, because its receipt
+   not start it early, with the verifiers, to save time: any commit made after
+   it starts makes its receipt stale. Do not commit while it runs: the run is then thrown away, because its receipt
    names a commit that is no longer the last one. Read
    the output, not the exit code. When it cannot reach its test stack, do what
    it prints, and stop and report only when that fails too. `hard-gate.sh`

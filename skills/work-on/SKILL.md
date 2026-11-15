@@ -54,8 +54,11 @@ commits and pushes, and the merge queue stays on `gh` (the github-issues
 skill, **Which tool makes the call**). The repo's own
 facts come first: where its `CLAUDE.md` or `docs/conventions/` sets a test
 command, a pre-push check, its changelog or a worktree
-standard, those bind. The PR steps themselves are **Opening a PR** in
-`${CLAUDE_PLUGIN_ROOT}/references/session-cliffs.md`. When a step names a
+standard, those bind. The PR steps are **Opening a PR**, as
+`python3 ${CLAUDE_PLUGIN_ROOT}/hooks/prime-context.py show "Opening a PR"`
+prints them from the worktree: the repo's own version when its
+`.claude/references/session-cliffs.md` has that lead, otherwise the plugin's,
+the same steps the hook injects. When a step names a
 file this repo does not have, do what the step is for with what the repo has,
 and list in the PR body each check the repo lacks. The `verifier` and
 `security-reviewer` agents live in `${CLAUDE_PLUGIN_ROOT}/agents` and review every repo;
@@ -77,8 +80,19 @@ gives and search again.
 
 ## What enforces this
 
-`gate-edit` refuses the first edit until a Korium search has run, and
-`hard-gate.sh` refuses `git push` and `gh pr create` until the repo's local
-test receipt matches the commit. Nothing else in this skill or its files is
-checked by a hook, including the ADR review; it rests on the text.
+These steps are checked by a hook; the README's check list says where each
+falls short:
+
+- `gate-edit` refuses the first edit until a Korium search has run, with the
+  Korium memory option on.
+- `hard-gate.sh` refuses `git push` and `gh pr create` until the repo's local
+  test receipt matches the commit, when the repo names a push check.
+- `agent-brief-gates.sh` refuses a verifier brief with no claims list and a third re-verify round,
+  and `dispatch-record-gate.sh` writes the dispatch log the agent count is
+  read from.
+- `review-write-fence.py` keeps a verifier's writes to its own findings file.
+- `issue-edit-gate.py` refuses an issue edit that drops a line quoted as the
+  person's.
+
+The rest, the ADR review included, rests on the text.
 
