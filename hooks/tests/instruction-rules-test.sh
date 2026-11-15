@@ -1364,5 +1364,27 @@ says  skills/setup/architecture-review.md 'You file only what the person names'
 says  skills/setup/architecture-review.md 'exit 6 means this session has reviewed its share'
 says  skills/setup/architecture-review.md 'say which parts were not reviewed (`left`)'
 says  agents/architecture-reviewer.md 'so the session that sent you keeps its room for the next batch'
+# MAST-36 round 1, F-4: every one of the seven lenses goes to a reviewer, by name.
+for lens in "Direction" "One way in and out" "Call shape" "Seams" "What each build carries" "Leftovers" "Tests and checks"; do
+  if sed -n '/^| Family | Lenses |$/,/^$/p' "$ROOT/skills/setup/architecture-review.md" | grep -qF -- "$lens"; then
+    pass=$((pass + 1)); else fail=$((fail + 1)); echo "FAIL skills/setup/architecture-review.md's family table leaves out the lens: $lens"; fi
+  if grep '^Lenses: ' "$ROOT/references/dispatch-brief.md" | grep -qF -- "$lens"; then
+    pass=$((pass + 1)); else fail=$((fail + 1)); echo "FAIL references/dispatch-brief.md's Lenses: line leaves out the lens: $lens"; fi
+done
+# F-5: a new review over a part-done one replaces it, on purpose.
+says  skills/setup/architecture-review.md 'run `plan` with `--fresh`'
+# F-6: a principle counts through the doc's rules, and design cost alone is dropped even when it quotes one.
+never agents/adjudicator.md 'that breaks a principle the brief'"'"'s principles file numbers'
+says  agents/adjudicator.md 'design cost alone is dropped even when it quotes a principle'
+# F-8: a doc that names no build still gets a scenario for each build.
+says  skills/setup/architecture-review.md 'When `builds` prints nothing, ask the person which builds the project ships'
+# F-10: the judge gets every batch reviewed and not judged, from any run.
+says  skills/setup/architecture-review.md 'findings --ledger <L>'
+says  skills/setup/architecture-review.md 'judged --ledger <L>'
+# F-2 and F-3: the reviewer gets the batch's exact file list, never a pattern.
+says  agents/architecture-reviewer.md 'names the file that lists the batch'
+says  references/dispatch-brief.md 'Sweep: the files listed in <the list path next prints>'
+# F-1: setup says why when there is no code to review.
+says  skills/setup/architecture-review.md 'say you found no code to review'
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]

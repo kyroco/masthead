@@ -55,23 +55,13 @@ def run(root, *args):
 
 
 def ledger_files(root, ledger):
-    """Every code file the ledger's batches cover, by expanding each part's pattern."""
+    """Every file the ledger's batches hand the reviewers, a line range counted as its file."""
     with open(ledger) as handle:
         data = json.load(handle)
-    tracked = [p for p in subprocess.run(["git", "ls-files"], cwd=root, capture_output=True, text=True).stdout.split()
-               if not p.endswith(".md")]
     covered = set()
     for batch in data["batches"]:
-        for part in batch["parts"]:
-            for path in tracked:
-                if part == "*" and "/" not in path:
-                    covered.add(path)
-                elif part.endswith("/**") and path.startswith(part[:-2]):
-                    covered.add(path)
-                elif part.endswith("/*") and path.startswith(part[:-1]) and "/" not in path[len(part) - 1:]:
-                    covered.add(path)
-                elif part == path:
-                    covered.add(path)
+        for entry in batch["files"]:
+            covered.add(entry.split("#L")[0])
     return covered, data
 
 
@@ -154,11 +144,19 @@ expect("left says when nothing is left", out.strip(), "nothing left")
 code, out = run(big, "plan", "--ledger", ledger, "--budget", "50")
 expect("a finished review can be planned again", code, 0)
 
-# A single file over the budget stands on its own, so nothing is left out.
+# Round 1, F-9: a file over the budget is split into line ranges, so no batch is over it.
 huge = repo({"lib/huge.ex": 120, "lib/small.ex": 10})
 code, out = run(huge, "parts", "--budget", "50")
 expect("a file over the budget is its own part",
        [line.split("\t")[0] for line in out.splitlines()], ["lib/huge.ex", "lib/small.ex"])
+ledger = os.path.join(huge, ".claude", "state", "architecture-review.json")
+code, out = run(huge, "plan", "--ledger", ledger, "--budget", "50")
+_, data = ledger_files(huge, ledger)
+expect("a file over the budget is read in ranges that fit",
+       [b["files"] for b in data["batches"]],
+       [["lib/huge.ex#L1-50"], ["lib/huge.ex#L51-100"], ["lib/huge.ex#L101-120", "lib/small.ex"]])
+expect("no batch is over the budget, even with a file over it",
+       [b["lines"] for b in data["batches"] if b["lines"] > 50], [])
 
 # Scenario 6: the doc's rules and builds, for the issue to quote.
 doc = os.path.join(root, "docs", "architecture.md")
@@ -189,6 +187,121 @@ expect("rules lists the seven rules", out.splitlines()[0], "Direction: The core 
 expect("rules lists all seven", len(out.splitlines()), 7)
 code, out = run(root, "builds", os.path.join(root, "README.md"))
 expect("a doc that names no build says so by its exit", code, 1)
+
+# Round 1, F-1: code in any language counts, and lock files and docs do not.
+other = repo({"src/main.zig": 40, "src/model.jl": 30, "engine/core.cxx": 50, "site/index.html": 20,
+              "pnpm-lock.yaml": 9000, "Cargo.lock": 400, "LICENSE": 200, "docs/guide.md": 10,
+              "logo.png": 3})
+code, out = run(other, "parts")
+expect("code in a language with no list entry is still code", code, 0)
+ledger = os.path.join(other, ".claude", "state", "architecture-review.json")
+run(other, "plan", "--ledger", ledger)
+covered, _ = ledger_files(other, ledger)
+expect("every code file is reviewed, and no lock file, licence, doc or image",
+       covered, {"src/main.zig", "src/model.jl", "engine/core.cxx", "site/index.html"})
+
+# Round 1, F-2: a targeted review at the default budget hands over only what was named.
+named = repo({"lib/billing/plan.ex": 30, "lib/billing/meter.ex": 25, "lib/account/status.ex": 20,
+              "lib/app.ex": 15, "lib/web/router.ex": 40})
+ledger = os.path.join(named, ".claude", "state", "architecture-review.json")
+run(named, "plan", "--ledger", ledger, "lib/billing", "lib/account")
+covered, data = ledger_files(named, ledger)
+expect("a targeted review at the default budget hands over only the named code",
+       covered, {"lib/billing/plan.ex", "lib/billing/meter.ex", "lib/account/status.ex"})
+expect("its parts name only what was picked",
+       [p for b in data["batches"] for p in b["parts"]], ["lib/account/**", "lib/billing/**"])
+run(named, "plan", "--ledger", ledger, "--fresh", "lib/billing/plan.ex")
+covered, _ = ledger_files(named, ledger)
+expect("one named file is the only file handed over", covered, {"lib/billing/plan.ex"})
+run(named, "plan", "--ledger", ledger, "--fresh", "lib/*")
+covered, _ = ledger_files(named, ledger)
+expect("a folder's own files, by the row parts prints, leave its subfolders out", covered, {"lib/app.ex"})
+
+# Round 1, F-3: a folder whose name holds glob characters is handed over by its real path.
+routes = repo({"app/[slug]/page.tsx": 30, "app/blog/page.tsx": 30, "app/layout.tsx": 10})
+ledger = os.path.join(routes, ".claude", "state", "architecture-review.json")
+run(routes, "plan", "--ledger", ledger, "--budget", "40")
+covered, _ = ledger_files(routes, ledger)
+expect("a folder named with brackets is reviewed", "app/[slug]/page.tsx" in covered, True)
+code, out = run(routes, "next", "--ledger", ledger)
+batch = json.loads(out)
+with open(os.path.join(routes, batch["list"])) as handle:
+    expect("next writes the batch's exact file list for the reviewers",
+           handle.read().split("\n")[:-1], batch["files"])
+
+# Round 1, F-10: a batch reviewed but never judged reaches the next run's judge.
+ledger = os.path.join(big, ".claude", "state", "architecture-review.json")
+run(big, "plan", "--ledger", ledger, "--budget", "50", "--fresh")
+for _ in range(2):
+    code, out = run(big, "next", "--ledger", ledger)
+    run(big, "done", "--ledger", ledger, str(json.loads(out)["id"]), "f-{}.json".format(json.loads(out)["id"]))
+run(big, "resume", "--ledger", ledger)
+code, out = run(big, "next", "--ledger", ledger)
+run(big, "done", "--ledger", ledger, str(json.loads(out)["id"]), "f-3.json")
+code, out = run(big, "findings", "--ledger", ledger)
+expect("the judge gets every batch reviewed and not judged, from any run", out.split(), ["f-1.json", "f-2.json", "f-3.json"])
+run(big, "judged", "--ledger", ledger)
+code, out = run(big, "findings", "--ledger", ledger)
+expect("a judged batch is not judged twice", out.split(), [])
+
+# Round 1, E-1: before any review, left answers plainly.
+fresh = os.path.join(big, ".claude", "state", "no-such-review.json")
+code, out = run(big, "left", "--ledger", fresh)
+expect("left with no review yet says nothing is left", (code, out.strip()), (0, "nothing left"))
+
+# Round 1, F-7: a rule or a build wrapped over several lines is read whole.
+wrapped = os.path.join(root, "docs", "wrapped.md")
+with open(wrapped, "w") as handle:
+    handle.write("""# Shop architecture
+
+## What each build ships
+
+- Hosted: core and billing; billing must meter
+  every save.
+- Marketplace: core only.
+
+## The seven rules
+
+- **Direction.** The core never names the billing app, and no extension names
+  another extension.
+- **One way in and out.** Billing data is reached only through Billing.Accounts.
+- **Call shape.** Callers ask one question of a service and get one answer.
+- **Seams.** Does not apply: there is one provider of everything.
+- **What each build carries.** Each build in the list above starts and serves its pages.
+- **Leftovers.** No rule is written in two apps.
+- **Tests and checks.** Each rule above has a check that reads code, not text.
+""")
+code, out = run(root, "rules", wrapped)
+expect("a wrapped rule is quoted whole", out.splitlines()[0],
+       "Direction: The core never names the billing app, and no extension names another extension")
+code, out = run(root, "builds", wrapped)
+expect("a wrapped build is one build", out.splitlines(),
+       ["Hosted: core and billing; billing must meter every save.", "Marketplace: core only."])
+plain = os.path.join(root, "docs", "plain.md")
+with open(plain, "w") as handle:
+    handle.write("""## What each build ships
+
+Hosted carries core and billing, and billing
+must meter every save.
+
+Marketplace carries the core only.
+""")
+code, out = run(root, "builds", plain)
+expect("a build written as a paragraph is one build", out.splitlines(),
+       ["Hosted carries core and billing, and billing must meter every save.",
+        "Marketplace carries the core only."])
+table = os.path.join(root, "docs", "table.md")
+with open(table, "w") as handle:
+    handle.write("""## What each build ships
+
+| Build | Carries |
+| -- | -- |
+| Hosted | core and billing |
+| Marketplace | core only |
+""")
+code, out = run(root, "builds", table)
+expect("a build table gives its rows, not its header", out.splitlines(),
+       ["Hosted: core and billing", "Marketplace: core only"])
 
 print("{} passed, {} failed".format(passed, failed))
 sys.exit(1 if failed else 0)
