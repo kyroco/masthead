@@ -71,7 +71,20 @@ umask 077
 # The session's folder under the user's private state root, from project_fact.py, the one place that finds
 # it and checks it (0700, ours, no symlink; MAST-38). With no trusted folder every mode stands aside.
 dir="$(python3 -I "$hook_dir/project_fact.py" --private-dir claude-engram "$sid" 2>/dev/null | head -1)"
-[ -n "$dir" ] && [ -d "$dir" ] || exit 0
+if [ -z "$dir" ] || [ ! -d "$dir" ]; then
+  # No folder: python3 did not run, project_fact.py is missing, or the private root is not ours. The brief
+  # check refuses; every other gate says it is off; the marks have nothing to say (MAST-38, round 0, A5).
+  why="no private state folder could be found (python3 did not run hooks/project_fact.py, or the state root is a symlink or not yours)"
+  case "$mode" in
+    gate-verify-brief)
+      printf '{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "The brief check cannot run: %s, so it cannot count re-verify rounds, and the dispatch is refused rather than sent unchecked. Fix that, then send it again."}}\n' "$why" ;;
+    gate-stop|gate-substop)
+      printf '{"systemMessage": "Masthead: the Korium capture check is off this session: %s."}\n' "$why" ;;
+    gate-*)
+      printf '{"hookSpecificOutput": {"hookEventName": "PreToolUse", "additionalContext": "Masthead: the %s gate is off: %s."}}\n' "$mode" "$why" ;;
+  esac
+  exit 0
+fi
 
 deny_tool() {
   if ! command -v jq >/dev/null 2>&1; then

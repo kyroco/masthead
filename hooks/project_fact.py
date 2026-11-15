@@ -229,8 +229,14 @@ SWITCH_PREFIXES = ("MASTHEAD_", "CLAUDE_PLUGIN_OPTION_")
 SWITCH_SUFFIXES = ("_GATE",)
 
 
+ENV_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+
+
 def is_switch(key):
-    return isinstance(key, str) and (key.startswith(SWITCH_PREFIXES) or key.endswith(SWITCH_SUFFIXES))
+    """A gate or option switch. Only a real environment variable name counts: a key no
+    shell could hold is never in a hook's environment, and is never printed (round 0, A4)."""
+    return isinstance(key, str) and ENV_NAME.fullmatch(key) is not None and \
+        (key.startswith(SWITCH_PREFIXES) or key.endswith(SWITCH_SUFFIXES))
 
 
 def tracked(folder, relative):
@@ -262,13 +268,38 @@ def repo_switch_keys(root=None):
     root = root or project_root()
     top = checkout_top(root)
     main = main_checkout(top) or top
-    keys = set()
+    keys, own = set(), set()
     for folder in dict.fromkeys((root, top, main)):
         keys.update(k for k in settings_env(os.path.join(folder, ".claude", "settings.json")) if is_switch(k))
         local = os.path.join(folder, ".claude", "settings.local.json")
-        if os.path.exists(local) and tracked(folder, os.path.join(".claude", "settings.local.json")):
-            keys.update(k for k in settings_env(local) if is_switch(k))
-    return sorted(keys)
+        if not os.path.exists(local):
+            continue
+        found = {k for k in settings_env(local) if is_switch(k)}
+        if tracked(folder, os.path.join(".claude", "settings.local.json")):
+            keys.update(found)
+        else:
+            own.update(found)
+    # A switch the person's own file sets is the value Claude Code applies, over the
+    # shared file's, so it stays (round 0, A3).
+    return sorted(keys - own)
+
+
+def git_state_path(root, name):
+    """A file in the checkout's own git folder (a worktree's own, not the main
+    checkout's), which no clone can commit or plant: where the push gate keeps its
+    pass record and the Stop hook its index lock. None outside a repository."""
+    leaf = re.sub(r"[^A-Za-z0-9._-]", "", os.path.basename(name or ""))
+    if leaf in ("", ".", ".."):
+        return None
+    try:
+        r = subprocess.run(["git", "-C", root or project_root(), "rev-parse", "--absolute-git-dir"],
+                           capture_output=True, text=True, timeout=5)
+    except Exception:
+        return None
+    folder = r.stdout.strip()
+    if r.returncode != 0 or not folder:
+        return None
+    return os.path.join(folder, leaf)
 
 
 TRACKER_FACT = "ISSUE_TRACKER"
@@ -340,6 +371,13 @@ def main(argv):
     # made when missing. Exit 1 and print nothing when it cannot be trusted.
     if argv and argv[0] == "--private-dir":
         path = private_dir(*[safe_session(part) for part in argv[1:]]) if len(argv) > 1 else None
+        if not path:
+            return 1
+        print(path)
+        return 0
+    # --git-state NAME: the full path of NAME in the checkout's own git folder; exit 1 outside a repository.
+    if len(argv) == 2 and argv[0] == "--git-state":
+        path = git_state_path(root, argv[1])
         if not path:
             return 1
         print(path)

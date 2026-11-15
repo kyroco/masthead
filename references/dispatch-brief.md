@@ -46,9 +46,8 @@ Who uses this: <the README's opening paragraph, quoted>.
 Mockup: <the mockup page the scenario names>, or "none".
 Verify <the diff command, with the head commit>. Write your findings to
 <state>/review/findings-verifier-<scenario>-<name>.json, where <state> is the
-repo's PROJECT_STATE_DIR fact from the env block of its .claude/settings.json
-(.claude/state when it states none). Write the real path in the brief, never
-the placeholder.
+folder `project_fact.py --state-path` prints. Write the real path in the
+brief, never the placeholder.
 
 Code outside the diff this depends on: <modules, files and functions it calls
 into or is called by>, or "self-contained".

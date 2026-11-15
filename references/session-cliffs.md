@@ -153,7 +153,8 @@ order. The steps live here and nowhere else; a repo supplies only its own facts
 7. Add the changelog entry when the repo keeps one, or its label for internal
    work.
 8. Commit, then run the repo's pre-push check on that last commit: the script
-   its `.claude/settings.json` env names as `PROJECT_PUSH_CHECK`, or its own
+   its settings name as `PROJECT_PUSH_CHECK` (`settings.local.json` over
+   `settings.json`, as `hooks/project_fact.py` reads them), or its own
    test command when it names none, in one command with nothing sourced. Run
    it one time, after the fixes of the last verification round are in. Do
    not start it early, with the verifiers, to save time: any commit made after
