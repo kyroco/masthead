@@ -228,6 +228,30 @@ bad = write(root, "headed-empty.md", GOOD.replace(
 code, out = check(bad, principles)
 expect("a lens heading with no rule below fails", code, 1)
 
+# Round 1, finding s6.c1: a heading or a sentence that merely starts with a lens
+# name is not that lens's rule.
+bad = write(root, "heading-as-rule.md", "## One way in and out for each body of data\n\n" + GOOD.replace(
+    "Billing data is reached only through one module, which hands back an object (P9).",
+    "<rule, such as \"billing data is reached only through one module\">"))
+code, out = check(bad, principles)
+expect("a section heading that starts with a lens name is not its rule", code, 1)
+expect("the failure names One way in and out", "One way in and out" in out, True)
+PROSE = """# Architecture
+
+Direction of travel for the team this year is to ship faster.
+One way in and out of the cluster is the load balancer.
+Call shape varies a lot across the codebase today.
+Seams are where we split the monolith into services.
+What each build carries depends on the customer contract.
+Leftovers from the old system are still being cleaned up (P1).
+Tests and checks run on every push to the main branch.
+"""
+code, out = check(write(root, "prose.md", PROSE), principles)
+expect("sentences that start with lens names are not rules", code, 1)
+expect("all seven lenses are named as missing", all(lens in out for lens in (
+    "Direction", "One way in and out", "Call shape", "Seams", "What each build carries",
+    "Leftovers", "Tests and checks")), True)
+
 code, out = check(TEMPLATE, principles)
 expect("the unfilled template fails", code, 1)
 expect("the template names all seven lenses", all(lens in open(TEMPLATE).read() for lens in (
