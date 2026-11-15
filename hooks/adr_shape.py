@@ -58,6 +58,8 @@ NOT_VERDICT = re.compile(r"(?i)\b(?:does\s+not|doesn't|do\s+not|don't|not|never)
 # Words that only point back at the doc or the part, so they give no reason for a divergence.
 NOT_A_REASON = {"from", "the", "this", "that", "doc", "document", "architecture", "part", "section",
                 "it", "its", "of", "to", "a", "an", "here", "in", "on", "with", "rule", "rules"}
+# What a Builds line may not stand on instead of a build.
+NO_BUILD = {"none", "n/a", "na", "tbd", "tba", "todo", "-", "?", "unknown", "nothing"}
 # A line that can open an entry: a heading, or a list item at the left margin (not a sub-bullet).
 ENTRY_LINE = re.compile(r"^(?:\s{0,3}#{1,6}\s|\s?(?:[-*+]|\d+[.)])\s)")
 BUILDS = re.compile(r"(?i)^\s*(?:[-*]\s+)?(?:\*\*|__)?\s*builds?\s*(?::\s*(?:\*\*|__)?|(?:\*\*|__)\s*:?)(.*)$")
@@ -212,6 +214,40 @@ def diverging(text, parts):
     return sorted(p for p, said in entries.items() if verdict(said)[0] == "diverges")
 
 
+def doc_builds(doc_text):
+    """The builds the doc names: the label of each top-level list item under a heading that mentions builds."""
+    builds, inside = [], False
+    for line in doc_text.splitlines():
+        heading = re.match(r"^\s{0,3}#{1,6}\s+(.+)$", line)
+        if heading:
+            inside = re.search(r"(?i)\bbuilds?\b", heading.group(1)) is not None
+            continue
+        item = re.match(r"^\s?[-*+]\s+(.+)$", line) if inside else None
+        if item:
+            name = _plain(re.split(r"\s*(?::|\s-\s|\(|,)", re.sub(r"[`*_]", "", item.group(1)))[0])
+            if name:
+                builds.append(name)
+    return builds
+
+
+def build_gaps(builds, known):
+    """The reasons the builds listed fall short: none listed, or one the doc does not name."""
+    real = [b for b in builds if _plain(b).lower() not in NO_BUILD]
+    if not real:
+        return ["`## %s` lists no builds. Add a `Builds:` line naming every build this decision's "
+                "work must work in, as the doc's parts name them." % ALIGNMENT]
+    if not known:
+        return []
+    unknown = [b for b in real if not any(
+        re.search(r"(?<![a-z0-9-])%s(?![a-z0-9-])" % re.escape(k.lower()), _plain(b).lower()) for k in known)]
+    if not unknown:
+        return []
+    return ["`## %s` lists %s, which the architecture doc does not name as a build. The doc's "
+            "builds: %s. Name the ones this decision's work must work in, or add the new build to "
+            "the doc." % (ALIGNMENT, ", ".join("`%s`" % _plain(b) for b in unknown),
+                          ", ".join("`%s`" % k for k in known))]
+
+
 def read_doc(doc):
     try:
         with open(doc[0]) as handle:
@@ -224,7 +260,8 @@ def alignment_gaps(text, doc):
     """The reasons a new record's alignment section falls short of what the issue asks, one per gap."""
     if not has_section(text, ALIGNMENT):
         return []
-    parts = doc_parts(read_doc(doc))
+    doc_text = read_doc(doc)
+    parts = doc_parts(doc_text)
     listed = "; ".join("`%s`" % p for p in parts) or "(the doc has no headings yet)"
     entries, builds, found = alignment(text, parts)
     reasons = []
@@ -241,10 +278,7 @@ def alignment_gaps(text, doc):
         if said_verdict == "diverges" and len(reason_words(said, end, part)) < MIN_WHY_WORDS:
             reasons.append("`## %s` says it diverges from `%s` but not why. Say what this "
                            "decision does instead and why." % (ALIGNMENT, part))
-    if not found or not builds:
-        reasons.append(
-            "`## %s` lists no builds. Add a `Builds:` line naming every build this decision's "
-            "work must work in, as the doc's parts name them." % ALIGNMENT)
+    reasons += build_gaps(builds if found else [], doc_builds(doc_text))
     return reasons
 
 
