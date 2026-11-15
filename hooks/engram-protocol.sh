@@ -511,7 +511,7 @@ print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permiss
 
     prompt="$(field '.tool_input.prompt // ""')"
     reasons=""
-    REVERIFY_FORM="the form is a line that begins 'Re-verify: round N' at column zero, N the number of this round, with no marker before it"
+    REVERIFY_FORM="the form is a line that begins 'Re-verify: round N' at column zero, N the number of this round, with no marker before it; for a verifier re-checking one extra's fix, 'Re-verify: extra <name>', the extra's name one word"
 
     # The round cap, on a verifier's and an architecture reviewer's brief. A
     # change gets at most two re-verify rounds. A round is spent by the
@@ -522,7 +522,9 @@ print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permiss
     # them is neither counted nor capped, and no other agent's row counts. The
     # row is written before the agent runs, so one that died or was declined
     # has spent its round. The dispatch log decides; the brief's number only
-    # says which round a dispatch joins.
+    # says which round a dispatch joins. A verifier re-checking the fix of one
+    # extra scored 8 or more ("Re-verify: extra <name>") spends no round: that
+    # extra gets one round of its own, and a second for it is refused (MAST-42).
     reverify_cap() {
       local kind="$1" state n log_root log state_dir session8 branch counts spent joins judged cap
       state="$(printf '%s' "$prompt" | awk '
@@ -530,12 +532,15 @@ print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permiss
           line = $0; sub(/\r$/, "", line)
           bare = line; gsub(/^[[:space:]>*_#`-]+|^[0-9]+\.[[:space:]]*/, "", bare); gsub(/[*_`]+/, "", bare)
           if (tolower(bare) ~ /^re-?verify[[:space:]]*:/) {
-            if (match(line, /^Re-verify: round [0-9]+/)) print "yes\t" substr(line, 18, RLENGTH - 17); else print "variant\t"
+            if (match(line, /^Re-verify: round [0-9]+/)) print "yes\t" substr(line, 18, RLENGTH - 17)
+            else if (match(line, /^Re-verify: extra [A-Za-z0-9][A-Za-z0-9_.-]*/)) print "extra\t" tolower(substr(line, 18, RLENGTH - 17))
+            else print "variant\t"
             exit
           }
         }' | head -1)"
       n="${state#*$'\t'}"
       state="${state%%$'\t'*}"
+      if [ "$state" = extra ] && [ "$kind" != verifier ]; then state=variant; fi
       if [ "$state" = variant ]; then
         [ -n "$reasons" ] && reasons="$reasons
 
@@ -567,6 +572,7 @@ print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permiss
       spent=0
       joins=0
       judged=0
+      extra_done=0
       if [ -s "$log" ]; then
         # Columns: when, session, agent, type, model, outcome, reason, branch. A row with no branch column is from
         # before the column existed and counts for its own session. Only this plugin's agents count: the bare
@@ -581,6 +587,11 @@ print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permiss
             else if ($8 != b) next
             if ($6 ~ /^refused/) next
             if (mine($4, "adjudicator")) { judged = 1; next }
+            if ($6 ~ /^re-verify extra /) {
+              e = $6; sub(/^re-verify extra /, "", e); sub(/[[:space:]].*$/, "", e)
+              if (mine($4, "verifier")) X[e]++
+              next
+            }
             if ($6 ~ /^re-verify/) {
               r = $6; sub(/^re-verify( round)?[[:space:]]*/, "", r); sub(/[[:space:]].*$/, "", r)
               if (mine($4, "verifier")) { v[r]++; V++ }
@@ -593,11 +604,18 @@ print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permiss
             j = 0
             if (kind == "verifier" && a[want] + 0 > v[want] + 0) j = 1
             if (kind == "architecture-reviewer" && v[want] + 0 > a[want] + 0) j = 1
-            print (V + A - paired + U) " " j " " judged + 0
+            print (V + A - paired + U) " " j " " judged + 0 " " X[want] + 0
           }' "$log" 2>/dev/null)"
-        spent="${counts%% *}"
-        joins="${counts#* }"; joins="${joins%% *}"
-        judged="${counts##* }"
+        read -r spent joins judged extra_done <<<"$counts"
+      fi
+      if [ "$state" = extra ]; then
+        if [ "${extra_done:-0}" -ge 1 ]; then
+          [ -n "$reasons" ] && reasons="$reasons
+
+"
+          reasons="${reasons}Re-verify rule: extra '$n' has already had its one round of its own on this branch, read from the dispatch log at $log, and an extra gets one. What is still on the adjudicator's fix list for it goes to the foreman, or to the user when there is none; send no further round for it."
+        fi
+        return 0
       fi
       if [ "$state" != yes ]; then
         if [ "${judged:-0}" -ge 1 ]; then
