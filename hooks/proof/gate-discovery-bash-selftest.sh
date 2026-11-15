@@ -120,7 +120,7 @@ rm -rf "${TMPDIR:-/tmp}/masthead-$(id -u)/claude-engram/$sid"
 echo "== an agent that cannot re-index is refused once, then let through (MAST-37) =="
 # The verifier, adjudicator and reader cannot run korium-cli index, so a lagging index would refuse them
 # on every search. The first refusal says how; after it, their searches go through for the session.
-for who in masthead:verifier adjudicator masthead:reader; do
+for who in masthead:verifier masthead:adjudicator masthead:reader masthead:review:verifier; do
   sid="gdtest-agent-$RANDOM"; : > "$JUDGE_LOG"
   record_search "$sid" empty stale
   agent_gate() {
@@ -135,6 +135,24 @@ for who in masthead:verifier adjudicator masthead:reader; do
     ok "$who: refused once on a stale index, then allowed" "refusals $first $second $third"
   else
     bad "$who: refused once on a stale index, then allowed" "refusals $first $second $third"
+  fi
+  rm -rf "${TMPDIR:-/tmp}/masthead-$(id -u)/claude-engram/$sid"
+done
+# Only Masthead's own agents: a repo's own agent named reader, or another plugin's, can re-index, so it stays refused.
+for who in reader verifier other:reader; do
+  sid="gdtest-notours-$RANDOM"; : > "$JUDGE_LOG"
+  record_search "$sid" empty stale
+  refusals=""
+  for pat in fuse_scores handle_call fuse_scores; do
+    out="$(jq -n --arg s "$sid" --arg a "$who" --argjson i "$(sh "rg $pat products/")" \
+      '{session_id:$s, agent_type:$a, tool_name:"Bash", tool_input:$i}' \
+      | bash "$WORK/engram-protocol.sh" gate-discovery 2>/dev/null | grep -c '"deny"')"
+    refusals="$refusals$out "
+  done
+  if [ "$refusals" = "1 1 1 " ]; then
+    ok "$who (not Masthead's): refused every time on a stale index" "refusals $refusals"
+  else
+    bad "$who (not Masthead's): refused every time on a stale index" "refusals $refusals"
   fi
   rm -rf "${TMPDIR:-/tmp}/masthead-$(id -u)/claude-engram/$sid"
 done
