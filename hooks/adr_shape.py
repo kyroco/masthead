@@ -59,6 +59,8 @@ OPENING_VERDICT = re.compile(r"(?i)^\W*(?:(does\s+not|doesn't|do\s+not|don't|not
 NOT_A_REASON = {"from", "the", "this", "that", "doc", "docs", "doc's", "document", "architecture", "part",
                 "section", "it", "its", "of", "to", "a", "an", "here", "in", "on", "at", "as", "by", "per",
                 "see", "with", "rule", "rules"}
+# Where a Builds line divides one build from the next.
+BUILD_SPLIT = re.compile(r"[,;&]|\s+and\s+")
 # What a Builds line may not stand on instead of a build.
 NO_BUILD = {"none", "n/a", "na", "tbd", "tba", "todo", "-", "?", "unknown", "nothing"}
 # A line that can open an entry: a heading, or a list item at the left margin (not a sub-bullet).
@@ -154,11 +156,13 @@ def _names(line, parts):
     return max(hits, key=len) if hits else None
 
 
-def alignment(text, parts):
+def alignment(text, parts, known=()):
     """Read the alignment section: ({part: the entry's text}, [each build listed], whether a Builds line was found).
 
     An entry is a heading or a top-level list item naming a part. A list item runs to the next
     blank line, taking its indented lines; a heading runs to the next heading or list item.
+    Under a bare Builds line, a list item is a build unless it names a part that is not a build
+    (`known` holds the doc's build lines).
     """
     entries, builds, found = {}, [], False
     current, kind, listing = None, None, False
@@ -167,13 +171,13 @@ def alignment(text, parts):
         if b:
             found, current = True, None
             rest = b.group(1).strip()
-            builds += [x.strip() for x in re.split(r"[,;]", rest) if x.strip()]
+            builds += [x.strip() for x in BUILD_SPLIT.split(re.sub(r"\([^)]*\)", "", rest)) if x.strip()]
             listing = not rest
             continue
         part = _names(line, parts)
         if listing:
             item = re.match(r"^\s*[-*+]\s+(.+)$", line)
-            if item and not (part and verdict(line, part)[0]):
+            if item and not (part and not is_build(part, known)):
                 builds.append(item.group(1).strip())
                 continue
             if line.strip():
@@ -232,38 +236,52 @@ def diverging(text, parts):
     return sorted(p for p, said in entries.items() if verdict(said, p)[0] == "diverges")
 
 
+def build_name(item):
+    """A build as a Builds line lists it: its name, without what follows a colon, dash, bracket or comma."""
+    return _plain(re.split(r"\s*(?::|\s-\s|\(|,)", re.sub(r"[`*_]", "", item))[0])
+
+
 def doc_builds(doc_text):
-    """The builds the doc names: the label of each top-level list item under a heading that mentions builds."""
-    builds, inside = [], False
+    """The doc's build lines: each line under the heading that lists what each build ships, list marker and markup removed.
+
+    A whole line, because the template asks for "one line each" without saying where the name ends.
+    """
+    lines, inside = [], False
     for line in doc_text.splitlines():
         heading = re.match(r"^\s{0,3}#{1,6}\s+(.+)$", line)
         if heading:
-            inside = re.search(r"(?i)\bbuilds?\b", heading.group(1)) is not None
+            # The template's "What each build ships"; not the rule "What each build carries".
+            inside = re.search(r"(?i)\bbuilds\b|\bships?\b|\beditions\b", heading.group(1)) is not None
             continue
-        item = re.match(r"^\s?[-*+]\s+(.+)$", line) if inside else None
-        if item:
-            name = _plain(re.split(r"\s*(?::|\s-\s|\(|,)", re.sub(r"[`*_]", "", item.group(1)))[0])
-            if name:
-                builds.append(name)
-    return builds
+        if inside and line.strip():
+            plain = _plain(re.sub(r"^\s*(?:[-*+]|\d+[.)])\s+", "", line))
+            if plain:
+                lines.append(plain)
+    return lines
+
+
+def is_build(name, known):
+    """Whether one of the doc's build lines opens with this build's name."""
+    name = build_name(name).lower()
+    return bool(name) and any(re.match(r"%s(?![a-z0-9-])" % re.escape(name), k.lower()) for k in known)
 
 
 def build_gaps(builds, known):
     """The reasons the builds listed fall short: none listed, or one the doc does not name."""
-    real = [b for b in builds if _plain(b).lower() not in NO_BUILD]
+    real = [b for b in builds if build_name(b).lower() not in NO_BUILD]
     if not real:
         return ["`## %s` lists no builds. Add a `Builds:` line naming every build this decision's "
                 "work must work in, as the doc's parts name them." % ALIGNMENT]
     if not known:
         return []
-    unknown = [b for b in real if not any(
-        re.search(r"(?<![a-z0-9-])%s(?![a-z0-9-])" % re.escape(k.lower()), _plain(b).lower()) for k in known)]
+    unknown = [b for b in real if not is_build(b, known)]
     if not unknown:
         return []
     return ["`## %s` lists %s, which the architecture doc does not name as a build. The doc's "
-            "builds: %s. Name the ones this decision's work must work in, or add the new build to "
-            "the doc." % (ALIGNMENT, ", ".join("`%s`" % _plain(b) for b in unknown),
-                          ", ".join("`%s`" % k for k in known))]
+            "builds: %s. Name each build this decision's work must work in as its line in the "
+            "doc opens, or add the new build to the doc." % (
+                ALIGNMENT, ", ".join("`%s`" % build_name(b) for b in unknown),
+                ", ".join("`%s`" % build_name(k) for k in known))]
 
 
 def read_doc(doc):
@@ -281,7 +299,8 @@ def alignment_gaps(text, doc):
     doc_text = read_doc(doc)
     parts = doc_parts(doc_text)
     listed = "; ".join("`%s`" % p for p in parts) or "(the doc has no headings yet)"
-    entries, builds, found = alignment(text, parts)
+    known = doc_builds(doc_text)
+    entries, builds, found = alignment(text, parts, known)
     reasons = []
     if not entries:
         reasons.append(
@@ -296,7 +315,7 @@ def alignment_gaps(text, doc):
         if said_verdict == "diverges" and len(reason_words(rest.replace(part, " "))) < MIN_WHY_WORDS:
             reasons.append("`## %s` says it diverges from `%s` but not why. Say what this "
                            "decision does instead and why." % (ALIGNMENT, part))
-    reasons += build_gaps(builds if found else [], doc_builds(doc_text))
+    reasons += build_gaps(builds if found else [], known)
     return reasons
 
 
