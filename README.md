@@ -152,10 +152,14 @@ path without running the tests a third time, and places each finding that
 holds: fixed in this pull request when a scenario's Then is false or no
 test proves it, a bug's test did not come first, something
 that worked before broke, or words a person reads are now wrong; otherwise
-an extra, which the worker scores like its own. That placement is final for
-the worker and the foreman; nobody files anything. The worker fixes the
-list, test first again, and only the claims the fix broke go back to a
-verifier, at most twice. The tests run on the final commit and leave a
+an extra, which the worker scores like its own. Once the trial is off, an
+architecture finding that breaks one of the doc's seven rules, a line of the
+decision record or the principles, or a build the doc names goes on the fix
+list whatever its customer score. One where the decision record and a
+mockup disagree always comes to you. That placement is final for the worker and the foreman; nobody files
+anything. The worker fixes the list, test first again, and only the claims
+the fix broke go back to a verifier, and only the architecture findings it
+fixed to the architecture reviewer, at most twice. The tests run on the final commit and leave a
 receipt that names it, and nothing can be pushed until the receipt matches.
 Then one pull request goes up, with `Fixes #41`, the list of what wasn't
 proved, the number of agent dispatches it took, and the issue moves to In
@@ -175,8 +179,13 @@ happened, and the run goes on without it.
 
 When a pull request is ready, every extra its worker's rule says to fix is
 already fixed in it, and nothing else reaches you unless a security finding
-could not be settled; that comes one item at a time, and you answer it. No
-issue is ever filed from a review. When its checks pass, its review
+could not be settled or the decision record and a mockup disagree; that
+comes one item at a time, and you answer it. While the architecture
+reviewer is on trial, every one of its findings reaches you too, kept or
+thrown out, with its lens, smell, class, scores and the judge's placement,
+and the worker fixes only the ones you send back. The trial is on from the
+first run until you set `"ARCHITECTURE_TRIAL": "off"` in the env block of
+`.claude/settings.json`. No issue is ever filed from a review. When its checks pass, its review
 is clean, every line is answered and the worker has cleaned up after itself,
 the foreman queues it to be merged. It closes the issue, and any big issue
 whose pieces are now all done, then starts the next issue, one that waited on

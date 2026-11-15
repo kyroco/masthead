@@ -108,17 +108,30 @@ order. The steps live here and nowhere else; a repo supplies only its own facts
 3. Send the `adjudicator` the commit range, the reviewed files (the files the
    change touched before its first verification, the same list on every
    round), the path of every findings file the round wrote, the README's
-   opening paragraph, and each scenario with the decision-record lines it
-   rests on, and nothing else: not your claims, not your did-not-prove list,
-   not your view of any finding. It reads the code along
+   opening paragraph, each scenario with the decision-record lines it
+   rests on, and what it needs to judge the architecture reviewer's
+   findings (the ADR's path, the architecture doc's path, the principles
+   file, the mockup pages, and the trial line from
+   `project_fact.py --architecture-trial`), and nothing else: not your
+   claims, not your did-not-prove list, not your view of any finding. It reads the code along
    each verifier's path, decides whether the finding holds, and places it:
-   fix in this PR, or an extra. That placement is final for you and the
-   foreman. What it throws out is gone: it is not logged or filed. Score and
+   fix in this PR, or an extra, as "Decide where it goes" in
+   `agents/adjudicator.md` says, for an architecture finding too. That placement is final for
+   you and the foreman. What it throws out is gone: it is not logged or filed. Score and
    settle each of its extras as the worker's "What done is" says
    (`skills/work-on/worker.md`); one you fix is fixed as step 4 says. Its For
    the foreman section (a security finding it could not
-   settle) goes to the foreman unedited (to the user when there is none), who
-   brings it to the user; the PR waits for that answer.
+   settle, or an ADR line and a mockup that disagree) goes to the foreman
+   unedited (to the user when there is none), who brings it to the user; the
+   PR waits for that answer. So does its Architecture trial section, while
+   the trial period is on: whenever that section lists a finding, whatever
+   your brief's `Architecture trial:` line said, since the adjudicator reads
+   a missing or misspelled line as on (`references/dispatch-brief.md` has
+   the switch). While the trial is on, you fix only the architecture
+   findings the person sends back, and none of the others, each as step 4
+   says; once it is off, the section reads "None, the trial is off" and the
+   adjudicator's Fix list holds them like any other finding, fixed as step
+   4 says.
 4. Fix each finding on the adjudicator's fix list in this PR, test first,
    in two commits of its own: a test that reproduces it and fails, then the
    fix. When no test can reproduce it (instruction text, a fault only a
@@ -132,12 +145,16 @@ order. The steps live here and nowhere else; a repo supplies only its own facts
    one `verifier` given those claims and the fix diff, its brief opening
    `Re-verify: round N, claims ...`, and the `security-reviewer` again when a
    security finding was fixed, then the `adjudicator` on that round's
-   findings files as in step 3. The architecture reviewer goes out once per
-   change: never on a re-verify round. At most two re-verify rounds per change;
-   the brief check counts the verifier's re-verify dispatches in the
-   dispatch log, on this branch, and refuses a third (the security
-   reviewer's dispatch does not spend a round; a verifier that died or was
-   declined did). If the second round still leaves anything on the fix
+   findings files as in step 3. When a fix addressed an architecture
+   finding, send the `architecture-reviewer` in the same message, given the
+   fix diff and only those findings, its brief opening
+   `Re-verify: round N, findings ...` with the same round number; it
+   re-checks only those findings. At most two re-verify rounds per change; a
+   round is the verifier, the architecture reviewer, or both under one round
+   number. The brief check counts their re-verify dispatches in the dispatch
+   log, on this branch, and refuses a third round (the security reviewer's
+   dispatch does not spend a round; an agent that died or was declined
+   did). If the second round still leaves anything on the fix
    list, stop and report it to the foreman, or to the user when there is
    none. That is fix-break-fix churn, and it needs a person: the foreman
    brings it to the user as numbered lines and rules on none of it.
