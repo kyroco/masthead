@@ -354,11 +354,32 @@ def committed(path):
         if top.returncode != 0:
             return None
         rel = os.path.relpath(os.path.realpath(full), os.path.realpath(top.stdout.strip()))
-        r = subprocess.run(["git", "-C", d, "show", "HEAD:" + rel],
-                           capture_output=True, text=True, timeout=5)
-        return r.stdout if r.returncode == 0 else None
+        for old in [rel] + earlier_names(d, rel):
+            r = subprocess.run(["git", "-C", d, "show", "HEAD:" + old],
+                               capture_output=True, text=True, timeout=5)
+            if r.returncode == 0:
+                return r.stdout
+        return None
     except Exception:
         return None
+
+
+def earlier_names(d, rel):
+    """The names HEAD may carry this record under: a staged rename's old name, then a committed
+    file with the same name in another folder (a record moved from Proposed to Current)."""
+    names = []
+    r = subprocess.run(["git", "-C", d, "diff", "--cached", "-M", "--name-status", "HEAD"],
+                       capture_output=True, text=True, timeout=5)
+    for line in r.stdout.splitlines() if r.returncode == 0 else []:
+        fields = line.split("\t")
+        if len(fields) == 3 and fields[0].startswith("R") and fields[2] == rel:
+            names.append(fields[1])
+    r = subprocess.run(["git", "-C", d, "ls-tree", "-r", "--full-tree", "--name-only", "HEAD"],
+                       capture_output=True, text=True, timeout=5)
+    base = os.path.basename(rel)
+    names += [n for n in (r.stdout.splitlines() if r.returncode == 0 else [])
+              if os.path.basename(n) == base and n != rel]
+    return names
 
 
 def check(path, text):
