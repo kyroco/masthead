@@ -1107,6 +1107,8 @@ says  skills/setup/SKILL.md 'before and no `ARCHITECTURE_DOC` is recorded, offer
 says  skills/setup/SKILL.md 'ask none of the other questions unless the person asks to change an answer'
 # Round 1, finding s4.j1: the rerun does not ask the .gitignore question again either.
 says  skills/setup/SKILL.md 'On such a run, step 9 does not ask the `.gitignore` question again'
+# Round 1, finding s2.j2: a recorded doc that is no longer there is offered again, not skipped.
+says  skills/setup/SKILL.md 'When `ARCHITECTURE_DOC` is recorded but `project_fact.py --architecture-doc` prints nothing, the doc has moved or gone'
 # Scenario 5: the path comes from the facts reader every other fact comes from.
 says  skills/setup/SKILL.md 'project_fact.py --architecture-doc'
 echo "$pass passed, $fail failed"
