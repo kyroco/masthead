@@ -27,7 +27,9 @@ out or prints unreadable output blocks the action instead of letting it through.
 Such a block carries no reason, so a refusal with no message means a gate
 broke. Empty stdin still allows. With no jq, the dangerous-command, brief,
 model and dispatch-record gates read the call with `hooks/json_field.py` and
-decide the same; the diagnoser and reader shell scope refuses every command;
+decide the same, and refuse every call when python3 cannot run either; the
+diagnoser and reader shell scope refuses every command of those two agents and
+leaves every other session's alone;
 the reviewer network gate refuses a reviewer call naming a network tool. A
 push check the repository names but the checkout lacks refuses the push.
 The commit attribution gate runs only on commands containing `commit` or `gh`,

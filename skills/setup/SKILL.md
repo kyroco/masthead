@@ -139,9 +139,15 @@ decision records (on if a folder was named). With a push check, say to commit
 cannot push. Check the tools the gates need with `command -v jq`, `command -v
 python3` and, where issues live on GitHub, `command -v gh`, and add one row for
 each one missing, saying what stays off until it is installed: no jq, the
-diagnoser and reader agents are refused every shell command; no python3,
-Masthead's gates cannot run, so install it first; no gh, the foreman stops before queueing a PR or listing
-what a merge unblocks and says `gh` is needed. Then name the
+diagnoser and reader agents are refused every shell command, and mix format
+and credo no longer run after an Elixir edit; no python3, Masthead's gates
+cannot run, so install it first; no gh, the foreman stops before queueing a
+PR or listing what a merge unblocks and says `gh` is needed, and with no
+GitHub connector either, no issue, status or pull request call can be made
+at all. If a check is refused, name the tool the refusal names as missing;
+one blocked with no message at all means a gate could not start, most often
+because python3 is missing.
+Then name the
 four install options and their defaults, because a terminal install never
 asked them: connect Korium memory (off), keep a code index in Korium (off),
 keep AI attribution out of commits (on), ask for a reason before a helper runs
