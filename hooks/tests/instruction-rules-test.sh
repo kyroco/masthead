@@ -1285,7 +1285,7 @@ fi
 VERIFIER_DENY="$(sed -n 's/^disallowedTools: //p' "$ROOT/agents/verifier.md" | tr ',' '\n' | tr -d ' ')"
 ARCH_DENY_ALL="$(sed -n 's/^disallowedTools: //p' "$ROOT/agents/architecture-reviewer.md" | tr ',' '\n' | tr -d ' ')"
 for tool in $VERIFIER_DENY; do
-  if printf '%s\n' "$ARCH_DENY_ALL" | grep -qx "$tool"; then pass=$((pass + 1)); else fail=$((fail + 1)); echo "FAIL agents/architecture-reviewer.md does not deny $tool, which the verifier denies"; fi
+  if grep -qx "$tool" <<<"$ARCH_DENY_ALL"; then pass=$((pass + 1)); else fail=$((fail + 1)); echo "FAIL agents/architecture-reviewer.md does not deny $tool, which the verifier denies"; fi
 done
 # Round 1, fix F5: the brief shape itself carries nothing of the author's account.
 says  references/dispatch-brief.md 'nothing of your account of the change: no claims, no did-not-prove list, no summary'
@@ -1294,14 +1294,14 @@ says  references/session-cliffs.md 'the principles file and the mockup pages, an
 ARCH_TOOLS="$(sed -n 's/^tools: //p' "$ROOT/agents/architecture-reviewer.md" | tr ',' '\n' | tr -d ' ')"
 ARCH_DENY="$(sed -n 's/^disallowedTools: //p' "$ROOT/agents/architecture-reviewer.md" | tr ',' '\n' | tr -d ' ')"
 for tool in mcp__korium__agent_search mcp__claude_ai_korium__agent_search mcp__korium__korium_browse mcp__claude_ai_korium__korium_browse; do
-  if printf '%s\n' "$ARCH_DENY" | grep -qx "$tool" && ! printf '%s\n' "$ARCH_TOOLS" | grep -qx "$tool"; then
+  if grep -qx "$tool" <<<"$ARCH_DENY" && ! grep -qx "$tool" <<<"$ARCH_TOOLS"; then
     pass=$((pass + 1))
   else
     fail=$((fail + 1)); echo "FAIL agents/architecture-reviewer.md does not deny $tool"
   fi
 done
 for tool in Edit MultiEdit NotebookEdit Agent WebFetch; do
-  if printf '%s\n' "$ARCH_DENY" | grep -qx "$tool"; then pass=$((pass + 1)); else fail=$((fail + 1)); echo "FAIL agents/architecture-reviewer.md does not deny $tool"; fi
+  if grep -qx "$tool" <<<"$ARCH_DENY"; then pass=$((pass + 1)); else fail=$((fail + 1)); echo "FAIL agents/architecture-reviewer.md does not deny $tool"; fi
 done
 if printf '%s\n' "$ARCH_TOOLS" | grep -E '__(save_|create_|delete_|update_|issue_write|add_|merge_|push_)' >/dev/null; then
   fail=$((fail + 1)); echo "FAIL agents/architecture-reviewer.md grants a tracker write: $(printf '%s\n' "$ARCH_TOOLS" | grep -E '__(save_|create_|delete_|update_|issue_write|add_|merge_|push_)' | tr '\n' ' ')"
