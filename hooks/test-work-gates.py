@@ -1587,6 +1587,16 @@ def main():
     general_show = show_as(REPO_ROOT, REPO_ROOT, "Opening a PR")
     check("and the general steps it shows are the ones the hook injects",
           " ".join(general_show.split()) in proof_cliff and general_show.strip() != "", True)
+    # Round 1 fix: the worker's Bash tool sets no CLAUDE_PROJECT_DIR, so show
+    # run from the repo's own checkout must still read the repo's lead.
+    bare_env = {k: v for k, v in os.environ.items() if k != "CLAUDE_PROJECT_DIR"}
+    bare_show = subprocess.run(
+        [sys.executable, PRIME, "show", "Opening a PR"], stdin=subprocess.DEVNULL, cwd=own_pr,
+        capture_output=True, text=True, check=False, env=bare_env).stdout
+    check("show with no CLAUDE_PROJECT_DIR, run from the repo's checkout, prints the repo's own PR steps",
+          "REPO-PR-CLIFF" in bare_show and "The steps live here and nowhere else" not in bare_show, True)
+    check("and it is the block the hook injects for that repo",
+          bare_show.strip() != "" and bare_show.strip() in own_out, True)
     check("show of a lead no source has prints nothing",
           show_as(REPO_ROOT, REPO_ROOT, "No such lead").strip(), "")
     shutil.rmtree(own_pr, ignore_errors=True)

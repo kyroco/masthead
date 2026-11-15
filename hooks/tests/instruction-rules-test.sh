@@ -1088,7 +1088,7 @@ says  agents/security-reviewer.md "A fault the change brings in that breaks one 
 # and the pre-push rule once, in step 8 of Opening a PR; every other file points.
 says  skills/work-on/worker.md "An extra that scores 8 or more is fixed in this PR, test first when it is a bug"
 says  skills/work-on/worker.md "One that scores under 8 is dropped: you bring it to no one"
-for f in references/session-cliffs.md agents/adjudicator.md skills/work-on/foreman.md skills/github-issues/SKILL.md skills/linear-issues/SKILL.md README.md docs/explainer.template.html docs/explainer.html; do
+for f in references/session-cliffs.md agents/adjudicator.md skills/work-on/foreman.md skills/github-issues/SKILL.md skills/linear-issues/SKILL.md README.md docs/explainer.template.html docs/explainer.html docs/images/review.svg; do
   never "$f" "8 or more"
   never "$f" "8 or higher"
   never "$f" "under 8"
@@ -1108,6 +1108,7 @@ never skills/work-on/worker.md "Do not commit while it runs"
 never skills/work-on/worker.md "Do not start it when you send out the verifiers"
 never references/session-cliffs.md "Do not start the repo's pre-push check now to save time"
 says  references/session-cliffs.md "Step 8 runs the pre-push check, once"
+says  skills/work-on/worker.md "Its step 8 says when to run the pre-push check"
 # Scenario 4: the worker reads the PR steps the hook injects, the repo's own
 # lead when its session-cliffs has one (prime-context.py cliff_source).
 says  skills/work-on/worker.md "prime-context.py show \"Opening a PR\""
@@ -1118,10 +1119,17 @@ never skills/work-on/SKILL.md "The PR steps themselves are **Opening a PR** in"
 never skills/work-on/foreman.md "filed exceeds closed"
 never skills/work-on/foreman.md "issues filed"
 says  skills/work-on/foreman.md "A split is not a stop"
+says  skills/work-on/foreman.md "start one worker per sub-issue, in blocked-by order"
 # Scenario 6: a thrown-out finding is not saved where the worker searches.
 never agents/adjudicator.md "and so does each thrown-out finding"
 never agents/adjudicator.md "A thrown-out finding's memory"
 says  agents/adjudicator.md "A thrown-out finding is never captured"
+# Round 1 fix: a verifier's and a security reviewer's own capture holds no
+# finding either, since the adjudicator may throw any of them out.
+says  agents/verifier.md "Your capture holds no finding"
+never agents/verifier.md "Capture it to Korium and return the thought id"
+says  agents/security-reviewer.md "one short capture to Korium before you finish, holding no finding"
+never agents/security-reviewer.md "and the report captured to Korium before you finish"
 # Scenario 7: the foreman rules on no disagreement between review rounds.
 never skills/work-on/foreman.md "a disagreement between review rounds"
 never skills/work-on/foreman.md "one round placed a finding on the fix list and the next among its extras"
@@ -1137,7 +1145,11 @@ says  skills/work-on/worker.md "Done is four things"
 never skills/work-on/worker.md "Done is three things"
 never .claude-plugin/plugin.json "Subagents run on Haiku unless"
 says  .claude-plugin/plugin.json "\"title\": \"Ask for a reason before a helper runs on the biggest model\""
-says  .claude-plugin/plugin.json "a call that names no model for a helper whose own file names one is not asked"
+says  .claude-plugin/plugin.json "a call that names no model is not asked for a helper whose own file names one, or for another plugin's helper"
+for f in README.md docs/explainer.template.html docs/explainer.html; do
+  says  "$f" "a call that names no model is not asked for a helper whose own file names one, or for another plugin's helper"
+done
+says  docs/explainer.html "<td><code>model-choice-gate.sh</code></td><td>Ask for a reason before a helper runs on the biggest model</td>"
 never .claude-plugin/plugin.json "before a subagent runs on Opus"
 says  README.md "| \`model-choice-gate.sh\` | Ask for a reason before a helper runs on the biggest model |"
 never README.md "Ask for a reason before the biggest model"
