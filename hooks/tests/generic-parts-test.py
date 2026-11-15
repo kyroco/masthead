@@ -269,11 +269,18 @@ for mode, payload in (("session-start", {"session_id": "p", "cwd": repo}),
         outputs.append(r.stdout)
 with open(log) as f:
     opened = sorted({line.strip() for line in f if line.strip()})
-prefixes = (os.path.realpath(PLUGIN) + "/", os.path.realpath(repo) + "/",
-            os.path.realpath(sys.prefix) + "/", os.path.realpath(sys.base_prefix) + "/")
+roots = [os.path.realpath(d) for d in (PLUGIN, repo, sys.prefix, sys.base_prefix)]
+
+
+def allowed(path):
+    """A root itself or anything under it. Python's importer lists the working folder, the repo's top."""
+    real = os.path.realpath(path)
+    return any(real == root or real.startswith(root + "/") for root in roots)
+
+
 outside = [p for p in opened
            # Python's own bytecode cache and random source are Python's, not the hook's.
-           if not os.path.realpath(p).startswith(prefixes) and ".pyc" not in p
+           if not allowed(p) and ".pyc" not in p
            and not p.startswith("/dev/") and p != os.path.realpath(log)]
 check("prime-context opened a file at all, so the audit is live", bool(opened), True)
 check("every file prime-context opened is the plugin's, the repository's or Python's", outside, [])
