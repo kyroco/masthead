@@ -408,6 +408,17 @@ code, err = stop_gate(r)
 check("4: an old ADR moved to another folder, unstaged, is not asked for the new section",
       code == 0, "%s %s" % (code, err))
 
+# ------------------------------------------------------------------ round 1: one command that writes an ADR and opens the pull request
+SHELL_WRITE = ("cat > docs/adr/ADR-0009-new.md <<'EOF'\n# ADR-0009\nEOF\n"
+               "git add -A && git commit -m x && gh pr create --title t --body b")
+for name, doc in (("r1-shell-no-doc", False), ("r1-shell-doc", True)):
+    r = make_repo(name, doc=doc)
+    git(r, "switch", "-q", "-c", "feature")
+    why = gate(r, "Bash", {"command": SHELL_WRITE})
+    check("5: a shell write of a new ADR is refused even when the command also opens a pull request (%s)"
+          % ("doc recorded" if doc else "no doc"),
+          "creates a new ADR (docs/adr/ADR-0009-new.md) through the shell" in why, why)
+
 shutil.rmtree(T, ignore_errors=True)
 print()
 print("%d passed, %d failed" % (passed, failed))
