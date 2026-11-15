@@ -54,4 +54,9 @@ refuses a longer one. Split a longer report into the claims it makes: one short
 memory first, then each claim as its own memory with a `supports` relation to
 that first one.
 
+When your brief carries the line "Korium is off.", skip each step that says
+to search or capture Korium, say so in one line of your report ("Korium is
+off, so nothing was captured"), and return your report in full where a
+thought id would go.
+
 </preamble>

@@ -1,8 +1,9 @@
 # The per-issue brief
 
 Sent to one `general-purpose` agent per issue, with `model: "haiku"`. Fill in
-the number, the repo, the project number and the Korium line, and send the
-rest as written.
+the number, the repo, the project number, the Korium line and, on Linear with
+Korium off, the state dir (`.claude/state` unless setup named another) in
+place of `<state dir>`, and send the rest as written.
 
 ```
 no code change
@@ -56,7 +57,8 @@ in full; never "as in section 2". Add nothing the sources do not support.
   goes in the Questions part as
   [NEEDS CLARIFICATION: the question; looked in: <decision-record section>, <README rule>, Korium "<query>"].
   Look in the issue's comments, the README, the decision record, the
-  architecture doc, the mockups and Korium first, and name where you looked;
+  architecture doc, the mockups and Korium first, and name where you looked
+  (with Korium off, leave out the Korium query and say Korium is off);
   a question a source settles is written into the issue with the line
   quoted, not asked. A design choice is not a question. Add the
   needs-decision label when a question is open.
@@ -82,7 +84,8 @@ number and send the brief with these lines in place of their GitHub ones:
 
 - First line after `no code change`: "This checks one Linear issue against
   its sources and edits only the part that fails; it may create sub-issues;
-  it changes no file in the repo."
+  it changes no file in the repo" (with Korium off, add: "except the
+  old-text file in the state dir").
 - What to read: the issue with every comment (`get_issue` with `id` <key>,
   then `list_comments` with `issueId` <key>), the project description
   (`get_project` with `query` the project name), which is the brief in
@@ -105,5 +108,8 @@ number and send the brief with these lines in place of their GitHub ones:
   record, the project description rule and the Korium query.
 - The capture: include the old text of every part you changed, word for
   word, since Linear keeps no earlier description the connector can read.
+  With Korium off, write that old text to `<state dir>/old-text/<key>.md`
+  before the edit instead, adding to the file if it is there, so the
+  milestone check can restore a line the edit dropped.
 
 On a repository whose issues live on GitHub, none of this section applies.

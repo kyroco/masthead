@@ -101,7 +101,9 @@ it: "the user"). Three things stay off the connector, whichever is loaded:
   refuses them.
 - **The merge queue goes through `gh`.** The connector has no call that adds
   a pull request to the queue, so the foreman queues with the
-  `enqueuePullRequest` GraphQL mutation through `gh api graphql`.
+  `enqueuePullRequest` GraphQL mutation through `gh api graphql`. With no
+  `gh`, that step, and the list of issues a merge unblocks, stop and say
+  `gh` is needed; neither is skipped.
 - **The branch linked to the issue comes from `gh issue develop`.** The
   connector's `create_branch` makes a branch without the link; with no `gh`,
   make the branch with git and let `Fixes #<n>` in the PR body do the linking.
