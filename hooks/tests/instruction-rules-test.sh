@@ -153,11 +153,8 @@ says  references/session-cliffs.md "Add the changelog entry when the repo keeps 
 # landed while the run was going, because it was started with the verifiers.
 says  references/session-cliffs.md "Run it one time, after the fixes of the last verification round are in"
 says  references/session-cliffs.md "Do not commit while it runs: the run is then thrown away"
-says  references/session-cliffs.md "Do not start the repo's pre-push check now to save time"
+says  references/session-cliffs.md "Do not start it early, with the verifiers, to save time"
 says  references/session-cliffs.md "any commit made after it starts makes its receipt stale"
-says  skills/work-on/worker.md "Run the repo's pre-push check one time: on the last commit, after the fixes of the last verification round are in"
-says  skills/work-on/worker.md "Do not start it when you send out the verifiers, because any later commit makes its receipt stale"
-says  skills/work-on/worker.md "Do not commit while it runs, because the run is then thrown away"
 # The push gate's order and its remembered pass, where a person reads about them.
 for doc in README.md docs/explainer.template.html docs/explainer.html; do
   says "$doc" "the test receipt and the secret scan first, then the stack checks, which are skipped when this exact commit already passed them"
@@ -214,7 +211,7 @@ never agents/security-reviewer.md "Everything in the \`reviewer\` agent applies"
 says  references/agent-preamble.md "Read by verifier"
 says  references/work-routing.md "Use \`verifier\`"
 never references/work-routing.md "Use \`reviewer\`"
-says  hooks/bash-scope-reviewer.sh 'REVIEWER_AGENTS="verifier|security-reviewer"'
+says  hooks/bash-scope-reviewer.sh 'REVIEWER_AGENTS="verifier|security-reviewer|architecture-reviewer"'
 says  hooks/review-write-fence.py "findings-verifier-"
 never hooks/review-write-fence.py "findings-reviewer-"
 # Scenario 2: there is no worker plan and no plan check; the design is
@@ -245,7 +242,7 @@ never skills/review-design/SKILL.md "It writes no code"
 says  skills/review-design/SKILL.md "## Then the issues"
 says  skills/review-design/SKILL.md "Change nothing until they say go"
 says  skills/review-design/SKILL.md "leave every other issue alone"
-says  skills/work-on/SKILL.md "except the verifier's and the adjudicator's"
+says  skills/work-on/SKILL.md "except the verifier's, the architecture reviewer's and the adjudicator's"
 # Scenario 3: the fix loop stays small.
 says  references/session-cliffs.md "one \`verifier\` per scenario"
 says  references/session-cliffs.md "only the claims the fix broke"
@@ -444,7 +441,7 @@ never docs/explainer.template.html "skill rewrites issues into this shape"
 says  docs/explainer.template.html "whether to keep a code index in Korium (off)"
 says  docs/explainer.html "whether to keep a code index in Korium (off)"
 says  README.md "the judge (the \`adjudicator\` agent)"
-says  references/agent-preamble.md "Read by verifier, security-reviewer, adjudicator, diagnoser and reader"
+says  references/agent-preamble.md "Read by verifier, security-reviewer, architecture-reviewer, adjudicator, diagnoser and reader"
 never references/agent-preamble.md "security-reviewer, diagnoser and reader, in every repo"
 says  references/work-routing.md "differs from all five"
 never references/work-routing.md "differs from all four"
@@ -544,9 +541,9 @@ done
 says  references/gate-catalog.md "except \`gate-verify-brief\`"
 never references/gate-catalog.md "none of these refuses anything"
 # A model named on the call is checked whatever the agent's file says.
-says  README.md "a call that names no model for a helper whose own file names one is not asked"
+says  README.md "a call that names no model is not asked for a helper whose file in the project's or the plugin's agents folder names one"
 never README.md "A helper with no model in its own file"
-says  docs/explainer.template.html "a call that names no model for a helper whose own file names one is not asked"
+says  docs/explainer.template.html "a call that names no model is not asked for a helper whose file in the project's or the plugin's agents folder names one"
 never docs/explainer.template.html "A helper with no model in its own file"
 says  references/gate-catalog.md "are not covered when the call names no model"
 says  references/dispatch-brief.md "Not covered when the call names no model"
@@ -569,21 +566,15 @@ says  docs/explainer.template.html "or three when a memory is already connected"
 # under 8 is dropped, never brought to the person and never filed.
 says  skills/work-on/foreman.md "What the product does, what it says, what it charges, and who may do what are the person's to decide"
 says  skills/work-on/foreman.md "one question at a time; never fill the gap yourself"
-says  skills/work-on/foreman.md "One that scores 8 or more is fixed in the same PR, test first when it is a bug"
-says  skills/work-on/foreman.md "One that scores under 8 is dropped: it is not brought to the person, and nobody files it"
-says  skills/work-on/foreman.md "Never bring the person an extra, and never file one"
-says  skills/work-on/foreman.md "every extra scored 8 or more is fixed in it"
 never skills/work-on/foreman.md "**Proceed**"
 never skills/work-on/foreman.md "This is the only issue a foreman files"
 says  skills/work-on/foreman.md "sessions alive, the ones waiting for the merge queue"
 says  skills/work-on/foreman.md "Some things are not yours to settle and go to the person as they stand"
-says  skills/work-on/foreman.md "The moment filed exceeds closed, stop dispatching"
 says  skills/work-on/foreman.md "and file no issue."
 never skills/work-on/foreman.md "file no issue except"
 never skills/work-on/foreman.md "answer it from the sources above, in order, with the line quoted, or ask the user"
 never skills/work-on/foreman.md "tell the worker to fix it, file it or leave it"
 never skills/work-on/foreman.md "a finding it placed as a new issue is filed"
-says  agents/adjudicator.md "fixes it in this PR when it scores 8 or more, and drops it when it scores under 8"
 never agents/adjudicator.md "the worker decides whether it reaches the person"
 says  agents/adjudicator.md "**Extras**"
 never agents/adjudicator.md "**Seen, not done**"
@@ -597,8 +588,6 @@ says  skills/work-on/worker.md "One that scores under 8 is dropped: you bring it
 never skills/work-on/worker.md "Then the extras you are bringing"
 never skills/work-on/worker.md "Bring them the rest"
 never skills/work-on/worker.md "is filed, blocked by this issue"
-says  references/session-cliffs.md "one that scores 8 or more you fix in this PR"
-says  references/session-cliffs.md "bringing it to no one and filing nothing"
 never references/session-cliffs.md "fix none of them here and file none"
 says  references/session-cliffs.md "Log nothing and file nothing"
 never references/session-cliffs.md "File each finding on its New issue list"
@@ -614,7 +603,7 @@ for doc in README.md docs/explainer.template.html docs/explainer.html; do
   never "$doc" "a follow-up that waited on this one first"
   never "$doc" "answers with the line quoted. Only when nothing settles it"
 done
-says  scripts/diagrams.py "8 or higher is fixed in this PR"
+says  scripts/diagrams.py "a high score is fixed in this PR"
 never docs/images/review.svg "fix later"
 never docs/images/review.svg "seen, not done"
 never docs/images/review.svg "reproduction"
@@ -778,8 +767,7 @@ A=skills/analyze-issues/SKILL.md
 IC=skills/analyze-issues/issue-check.md
 MC=skills/analyze-issues/milestone-check.md
 RD=skills/review-design/SKILL.md
-DS=references/design-sheet.md
-for f in "$A" "$IC" "$MC" "$RD" "$DS"; do
+for f in "$A" "$IC" "$MC" "$RD"; do
   says  "$f" "## On Linear"
   says  "$f" "On a repository whose issues live on GitHub, none of this section applies"
 done
@@ -808,7 +796,6 @@ says  "$MC" "duplicates, contradictions, gaps and order"
 says  "$RD" "the Linear projects whose description names the decision record"
 says  "$RD" "\`list_issues\` with \`project\` each of those projects"
 says  "$RD" "fix each stale issue with \`save_issue\` with \`id\` the key and \`patch\`, after reading it with \`get_issue\`"
-says  "$DS" "append the section with \`save_issue\` with \`id\` the key and a \`patch\` of op \`append\`"
 # Scenario 7: on GitHub, the steps stand as written.
 says  "$A" "On \`github\`, every \`gh\` step below"
 says  "$A" "adds the \`needs-decision\` label"
@@ -816,7 +803,6 @@ says  "$IC" "with every comment (\`gh issue view <n> --comments\`), the project 
 says  "$IC" "Add the needs-decision label when a question is open"
 says  "$MC" "(\`gh issue list --milestone \"<title>\"\`, then \`gh issue view <n> --comments\`)"
 says  "$RD" "\`gh issue edit <n> --body-file <path>\`"
-says  "$DS" "write it back with \`gh issue edit <n> --body-file <file>\`"
 # Review S2-1: a Linear question names the project description rule, and the
 # edit line says the check refuses a question without its "looked in:" part.
 says  "$IC" "<project description rule>"
@@ -923,7 +909,7 @@ never agents/verifier.md "Say with each what the worker's run"
 never agents/security-reviewer.md "each with what the worker's run has to show"
 says  hooks/review-write-fence.py "never a copy of the tree"
 never hooks/review-write-fence.py "make a throwaway worktree"
-says  hooks/bash-scope-reviewer.sh 'REVIEWER_AGENTS="verifier|security-reviewer"'
+says  hooks/bash-scope-reviewer.sh 'REVIEWER_AGENTS="verifier|security-reviewer|architecture-reviewer"'
 never hooks/bash-scope-reviewer.sh "DATABASE_BARRED_AGENTS"
 for doc in README.md docs/explainer.template.html docs/explainer.html references/gate-catalog.md; do
   never "$doc" "a scratch copy under"
@@ -1081,17 +1067,138 @@ says  agents/security-reviewer.md "Comments, module docs and internal docs are n
 # Re-verify round 1 fix: the copy left lines out, so the security reviewer's
 # scope grew. It now carries every line it took from the verifier at ac86e48,
 # word for word: what counts as a claim, the stance, and how it reports.
-says  agents/security-reviewer.md "Nothing else is a claim: a fault in code the change did not touch is not a finding"
 says  agents/security-reviewer.md "A breach of the repository's written rules (CLAUDE.md, \`docs/conventions/\`) is a finding only when it makes one of the claims false"
 says  agents/security-reviewer.md "it needs to be adversarial and assume the architecture and code is shit and prove it's right by looking. It's not about always finding something."
 says  agents/security-reviewer.md "A claim you could not make false, with the run that shows it, is as much your result as one you could"
 says  agents/security-reviewer.md "The author's claims are suspect until you prove otherwise"
-says  agents/security-reviewer.md "The scenario's Given, When and Then, as written, are the standard"
-says  agents/security-reviewer.md "When the change adds or edits text a person reads"
 says  agents/security-reviewer.md "A claim that a test covers something is false when no test fails without the change"
 says  agents/security-reviewer.md "Never write that file with a shell command. If the write is refused, put the findings in your final reply and say so"
 says  agents/security-reviewer.md "Quote it as a false claim"
 says  agents/security-reviewer.md "Your final message is the report: each claim with its answer, false ones first"
+# MAST-37: with no gh, the foreman stops and says so for each step that has no connector call, naming that step.
+says  skills/work-on/foreman.md "With no \`gh\` (\`command -v gh\` finds nothing)"
+says  skills/work-on/foreman.md "\"\`gh\` is needed to queue PR #<pr>\""
+says  skills/work-on/foreman.md "\"\`gh\` is needed to list the issues that issue #<n> unblocks\""
+says  skills/work-on/foreman.md "Never skip one of these steps or report it done"
+never skills/work-on/foreman.md "\`gh\` is needed to queue PR #<n>"
+says  skills/github-issues/SKILL.md "stop and say \`gh\` is needed; neither is skipped"
+
+# MAST-37: setup's no-jq row names only what really stays off: the stop gates, capture reports and shell searches now hold without jq.
+says  skills/setup/SKILL.md "the code index gate cannot tell a fresh code_locate answer from a stale one, so any lookup of a name lets a search for it through"
+says  skills/setup/SKILL.md "the two gates that send a repeated search or a whole-file read back to that answer stay off"
+never skills/setup/SKILL.md "every search the code index gate reads is refused"
+
+# MAST-37: on Linear with Korium off, the old text goes to a file the milestone check reads and restores from.
+says  skills/analyze-issues/issue-check.md "the state dir (\`.claude/state\` unless setup named another)"
+says  skills/analyze-issues/milestone-check.md "the state dir (\`.claude/state\` unless setup named another)"
+says  skills/analyze-issues/issue-check.md "With Korium off, write that old text to \`<state dir>/old-text/<key>.md\` before the edit"
+says  skills/analyze-issues/milestone-check.md "With Korium off, read it from \`<state dir>/old-text/<key>.md\` instead"
+says  skills/analyze-issues/milestone-check.md "A line of the user's that the old text holds and the issue lost is restored with a \`patch\`"
+says  skills/analyze-issues/milestone-check.md "cannot be checked or restored, and name it; never call it clean"
+says  skills/analyze-issues/SKILL.md "the check says it cannot restore a dropped line, names the issue, and does not pass it"
+
+# MAST-37: one meaning of Korium off (the install option), handed to agents in the brief.
+says  skills/work-on/SKILL.md "Korium is off when the \`korium\` install option is off"
+says  skills/work-on/SKILL.md "\"Korium is off, so no search.\""
+says  skills/work-on/SKILL.md "put the line \"Korium is off.\" in every brief you send"
+never skills/work-on/SKILL.md "or \`ToolSearch\` finds no Korium tool"
+says  references/agent-preamble.md "When your brief carries the line \"Korium is off.\""
+says  references/agent-preamble.md "\"Korium is off, so nothing was captured\""
+never references/agent-preamble.md "\`ToolSearch\` finds no Korium tool"
+
+# Linear issue MAST-39: the old copies of rules left by the move to one
+# verifier per scenario are gone, and each rule is written once.
+# Scenario 1: no line tells a verifier to report faults outside its claims
+# (October 27 design: "anything outside the claims is a follow-up by construction").
+never references/agent-preamble.md "A bug you find is reported with file:line, even outside your question"
+never references/agent-preamble.md "even outside your question"
+says  references/agent-preamble.md "What you do with a fault outside your question is your agent file's to say"
+says  agents/diagnoser.md "A bug you find outside your case is reported with \`file:line\` too"
+says  agents/verifier.md "Nothing else is a claim: a fault in code the change did not touch is not a finding"
+# Scenario 2: the security reviewer's claims are the repo's security conventions,
+# and nothing in its file makes the scenario's Then lines its only claims.
+never agents/security-reviewer.md "Nothing else is a claim"
+never agents/security-reviewer.md "are the standard"
+never agents/security-reviewer.md "Then true in each state the Given allows"
+says  agents/security-reviewer.md "the repository's security conventions are your claims"
+says  agents/security-reviewer.md "A fault the change brings in that breaks one of your claims is a finding wherever its lines are"
+# Scenario 3: the extras rule is written once, in the worker's "What done is",
+# and the pre-push rule once, in step 8 of Opening a PR; every other file points.
+says  skills/work-on/worker.md "An extra that scores 8 or more is fixed in this PR, test first when it is a bug"
+says  skills/work-on/worker.md "One that scores under 8 is dropped: you bring it to no one"
+for f in references/session-cliffs.md agents/adjudicator.md skills/work-on/foreman.md skills/github-issues/SKILL.md skills/linear-issues/SKILL.md README.md docs/explainer.template.html docs/explainer.html docs/images/review.svg; do
+  never "$f" "8 or more"
+  never "$f" "8 or higher"
+  never "$f" "under 8"
+done
+says  references/session-cliffs.md "as the worker's \"What done is\" says (\`skills/work-on/worker.md\`)"
+says  agents/adjudicator.md "the worker settles it as its \"What done is\" says (\`skills/work-on/worker.md\`)"
+says  skills/work-on/foreman.md "settled by its worker, as \`worker.md\` **What done is** says"
+says  skills/github-issues/SKILL.md "an extra is settled as the worker's \"What done is\" says"
+never skills/linear-issues/SKILL.md "by answering \"fix later\""
+says  skills/linear-issues/SKILL.md "an extra is settled as the worker's \"What done is\" says"
+says  README.md "the rule is in \`skills/work-on/worker.md\`"
+says  docs/explainer.template.html "the rule is in <code>skills/work-on/worker.md</code>"
+says  docs/explainer.html "the rule is in <code>skills/work-on/worker.md</code>"
+says  references/session-cliffs.md "Run it one time, after the fixes of the last verification round are in"
+never skills/work-on/worker.md "Run the repo's pre-push check one time"
+never skills/work-on/worker.md "Do not commit while it runs"
+never skills/work-on/worker.md "Do not start it when you send out the verifiers"
+never references/session-cliffs.md "Do not start the repo's pre-push check now to save time"
+says  references/session-cliffs.md "Step 8 runs the pre-push check, once"
+says  skills/work-on/worker.md "Its step 8 says when to run the pre-push check"
+# Scenario 4: the worker reads the PR steps the hook injects, the repo's own
+# lead when its session-cliffs has one (prime-context.py cliff_source).
+says  skills/work-on/worker.md "prime-context.py show \"Opening a PR\""
+says  skills/work-on/SKILL.md "prime-context.py show \"Opening a PR\""
+never skills/work-on/worker.md "Follow **Opening a PR** in \`\${CLAUDE_PLUGIN_ROOT}/references/session-cliffs.md\`"
+never skills/work-on/SKILL.md "The PR steps themselves are **Opening a PR** in"
+# Scenario 5: a split does not stop a foreman run (reviews file nothing).
+never skills/work-on/foreman.md "filed exceeds closed"
+never skills/work-on/foreman.md "issues filed"
+says  skills/work-on/foreman.md "A split is not a stop"
+says  skills/work-on/foreman.md "start one worker per sub-issue, in blocked-by order"
+# Scenario 6: a thrown-out finding is not saved where the worker searches.
+never agents/adjudicator.md "and so does each thrown-out finding"
+never agents/adjudicator.md "A thrown-out finding's memory"
+says  agents/adjudicator.md "A thrown-out finding is never captured"
+# Round 1 fix: a verifier's and a security reviewer's own capture holds no
+# finding either, since the adjudicator may throw any of them out.
+says  agents/verifier.md "Your capture holds no finding"
+never agents/verifier.md "Capture it to Korium and return the thought id"
+says  agents/security-reviewer.md "one short capture to Korium before you finish, holding no finding"
+never agents/security-reviewer.md "and the report captured to Korium before you finish"
+# Scenario 7: the foreman rules on no disagreement between review rounds.
+never skills/work-on/foreman.md "a disagreement between review rounds"
+never skills/work-on/foreman.md "one round placed a finding on the fix list and the next among its extras"
+says  skills/work-on/foreman.md "what the second re-verify round left on the fix list"
+# The retired design sheet no longer ships.
+if [ -e "$ROOT/references/design-sheet.md" ]; then
+  fail=$((fail + 1)); echo "FAIL references/design-sheet.md still ships"
+else
+  pass=$((pass + 1))
+fi
+# Scenario 8: the docs and option text match the code.
+says  skills/work-on/worker.md "Done is four things"
+never skills/work-on/worker.md "Done is three things"
+never .claude-plugin/plugin.json "Subagents run on Haiku unless"
+says  .claude-plugin/plugin.json "\"title\": \"Ask for a reason before a helper runs on the biggest model\""
+says  .claude-plugin/plugin.json "a call that names no model is not asked for a helper whose file in the project's or the plugin's agents folder names one, or for another plugin's helper"
+never .claude-plugin/plugin.json "for a helper whose own file names one"
+for f in README.md docs/explainer.template.html docs/explainer.html; do
+  says  "$f" "a call that names no model is not asked for a helper whose file in the project's or the plugin's agents folder names one, or for another plugin's helper"
+  never "$f" "for a helper whose own file names one"
+done
+says  docs/explainer.html "<td><code>model-choice-gate.sh</code></td><td>Ask for a reason before a helper runs on the biggest model</td>"
+never .claude-plugin/plugin.json "before a subagent runs on Opus"
+says  README.md "| \`model-choice-gate.sh\` | Ask for a reason before a helper runs on the biggest model |"
+never README.md "Ask for a reason before the biggest model"
+says  docs/explainer.template.html "<td><code>model-choice-gate.sh</code></td><td>Ask for a reason before a helper runs on the biggest model</td>"
+never hooks/run-tests.sh "nothing runs these in CI"
+says  hooks/run-tests.sh "CI runs this on Linux and macOS"
+never skills/work-on/SKILL.md "Nothing else in this skill or its files is checked by a hook"
+says  skills/work-on/SKILL.md "\`agent-brief-gates.sh\` refuses a verifier brief with no claims list and a third re-verify round"
+
 
 # MAST-30: setup finds or starts the architecture doc and records where it lives.
 # Scenario 1: name the doc found, ask, record on yes.
@@ -1120,5 +1227,127 @@ says  skills/setup/SKILL.md 'On such a run, step 9 does not ask the `.gitignore`
 says  skills/setup/SKILL.md 'When `ARCHITECTURE_DOC` is recorded but `project_fact.py --architecture-doc` prints nothing, the doc has moved or gone'
 # Scenario 5: the path comes from the facts reader every other fact comes from.
 says  skills/setup/SKILL.md 'project_fact.py --architecture-doc'
+# MAST-34: one architecture reviewer on every PR, in place of the ADR check
+# nothing ran. Robert, November 14, 2026, on whether this replaces "at no other
+# time": "yes it does".
+# Scenario 1: one reviewer per change, sent with the first verification.
+says  references/session-cliffs.md 'one `architecture-reviewer` for the whole change, never one per scenario'
+says  references/session-cliffs.md 'The architecture reviewer goes out once per change: never on a re-verify round'
+# Scenario 2: only the lines the change touched, the seven lenses, and what a finding names.
+says  agents/architecture-reviewer.md 'name: architecture-reviewer'
+says  agents/architecture-reviewer.md 'You review only the lines the change touched'
+# Round 1, fix F7: what the touched lines are held to.
+says  agents/architecture-reviewer.md 'Hold each touched line to the ADR'"'"'s alignment lines, the architecture doc and the principles'
+for lens in 'Direction' 'One way in and out' 'Call shape' 'Seams' 'What each build carries' 'Leftovers' 'Tests and checks'; do
+  says agents/architecture-reviewer.md "| $lens |"
+done
+says  agents/architecture-reviewer.md 'Each finding names its `file:line`, the lens, the smell, and the rule or build it breaks'
+# Scenario 2a: two scores on every finding.
+says  agents/architecture-reviewer.md 'a customer score from 1 to 10'
+says  agents/architecture-reviewer.md 'drift, yes or no'
+says  agents/architecture-reviewer.md 'does it break one of the seven rules as this project'"'"'s architecture doc states them'
+# Scenario 3: blind, as the verifier is.
+says  agents/architecture-reviewer.md 'You never get the author'"'"'s account of the change or another review'
+says  agents/architecture-reviewer.md 'You do not search Korium'"'"'s memory'
+# Re-verify round 1, fixes V1 and N2: the README promises only what the fences do.
+never README.md 'None of them can reach the network'
+never README.md 'None of them can edit anything'
+says  README.md 'refuse the common network programs'
+says  references/gate-catalog.md 'a denylist of network programs, not an allowlist'
+# Re-verify round 2 (Robert, November 15): the README and catalog claim only
+# the exact shapes the architecture reviewer's shell allows, and no fence they
+# do not have.
+never README.md 'the architecture reviewer'"'"'s shell can only read'
+says  README.md 'The architecture reviewer'"'"'s shell runs only `git diff`, `git show` and `git log` with plain revisions and paths'
+says  README.md 'and refuses every other command'
+never references/gate-catalog.md 'refuses git'"'"'s `-O` in any spelling'
+says  references/gate-catalog.md 'a wrapper it does not see through (`timeout`, `stdbuf`, `nice -n 5`, `exec -a y`, a shell'"'"'s bundled `-lc`), a git alias set with `-c`, or git run from `find -exec`, still gets through for the verifier and security reviewer (MAST-43)'
+# Re-verify round 3, fixes V1 and S1, and the judge's N1: the hook-table row
+# names --comments, and neither the catalog nor the README claims a refusal a
+# wrapper gets past.
+says  README.md '`gh issue view <n>`, bare or with `--comments` | scoped by the agent'"'"'s type |'
+never references/gate-catalog.md 'refuses git'"'"'s `-O` written after git in the same command'
+says  references/gate-catalog.md 'refuses git'"'"'s `-O` when git is the first word or follows a wrapper it steps over'
+says  README.md 'though one run through a wrapper the fence does not see through, such as `timeout 5 curl`, still gets through (MAST-43)'
+says  references/gate-catalog.md 'the `architecture-reviewer` shell to exact command shapes'
+says  agents/architecture-reviewer.md 'Your shell runs only these exact commands'
+never agents/architecture-reviewer.md 'with `--comments` or `--json`'
+# Re-verify round 1, fix T1: the reviewer's grant is pinned whole, so any tool
+# added to it fails here.
+WANT_TOOLS="Read Glob Grep Bash ToolSearch Write mcp__korium__code_locate mcp__claude_ai_korium__code_locate mcp__korium__agent_capture mcp__claude_ai_korium__agent_capture mcp__Linear__get_issue mcp__Linear__list_comments mcp__linear__get_issue mcp__linear__list_comments mcp__claude_ai_Linear__get_issue mcp__claude_ai_Linear__list_comments mcp__plugin_linear_linear__get_issue mcp__plugin_linear_linear__list_comments mcp__github__issue_read mcp__claude_ai_GitHub__issue_read mcp__plugin_github_github__issue_read"
+GOT_TOOLS="$(sed -n 's/^tools: //p' "$ROOT/agents/architecture-reviewer.md" | tr ',' '\n' | tr -d ' ' | sort | tr '\n' ' ')"
+if [ "$GOT_TOOLS" = "$(printf '%s\n' $WANT_TOOLS | sort | tr '\n' ' ')" ]; then
+  pass=$((pass + 1))
+else
+  fail=$((fail + 1)); echo "FAIL agents/architecture-reviewer.md tools differ from the pinned grant: $GOT_TOOLS"
+fi
+# Every tool the verifier is denied, the architecture reviewer is denied too.
+VERIFIER_DENY="$(sed -n 's/^disallowedTools: //p' "$ROOT/agents/verifier.md" | tr ',' '\n' | tr -d ' ')"
+ARCH_DENY_ALL="$(sed -n 's/^disallowedTools: //p' "$ROOT/agents/architecture-reviewer.md" | tr ',' '\n' | tr -d ' ')"
+for tool in $VERIFIER_DENY; do
+  if printf '%s\n' "$ARCH_DENY_ALL" | grep -qx "$tool"; then pass=$((pass + 1)); else fail=$((fail + 1)); echo "FAIL agents/architecture-reviewer.md does not deny $tool, which the verifier denies"; fi
+done
+# Round 1, fix F5: the brief shape itself carries nothing of the author's account.
+says  references/dispatch-brief.md 'nothing of your account of the change: no claims, no did-not-prove list, no summary'
+says  references/session-cliffs.md 'the principles file and the mockup pages, and nothing of your account'
+# Round 1, fix F6: the agent's own tool grant holds no memory search and no tracker write.
+ARCH_TOOLS="$(sed -n 's/^tools: //p' "$ROOT/agents/architecture-reviewer.md" | tr ',' '\n' | tr -d ' ')"
+ARCH_DENY="$(sed -n 's/^disallowedTools: //p' "$ROOT/agents/architecture-reviewer.md" | tr ',' '\n' | tr -d ' ')"
+for tool in mcp__korium__agent_search mcp__claude_ai_korium__agent_search mcp__korium__korium_browse mcp__claude_ai_korium__korium_browse; do
+  if printf '%s\n' "$ARCH_DENY" | grep -qx "$tool" && ! printf '%s\n' "$ARCH_TOOLS" | grep -qx "$tool"; then
+    pass=$((pass + 1))
+  else
+    fail=$((fail + 1)); echo "FAIL agents/architecture-reviewer.md does not deny $tool"
+  fi
+done
+for tool in Edit MultiEdit NotebookEdit Agent WebFetch; do
+  if printf '%s\n' "$ARCH_DENY" | grep -qx "$tool"; then pass=$((pass + 1)); else fail=$((fail + 1)); echo "FAIL agents/architecture-reviewer.md does not deny $tool"; fi
+done
+if printf '%s\n' "$ARCH_TOOLS" | grep -E '__(save_|create_|delete_|update_|issue_write|add_|merge_|push_)' >/dev/null; then
+  fail=$((fail + 1)); echo "FAIL agents/architecture-reviewer.md grants a tracker write: $(printf '%s\n' "$ARCH_TOOLS" | grep -E '__(save_|create_|delete_|update_|issue_write|add_|merge_|push_)' | tr '\n' ' ')"
+else
+  pass=$((pass + 1))
+fi
+# Scenario 4: foreman runs too.
+says  references/session-cliffs.md 'in a foreman run as in one the user started'
+says  agents/architecture-reviewer.md 'and in a foreman run as in one the user started'
+# Scenario 5: the issue through the repository's own tracker, never the other.
+says  agents/architecture-reviewer.md 'project_fact.py --tracker'
+says  agents/architecture-reviewer.md '`get_issue` with `id` the key, then `list_comments`'
+says  agents/architecture-reviewer.md '`issue_read`, method `get`, then method `get_comments`'
+says  agents/architecture-reviewer.md 'else `gh issue view <n> --comments`'
+says  agents/architecture-reviewer.md 'never fall back from one tracker to the other'
+# Scenario 6: the write fence and the brief gate.
+says  hooks/review-write-fence.py 'findings-architecture-reviewer'
+says  references/dispatch-brief.md 'ADR alignment:'
+says  references/dispatch-brief.md 'Architecture doc:'
+# Scenario 7: the ADR check is gone and no file names it.
+if [ -e "$ROOT/skills/work-on/adr-check.md" ]; then
+  fail=$((fail + 1)); echo "FAIL skills/work-on/adr-check.md still exists; the architecture reviewer replaces it"
+else
+  pass=$((pass + 1))
+fi
+if git -C "$ROOT" grep -lF 'adr-check' -- . ':!hooks/tests/instruction-rules-test.sh' >/dev/null 2>&1; then
+  fail=$((fail + 1)); echo "FAIL a file still names adr-check: $(git -C "$ROOT" grep -lF 'adr-check' -- . ':!hooks/tests/instruction-rules-test.sh' | tr '\n' ' ')"
+else
+  pass=$((pass + 1))
+fi
+# Scenario 8: with no doc recorded it still runs, on the principles alone.
+says  agents/architecture-reviewer.md 'When the brief says `Architecture doc: none recorded`, you review against the principles alone'
+says  references/session-cliffs.md 'whether or not the project records an architecture doc'
+# Scenarios 9 to 11: the ADR check's two jobs, and a disagreement between the ADR and the mockup.
+says  agents/architecture-reviewer.md 'each requirement of that part (each decision, acceptance criterion and rule) is in the code as the ADR says'
+says  agents/architecture-reviewer.md 'a requirement not built is a finding'
+# Round 1, fix F4: the evidence for each requirement found built.
+says  agents/architecture-reviewer.md 'Quote the ADR line and give the code'"'"'s `file:line`'
+says  agents/architecture-reviewer.md 'anything in the code that contradicts the mockup is a finding, with the mockup line quoted'
+says  agents/architecture-reviewer.md 'report the disagreement itself as a finding for the person, quoting both'
+says  agents/architecture-reviewer.md 'do not pick one to check the code against'
+# Round 1, fix F3: the ADR comes as a path the reviewer can read, never a link.
+says  references/dispatch-brief.md 'never a link, which the reviewer cannot open'
+says  agents/architecture-reviewer.md 'that no requirement of it was checked is a finding for the person'
+# Round 1, extra scored 8: the ADR check's other job, a changed line that
+# contradicts any line of the ADR (Robert, November 14, "yes" to keeping both jobs).
+says  agents/architecture-reviewer.md 'a changed line that contradicts any line of the ADR, such as an option it rejected, is a finding, with that line quoted'
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]

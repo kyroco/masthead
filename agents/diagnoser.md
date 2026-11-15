@@ -61,4 +61,6 @@ you, never from memory. The version in the lockfile decides.
 Your final message is the case file: the symptom, how you reproduced it, the root
 cause at `file:line`, the two observations, and what you ruled out. Capture it to
 Korium and return the thought id. If the honest answer is that the premise is
-wrong, that is the finding, and it still gets captured.
+wrong, that is the finding, and it still gets captured. A bug you find outside
+your case is reported with `file:line` too, under its own heading; you do not
+fix it.

@@ -451,9 +451,17 @@ def main():
           str("deny" in sized_raw("x" * 2001, env={"MASTHEAD_CAPTURE_GATE": "off"})), "False")
 
     # With no jq the hook reads no field, so the length rule must count another way.
+    # Every tool on this machine but jq, since a machine without jq still has tr and grep (MAST-37).
     NO_JQ = tempfile.mkdtemp(prefix="capture-no-jq-")
-    for tool in ("bash", "cat", "id", "mkdir", "chmod", "dirname", "python3"):
-        os.symlink(os.path.realpath(shutil.which(tool)), os.path.join(NO_JQ, tool))
+    for folder in os.environ.get("PATH", "").split(os.pathsep):
+        if not os.path.isdir(folder):
+            continue
+        for name in os.listdir(folder):
+            target = os.path.join(NO_JQ, name)
+            source = os.path.join(folder, name)
+            if name != "jq" and not os.path.lexists(target) and \
+                    os.path.isfile(source) and os.access(source, os.X_OK):
+                os.symlink(source, target)
     no_jq = {"PATH": NO_JQ}
     out = sized_raw("x" * 2001, "adjudicator", no_jq)
     check("no jq: 2,001 characters is refused", str("deny" in out), "True")
@@ -473,6 +481,62 @@ def main():
           str("deny" in sized_raw("x" * 2001, "adjudicator",
                                   {**no_jq, "MASTHEAD_CAPTURE_GATE": "off"})), "False")
 
+    print("\n--- no jq: the stop gates and the capture reports still speak (MAST-37) ---")
+    # Without jq these printed nothing, so a session ended with no capture and a refused capture went unreported.
+    check("no jq: the stub PATH really has no jq",
+          str(os.path.exists(os.path.join(NO_JQ, "jq"))), "False")
+    nojq_state = tempfile.mkdtemp(prefix="stop-no-jq-")
+    nojq_env = dict(os.environ, PATH=NO_JQ, TMPDIR=nojq_state)
+    nojq_env.pop("CLAUDE_PROJECT_DIR", None)
+    nojq_env.pop("CLAUDE_PLUGIN_DATA", None)
+
+    def protocol_raw(mode, payload):
+        return subprocess.run(["bash", PROTOCOL, mode], input=json.dumps(payload),
+                              capture_output=True, text=True, check=False,
+                              env=nojq_env).stdout.strip()
+
+    def stop_decision(out):
+        try:
+            return json.loads(out).get("decision") or "unparseable"
+        except ValueError:
+            return "allow" if not out else "unparseable: " + out[:70]
+
+    def capture_response(body):
+        return [{"type": "text", "text": json.dumps(body)}]
+
+    for mode in ("gate-stop", "gate-substop"):
+        sid = "nojq-" + mode
+        first = protocol_raw(mode, {"session_id": sid})
+        check(f"no jq: {mode} refuses a session that captured nothing", stop_decision(first), "block")
+        check(f"no jq: {mode} says why, in the jq words",
+              str("captured nothing" in first or "without writing to Korium" in first), "True")
+        check(f"no jq: {mode} then lets the session end",
+              stop_decision(protocol_raw(mode, {"session_id": sid})), "allow")
+
+    protocol_raw("mark-capture", {"session_id": "nojq-stored", "tool_name": "mcp__korium__agent_capture",
+                                  "tool_response": capture_response({"thought_id": "t-1"})})
+    check("no jq: a stored capture is read, so the stop gate stands aside",
+          stop_decision(protocol_raw("gate-stop", {"session_id": "nojq-stored"})), "allow")
+
+    rejected = protocol_raw("mark-capture", {
+        "session_id": "nojq-rejected", "tool_name": "mcp__korium__agent_capture",
+        "tool_response": capture_response({"status": "rejected", "reason": "too long"})})
+    check("no jq: a rejected capture is reported", stop_decision(rejected), "block")
+    check("no jq: the report says Korium refused it", str("Korium refused that capture" in rejected), "True")
+
+    quota = protocol_raw("mark-capture", {
+        "session_id": "nojq-quota", "tool_name": "mcp__korium__agent_capture",
+        "tool_response": capture_response({"status": "rejected", "class": "quota"})})
+    check("no jq: a capture refused for a plan limit is reported", str("plan limit" in quota), "True")
+    check("no jq: and the stop gate then stands aside, since it cannot capture",
+          stop_decision(protocol_raw("gate-stop", {"session_id": "nojq-quota"})), "allow")
+
+    protocol_raw("mark-search", {"session_id": "nojq-search", "tool_name": "mcp__korium__agent_search",
+                                 "tool_input": {"query": "stop gate"},
+                                 "tool_response": capture_response({"result_count": 3})})
+    edit = protocol_raw("gate-edit", {"session_id": "nojq-search", "tool_name": "Edit"})
+    check("no jq: a search that found something lets the first edit through", edit, "")
+
     print("\n--- the adjudicator saves one memory per finding ---")
     # Issue #63: what the agent is told to do, read from the file it runs on, since
     # nothing in this suite can run the model.
@@ -485,9 +549,14 @@ def main():
                   "return the verdict memory's thought id"):
         check(f"the adjudicator's capture section says: {words}",
               str(words in " ".join(capture_section.split())), "True")
-    check("a failed save of a thrown-out finding is reported as a count",
-          str("A thrown-out finding whose save failed is counted, never named"
+    # MAST-39: a thrown-out finding is gone, so it is never saved where the
+    # worker searches; only its count is in the verdict memory.
+    check("a thrown-out finding is never captured",
+          str("A thrown-out finding is never captured"
               in " ".join(capture_section.split())), "True")
+    check("and no thrown-out finding gets a memory of its own",
+          str("and so does each thrown-out finding"
+              in " ".join(capture_section.split())), "False")
     check("the adjudicator is no longer told to save the verdict whole",
           str("Capture the verdict to Korium" in capture_section), "False")
 
@@ -582,7 +651,7 @@ def main():
     FAN_USER = tempfile.mkdtemp()
 
     def fan_out(prompt, hook=BRIEF_GATES, subagent="general-purpose", raw=None,
-                model="haiku"):
+                model="haiku", path=None):
         # model haiku by default, so model-choice-gate stays out of the cases
         # that are about the other checks; model=None leaves it unset.
         payload = raw
@@ -596,6 +665,8 @@ def main():
                 "tool_input": tool_input})
         env = dict(os.environ, TMPDIR=FAN_TMP + "/", CLAUDE_CONFIG_DIR=FAN_USER)
         env.pop("CLAUDE_PROJECT_DIR", None)
+        if path:
+            env["PATH"] = path
         return subprocess.run(["bash", hook], input=payload, capture_output=True,
                               text=True, check=False, env=env).stdout.strip()
 
@@ -635,6 +706,63 @@ def main():
              "List every hook file that carries a shebang.")
     check("a brief with nothing wrong is allowed", fan_out(CLEAN), "")
     check("empty stdin allows", fan_out(None, raw=""), "")
+
+    # NO JQ (MAST-37). A PATH holding every tool on this one but jq: the brief
+    # check must refuse the same brief it refuses with jq, not let it through.
+    FAN_NO_JQ = tempfile.mkdtemp(prefix="brief-no-jq-")
+    for folder in os.environ.get("PATH", "").split(os.pathsep):
+        if not os.path.isdir(folder):
+            continue
+        for name in os.listdir(folder):
+            target = os.path.join(FAN_NO_JQ, name)
+            source = os.path.join(folder, name)
+            if name != "jq" and not os.path.lexists(target) and \
+                    os.path.isfile(source) and os.access(source, os.X_OK):
+                os.symlink(source, target)
+    check("no jq: the stub PATH really has no jq",
+          subprocess.run(["bash", "-c", "command -v jq"], env={"PATH": FAN_NO_JQ},
+                         capture_output=True).returncode != 0, True)
+    nojq_out = fan_out(TWO_PROBLEMS, subagent="verifier", path=FAN_NO_JQ)
+    check("no jq: a verifier brief with no claims list is refused",
+          '"deny"' in nojq_out, True)
+    nojq_reason = reason_of(nojq_out)
+    check("no jq: the refusal names the brief check and says what it wants",
+          "] gate-verify-brief\n" in nojq_reason and "Claims:" in nojq_reason, True)
+    check("no jq: and counts the checks the same way",
+          "refused by 1 of the 3 brief checks" in nojq_reason, True)
+    check("no jq: a namespaced verifier with no claims is refused too",
+          '"deny"' in fan_out(TWO_PROBLEMS, subagent="masthead:verifier", path=FAN_NO_JQ), True)
+    nojq_claims = ("Verify git diff abc123..def456.\n\nClaims:\n"
+                   "- the refusal sentence names the month\n")
+    check("no jq: a verifier brief with its claims goes through",
+          fan_out(nojq_claims, subagent="verifier", path=FAN_NO_JQ), "")
+    check("no jq: a brief with nothing wrong is allowed", fan_out(CLEAN, path=FAN_NO_JQ), "")
+    check("no jq: an Opus dispatch with no Model-choice line is refused, as with jq",
+          '"deny"' in fan_out(CLEAN, model="opus", path=FAN_NO_JQ), True)
+    # A python3 that is found but cannot run reads nothing, so the brief must be refused, not sent.
+    BROKEN_BIN = tempfile.mkdtemp(prefix="brief-broken-python-")
+    with open(os.path.join(BROKEN_BIN, "python3"), "w") as fh:
+        fh.write("#!/bin/sh\nexit 1\n")
+    os.chmod(os.path.join(BROKEN_BIN, "python3"), 0o755)
+    check("no jq, broken python3: a verifier brief with no claims list is refused",
+          '"deny"' in fan_out(TWO_PROBLEMS, subagent="verifier",
+                              path=BROKEN_BIN + os.pathsep + FAN_NO_JQ), True)
+    shutil.rmtree(BROKEN_BIN, ignore_errors=True)
+    # A Latin-1 locale and a brief with an arrow in it: the refusal still reaches Claude Code.
+    latin_env_out = subprocess.run(
+        ["bash", BRIEF_GATES], capture_output=True, check=False,
+        input=json.dumps({"session_id": "brief-fan", "cwd": FAN_CWD, "tool_name": "Agent",
+                          "tool_input": {"prompt": "Verify this diff → report.",
+                                         "subagent_type": "verifier", "model": "haiku",
+                                         "name": "fan-out-case"}}).encode(),
+        env=dict(os.environ, PATH=FAN_NO_JQ, TMPDIR=FAN_TMP + "/", CLAUDE_CONFIG_DIR=FAN_USER,
+                 LANG="en_US.ISO8859-1", LC_ALL="en_US.ISO8859-1")).stdout
+    check("no jq, Latin-1 locale: a verifier brief with an arrow and no claims is refused",
+          b'"deny"' in latin_env_out, True)
+    nojq_rows = open(record).read().splitlines()
+    check("no jq: the dispatch is still recorded",
+          len([r for r in nojq_rows if "\tfan-out-case\t" in r]) >= 6, True)
+    shutil.rmtree(FAN_NO_JQ, ignore_errors=True)
 
     # A CHECK THAT CANNOT RUN IS A REFUSAL. The fan-out copied somewhere with
     # no checks beside it must say so rather than allow everything.

@@ -37,7 +37,7 @@
   <rect x="1008" y="204" width="359" height="90" rx="10" fill="#f3f4f6" stroke="#9ca3af" stroke-width="1.5"/>
   <text x="1187" y="230" text-anchor="middle" font-size="14" font-weight="600" fill="#374151">extras</text>
   <text x="1187" y="246" text-anchor="middle" font-size="12" fill="#4b5563">real, but not this change's to fix: the worker</text>
-  <text x="1187" y="262" text-anchor="middle" font-size="12" fill="#4b5563">scores each; 8 or higher is fixed in this PR,</text>
+  <text x="1187" y="262" text-anchor="middle" font-size="12" fill="#4b5563">scores each; a high score is fixed in this PR,</text>
   <text x="1187" y="278" text-anchor="middle" font-size="12" fill="#4b5563">lower is dropped, and nothing is filed</text>
   <rect x="1008" y="318" width="222" height="74" rx="10" fill="#f9fafb" stroke="#d1d5db" stroke-width="1.5"/>
   <text x="1119" y="344" text-anchor="middle" font-size="14" font-weight="600" fill="#6b7280">thrown out</text>

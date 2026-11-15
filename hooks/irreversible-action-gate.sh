@@ -1,21 +1,48 @@
 #!/usr/bin/env bash
 # irreversible-action-gate.sh - PreToolUse Bash: refuse a command nothing can undo (force push, hard reset, git clean, --no-verify, tofu destroy, state edits or prod apply, dropped data, deleted memory files, recursive deletes outside scratch and build folders, deleted remote branches, gh repo, release and API deletes).
-# Appends every match to a record file in the session directory, fails open on any internal error, and always exits 0 printing a deny decision as JSON or nothing.
+# Appends every match to a record file in the session directory, refuses a call it cannot read, reads the call with python3 when jq is missing, and always exits 0 printing a deny decision as JSON or nothing.
 
 set -uo pipefail
 
 INPUT="$(cat 2>/dev/null || true)"
 [ -n "$INPUT" ] || exit 0
 
-command -v jq >/dev/null 2>&1 || exit 0
+# jq reads the call when it is installed, and json_field.py when it is not, so a machine without jq is guarded the same (MAST-37).
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd -P)" || HERE="$(dirname "$0")"
+if command -v jq >/dev/null 2>&1; then
+  field() { printf '%s' "$INPUT" | jq -r "$1" 2>/dev/null || true; }
+  is_object() { printf '%s' "$INPUT" | jq -e 'type == "object"' >/dev/null 2>&1; }
+  deny_json() { jq -n --arg r "$1" '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: $r}}' 2>/dev/null; }
+# python3 must run, not only be found: the macOS stub with no Command Line Tools is found and reads nothing.
+elif python3 -I -c 'import json' >/dev/null 2>&1 && [ -r "$HERE/json_field.py" ]; then
+  field() { printf '%s' "$INPUT" | python3 -I "$HERE/json_field.py" "$1" 2>/dev/null || true; }
+  is_object() { printf '%s' "$INPUT" | python3 -I "$HERE/json_field.py" --object 2>/dev/null; }
+  deny_json() { python3 -I "$HERE/json_field.py" --deny "$1" 2>/dev/null; }
+else
+  # Nothing can read the call: refuse one that names a command these rules govern, rather than pass it unread.
+  case "$INPUT" in
+    *git*|*rm*|*tofu*|*terraform*|*terragrunt*|*psql*|*mysql*|*mix*|*sql*|*gh*)
+      printf '%s\n' '{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "Neither jq nor a working python3 is installed, so the guard against force pushes, hard resets and deletes cannot read this command, and it is refused rather than let through unread. Install jq (brew install jq) and run it again."}}' ;;
+  esac
+  exit 0
+fi
 
-TOOL="$(printf '%s' "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null || true)"
+# A call that cannot be read is refused, never passed unread (MAST-37, project rule 2): a payload that is not
+# one JSON object, or a Bash call whose command reads as empty.
+unreadable() {
+  printf '%s\n' '{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "This Bash call could not be read, so the guard against force pushes, hard resets and deletes cannot check it, and it is refused rather than let through unread. Rewrite the command without unusual characters and run it again."}}'
+  exit 0
+}
+is_object || unreadable
+
+TOOL="$(field '.tool_name // empty')"
 [ "$TOOL" = "Bash" ] || exit 0
 
-CMD="$(printf '%s' "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null || true)"
-[ -n "$CMD" ] || exit 0
+CMD="$(field '.tool_input.command // empty')"
+[ -n "$CMD" ] || unreadable
 
-SID="$(printf '%s' "$INPUT" | jq -r '.session_id // "nosession"' 2>/dev/null || echo nosession)"
+SID="$(field '.session_id // "nosession"')"
+[ -n "$SID" ] || SID="nosession"
 # The user's private state root: $CLAUDE_PLUGIN_DATA/state, else $TMPDIR/masthead-<uid>. Mode 0700; refused when a symlink or not ours.
 state_root() {
   local r
@@ -360,13 +387,10 @@ deny() {
     printf '%s\t%s\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$1" "$CMD" \
     >> "$RECORD_DIR/attempts.tsv" 2>/dev/null) || true
 
-  jq -n --arg r "$1"$'\n\n'"$2"$'\n\nCommand: '"$CMD" '{
-    hookSpecificOutput: {
-      hookEventName: "PreToolUse",
-      permissionDecision: "deny",
-      permissionDecisionReason: $r
-    }
-  }' 2>/dev/null
+  out="$(deny_json "$1"$'\n\n'"$2"$'\n\nCommand: '"$CMD")"
+  # A refusal that could not be written is still a refusal.
+  [ -n "$out" ] || out='{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "This command would do something nothing can undo, and the full refusal could not be written. Run it in your own terminal if you mean it."}}'
+  printf '%s\n' "$out"
   exit 0
 }
 

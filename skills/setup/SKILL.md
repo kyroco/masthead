@@ -203,7 +203,22 @@ Keep it to the rails this repository has: dangerous-command and secret
 refusals (always on), blind review (always on), push check (on if set), where
 issues live (GitHub or Linear, with the team key), memory (on if connected),
 decision records (on if a folder was named), architecture doc (its path, or
-none). Then name the
+none). With a push check, say to commit
+`.claude/push-check.sh` and `.claude/push-check.cmd`: a branch without them
+cannot push. Check the tools the gates need with `command -v jq`, `command -v
+python3` and, where issues live on GitHub, `command -v gh`, and add one row for
+each one missing, saying what stays off until it is installed: no jq, the
+diagnoser and reader agents are refused every shell command, mix format
+and credo no longer run after an Elixir edit, and, with the code index option
+on, the code index gate cannot tell a fresh code_locate answer from a stale one, so any lookup of a name lets a search for it through,
+and the two gates that send a repeated search or a whole-file read back to that answer stay off; no python3, Masthead's gates
+cannot run, so install it first; no gh, the foreman stops before queueing a
+PR or listing what a merge unblocks and says `gh` is needed, and with no
+GitHub connector either, no issue, status or pull request call can be made
+at all. If a check is refused, name the tool the refusal names as missing;
+one blocked with no message at all means a gate could not start, most often
+because python3 is missing.
+Then name the
 four install options and their defaults, because a terminal install never
 asked them: connect Korium memory (off), keep a code index in Korium (off),
 keep AI attribution out of commits (on), ask for a reason before a helper runs

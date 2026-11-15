@@ -7,7 +7,7 @@
 #   gate-edit         refuses the first edit until a Korium search ran
 #   gate-discovery    refuses a Grep, Glob or shell search for a name the code index holds until a fresh code_locate lookup
 #   gate-redundant-grep, gate-span-read  refuse repeating what code_locate just answered
-#   gate-verify-brief  refuses a verifier or security-reviewer brief with no claims list, and a third re-verify round
+#   gate-verify-brief  refuses a verifier or security-reviewer brief with no claims list, a third re-verify round, and an architecture-reviewer brief without the ADR alignment lines or the architecture doc the project records
 #   gate-capture      refuses a capture over 2,000 characters, a decision with no decider or no word on what it replaces, and a subagent capture filed under another agent's name
 #   gate-stop, gate-substop  refuse one finish with no capture
 # Every refusal happens once per session, then stands down. MASTHEAD_<NAME>_GATE=off in the operator's environment switches a gate off.
@@ -18,6 +18,30 @@ mode="${1:?usage: engram-protocol.sh <mode>}"
 payload="$(cat 2>/dev/null || echo '{}')"
 
 field() { printf '%s' "$payload" | jq -r "$1" 2>/dev/null || echo ""; }
+# With no jq, json_field.py reads a plain path such as '.tool_input.prompt // ""', so the gates that read
+# only plain paths (the brief check among them) hold the same (MAST-37). Any other filter reads as empty.
+if ! command -v jq >/dev/null 2>&1; then
+  _json_field="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd -P)/json_field.py"
+  field() { printf '%s' "$payload" | python3 -I "$_json_field" "$1" 2>/dev/null || echo ""; }
+fi
+
+# A plain path read from JSON other than the payload, such as shell-search-pattern.py's answer, with or without jq.
+json_read() {
+  if command -v jq >/dev/null 2>&1; then
+    printf '%s' "$1" | jq -r "$2" 2>/dev/null
+  else
+    printf '%s' "$1" | python3 -I "$_json_field" "$2" 2>/dev/null
+  fi
+}
+
+# The tool response as one line of text, as jq's tostring gives it; json_field.py prints the same value with no jq.
+response_text() {
+  if command -v jq >/dev/null 2>&1; then
+    printf '%s' "$payload" | jq -r '.tool_response | tostring' 2>/dev/null
+  else
+    field '.tool_response'
+  fi
+}
 
 # The dispatched agent: Claude Code sends this plugin's verifier as masthead:verifier, or masthead:<folder>:verifier for one in a subfolder of agents/, so a masthead: name is matched on the part after the last colon. Another plugin's agent keeps its prefix, so it is never taken for ours.
 # The masthead: namespace is trusted as this plugin's identity. A fork also named masthead would pass as ours, but reading the name from .claude-plugin/plugin.json would not tell it apart either, since a fork's plugin.json says masthead too.
@@ -25,7 +49,7 @@ field() { printf '%s' "$payload" | jq -r "$1" 2>/dev/null || echo ""; }
 agent_type() {
   local t; t="$(field '.tool_input.subagent_type // ""')"
   case "$t" in
-    masthead:*) printf '%s' "${t#masthead:}" | awk -F: '{ for (i = NF; i >= 1; i--) if ($i ~ /^(verifier|security-reviewer|adjudicator|diagnoser|reader)$/) { printf "%s", $i; exit } printf "%s", $NF }' ;;
+    masthead:*) printf '%s' "${t#masthead:}" | awk -F: '{ for (i = NF; i >= 1; i--) if ($i ~ /^(verifier|security-reviewer|architecture-reviewer|adjudicator|diagnoser|reader)$/) { printf "%s", $i; exit } printf "%s", $NF }' ;;
     *) printf '%s' "$t" ;;
   esac
 }
@@ -55,6 +79,10 @@ if [ -n "${BASH_SOURCE[0]:-}" ]; then
 fi
 
 deny_tool() {
+  if ! command -v jq >/dev/null 2>&1; then
+    python3 -I "$_json_field" --deny "$1"
+    return
+  fi
   jq -n --arg r "$1" '{
     hookSpecificOutput: {
       hookEventName: "PreToolUse",
@@ -64,23 +92,32 @@ deny_tool() {
   }'
 }
 
+# A Stop or PostToolUse block carrying the reason; json_field.py writes it when jq is missing (MAST-37).
+block_decision() {
+  if ! command -v jq >/dev/null 2>&1; then
+    python3 -I "$_json_field" --block "$1"
+    return
+  fi
+  jq -n --arg r "$1" '{decision: "block", reason: $r}'
+}
+
 # Block once, then stand down (see FAIL-OPEN above).
 block_stop() {
   local once="$dir/stop-blocked-$2"
   [ -f "$once" ] && exit 0
   : > "$once"
-  jq -n --arg r "$1" '{decision: "block", reason: $r}'
+  block_decision "$1"
 }
 
 # Tell the model, every time, that a capture was refused and why.
 report_refusal() {
-  jq -n --arg r "$1" '{decision: "block", reason: $r}'
+  block_decision "$1"
 }
 
 # Classify a capture's tool_response: stored, unfixable, rejected or unknown.
 capture_outcome() {
   local resp
-  resp="$(printf '%s' "$payload" | jq -r '.tool_response | tostring' 2>/dev/null | tr -d '\\ ')"
+  resp="$(response_text | tr -d '\\ ')"
 
   case "$resp" in
     # stored: the tool returned a thought id.
@@ -99,7 +136,7 @@ case "$mode" in
   mark-search)
     : > "$dir/searched"
     q="$(field '.tool_input.query // ""' | tr '\t\n' '  ')"
-    resp="$(printf '%s' "$payload" | jq -r '.tool_response | tostring' 2>/dev/null | tr -d '\\ ')"
+    resp="$(response_text | tr -d '\\ ')"
     n="$(printf '%s' "$resp" | grep -oE '"result_count":[0-9]+' | head -1 | grep -oE '[0-9]+$')"
     [ -n "$n" ] || n="-"
     printf '%s\t%s\n' "$n" "$q" >> "$dir/searches.tsv" 2>/dev/null || true
@@ -206,8 +243,8 @@ case "$mode" in
         cmd="$(field '.tool_input.command // ""')"
         printf '%s' "$cmd" | grep -qE '(^|[^[:alnum:]_-])(grep|egrep|fgrep|rg)([[:space:]]|$)' || exit 0
         found="$(printf '%s' "$cmd" | python3 "$hook_dir/shell-search-pattern.py" 2>/dev/null)"
-        pat="$(printf '%s' "$found" | jq -r '.pattern // ""' 2>/dev/null)"
-        path="$(printf '%s' "$found" | jq -r '.path // ""' 2>/dev/null)"
+        pat="$(json_read "$found" '.pattern // ""')"
+        path="$(json_read "$found" '.path // ""')"
         # The judge reads a shell search as the Grep it is.
         tool="Grep"
         ;;
@@ -227,10 +264,15 @@ case "$mode" in
       verdict="UNKNOWN"
     else
       # Ask the index judge, with the cwd for a relative path.
-      verdict="$(jq -n --arg t "$tool" --arg p "$pat" --arg d "${path:-}" \
-        --arg c "$(field '.cwd // ""')" \
-        '{tool:$t,pattern:$p,path:$d,cwd:$c}' 2>/dev/null \
-        | python3 "$judge" 2>/dev/null | tr -d '[:space:]')"
+      if command -v jq >/dev/null 2>&1; then
+        question="$(jq -n --arg t "$tool" --arg p "$pat" --arg d "${path:-}" \
+          --arg c "$(field '.cwd // ""')" \
+          '{tool:$t,pattern:$p,path:$d,cwd:$c}' 2>/dev/null)"
+      else
+        question="$(python3 -I "$_json_field" --build tool "$tool" pattern "$pat" path "${path:-}" \
+          cwd "$(field '.cwd // ""')" 2>/dev/null)"
+      fi
+      verdict="$(printf '%s' "$question" | python3 "$judge" 2>/dev/null | tr -d '[:space:]')"
       case "$verdict" in
         SEARCHABLE|NOT_SEARCHABLE) printf '%s' "$verdict" > "$cache" ;;
         *) : > "$dir/judge-down" ;;
@@ -275,6 +317,21 @@ case "$mode" in
       done < "$dir/codesearches.tsv"
     fi
 
+    # A review agent cannot run korium-cli index, so a lagging index would refuse it on every search: it is
+    # refused once a session, then its searches go through (MAST-37). The main session can re-index, so it stays refused.
+    # Only Masthead's own agents, by the rule review-write-fence.py uses: a masthead: name, whose last part that
+    # names one of them is the agent. A bare name such as reader can be a repo's own agent, which can re-index.
+    acting="$(field '.agent_type // .agent_name // ""')"
+    case "$acting" in
+      masthead:*) acting="$(printf '%s' "${acting#masthead:}" | awk -F: '{ for (i = NF; i >= 1; i--) if ($i ~ /^(verifier|security-reviewer|adjudicator|diagnoser|reader)$/) { printf "%s", $i; exit } }')" ;;
+      *) acting="" ;;
+    esac
+    case "$acting" in
+      verifier|security-reviewer|adjudicator|diagnoser|reader)
+        [ -f "$dir/discovery-refused-agent" ] && exit 0
+        : > "$dir/discovery-refused-agent"
+        judge_down="${judge_down}This agent cannot re-index, so this is the only search it is refused this session: ask code_locate once, and if the answer is stale, search again and it goes through. " ;;
+    esac
     printf 'refused\n' >> "$dir/discovery-refused"
     deny_tool "${judge_down}Korium code index first: the index can answer this. Call code_locate (mcp__korium__code_locate, or mcp__claude_ai_korium__code_locate through the claude.ai connector) with the repo value for the checkout you are in, head_sha set to the current HEAD, and a query phrased toward the name you expect. The repo's CLAUDE.md names that value when it has one; if it does not, ask code_locate without repo and, when the answer lists known_repositories, use the one for this repository. It holds code symbols and also YAML keys, SQL and Terraform resources. Read the span it returns instead of the whole file. If it reports itself stale, or holds no index for this branch, run korium-cli index in your checkout (it takes seconds) and ask again with branch set to your checkout's branch; without branch it reads the trunk, which is still stale. If korium-cli says this Mac is not signed in, stop and tell the person rather than wait on a browser sign-in. Without the MCP tool, korium-cli search \"<name>\" asks the same index. Once a fresh lookup of this name has been made, whatever it found, this search goes through, so a search for its callers is not blocked."
     ;;
@@ -438,14 +495,110 @@ print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permiss
   gate-verify-brief)
     case "${MASTHEAD_BRIEF_GATE:-}" in off|0|false|no) exit 0 ;; esac
 
-    # Only the two agents that verify claims are screened.
+    # Only the two agents that verify claims, and the architecture reviewer, are screened.
     case "$(agent_type)" in
-      verifier|security-reviewer) : ;;
+      verifier|security-reviewer|architecture-reviewer) : ;;
       *) exit 0 ;;
     esac
 
     prompt="$(field '.tool_input.prompt // ""')"
     reasons=""
+
+    # The architecture reviewer (MAST-34 scenario 6): no claims list, but the ADR's alignment lines and the architecture doc the project records, each in one exact form.
+    if [ "$(agent_type)" = architecture-reviewer ]; then
+      ALIGN_FORM="the form is a line that is exactly 'ADR alignment:' at column zero, and the next non-blank line is a bullet starting '- ' of at least four words quoting the ADR's lines on how it applies the architecture doc, one bullet each; when the issue builds no ADR, that line reads 'ADR alignment: none, <why>' with the reason in at least three words"
+      align_state="$(printf '%s' "$prompt" | awk '
+        {
+          line = $0; sub(/\r$/, "", line)
+          if (!seen) {
+            bare = line; gsub(/^[[:space:]>*_#`-]+|^[0-9]+\.[[:space:]]*/, "", bare); gsub(/[*_`]+/, "", bare)
+            if (tolower(bare) ~ /^adr alignment[[:space:]]*:/) {
+              seen = 1
+              if (line ~ /^ADR alignment:[[:space:]]*none,/) {
+                rest = line; sub(/^ADR alignment:[[:space:]]*none,[[:space:]]*/, "", rest)
+                if (split(rest, words, /[[:space:]]+/) >= 3) print "yes"; else print "short"
+                exit
+              }
+              if (line !~ /^ADR alignment:[[:space:]]*$/) { print "variant"; exit }
+            }
+            next
+          }
+          if (line ~ /[^[:space:]]/) {
+            if (line ~ /^- [^[:space:]]/ && split(substr(line, 3), words, /[[:space:]]+/) >= 4) print "yes"; else print "short"
+            exit
+          }
+        }
+        END { if (!seen) print "missing"; else print "empty" }' | head -1)"
+      if [ "$align_state" != yes ]; then
+        reasons="Architecture review brief rule: the reviewer checks the change against the ADR's alignment with the architecture doc, so the brief carries those lines; $ALIGN_FORM. Then retry."
+      fi
+
+      # The ADR line names a path the reviewer can read, or none: it cannot open a link (round 1, fix F3).
+      adr_line="$(printf '%s' "$prompt" | awk '
+        {
+          line = $0; sub(/\r$/, "", line)
+          bare = line; gsub(/^[[:space:]>*_#`-]+|^[0-9]+\.[[:space:]]*/, "", bare); gsub(/[*_`]+/, "", bare)
+          if (tolower(bare) ~ /^adr[[:space:]]*:/) {
+            if (line ~ /^ADR: [^[:space:]]/) { sub(/^ADR: [[:space:]]*/, "", line); print "line\t" line } else print "variant\t"
+            exit
+          }
+        }' | head -1)"
+      case "$adr_line" in
+        line$'\t'*://*|variant*|"")
+          [ -n "$reasons" ] && reasons="$reasons
+
+"
+          reasons="${reasons}Architecture review brief rule: the reviewer reads the ADR from a file and cannot open a link, so the brief has a line that is exactly 'ADR: <path>' at column zero, the ADR's path in this checkout or in the local clone the repo's ADR_DIR fact names (pull it first), or 'ADR: none' when the issue builds no ADR. Then retry." ;;
+      esac
+
+      # The doc line names what the project records: project_fact.py --architecture-doc, read for the checkout the dispatch comes from.
+      cwd="$(field '.cwd // ""')"
+      [ -n "$cwd" ] || cwd="${CLAUDE_PROJECT_DIR:-$PWD}"
+      recorded=""
+      if [ -n "$hook_dir" ] && [ -r "$hook_dir/project_fact.py" ]; then
+        recorded="$(CLAUDE_PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$cwd}" python3 "$hook_dir/project_fact.py" --root "$cwd" --architecture-doc 2>/dev/null | head -1)"
+      fi
+      doc_line="$(printf '%s' "$prompt" | awk '
+        {
+          line = $0; sub(/\r$/, "", line)
+          bare = line; gsub(/^[[:space:]>*_#`-]+|^[0-9]+\.[[:space:]]*/, "", bare); gsub(/[*_`]+/, "", bare)
+          if (tolower(bare) ~ /^architecture doc[[:space:]]*:/) {
+            if (line ~ /^Architecture doc: /) { sub(/^Architecture doc: [[:space:]]*/, "", line); sub(/[[:space:]]+$/, "", line); print "line\t" line }
+            else print "variant\t"
+            exit
+          }
+        }' | head -1)"
+      doc_kind="${doc_line%%$'\t'*}"
+      doc_value="${doc_line#*$'\t'}"
+      doc_value="${doc_value//\`/}"
+      if [ -n "$recorded" ]; then
+        DOC_FORM="this project records its architecture doc at $recorded, so write 'Architecture doc: <that path>' at column zero, as the path from the repository's top or in full"
+      else
+        DOC_FORM="this project records no architecture doc (project_fact.py --architecture-doc prints nothing), so write 'Architecture doc: none recorded' at column zero, and the reviewer works from the project's principles alone"
+      fi
+      doc_ok=0
+      if [ "$doc_kind" = line ] && [ -n "$doc_value" ]; then
+        case "$doc_value" in
+          none*|None*)
+            [ -z "$recorded" ] && doc_ok=1 ;;
+          *)
+            if [ -n "$recorded" ]; then
+              top="$(git -C "$cwd" rev-parse --show-toplevel 2>/dev/null || printf '%s' "$cwd")"
+              case "$doc_value" in /*) named="$doc_value" ;; *) named="$top/$doc_value" ;; esac
+              named="$(python3 -c 'import os, sys; print(os.path.realpath(sys.argv[1]))' "$named" 2>/dev/null)"
+              [ -n "$named" ] && [ "$named" = "$recorded" ] && doc_ok=1
+            fi ;;
+        esac
+      fi
+      if [ "$doc_ok" -ne 1 ]; then
+        [ -n "$reasons" ] && reasons="$reasons
+
+"
+        reasons="${reasons}Architecture review brief rule: the brief names the architecture doc the reviewer holds the change to, and the check reads one exact form; $DOC_FORM. Then retry."
+      fi
+      [ -n "$reasons" ] && deny_tool "$reasons"
+      exit 0
+    fi
 
     # The form is exact, on purpose: a line that is exactly "Claims:" at column zero, whose next non-blank line is a "- " bullet of at least four words; and, on a re-verify, a line that begins "Re-verify: round N" at column zero. Every other spelling of either label is refused with the form to use, so no variant is ever half-read.
     CLAIMS_FORM="the form is a line that is exactly 'Claims:' at column zero (no marker before it, nothing after the colon), and the next non-blank line is a bullet starting '- ' with at least four words; put the claims under the first Claims: line, since only that one is read"

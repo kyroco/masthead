@@ -8,9 +8,15 @@ case "${MASTHEAD_MODEL_GATE:-}" in off|0|false|no) exit 0 ;; esac
 
 INPUT="$(cat 2>/dev/null || true)"
 [ -n "$INPUT" ] || exit 0
-command -v jq >/dev/null 2>&1 || exit 0
-
-field() { printf '%s' "$INPUT" | jq -r "$1" 2>/dev/null || true; }
+# jq reads the call when it is installed, json_field.py when it is not, so the rule holds without jq (MAST-37).
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd -P)" || HERE="$(dirname "$0")"
+if command -v jq >/dev/null 2>&1; then
+  field() { printf '%s' "$INPUT" | jq -r "$1" 2>/dev/null || true; }
+  deny_json() { jq -n --arg r "$1" '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: $r}}'; }
+else
+  field() { printf '%s' "$INPUT" | python3 -I "$HERE/json_field.py" "$1" 2>/dev/null || true; }
+  deny_json() { python3 -I "$HERE/json_field.py" --deny "$1"; }
+fi
 
 [ "$(field '.tool_name // empty')" = "Agent" ] || exit 0
 
@@ -56,11 +62,5 @@ if [ "$MODEL" = "inherited" ]; then
 else
   runs="runs on ${MODEL}"
 fi
-jq -n --arg r "Haiku is the default for helper work. This dispatch ${runs} and the brief does not say why. Either set model to \"haiku\" (or \"sonnet\") on the Agent call, or make the brief's first line \"Model-choice: opus, <why>\", for work that decides something no later step checks, such as writing code or judging a design." '{
-  hookSpecificOutput: {
-    hookEventName: "PreToolUse",
-    permissionDecision: "deny",
-    permissionDecisionReason: $r
-  }
-}'
+deny_json "Haiku is the default for helper work. This dispatch ${runs} and the brief does not say why. Either set model to \"haiku\" (or \"sonnet\") on the Agent call, or make the brief's first line \"Model-choice: opus, <why>\", for work that decides something no later step checks, such as writing code or judging a design."
 exit 0

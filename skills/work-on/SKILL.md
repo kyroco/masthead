@@ -54,11 +54,14 @@ commits and pushes, and the merge queue stays on `gh` (the github-issues
 skill, **Which tool makes the call**). The repo's own
 facts come first: where its `CLAUDE.md` or `docs/conventions/` sets a test
 command, a pre-push check, its changelog or a worktree
-standard, those bind. The PR steps themselves are **Opening a PR** in
-`${CLAUDE_PLUGIN_ROOT}/references/session-cliffs.md`. When a step names a
+standard, those bind. The PR steps are **Opening a PR**, as
+`python3 ${CLAUDE_PLUGIN_ROOT}/hooks/prime-context.py show "Opening a PR"`
+prints them from the worktree: the repo's own version when its
+`.claude/references/session-cliffs.md` has that lead, otherwise the plugin's,
+the same steps the hook injects. When a step names a
 file this repo does not have, do what the step is for with what the repo has,
-and list in the PR body each check the repo lacks. The `verifier` and
-`security-reviewer` agents live in `${CLAUDE_PLUGIN_ROOT}/agents` and review every repo;
+and list in the PR body each check the repo lacks. The `verifier`,
+`security-reviewer` and `architecture-reviewer` agents live in `${CLAUDE_PLUGIN_ROOT}/agents` and review every repo;
 `/code-review` is not part of the flow.
 
 ## Korium, at every step
@@ -69,16 +72,38 @@ value from `CLAUDE.md`) for code you are about to read or change. For what is
 adopted, use `stance: "position"` with a `limit` of 10, so a ruling that ranks
 low is still read. Every other `agent_search` takes a `limit` of 5: each hit comes
 back whole, and at the default of 10 one search has filled 40,000 characters.
-Use what comes back, and put this rule in every subagent brief except the verifier's
-and the adjudicator's, which hold no memory search and judge from the code,
+Use what comes back, and put this rule in every subagent brief except the verifier's,
+the architecture reviewer's and the adjudicator's, which hold no memory search and judge from the code,
 the claims and the findings alone. Error -32029 is the
 limit of 60 searches a minute, not an outage: wait the `retry_after_ms` it
 gives and search again.
 
+Korium is off when the `korium` install option is off: the session then
+starts with no Korium memory protocol, and the gates that ask for a search
+stand down. Skip every step in these files that says to search or capture
+Korium, say so in one line where its result would go: "Korium is off, so no
+search.", and put the line "Korium is off." in every brief you send. Nothing
+else changes, and a question's "looked in:" part names the decision record
+and the README rule without a Korium query. With the option on and no Korium
+tool found, Korium is down, not off: stop and tell the person.
+
 ## What enforces this
 
-`gate-edit` refuses the first edit until a Korium search has run, and
-`hard-gate.sh` refuses `git push` and `gh pr create` until the repo's local
-test receipt matches the commit. Nothing else in this skill or its files is
-checked by a hook, including the ADR review; it rests on the text.
+These steps are checked by a hook; the README's check list says where each
+falls short:
+
+- `gate-edit` refuses the first edit until a Korium search has run, with the
+  Korium memory option on.
+- `hard-gate.sh` refuses `git push` and `gh pr create` until the repo's local
+  test receipt matches the commit, when the repo names a push check.
+- `agent-brief-gates.sh` refuses a verifier brief with no claims list and a third re-verify round,
+  and an architecture reviewer's brief without the ADR alignment lines or the
+  architecture doc's path, and `dispatch-record-gate.sh` writes the dispatch
+  log the agent count is read from.
+- `review-write-fence.py` keeps a verifier's or the architecture reviewer's
+  writes to its own findings file.
+- `issue-edit-gate.py` refuses an issue edit that drops a line quoted as the
+  person's.
+
+The rest, sending the architecture reviewer included, rests on the text.
 

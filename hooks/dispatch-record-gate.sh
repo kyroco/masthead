@@ -11,20 +11,26 @@ REFUSED=""
 INPUT="$(cat 2>/dev/null || true)"
 [ -n "$INPUT" ] || exit 0
 
-command -v jq >/dev/null 2>&1 || exit 0
+# jq reads the call when it is installed, json_field.py when it is not, so every dispatch is recorded without jq too (MAST-37).
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd -P)" || HERE="$(dirname "$0")"
+if command -v jq >/dev/null 2>&1; then
+  field() { printf '%s' "$INPUT" | jq -r "$1" 2>/dev/null; }
+else
+  field() { printf '%s' "$INPUT" | python3 -I "$HERE/json_field.py" "$1" 2>/dev/null; }
+fi
 
-TOOL="$(printf '%s' "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null || true)"
+TOOL="$(field '.tool_name // empty' || true)"
 [ "$TOOL" = "Agent" ] || exit 0
 
-PROMPT="$(printf '%s' "$INPUT" | jq -r '.tool_input.prompt // ""' 2>/dev/null || true)"
+PROMPT="$(field '.tool_input.prompt // ""' || true)"
 # Skip a payload with no prompt.
 [ -n "$PROMPT" ] || exit 0
-SUBTYPE="$(printf '%s' "$INPUT" | jq -r '.tool_input.subagent_type // "(default)"' 2>/dev/null || echo "(default)")"
-NAME="$(printf '%s' "$INPUT" | jq -r '.tool_input.name // .tool_input.description // "(unnamed)"' 2>/dev/null || echo "(unnamed)")"
-MODEL="$(printf '%s' "$INPUT" | jq -r '.tool_input.model // "(inherited)"' 2>/dev/null || echo "(inherited)")"
-SID="$(printf '%s' "$INPUT" | jq -r '.session_id // "nosession"' 2>/dev/null || echo nosession)"
+SUBTYPE="$(field '.tool_input.subagent_type // "(default)"' || echo "(default)")"
+NAME="$(field '.tool_input.name // .tool_input.description // "(unnamed)"' || echo "(unnamed)")"
+MODEL="$(field '.tool_input.model // "(inherited)"' || echo "(inherited)")"
+SID="$(field '.session_id // "nosession"' || echo nosession)"
 
-ROOT="$(printf '%s' "$INPUT" | jq -r '.cwd // empty' 2>/dev/null || true)"
+ROOT="$(field '.cwd // empty' || true)"
 [ -n "$ROOT" ] || ROOT="${CLAUDE_PROJECT_DIR:-$PWD}"
 RECORD_DIR="$ROOT/.claude/state"
 RECORD="$RECORD_DIR/dispatches.tsv"
