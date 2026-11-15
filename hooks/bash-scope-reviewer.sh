@@ -79,7 +79,6 @@ case "$agent" in
     if ! why="$(printf '%s' "$CMD" | python3 -I "$SHAPES" --cwd "${CWD:-$PWD}" 2>&1)"; then
       echo "DENIED by the $agent's shell guard: ${why:-the command is not one of its shapes}" >&2
       echo "Command: $CMD" >&2
-      echo "Allowed, each command alone or joined by |, && or ;: read-only git (status, diff, log, show, blame, rev-parse, ls-files, merge-base, shortlog, describe, grep); the repository's tests (bash, sh or python3 with a script in the checkout, python3 -m pytest or unittest, mix test, cargo test --offline, GOPROXY=off go test, npm test, make test); semgrep --metrics=off --disable-version-check --config <rules file>; cat, head, tail, wc, ls, grep, rg, jq, find, diff, sort and the like; rm of your own scratch files; 2>&1 and >/dev/null. The full list is in hooks/reviewer_shapes.py. Read files with Read, Glob and Grep, and write your findings with the Write tool." >&2
       exit 2
     fi ;;
 esac

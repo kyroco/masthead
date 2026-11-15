@@ -1261,7 +1261,10 @@ never README.md 'None of them can edit anything'
 # MAST-43: the README and catalog say the verifiers' shells run exact shapes, and what that leaves open.
 never README.md 'refuse the common network programs'
 says  README.md 'shells run only the command shapes in `hooks/reviewer_shapes.py`'
-says  README.md 'They refuse every other command, a wrapper such as `timeout 5 curl` included, and write no file. The fence reads the command the agent types, not what a test or probe script it runs then does (MAST-43)'
+says  README.md 'They refuse every other command, a wrapper such as `timeout 5 curl` included, and every redirect into a file. The fence reads the command the agent types, not what a program it runs then does: a test, a test runner, semgrep or a probe script (MAST-43)'
+# Round 1, S2-F1: the README's list is the fence's own summary (bash-scope-reviewer-test.sh holds them together).
+never README.md 'joined by a pipe or `&&`'
+never references/gate-catalog.md 'the reviewer network gate refuses a reviewer call naming a network tool'
 never references/gate-catalog.md 'a denylist of network programs, not an allowlist'
 says  references/gate-catalog.md 'Holds the `verifier` and `security-reviewer` shells to the exact command shapes `hooks/reviewer_shapes.py` lists'
 says  references/gate-catalog.md 'a test or probe script it runs is the repository'"'"'s code and may do anything'

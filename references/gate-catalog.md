@@ -32,7 +32,8 @@ dispatch and the dangerous-command gate every command naming git, rm, gh, a
 database client or an infrastructure tool; the
 diagnoser and reader shell scope refuses every command of those two agents and
 leaves every other session's alone;
-the reviewer network gate refuses a reviewer call naming a network tool. A
+the reviewer shell gate refuses every command of the verifier and security
+reviewer, and an architecture reviewer call naming a network tool. A
 push check the repository names but the checkout lacks refuses the push.
 The commit attribution gate runs only on commands containing `commit` or `gh`,
 and the two code-search gates only on ones containing `rg` or `grep` (hook `if`

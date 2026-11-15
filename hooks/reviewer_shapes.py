@@ -15,13 +15,19 @@ The shapes, each command separated by |, &&, || or ; and each judged alone:
   git, read only: status, diff, log, show, blame, rev-parse, ls-files,
     merge-base, shortlog, describe and grep, with the flags below and plain
     revisions and paths; nothing between git and the subcommand but --no-pager.
-  the repository's tests: bash, sh or python3 with a script path inside the
-    checkout; ./<script>; python3 -m pytest or -m unittest; pytest; mix test
-    (MIX_ENV=test may come first); cargo test --offline; GOPROXY=off go test;
-    npm, pnpm or yarn test; make test or make check; bundle exec rspec; rspec.
-  semgrep with --metrics=off and --disable-version-check, and opengrep with
-    --disable-version-check, each with --config naming a rules file in the
-    checkout.
+  the repository's tests, each runner with its offline switch where it has
+    one, and every path, module or package it is given in the checkout: bash,
+    sh or python3 with a script path inside the checkout; ./<script>; python3
+    -m pytest or -m unittest; pytest; mix test (MIX_ENV=test may come first);
+    cargo test --offline; GOPROXY=off go test ./<path>; npm, pnpm or yarn
+    test; npx --no-install vitest, jest or mocha; make test or make check;
+    bundle exec rspec; rspec; swift test --skip-update
+    --disable-automatic-resolution; xcodebuild test -skipPackageUpdates
+    -disableAutomaticPackageResolution; dotnet test --no-restore; mvn -o test
+    or verify; gradle test or check --offline.
+  semgrep (scan) with --metrics=off and --disable-version-check, and
+    opengrep with --disable-version-check, each with --config naming a rules
+    file in the checkout.
   reading: cat, head, tail, wc, ls, grep, egrep, fgrep, rg, jq, find (searching
     only), diff, cmp, sort, uniq, cut, tr, echo, printf, pwd, basename,
     dirname, realpath.
@@ -29,12 +35,19 @@ The shapes, each command separated by |, &&, || or ; and each judged alone:
   2>&1, >/dev/null and 2>/dev/null; no other redirect.
 Refused everywhere: a wrapper (timeout, env, nice, xargs, exec, sudo...), a
 shell's -c, $, backticks, backslashes, globs, braces, subshells, & on its own,
-a new line, a URL and /dev/tcp.
+a word starting with = (zsh's path of a program), a new line, a URL and
+/dev/tcp.
 """
 
 import os
 import re
 import sys
+
+# What a refused agent is told, and what the README says, word for word (a test holds them together).
+SUMMARY = ("read-only git, the repository's own tests with their offline switches, semgrep and "
+           "opengrep with their calls home turned off, a few reading tools such as cat, grep and "
+           "jq, and rm of the agent's own scratch files, one command at a time or several joined "
+           "by |, &&, || or ;")
 
 # --- git -------------------------------------------------------------------
 GIT_SUBS = {"status", "diff", "log", "show", "blame", "rev-parse", "ls-files",
@@ -135,11 +148,11 @@ FIND_VALUE = {"-name", "-iname", "-path", "-ipath", "-wholename", "-type", "-max
               "-perm", "-links"}
 
 # --- test runners ---------------------------------------------------------------
-PYTEST = ("qvxsl", "kr", {"tb", "lf", "last-failed", "ff", "failed-first", "maxfail",
+PYTEST = ("qvxsl", "kmr", {"tb", "lf", "last-failed", "ff", "failed-first", "maxfail",
                           "no-header", "collect-only", "co", "quiet", "verbose", "exitfirst",
                           "durations", "showlocals", "deselect", "strict-markers",
                           "capture", "no-summary", "color"})
-UNITTEST = ("vqfbc", "kspt", {"verbose", "quiet", "failfast", "buffer", "catch", "locals"})
+UNITTEST = ("vqfbc", "", {"verbose", "quiet", "failfast", "buffer", "catch", "locals"})
 MIX_TEST = ("", "", {"only", "exclude", "include", "seed", "max-failures", "trace", "failed",
                      "stale", "warnings-as-errors", "color", "no-color", "slowest",
                      "max-cases", "timeout"})
@@ -150,9 +163,29 @@ CARGO_TEST = ("q", "p", {"offline", "lib", "bins", "tests", "doc", "all-targets"
                          "ignored", "include-ignored", "show-output"})
 GO_TEST = ("", "", {"v", "run", "count", "race", "short", "timeout", "cover", "failfast",
                     "skip", "bench", "benchtime", "cpu", "parallel", "list", "json"})
-SEMGREP = ("q", "c", {"metrics", "disable-version-check", "config", "json", "quiet", "error",
+# No -c: semgrep reads a c anywhere in a bundle such as -qc as --config, so the rules file is named only by --config.
+SEMGREP = ("q", "", {"metrics", "disable-version-check", "config", "json", "quiet", "error",
                       "no-git-ignore", "sarif", "exclude", "include", "severity", "verbose",
                       "text", "max-target-bytes", "timeout", "jobs"})
+
+GO_VALUE = {"run", "count", "timeout", "skip", "bench", "benchtime", "cpu", "parallel", "list"}
+SWIFT_TEST = ("qv", "c", {"skip-update", "disable-automatic-resolution", "force-resolved-versions",
+                          "only-use-versions-from-resolved-file", "filter", "skip", "parallel",
+                          "num-workers", "configuration", "quiet", "verbose"})
+SWIFT_OFFLINE = ("--disable-automatic-resolution", "--force-resolved-versions",
+                 "--only-use-versions-from-resolved-file")
+# xcodebuild's flags are single-dash words: those that take the next word as their value, and those that take none.
+XCODE_VALUE = {"-scheme", "-destination", "-project", "-workspace", "-configuration", "-testPlan", "-sdk"}
+XCODE_NOVALUE = {"-quiet", "-skipPackageUpdates", "-disableAutomaticPackageResolution",
+                 "-onlyUsePackageVersionsFromResolvedFile"}
+DOTNET_VALUE = {"--filter", "--configuration", "-c", "--verbosity", "-v", "--framework", "-f"}
+DOTNET_NOVALUE = {"--no-restore", "--no-build", "--nologo"}
+MVN_NOVALUE = {"-o", "--offline", "-q", "--quiet", "-B", "--batch-mode"}
+MVN_VALUE = {"-pl", "--projects"}
+MVN_PROPERTIES = ("-Dtest=", "-DfailIfNoTests=", "-Dsurefire.failIfNoSpecifiedTests=")
+GRADLE_NOVALUE = {"--offline", "-q", "--quiet", "--info", "--continue"}
+GRADLE_VALUE = {"--tests"}
+NPX_RUNNERS = {"vitest", "jest", "mocha"}
 
 ENV_OK = {"MIX_ENV=test", "GOPROXY=off"}
 
@@ -226,7 +259,8 @@ def tokenize(cmd):
             refuse(f"'{c}' is rewritten by the shell after this check reads the command "
                    "(a variable, substitution, backslash, subshell, brace, input redirect or glob); "
                    "write the literal words, quoting a pattern")
-        elif c in "#~!" and not in_word:
+        elif c in "#~!=" and not in_word:
+            # zsh, the Bash tool's shell on macOS, turns =name into the full path of a program on PATH.
             refuse(f"a word starting with '{c}' is rewritten by the shell; quote it")
         else:
             word += c
@@ -290,6 +324,105 @@ def script_path(prog, path, cwd):
         refuse(f"'{path}' is outside the checkout under review")
 
 
+def own_path(prog, word, cwd):
+    """A path a runner is given stays in the checkout, so it runs the repository's tests, not the system's."""
+    if inside(word.split("::", 1)[0], cwd) is None:
+        refuse(f"'{prog} {word}' names a path outside the checkout under review")
+
+
+def judge_pytest(words, cwd):
+    """pytest: the flags it allows, and paths in the checkout. -k, -m and -r take the next word as a value."""
+    k = 0
+    while k < len(words):
+        t = words[k]
+        if t in ("-k", "-m", "-r"):
+            k += 2
+            continue
+        if t.startswith("-") and t != "--":
+            judge_flags("pytest", [t], PYTEST)
+        elif t != "--":
+            own_path("pytest", t, cwd)
+        k += 1
+
+
+def judge_unittest(words, cwd):
+    """unittest imports what it is given, so each name must be the repository's own: discover with a start
+    folder in the checkout, a test file in the checkout, or a dotted name whose first part is a folder or
+    module in the checkout (python -m puts the checkout first on the import path)."""
+    k = 0
+    while k < len(words):
+        t = words[k]
+        if t in ("-s", "-t", "-p", "-k"):
+            if k + 1 >= len(words):
+                refuse(f"unittest {t} with no value")
+            if t in ("-s", "-t"):
+                own_path("unittest", words[k + 1], cwd)
+            k += 2
+            continue
+        if t.startswith("-"):
+            judge_flags("unittest", [t], UNITTEST)
+        elif t == "discover" and k == 0:
+            pass
+        elif t.endswith(".py"):
+            full = inside(t, cwd)
+            if full is None or not os.path.isfile(full):
+                refuse(f"'unittest {t}' is not a test file in the checkout")
+        else:
+            first = t.split(".", 1)[0]
+            if not first.isidentifier() or not (os.path.isdir(os.path.join(cwd, first))
+                                                or os.path.isfile(os.path.join(cwd, first + ".py"))):
+                refuse(f"'unittest {t}' is not a module of the checkout; unittest imports it, and a standard "
+                       "library module such as antigravity can open the browser")
+        k += 1
+
+
+def judge_single_words(prog, words, novalue, value, cwd, paths):
+    """Runners whose flags are whole words (no bundles): each flag is listed, a value flag takes the next word,
+    and what is left is returned. With paths, what is left must be paths in the checkout."""
+    rest, k = [], 0
+    while k < len(words):
+        t = words[k]
+        if t in value:
+            k += 2
+            continue
+        if t.startswith("-"):
+            if t not in novalue:
+                refuse(f"'{prog} {t}' is not one of the flags this shell allows for {prog}")
+        else:
+            if paths:
+                own_path(prog, t, cwd)
+            rest.append(t)
+        k += 1
+    return rest
+
+
+def judge_xcodebuild(w, cwd):
+    """xcodebuild test, with its package fetching off."""
+    if "-skipPackageUpdates" not in w or not ("-disableAutomaticPackageResolution" in w
+                                              or "-onlyUsePackageVersionsFromResolvedFile" in w):
+        refuse("xcodebuild fetches packages over the network unless given -skipPackageUpdates and "
+               "-disableAutomaticPackageResolution")
+    actions, k = [], 1
+    while k < len(w):
+        t = w[k]
+        if t in XCODE_VALUE:
+            if k + 1 >= len(w):
+                refuse(f"xcodebuild {t} with no value")
+            if t in ("-project", "-workspace"):
+                own_path("xcodebuild", w[k + 1], cwd)
+            k += 2
+            continue
+        if t.startswith("-only-testing:") or t.startswith("-skip-testing:") or t in XCODE_NOVALUE:
+            pass
+        elif t.startswith("-"):
+            refuse(f"'xcodebuild {t}' is not one of the flags this shell allows for xcodebuild")
+        else:
+            actions.append(t)
+        k += 1
+    if actions != ["test"]:
+        refuse("xcodebuild runs here only the test action, with no build setting")
+
+
 # --- each command -------------------------------------------------------------------
 def judge_git(w, cwd):
     i = 1
@@ -333,12 +466,10 @@ def judge_semgrep(prog, w, cwd):
         refuse(f"{prog} asks its server for the newest version unless given --disable-version-check")
     configs = []
     for k, t in enumerate(w):
-        if t in ("--config", "-c"):
+        if t == "--config":
             configs.append(w[k + 1] if k + 1 < len(w) else "")
         elif t.startswith("--config="):
             configs.append(t.split("=", 1)[1])
-        elif t.startswith("-c") and len(t) > 2 and not t.startswith("--"):
-            configs.append(t[2:])
     if not configs:
         refuse(f"{prog} with no --config; name a rules file in the checkout")
     for value in configs:
@@ -355,11 +486,19 @@ def judge_scratch_rm(w, cwd, state):
     paths = [t for t in w[1:] if not t.startswith("-")]
     if not paths:
         refuse("rm with nothing to remove")
-    scratch = os.path.normpath(os.path.join(cwd, state, "review", "scratch"))
+    # The shell follows a symlink where the text of a path does not, so the check reads the disk: no ..,
+    # no symlink on the way to the scratch folder or at the path, and the path resolves inside it.
+    root = os.path.realpath(cwd)
+    scratch = os.path.join(root, state, "review", "scratch")
+    if os.path.realpath(scratch) != scratch:
+        refuse(f"{state}/review/scratch/ is or sits under a symlink, so nothing in it may be removed")
     for p in paths:
-        full = inside(p, cwd)
-        if not full or not full.startswith(scratch + os.sep):
-            refuse(f"'rm {p}': only your own files under {state}/review/scratch/ may be removed")
+        where = f"'rm {p}': only your own files under {state}/review/scratch/ may be removed"
+        if ".." in p.replace("\\", "/").split("/"):
+            refuse(where + ", named without ..")
+        full = os.path.normpath(p if os.path.isabs(p) else os.path.join(cwd, p))
+        if os.path.islink(full) or not os.path.realpath(full).startswith(scratch + os.sep):
+            refuse(where + ", never through a symlink")
 
 
 def judge_command(w, cwd, state):
@@ -402,19 +541,23 @@ def judge_command(w, cwd, state):
         if sub == "-m":
             mod = w[2] if len(w) > 2 else ""
             if mod == "pytest":
-                return judge_flags("pytest", w[3:], PYTEST)
+                return judge_pytest(w[3:], cwd)
             if mod == "unittest":
-                return judge_flags("unittest", w[3:], UNITTEST)
+                return judge_unittest(w[3:], cwd)
             refuse(f"'python3 -m {mod}' is not allowed; only -m pytest and -m unittest")
         if not sub:
             refuse("python3 with no script; this shell runs no interactive interpreter")
         return script_path(prog, sub, cwd)
     if prog == "pytest":
-        return judge_flags("pytest", w[1:], PYTEST)
+        return judge_pytest(w[1:], cwd)
     if prog == "mix":
         if sub != "test":
             refuse(f"'mix {sub}' is not allowed; only mix test (no compile, deps or database task)")
-        return judge_flags("mix test", w[2:], MIX_TEST)
+        judge_flags("mix test", w[2:], MIX_TEST)
+        for t in w[2:]:
+            if not t.startswith("-"):
+                own_path("mix test", re.sub(r":\d+$", "", t), cwd)
+        return
     if prog == "cargo":
         if sub != "test":
             refuse(f"'cargo {sub}' is not allowed; only cargo test --offline")
@@ -426,12 +569,61 @@ def judge_command(w, cwd, state):
             refuse(f"'go {sub}' is not allowed; only GOPROXY=off go test")
         if "GOPROXY=off" not in envs:
             refuse("go test fetches modules over the network unless GOPROXY=off comes first")
-        # go's own flags are single-dash words, such as -run and -count.
-        for t in w[2:]:
+        # go's own flags are single-dash words, such as -run and -count; a package is the repository's own (./...).
+        k = 2
+        while k < len(w):
+            t = w[k]
             if t.startswith("-") and t != "--":
                 name = t.lstrip("-").split("=", 1)[0]
                 if name not in GO_TEST[2]:
                     refuse(f"'go test {t}' is not one of the flags this shell allows for go test")
+                if name in GO_VALUE and "=" not in t:
+                    k += 1
+            elif t != "--":
+                if not (t == "." or t.startswith("./")):
+                    refuse(f"'go test {t}': a package here is the repository's own, written ./<path>")
+                own_path("go test", t, cwd)
+            k += 1
+        return
+    if prog == "swift":
+        if sub != "test":
+            refuse(f"'swift {sub}' is not allowed; only swift test --skip-update --disable-automatic-resolution")
+        if "--skip-update" not in w or not any(t in SWIFT_OFFLINE for t in w):
+            refuse("swift test fetches packages over the network unless given --skip-update and --disable-automatic-resolution")
+        return judge_flags("swift test", w[2:], SWIFT_TEST)
+    if prog == "xcodebuild":
+        return judge_xcodebuild(w, cwd)
+    if prog == "dotnet":
+        if sub != "test":
+            refuse(f"'dotnet {sub}' is not allowed; only dotnet test --no-restore")
+        if "--no-restore" not in w:
+            refuse("dotnet test restores packages over the network unless given --no-restore")
+        return judge_single_words("dotnet test", w[2:], DOTNET_NOVALUE, DOTNET_VALUE, cwd, paths=True)
+    if prog == "mvn":
+        if "-o" not in w and "--offline" not in w:
+            refuse("mvn fetches plugins and packages over the network unless given -o (--offline)")
+        rest = [t for t in w[1:] if not t.startswith(MVN_PROPERTIES)]
+        goals = judge_single_words("mvn", rest, MVN_NOVALUE, MVN_VALUE, cwd, paths=False)
+        if not goals or any(g not in ("test", "verify") for g in goals):
+            refuse("mvn runs here only the test or verify goal")
+        return
+    if prog == "gradle":
+        if "--offline" not in w:
+            refuse("gradle fetches plugins and packages over the network unless given --offline")
+        tasks = judge_single_words("gradle", w[1:], GRADLE_NOVALUE, GRADLE_VALUE, cwd, paths=False)
+        if not tasks or any(t not in ("test", "check") for t in tasks):
+            refuse("gradle runs here only the test or check task")
+        return
+    if prog == "npx":
+        if sub not in ("--no-install", "--no"):
+            refuse("npx installs a missing package from the network unless given --no-install first")
+        runner = w[2] if len(w) > 2 else ""
+        if runner not in NPX_RUNNERS:
+            refuse(f"'npx {sub} {runner}': npx runs here only {', '.join(sorted(NPX_RUNNERS))}")
+        for t in w[3:]:
+            if t.startswith("-"):
+                refuse(f"'npx {runner} {t}': {runner} takes no flag here")
+            own_path(f"npx {runner}", t, cwd)
         return
     if prog in ("npm", "pnpm", "yarn"):
         if sub in ("test", "t"):
@@ -461,6 +653,8 @@ def judge_command(w, cwd, state):
     if prog in ("semgrep", "opengrep"):
         if sub == "scan":
             w = [prog] + w[2:]
+        elif sub and not sub.startswith("-"):
+            refuse(f"'{prog} {sub}': {prog} runs here only as a scan, with its flags first")
         return judge_semgrep(prog, w, cwd)
     if prog == "rm":
         return judge_scratch_rm(w, cwd, state)
@@ -470,7 +664,8 @@ def judge_command(w, cwd, state):
         return judge_flags(prog, w[1:], READERS["grep"])
     if prog in READERS:
         judge_flags(prog, w[1:], READERS[prog], numbers=prog in ("head", "tail"))
-        if prog == "uniq" and len([t for t in w[1:] if not t.startswith("-")]) > 1:
+        # A lone - is a file name too (standard input), so uniq - OUT writes OUT.
+        if prog == "uniq" and len([t for t in w[1:] if t == "-" or not t.startswith("-")]) > 1:
             refuse("uniq with a second file writes that file; this shell writes no file")
         if prog == "printf" and len(w) > 1 and w[1].startswith("-"):
             refuse("printf takes no flag here")
@@ -488,6 +683,9 @@ def state_folder(cwd):
 
 
 def main(argv):
+    if argv == ["--summary"]:
+        print(SUMMARY)
+        return 0
     cwd = os.getcwd()
     if len(argv) == 2 and argv[0] == "--cwd" and argv[1]:
         cwd = argv[1]
@@ -498,6 +696,8 @@ def main(argv):
             judge_command(command, cwd, state)
     except Refused as why:
         print(str(why))
+        print(f"Allowed: {SUMMARY}. The full list is at the top of hooks/reviewer_shapes.py. Read files with "
+              "Read, Glob and Grep, and write your findings with the Write tool.")
         return 2
     return 0
 
