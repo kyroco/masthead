@@ -25,6 +25,24 @@ if ! command -v jq >/dev/null 2>&1; then
   field() { printf '%s' "$payload" | python3 -I "$_json_field" "$1" 2>/dev/null || echo ""; }
 fi
 
+# A plain path read from JSON other than the payload, such as shell-search-pattern.py's answer, with or without jq.
+json_read() {
+  if command -v jq >/dev/null 2>&1; then
+    printf '%s' "$1" | jq -r "$2" 2>/dev/null
+  else
+    printf '%s' "$1" | python3 -I "$_json_field" "$2" 2>/dev/null
+  fi
+}
+
+# The tool response as one line of text, as jq's tostring gives it; json_field.py prints the same value with no jq.
+response_text() {
+  if command -v jq >/dev/null 2>&1; then
+    printf '%s' "$payload" | jq -r '.tool_response | tostring' 2>/dev/null
+  else
+    field '.tool_response'
+  fi
+}
+
 # The dispatched agent: Claude Code sends this plugin's verifier as masthead:verifier, or masthead:<folder>:verifier for one in a subfolder of agents/, so a masthead: name is matched on the part after the last colon. Another plugin's agent keeps its prefix, so it is never taken for ours.
 # The masthead: namespace is trusted as this plugin's identity. A fork also named masthead would pass as ours, but reading the name from .claude-plugin/plugin.json would not tell it apart either, since a fork's plugin.json says masthead too.
 # Of a masthead: name's parts, the last one naming a masthead agent is the agent, as in the fences; else the last part.
@@ -74,23 +92,32 @@ deny_tool() {
   }'
 }
 
+# A Stop or PostToolUse block carrying the reason; json_field.py writes it when jq is missing (MAST-37).
+block_decision() {
+  if ! command -v jq >/dev/null 2>&1; then
+    python3 -I "$_json_field" --block "$1"
+    return
+  fi
+  jq -n --arg r "$1" '{decision: "block", reason: $r}'
+}
+
 # Block once, then stand down (see FAIL-OPEN above).
 block_stop() {
   local once="$dir/stop-blocked-$2"
   [ -f "$once" ] && exit 0
   : > "$once"
-  jq -n --arg r "$1" '{decision: "block", reason: $r}'
+  block_decision "$1"
 }
 
 # Tell the model, every time, that a capture was refused and why.
 report_refusal() {
-  jq -n --arg r "$1" '{decision: "block", reason: $r}'
+  block_decision "$1"
 }
 
 # Classify a capture's tool_response: stored, unfixable, rejected or unknown.
 capture_outcome() {
   local resp
-  resp="$(printf '%s' "$payload" | jq -r '.tool_response | tostring' 2>/dev/null | tr -d '\\ ')"
+  resp="$(response_text | tr -d '\\ ')"
 
   case "$resp" in
     # stored: the tool returned a thought id.
@@ -109,7 +136,7 @@ case "$mode" in
   mark-search)
     : > "$dir/searched"
     q="$(field '.tool_input.query // ""' | tr '\t\n' '  ')"
-    resp="$(printf '%s' "$payload" | jq -r '.tool_response | tostring' 2>/dev/null | tr -d '\\ ')"
+    resp="$(response_text | tr -d '\\ ')"
     n="$(printf '%s' "$resp" | grep -oE '"result_count":[0-9]+' | head -1 | grep -oE '[0-9]+$')"
     [ -n "$n" ] || n="-"
     printf '%s\t%s\n' "$n" "$q" >> "$dir/searches.tsv" 2>/dev/null || true
@@ -216,8 +243,8 @@ case "$mode" in
         cmd="$(field '.tool_input.command // ""')"
         printf '%s' "$cmd" | grep -qE '(^|[^[:alnum:]_-])(grep|egrep|fgrep|rg)([[:space:]]|$)' || exit 0
         found="$(printf '%s' "$cmd" | python3 "$hook_dir/shell-search-pattern.py" 2>/dev/null)"
-        pat="$(printf '%s' "$found" | jq -r '.pattern // ""' 2>/dev/null)"
-        path="$(printf '%s' "$found" | jq -r '.path // ""' 2>/dev/null)"
+        pat="$(json_read "$found" '.pattern // ""')"
+        path="$(json_read "$found" '.path // ""')"
         # The judge reads a shell search as the Grep it is.
         tool="Grep"
         ;;
@@ -237,10 +264,15 @@ case "$mode" in
       verdict="UNKNOWN"
     else
       # Ask the index judge, with the cwd for a relative path.
-      verdict="$(jq -n --arg t "$tool" --arg p "$pat" --arg d "${path:-}" \
-        --arg c "$(field '.cwd // ""')" \
-        '{tool:$t,pattern:$p,path:$d,cwd:$c}' 2>/dev/null \
-        | python3 "$judge" 2>/dev/null | tr -d '[:space:]')"
+      if command -v jq >/dev/null 2>&1; then
+        question="$(jq -n --arg t "$tool" --arg p "$pat" --arg d "${path:-}" \
+          --arg c "$(field '.cwd // ""')" \
+          '{tool:$t,pattern:$p,path:$d,cwd:$c}' 2>/dev/null)"
+      else
+        question="$(python3 -I "$_json_field" --build tool "$tool" pattern "$pat" path "${path:-}" \
+          cwd "$(field '.cwd // ""')" 2>/dev/null)"
+      fi
+      verdict="$(printf '%s' "$question" | python3 "$judge" 2>/dev/null | tr -d '[:space:]')"
       case "$verdict" in
         SEARCHABLE|NOT_SEARCHABLE) printf '%s' "$verdict" > "$cache" ;;
         *) : > "$dir/judge-down" ;;

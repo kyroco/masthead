@@ -14,6 +14,10 @@ refuses the same calls either way instead of letting everything through.
   json_field.py --reasons
       Print every permissionDecisionReason in the JSON on stdin, at any depth
       and in any number of JSON values, joined by a blank line.
+  json_field.py --block REASON
+      Print a Stop or PostToolUse block decision carrying REASON.
+  json_field.py --build KEY VALUE [KEY VALUE ...]
+      Print one JSON object of those string fields, as `jq -n --arg` builds it.
 
 A filter it does not read, or input that is not JSON, exits 2 and prints
 nothing, which the gates read as the field being absent.
@@ -100,6 +104,13 @@ def main(argv):
             "hookEventName": "PreToolUse",
             "permissionDecision": "deny",
             "permissionDecisionReason": argv[1]}}) + "\n")
+        return 0
+    if len(argv) == 2 and argv[0] == "--block":
+        write_out(json.dumps({"decision": "block", "reason": argv[1]}) + "\n")
+        return 0
+    if argv and argv[0] == "--build" and len(argv) % 2 == 1:
+        pairs = argv[1:]
+        write_out(json.dumps(dict(zip(pairs[0::2], pairs[1::2]))) + "\n")
         return 0
     if argv == ["--object"]:
         # Exit 0 when stdin is one JSON object, so a gate can tell an unreadable call from an absent field.

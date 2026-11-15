@@ -141,8 +141,8 @@ python3` and, where issues live on GitHub, `command -v gh`, and add one row for
 each one missing, saying what stays off until it is installed: no jq, the
 diagnoser and reader agents are refused every shell command, mix format
 and credo no longer run after an Elixir edit, and, with the code index option
-on, every search the code index gate reads is refused, since it cannot ask
-the index; no python3, Masthead's gates
+on, the code index gate cannot tell a fresh code_locate answer from a stale one, so any lookup of a name lets a search for it through,
+and the two gates that send a repeated search or a whole-file read back to that answer stay off; no python3, Masthead's gates
 cannot run, so install it first; no gh, the foreman stops before queueing a
 PR or listing what a merge unblocks and says `gh` is needed, and with no
 GitHub connector either, no issue, status or pull request call can be made
