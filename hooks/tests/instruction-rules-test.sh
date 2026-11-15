@@ -1440,8 +1440,13 @@ says  skills/analyze-issues/issue-check.md 'is quoted in the issue with its sour
 says  skills/github-issues/SKILL.md 'the Scenarios cover each build the ADR names'
 says  skills/linear-issues/SKILL.md 'the Scenarios cover each build the ADR names'
 # Scenario 6: no architecture doc recorded, the four checks are skipped.
-says  skills/analyze-issues/issue-check.md 'With "Architecture doc: none recorded" above, skip all four'
-says  skills/analyze-issues/SKILL.md 'With no doc recorded, those four are skipped and the check runs as before'
+# Scenario 6 as the foreman narrowed it (MAST-33 comment, November 15): with no doc, only
+# checks 7 to 9 are skipped; the rulings check runs on every issue.
+says  skills/analyze-issues/issue-check.md 'With "Architecture doc: none recorded" above, skip checks 7 to 9'
+says  skills/analyze-issues/issue-check.md 'Check 10 runs on every issue'
+says  skills/analyze-issues/SKILL.md 'With no doc recorded, those three are skipped'
+says  skills/analyze-issues/SKILL.md 'every issue, doc or none'
+never skills/analyze-issues/issue-check.md 'skip all four'
 says  skills/analyze-issues/SKILL.md 'project_fact.py --architecture-doc'
 never skills/analyze-issues/issue-check.md 'Run these six checks'
 # MAST-33 round 1, F2: the README says what check 8 asks, a build not reached named in Out of scope.
