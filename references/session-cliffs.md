@@ -124,11 +124,14 @@ order. The steps live here and nowhere else; a repo supplies only its own facts
    settle, or an ADR line and a mockup that disagree) goes to the foreman
    unedited (to the user when there is none), who brings it to the user; the
    PR waits for that answer. So does its Architecture trial section, while
-   the trial period is on, as the brief's `Architecture trial:` line says
-   (`references/dispatch-brief.md`). While the trial is on, you fix only the
-   architecture findings the person sends back, and none of the others,
-   each as step 4 says; once it is off, the adjudicator's Fix list holds
-   them like any other finding.
+   the trial period is on: whenever that section lists a finding, whatever
+   your brief's `Architecture trial:` line said, since the adjudicator reads
+   a missing or misspelled line as on (`references/dispatch-brief.md` has
+   the switch). While the trial is on, you fix only the architecture
+   findings the person sends back, and none of the others, each as step 4
+   says; once it is off, the section reads "None, the trial is off" and the
+   adjudicator's Fix list holds them like any other finding, fixed as step
+   4 says.
 4. Fix each finding on the adjudicator's fix list in this PR, test first,
    in two commits of its own: a test that reproduces it and fails, then the
    fix. When no test can reproduce it (instruction text, a fault only a
