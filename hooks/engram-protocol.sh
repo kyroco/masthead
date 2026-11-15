@@ -285,6 +285,16 @@ case "$mode" in
       done < "$dir/codesearches.tsv"
     fi
 
+    # A review agent cannot run korium-cli index, so a lagging index would refuse it on every search: it is
+    # refused once a session, then its searches go through (MAST-37). The main session can re-index, so it stays refused.
+    acting="$(field '.agent_type // .agent_name // ""')"
+    case "$acting" in masthead:*) acting="${acting##*:}" ;; esac
+    case "$acting" in
+      verifier|security-reviewer|adjudicator|diagnoser|reader)
+        [ -f "$dir/discovery-refused-agent" ] && exit 0
+        : > "$dir/discovery-refused-agent"
+        judge_down="${judge_down}This agent cannot re-index, so this is the only search it is refused this session: ask code_locate once, and if the answer is stale, search again and it goes through. " ;;
+    esac
     printf 'refused\n' >> "$dir/discovery-refused"
     deny_tool "${judge_down}Korium code index first: the index can answer this. Call code_locate (mcp__korium__code_locate, or mcp__claude_ai_korium__code_locate through the claude.ai connector) with the repo value for the checkout you are in, head_sha set to the current HEAD, and a query phrased toward the name you expect. The repo's CLAUDE.md names that value when it has one; if it does not, ask code_locate without repo and, when the answer lists known_repositories, use the one for this repository. It holds code symbols and also YAML keys, SQL and Terraform resources. Read the span it returns instead of the whole file. If it reports itself stale, or holds no index for this branch, run korium-cli index in your checkout (it takes seconds) and ask again with branch set to your checkout's branch; without branch it reads the trunk, which is still stale. If korium-cli says this Mac is not signed in, stop and tell the person rather than wait on a browser sign-in. Without the MCP tool, korium-cli search \"<name>\" asks the same index. Once a fresh lookup of this name has been made, whatever it found, this search goes through, so a search for its callers is not blocked."
     ;;
