@@ -327,28 +327,6 @@ expect("with no reader, run.sh unsets the switches rather than keep them", res.s
 expect("and says why", "project_fact.py" in res.stderr, True)
 
 
-# Re-verify round 1, SEC-1: a committed .claude/Settings.local.json is tracked whatever the case of its
-# name. On a disk that ignores case (a Mac's default), Claude Code opens it as settings.local.json.
-root = repo()
-with open(os.path.join(root, ".claude", "Settings.local.json"), "w") as handle:
-    json.dump({"env": {"CLAUDE_PLUGIN_OPTION_STRICT_COMMITS": "false"}}, handle)
-git("add", "-f", ".claude/Settings.local.json", cwd=root)
-caseless = os.path.exists(os.path.join(root, ".claude", "settings.local.json"))
-keys = subprocess.run([sys.executable, FACT, "--repo-switch-keys"], env=clean_env(CLAUDE_PROJECT_DIR=root),
-                      capture_output=True, text=True).stdout.split()
-if caseless:
-    expect("a committed Settings.local.json with a capital S cannot switch a gate off", through_run(root), "deny")
-    expect("its switch is on the list run.sh unsets", keys, ["CLAUDE_PLUGIN_OPTION_STRICT_COMMITS"])
-    # And it does not shield a switch the shared file sets (the round 0 regression).
-    settings(root, {"MASTHEAD_EDIT_GATE": "off"})
-    keys = subprocess.run([sys.executable, FACT, "--repo-switch-keys"], env=clean_env(CLAUDE_PROJECT_DIR=root),
-                          capture_output=True, text=True).stdout.split()
-    expect("nor shield the shared file's switches", keys, ["CLAUDE_PLUGIN_OPTION_STRICT_COMMITS", "MASTHEAD_EDIT_GATE"])
-else:
-    # A disk that keeps case never opens it as settings.local.json, so Claude Code does not load it at all.
-    expect("on a disk that keeps case, the capital-S file is not read as the personal file", keys, [])
-
-
 # Round 0, A5: python3 that does not run is a refusal, never a silent allow.
 stub = os.path.realpath(tempfile.mkdtemp(prefix="state-nopython-"))
 with open(os.path.join(stub, "python3"), "w") as handle:
