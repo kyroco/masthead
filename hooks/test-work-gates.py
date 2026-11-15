@@ -1569,6 +1569,26 @@ def main():
     stranger_out = prime_as(REPO_ROOT, own_pr, "open a PR")
     check("a stranger repo's procedure does not replace the general one",
           "REPO-PR-CLIFF" not in stranger_out and "The steps live here and nowhere else" in stranger_out, True)
+    # MAST-39 scenario 4: the worker reads the PR steps with `show`, and gets the
+    # same block the hook injects, the repo's own lead when it has one.
+    def show_as(session, cwd, lead):
+        return subprocess.run(
+            [sys.executable, PRIME, "show", lead], stdin=subprocess.DEVNULL, cwd=cwd,
+            capture_output=True, text=True, check=False,
+            env=dict(os.environ, CLAUDE_PROJECT_DIR=session)).stdout
+    own_show = show_as(own_pr, own_pr, "Opening a PR")
+    check("show prints the repo's own PR steps when the repo has the lead",
+          "REPO-PR-CLIFF" in own_show and "The steps live here and nowhere else" not in own_show, True)
+    check("and it is the block the hook injects, word for word",
+          own_show.strip() in own_out and own_show.strip() != "", True)
+    stranger_show = show_as(REPO_ROOT, own_pr, "Opening a PR")
+    check("show prints the general PR steps for a repo that is not the session's",
+          "REPO-PR-CLIFF" not in stranger_show and "The steps live here and nowhere else" in stranger_show, True)
+    general_show = show_as(REPO_ROOT, REPO_ROOT, "Opening a PR")
+    check("and the general steps it shows are the ones the hook injects",
+          " ".join(general_show.split()) in proof_cliff and general_show.strip() != "", True)
+    check("show of a lead no source has prints nothing",
+          show_as(REPO_ROOT, REPO_ROOT, "No such lead").strip(), "")
     shutil.rmtree(own_pr, ignore_errors=True)
     steps = ["Build on a branch", "verification of the finished diff", "Fix each finding on the adjudicator's fix list",
              "changelog entry", "pre-push check on that last commit", "open one PR"]
