@@ -1090,7 +1090,7 @@ says  agents/security-reviewer.md "Your final message is the report: each claim 
 # MAST-30: setup finds or starts the architecture doc and records where it lives.
 # Scenario 1: name the doc found, ask, record on yes.
 says  skills/setup/SKILL.md 'architecture-doc.py find'
-says  skills/setup/SKILL.md 'Is this the project'"'"'s architecture doc?'
+says  skills/setup/SKILL.md 'Name the file and ask: "I found `<path>`. Is this the project'"'"'s architecture doc?"'
 says  skills/setup/SKILL.md 'add `"ARCHITECTURE_DOC": "<path>"`'
 # Scenario 2: offer a draft from the code, show it, write only on yes.
 says  skills/setup/SKILL.md 'Shall I draft one from the code?'
