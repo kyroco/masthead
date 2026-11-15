@@ -1,8 +1,9 @@
 # The milestone brief
 
 Sent to one `general-purpose` agent with `model: "opus"`, after every
-per-issue agent is back. Fill in the names and the Korium line, and send the
-rest as written.
+per-issue agent is back. Fill in the names, the Korium line and, on Linear
+with Korium off, the state dir (`.claude/state` unless setup named another)
+in place of `<state dir>`, and send the rest as written.
 
 ```
 Model-choice: opus, this checks every issue of a milestone against the whole ADR, fixes copying mistakes and verifies size, and no later step checks it.

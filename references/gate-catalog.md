@@ -27,7 +27,9 @@ out or prints unreadable output blocks the action instead of letting it through.
 Such a block carries no reason, so a refusal with no message means a gate
 broke. Empty stdin still allows. With no jq, the dangerous-command, brief,
 model and dispatch-record gates read the call with `hooks/json_field.py` and
-decide the same, and refuse every call when python3 cannot run either; the
+decide the same; when python3 cannot run either, the brief gates refuse every
+dispatch and the dangerous-command gate every command naming git, rm, gh, a
+database client or an infrastructure tool; the
 diagnoser and reader shell scope refuses every command of those two agents and
 leaves every other session's alone;
 the reviewer network gate refuses a reviewer call naming a network tool. A

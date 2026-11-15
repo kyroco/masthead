@@ -226,10 +226,11 @@ GitHub call here goes through the connector when it is loaded, as **Which
 tool makes the call** in the github-issues skill says.
 
 With no `gh` (`command -v gh` finds nothing), park an issue through the
-connector's label call, and for queueing a PR and listing what a merge
-unblocks, which have no connector call, stop and tell the person: "`gh` is
-needed to queue PR #<n> (brew install gh, then gh auth login)." Never skip one
-of these steps or report it done.
+connector's label call. Queueing a PR and listing what a merge unblocks have
+no connector call, so at either one stop and tell the person which step waits,
+with "(brew install gh, then gh auth login)" after it: "`gh` is needed to queue
+PR #<pr>" before the merge, or "`gh` is needed to list the issues that issue
+#<n> unblocks" after it. Never skip one of these steps or report it done.
 
 Once it merges: close its issue if the `Fixes` line did not, then each parent
 up the chain that has no open sub-issue left, and set the merged issue and

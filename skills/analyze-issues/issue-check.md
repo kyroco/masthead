@@ -1,8 +1,9 @@
 # The per-issue brief
 
 Sent to one `general-purpose` agent per issue, with `model: "haiku"`. Fill in
-the number, the repo, the project number and the Korium line, and send the
-rest as written.
+the number, the repo, the project number, the Korium line and, on Linear with
+Korium off, the state dir (`.claude/state` unless setup named another) in
+place of `<state dir>`, and send the rest as written.
 
 ```
 no code change
