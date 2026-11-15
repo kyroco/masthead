@@ -419,6 +419,20 @@ for name, doc in (("r1-shell-no-doc", False), ("r1-shell-doc", True)):
           % ("doc recorded" if doc else "no doc"),
           "creates a new ADR (docs/adr/ADR-0009-new.md) through the shell" in why, why)
 
+# ------------------------------------------------------------------ round 1: a new ADR filled in by Edit after an empty Write
+r = make_repo("r1-empty-then-edit")
+path = os.path.join(r, "docs/adr/ADR-0007-take-orders.md")
+check("1: an empty Write of a new ADR is let through, as before", write_adr(r, "\n") == "")
+write(path, "\n")
+why = gate(r, "Edit", {"file_path": path, "old_string": "\n", "new_string": adr()})
+check("1: an Edit that fills a new ADR without the alignment section is refused",
+      "`## Architecture Alignment` is absent" in why, why)
+why = gate(r, "Edit", {"file_path": path, "old_string": "\n", "new_string": adr(ALIGNED)})
+check("1: an Edit that fills it with the whole shape is allowed", why == "", why)
+write(path, adr(ALIGNED))
+why = gate(r, "Edit", {"file_path": path, "old_string": "Proposed", "new_string": "Accepted"})
+check("1: a later Edit of a new ADR that keeps the shape is allowed", why == "", why)
+
 shutil.rmtree(T, ignore_errors=True)
 print()
 print("%d passed, %d failed" % (passed, failed))
