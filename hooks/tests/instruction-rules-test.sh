@@ -1261,13 +1261,18 @@ never README.md 'None of them can edit anything'
 # MAST-43: the README and catalog say the verifiers' shells run exact shapes, and what that leaves open.
 never README.md 'refuse the common network programs'
 says  README.md 'shells run only the command shapes in `hooks/reviewer_shapes.py`'
-says  README.md 'They refuse every other command, a wrapper such as `timeout 5 curl` included, and every redirect into a file. The fence reads the command the agent types, not what a program it runs then does: a test, a test runner, semgrep or a probe script (MAST-43)'
+says  README.md 'They refuse every other command, a wrapper such as `timeout 5 curl` included, and every redirect into a file.'
+# Round 1 arch-1, Robert, November 15: probe scripts stay, and the text says the fence covers the
+# commands typed, not code run, a probe script the agent wrote itself included.
+says  README.md 'The fence covers the commands the agent types, not code it runs: a test, a test runner, semgrep, or a probe script it wrote itself in its scratch folder can still do anything (MAST-43)'
+says  references/gate-catalog.md 'It covers the commands the agent types, not code it runs: a test, a test runner, semgrep, or a probe script the agent wrote itself in its scratch folder can still do anything'
+never references/gate-catalog.md 'a test or probe script it runs is the repository'"'"'s code'
+never hooks/reviewer_shapes.py 'A test or probe script it runs is code of the repository'
 # Round 1, S2-F1: the README's list is the fence's own summary (bash-scope-reviewer-test.sh holds them together).
 never README.md 'joined by a pipe or `&&`'
 never references/gate-catalog.md 'the reviewer network gate refuses a reviewer call naming a network tool'
 never references/gate-catalog.md 'a denylist of network programs, not an allowlist'
 says  references/gate-catalog.md 'Holds the `verifier` and `security-reviewer` shells to the exact command shapes `hooks/reviewer_shapes.py` lists'
-says  references/gate-catalog.md 'a test or probe script it runs is the repository'"'"'s code and may do anything'
 says  references/gate-catalog.md 'For the architecture reviewer it is a denylist of network programs'
 # Re-verify round 2 (Robert, November 15): the README and catalog claim only
 # the exact shapes the architecture reviewer's shell allows, and no fence they
