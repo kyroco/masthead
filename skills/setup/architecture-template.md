@@ -3,7 +3,8 @@
 <One or two sentences: what this project is and who uses it.> This doc is the
 target shape every decision record and pull request is checked against. Keep it
 to a page or two. The principles live in <the file that holds them, usually
-CLAUDE.md>; this doc cites them by number (P1, P2 and on) and never copies them.
+CLAUDE.md>; each rule and section below cites the ones it applies by number and
+never copies them.
 
 ## The parts
 

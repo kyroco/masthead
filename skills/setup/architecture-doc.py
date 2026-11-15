@@ -123,8 +123,8 @@ def label_rest(line, lens):
     return re.sub(r"^[^\w<]+", "", rest).rstrip(" .:\t")
 
 
-def lens_problem(lines, lens):
-    """Why the doc does not state `lens` as a rule, or None when it does."""
+def lens_rule(lines, lens):
+    """(the rule the doc states for `lens`, None) or (None, why it states none)."""
     best = None
     for i, line in enumerate(lines):
         rest = label_rest(line, lens)
@@ -141,17 +141,17 @@ def lens_problem(lines, lens):
         if rest.lower().startswith("does not apply"):
             reason = rest[len("does not apply"):]
             if len(words(reason)) >= MIN_REASON_WORDS:
-                return None
+                return rest, None
             best = "{}: says it does not apply but not why".format(lens)
             continue
         if len(words(rest)) >= MIN_RULE_WORDS:
-            return None
+            return rest, None
         best = best or "{}: names the lens but states no rule for this project".format(lens)
-    return best or "{}: not stated; write it as a rule for this project, or say why it does not apply".format(lens)
+    return None, best or "{}: not stated; write it as a rule for this project, or say why it does not apply".format(lens)
 
 
-def section_problem(lines, name):
-    """Why a draft does not fill the template section `name`, or None when it does."""
+def section_body(lines, name):
+    """The text under the heading `name`, or None when the doc has no such heading."""
     for i, line in enumerate(lines):
         if re.match(r"^#+\s*" + re.escape(name) + r"\s*$", line.strip(), re.IGNORECASE):
             body = []
@@ -159,13 +159,20 @@ def section_problem(lines, name):
                 if nxt.lstrip().startswith("#"):
                     break
                 body.append(nxt)
-            body = " ".join(body)
-            if PLACEHOLDER.search(body):
-                return "{}: the section is still a placeholder".format(name)
-            if len(words(body)) < MIN_RULE_WORDS:
-                return "{}: the section is empty".format(name)
-            return None
-    return "{}: the section is missing".format(name)
+            return " ".join(body)
+    return None
+
+
+def section_problem(lines, name):
+    """Why a draft does not fill the template section `name`, or None when it does."""
+    body = section_body(lines, name)
+    if body is None:
+        return "{}: the section is missing".format(name)
+    if PLACEHOLDER.search(body):
+        return "{}: the section is still a placeholder".format(name)
+    if len(words(body)) < MIN_RULE_WORDS:
+        return "{}: the section is empty".format(name)
+    return None
 
 
 def check(doc, principles_file=None, draft=False):
@@ -175,7 +182,12 @@ def check(doc, principles_file=None, draft=False):
     problems = []
     if draft:
         problems += [p for p in (section_problem(lines, name) for name in SECTIONS) if p]
-    problems += [p for p in (lens_problem(lines, lens) for lens in LENSES) if p]
+    rules = [lens_rule(lines, lens) for lens in LENSES]
+    problems += [problem for _, problem in rules if problem]
+    # A citation is a P-number in a rule or in one of the template's sections,
+    # never in the intro that says how the doc cites.
+    cites_in = " ".join([rule for rule, _ in rules if rule] +
+                        [body for body in (section_body(lines, name) for name in SECTIONS) if body])
     if draft:
         for line in lines:
             if PLACEHOLDER.search(line):
@@ -183,7 +195,7 @@ def check(doc, principles_file=None, draft=False):
     if principles_file:
         known = principles(principles_file)
         if known:
-            cited = set(re.findall(r"\bP(\d+)\b", text))
+            cited = set(re.findall(r"\bP(\d+)\b", cites_in))
             if not cited:
                 problems.append("cites none of the project's principles by number ({})".format(
                     ", ".join("P" + n for n in sorted(known, key=int))))
