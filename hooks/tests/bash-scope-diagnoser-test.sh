@@ -226,6 +226,37 @@ for tool in Write Edit MultiEdit NotebookEdit Agent; do
     || fail "reader.md no longer denies $tool"
 done
 
+# MAST-34 round 1, fix F2: the architecture reviewer writes only its findings
+# file, so its shell is held to this read-only allowlist too, with no test
+# runners and no redirect but /dev/null. It may run the plugin's own
+# project_fact.py to ask which tracker the repo uses.
+FACT="$(cd "$SCRIPT_DIR/.." && pwd -P)/project_fact.py"
+arch() {
+  local want="$1" label="$2" cmd="$3" payload rc
+  payload="$(jq -nc --arg c "$cmd" --arg d "$WORK" '{tool_name:"Bash", agent_type:"masthead:architecture-reviewer", cwd:$d, tool_input:{command:$c}}')"
+  printf '%s' "$payload" | bash "$HOOK" --project-wide >/dev/null 2>&1
+  rc=$?
+  if [ "$rc" -eq "$want" ]; then pass "architecture reviewer: $label (rc=$rc)"; else fail "architecture reviewer: $label: got rc=$rc, expected $want. Command was: $cmd"; fi
+}
+arch 2 "a shell redirect into the tree"          'echo hi > README.md'
+arch 2 "a shell redirect into /tmp"              'echo hi > /tmp/arch-note'
+arch 2 "an append into the tree"                 'printf x >> lib/a.ex'
+arch 2 "tee into the tree"                       'echo hi | tee lib/a.ex'
+arch 2 "a copy over the code"                    'cp lib/a.ex lib/b.ex'
+arch 2 "a test run, which writes build output"   'mix test'
+arch 2 "python running another script"           'python3 /tmp/evil.py'
+arch 2 "project_fact.py with another flag"       "python3 $FACT --root /tmp --tracker"
+arch 2 "a GH_REPO setting before gh"             'GH_REPO=evil.example/o/r gh issue view 41'
+arch 0 "a redirect into /dev/null"               'git diff HEAD~1 2>/dev/null'
+arch 0 "read-only git"                           'git diff 1e105da..b58f714'
+arch 0 "reading a file"                          'cat lib/a.ex'
+arch 0 "searching"                               'rg Billing lib'
+arch 0 "asking which tracker the repo uses"      "python3 $FACT --tracker"
+arch 0 "asking where the architecture doc is"    "python3 $FACT --architecture-doc"
+arch 0 "reading the issue with gh"               'gh issue view 41 --comments'
+scoped 2 "project-wide: the plugin's architecture reviewer is gated" "{$RM,\"agent_type\":\"masthead:architecture-reviewer\"}" --project-wide
+scoped 0 "project-wide: another plugin's architecture reviewer passes" "{$RM,\"agent_type\":\"otherplugin:architecture-reviewer\"}" --project-wide
+
 printf '%s' '{"tool_name":"Bash","tool_input":{}}' | bash "$HOOK" >/dev/null 2>&1
 [ $? -eq 2 ] && pass "a Bash call with no command string is denied" \
   || fail "a Bash call with no readable command should be denied"

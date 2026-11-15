@@ -1170,5 +1170,11 @@ says  agents/architecture-reviewer.md 'a requirement not built is a finding'
 says  agents/architecture-reviewer.md 'anything in the code that contradicts the mockup is a finding, with the mockup line quoted'
 says  agents/architecture-reviewer.md 'report the disagreement itself as a finding for the person, quoting both'
 says  agents/architecture-reviewer.md 'do not pick one to check the code against'
+# Round 1, fix F3: the ADR comes as a path the reviewer can read, never a link.
+says  references/dispatch-brief.md 'never a link, which the reviewer cannot open'
+says  agents/architecture-reviewer.md 'that no requirement of it was checked is a finding for the person'
+# Round 1, extra scored 8: the ADR check's other job, a changed line that
+# contradicts any line of the ADR (Robert, November 14, "yes" to keeping both jobs).
+says  agents/architecture-reviewer.md 'a changed line that contradicts any line of the ADR, such as an option it rejected, is a finding, with that line quoted'
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]

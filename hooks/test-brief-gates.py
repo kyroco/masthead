@@ -388,6 +388,18 @@ ARCHITECTURE_CASES = [
      architecture_brief("Architecture doc: docs/architecture.md",
                         alignment="**ADR alignment:**\n- \"Billing data is reached only through Billing.Accounts.\""),
      "docs/architecture.md", "deny"),
+    # Round 1, fix F3: the reviewer cannot open a link, so the ADR line names a
+    # path it can read, or "none".
+    ("HELD an ADR given as a link", "architecture-reviewer",
+     architecture_brief("Architecture doc: docs/architecture.md").replace(
+         "ADR: docs/adr/ADR-0007-billing.md", "ADR: https://github.com/o/r/wiki/ADR-0007"), "docs/architecture.md", "deny"),
+    ("HELD no ADR line", "architecture-reviewer",
+     architecture_brief("Architecture doc: docs/architecture.md").replace(
+         "ADR: docs/adr/ADR-0007-billing.md\n", ""), "docs/architecture.md", "deny"),
+    ("an issue that builds no ADR names none", "architecture-reviewer",
+     architecture_brief("Architecture doc: docs/architecture.md",
+                        alignment="ADR alignment: none, the issue builds no ADR").replace(
+         "ADR: docs/adr/ADR-0007-billing.md", "ADR: none"), "docs/architecture.md", "allow"),
     ("another plugin's architecture reviewer is not masthead's", "otherplugin:architecture-reviewer",
      THIN, "docs/architecture.md", "allow"),
 ]
