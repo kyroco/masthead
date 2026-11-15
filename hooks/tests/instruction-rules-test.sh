@@ -1102,6 +1102,9 @@ says  skills/setup/SKILL.md 'Either way, check it before showing it or recording
 says  skills/setup/SKILL.md 'architecture-doc.py check <doc> <principles file>'
 says  skills/setup/SKILL.md 'For a draft you made from the template, run it as `check --draft`'
 says  skills/setup/SKILL.md 'cites the project'"'"'s principles by number, such as P9, and copies none of their text'
+# Re-verify round 1, finding s6.1: a doc that fails the check is never recorded.
+says  skills/setup/SKILL.md 'If they say no, do not record the doc'
+never skills/setup/SKILL.md 'record the doc anyway'
 # Scenario 4: a repository set up before is offered the doc alone.
 says  skills/setup/SKILL.md 'before and no `ARCHITECTURE_DOC` is recorded, offer the architecture doc on its own'
 says  skills/setup/SKILL.md 'ask none of the other questions unless the person asks to change an answer'
