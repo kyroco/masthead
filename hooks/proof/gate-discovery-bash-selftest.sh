@@ -117,6 +117,36 @@ got="$(gate "$sid" Bash "$(sh 'rg handle_call products/')")"
   || bad "a korium-cli search counts as the lookup" "$got"
 rm -rf "${TMPDIR:-/tmp}/masthead-$(id -u)/claude-engram/$sid"
 
+echo "== an agent that cannot re-index is refused once, then let through (MAST-37) =="
+# The verifier, adjudicator and reader cannot run korium-cli index, so a lagging index would refuse them
+# on every search. The first refusal says how; after it, their searches go through for the session.
+for who in masthead:verifier adjudicator masthead:reader; do
+  sid="gdtest-agent-$RANDOM"; : > "$JUDGE_LOG"
+  record_search "$sid" empty stale
+  agent_gate() {
+    jq -n --arg s "$sid" --arg a "$who" --argjson i "$(sh "$1")" \
+      '{session_id:$s, agent_type:$a, tool_name:"Bash", tool_input:$i}' \
+      | bash "$WORK/engram-protocol.sh" gate-discovery 2>/dev/null | grep -c '"deny"'
+  }
+  first="$(agent_gate 'rg fuse_scores products/')"
+  second="$(agent_gate 'rg handle_call products/')"
+  third="$(agent_gate 'rg fuse_scores products/')"
+  if [ "$first" = 1 ] && [ "$second" = 0 ] && [ "$third" = 0 ]; then
+    ok "$who: refused once on a stale index, then allowed" "refusals $first $second $third"
+  else
+    bad "$who: refused once on a stale index, then allowed" "refusals $first $second $third"
+  fi
+  rm -rf "${TMPDIR:-/tmp}/masthead-$(id -u)/claude-engram/$sid"
+done
+# The main session can re-index, so it stays refused until it does.
+sid="gdtest-main-$RANDOM"; : > "$JUDGE_LOG"
+record_search "$sid" empty stale
+gate "$sid" Bash "$(sh 'rg fuse_scores products/')" >/dev/null
+got="$(gate "$sid" Bash "$(sh 'rg handle_call products/')")"
+[ "$got" = deny ] && ok "the main session is still refused a second time on a stale index" "$got" \
+  || bad "the main session is still refused a second time on a stale index" "$got"
+rm -rf "${TMPDIR:-/tmp}/masthead-$(id -u)/claude-engram/$sid"
+
 echo "== a judge that is down =="
 # Since 2026-10-09 a judge that cannot be read refuses (the way through is a
 # fresh lookup), so the second search is denied; it must still cost no second
