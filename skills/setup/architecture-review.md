@@ -17,6 +17,10 @@ change nothing either. Ask one question at a time and wait for the answer.
 
 ## 1. Ask what they want
 
+When `findings --ledger <L>` prints a file, a review was left unjudged: an
+earlier session reviewed batches and ended before its judge. Say so, and go
+to step 5 with what it prints before asking anything else.
+
 Ask only when the repository has code: the script's `parts` exits 3 when it
 holds none (it counts everything tracked but docs, media, archives, binaries,
 licences and lock files), and then say you found no code to review, so there
@@ -137,7 +141,10 @@ those skills give:
   `builds <doc>` lists them), each "Given <that build>, When <...>, Then
   <...>". When `builds` prints nothing, ask the person which builds the
   project ships, once for the whole filing, and give one scenario for each;
-  a project that ships one build gets one scenario for it. Each rests on the doc line the cause breaks, quoted word for word
+  a project that ships one build gets one scenario for it. When one line
+  names more than one build, as one sentence can ("the open build ships the
+  core alone; the hosted build adds billing"), split it into a scenario for
+  each. Each rests on the doc line the cause breaks, quoted word for word
   from `rules <doc>`, or the principle it breaks, by number.
 - **Out of scope**: the other causes, by key once filed.
 - **Questions**: what the doc and the code do not settle, as those skills

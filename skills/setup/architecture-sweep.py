@@ -48,7 +48,9 @@ DEFAULT_BUDGET = 6000
 # room goes to reports instead of judging, so the rest waits for the next run, a new session.
 MAX_BATCHES_PER_SESSION = 6
 # Everything tracked counts as code except what is plainly not: docs, media, archives, binaries,
-# licences and the lock files package managers write.
+# licences, the lock files package managers write, and the dependencies a repository keeps. A
+# folder named build, target or doc inside the code is code: only tracked files are read, and
+# generated output is rarely tracked.
 NOT_CODE_EXT = {
     ".md", ".markdown", ".txt", ".rst", ".adoc", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico",
     ".webp", ".bmp", ".pdf", ".woff", ".woff2", ".ttf", ".otf", ".eot", ".zip", ".gz", ".tgz",
@@ -56,7 +58,9 @@ NOT_CODE_EXT = {
 }
 LOCK_NAMES = {"package-lock.json", "pnpm-lock.yaml", "yarn.lock", "npm-shrinkwrap.json", "go.sum"}
 NOT_CODE_STEMS = {"license", "licence", "notice", "copying", "changelog", "authors"}
-SKIP = {"node_modules", "vendor", "deps", "_build", "target", "dist", "build", ".git", "docs", "doc"}
+SKIP = {"node_modules", "vendor", ".git"}
+# A .txt file is prose, except these, which hold builds and dependencies.
+TXT_CODE = re.compile(r"^(cmakelists|requirements.*|constraints.*)\.txt$")
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 
@@ -85,6 +89,8 @@ def is_code(path, data):
         return False
     name = parts[-1]
     stem, ext = os.path.splitext(name.lower())
+    if TXT_CODE.match(name.lower()):
+        return b"\0" not in data[:8192]
     if name in LOCK_NAMES or ext in NOT_CODE_EXT or stem in NOT_CODE_STEMS:
         return False
     return b"\0" not in data[:8192]
@@ -240,9 +246,14 @@ def main(argv):
 
     if command == "plan" and ledger:
         if os.path.exists(ledger) and not fresh:
-            if any(b["status"] != "done" for b in load(ledger)["batches"]):
+            old = load(ledger)["batches"]
+            if any(b["status"] != "done" for b in old):
                 print("a review is part done in {}: run `left` to see what it has not reviewed, "
                       "`next` to go on, or plan again with --fresh to start over".format(ledger))
+                return 4
+            if any(not b.get("judged", True) for b in old):
+                print("a review in {} was reviewed and not judged: judge what `findings` prints, "
+                      "or plan again with --fresh to start over".format(ledger))
                 return 4
         root = top()
         every = code_files(root)
@@ -354,9 +365,13 @@ def main(argv):
     return usage()
 
 
+BULLET = re.compile(r"^(\s*)(?:[-*+]|\d+[.)])\s+(.*)$")
+
+
 def builds(lines, name):
-    """Each build under the heading `name`: a table's rows, each bullet with its wrapped lines,
-    or each paragraph."""
+    """Each build under the heading `name`: a table's rows; each list item, with its wrapped lines
+    and its sub-items; or each line, a line that starts in lower case after one that ends with no
+    stop continuing it."""
     body = None
     for i, line in enumerate(lines):
         if re.match(r"^#+\s*" + re.escape(name) + r"\s*$", line.strip(), re.IGNORECASE):
@@ -373,25 +388,35 @@ def builds(lines, name):
         cells = [[c.strip() for c in r.strip("|").split("|")] for r in rows]
         data = [c for c in cells[1:] if not all(re.match(r"^:?-+:?$", x) for x in c if x)]
         return ["{}: {}".format(c[0], ", ".join(x for x in c[1:] if x)) if len(c) > 1 else c[0] for c in data]
-    found, current, bulleted = [], None, any(re.match(r"^\s*[-*]\s", b) for b in body)
+    items = [BULLET.match(b) for b in body]
+    if any(items):
+        top = min(len(m.group(1)) for m in items if m)
+        found, subs = [], []
+        for line, m in zip(body, items):
+            if m and len(m.group(1)) == top:
+                if found and subs:
+                    found[-1] = found[-1].rstrip(" :") + ": " + ", ".join(subs)
+                found.append(m.group(2).strip())
+                subs = []
+            elif m and found:
+                subs.append(m.group(2).strip())
+            elif line.strip() and found and line[:1].isspace():
+                if subs:
+                    subs[-1] += " " + line.strip()
+                else:
+                    found[-1] += " " + line.strip()
+        if found and subs:
+            found[-1] = found[-1].rstrip(" :") + ": " + ", ".join(subs)
+        return found
+    found = []
     for line in body:
         text = line.strip()
-        if bulleted:
-            if re.match(r"^[-*]\s", text):
-                current = re.sub(r"^[-*]\s+", "", text)
-                found.append(current)
-            elif text and found and line[:1].isspace():
-                found[-1] += " " + text
-            else:
-                current = None
-        elif text:
-            if current is None:
-                found.append(text)
-                current = text
-            else:
-                found[-1] += " " + text
+        if not text:
+            continue
+        if found and found[-1] is not None and text[:1].islower() and not re.search(r"[.;:!?]$", found[-1]):
+            found[-1] += " " + text
         else:
-            current = None
+            found.append(text)
     return found
 
 
