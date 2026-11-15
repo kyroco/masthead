@@ -1421,5 +1421,28 @@ says  skills/setup/architecture-review.md 'say you found no code to review'
 says  skills/setup/architecture-review.md 'When `findings --ledger <L>` prints a file, a review was left unjudged'
 # Claim 7: a line that names more than one build is split by the session.
 says  skills/setup/architecture-review.md 'When one line names more than one build'
+
+# MAST-33: every issue carries the ADR's target shape and a scenario for each build.
+# Scenario 1: the issue quotes the alignment lines it builds toward, or the check names them.
+says  skills/analyze-issues/issue-check.md 'Target shape: the issue quotes the alignment lines it builds toward'
+says  skills/analyze-issues/issue-check.md 'Fails naming each alignment line the work builds toward and the issue leaves out'
+says  skills/analyze-issues/issue-check.md 'Architecture doc: <its path, or none recorded>'
+# Scenario 2: a scenario for each build the work reaches.
+says  skills/analyze-issues/issue-check.md 'the issue has a scenario for each build its work reaches'
+says  skills/analyze-issues/issue-check.md 'Fails naming each build with neither'
+# Scenario 3: a pattern to copy is held to the alignment, and a break names the line.
+says  skills/analyze-issues/issue-check.md 'Patterns to copy: where the issue tells the worker to do it "the same way"'
+says  skills/analyze-issues/issue-check.md 'naming the alignment or doc line and the file:line that breaks it'
+# Scenario 4: each governing ruling is quoted with its source.
+says  skills/analyze-issues/issue-check.md 'run agent_search with stance "position" and limit 10'
+says  skills/analyze-issues/issue-check.md 'is quoted in the issue with its source'
+# Scenario 5: both issue skills say the Scenarios cover each build the ADR names.
+says  skills/github-issues/SKILL.md 'the Scenarios cover each build the ADR names'
+says  skills/linear-issues/SKILL.md 'the Scenarios cover each build the ADR names'
+# Scenario 6: no architecture doc recorded, the four checks are skipped.
+says  skills/analyze-issues/issue-check.md 'With "Architecture doc: none recorded" above, skip all four'
+says  skills/analyze-issues/SKILL.md 'With no doc recorded, those four are skipped and the check runs as before'
+says  skills/analyze-issues/SKILL.md 'project_fact.py --architecture-doc'
+never skills/analyze-issues/issue-check.md 'Run these six checks'
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]

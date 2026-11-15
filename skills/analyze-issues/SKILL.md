@@ -1,6 +1,6 @@
 ---
 name: analyze-issues
-description: Check a milestone, a project or a list of issues before any of them is built, verify each issue against its sources (its four parts Why, Scenarios, Out of scope and Questions, the user's lines, each scenario's source line, its shape, no how, and the size rule), fix only the part that fails, split the ones that are too big, and bring the user the questions nothing else answers. /analyze-issues milestone 4, /analyze-issues <project>, or /analyze-issues #3074 #3075. The foreman runs it as its first step; the user runs it alone any time after planning. Run it from the repo the issues live in.
+description: Check a milestone, a project or a list of issues before any of them is built, verify each issue against its sources (its four parts Why, Scenarios, Out of scope and Questions, the user's lines, each scenario's source line, its shape, no how, the size rule, and, where the project records an architecture doc, the ADR's target shape, a scenario per build, patterns to copy and the user's rulings), fix only the part that fails, split the ones that are too big, and bring the user the questions nothing else answers. /analyze-issues milestone 4, /analyze-issues <project>, or /analyze-issues #3074 #3075. The foreman runs it as its first step; the user runs it alone any time after planning. Run it from the repo the issues live in.
 disable-model-invocation: true
 ---
 
@@ -44,6 +44,16 @@ line the user wrote is still quoted under its scenario; each scenario cites a
 source line that exists, which it opens and quotes; each scenario is
 Given/When/Then and a test can show it; nothing says how; and it fits one
 worker session by the Size rule, with the reason.
+
+Where the project recorded an architecture doc (run
+`python3 ${CLAUDE_PLUGIN_ROOT}/hooks/project_fact.py --architecture-doc`
+and fill its path into the brief, or `none recorded`), four more checks
+hold the issue to where the design is headed: it quotes the decision
+record's alignment lines it builds toward; it has a scenario for each build
+the record names that its work reaches; a pattern it points the worker at
+to copy keeps to the alignment; and each of the user's rulings that governs
+its area is quoted with its source. With no doc recorded, those four are
+skipped and the check runs as before.
 
 An issue that passes every check is untouched: no edit and no comment.
 Otherwise, on GitHub, it:

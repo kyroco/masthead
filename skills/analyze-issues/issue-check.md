@@ -1,7 +1,9 @@
 # The per-issue brief
 
 Sent to one `general-purpose` agent per issue, with `model: "haiku"`. Fill in
-the number, the repo, the project number, the Korium line and, on Linear with
+the number, the repo, the project number, the Korium line, the architecture
+doc line (the path `project_fact.py --architecture-doc` prints, or
+`none recorded` when it prints nothing) and, on Linear with
 Korium off, the state dir (`.claude/state` unless setup named another) in
 place of `<state dir>`, and send the rest as written.
 
@@ -10,6 +12,7 @@ no code change
 This checks one GitHub issue against its sources and edits only the part that fails; it may create sub-issues; it changes no file in the repo.
 
 Korium: <what this session's agent_search found about this issue's subsystem, or that it found nothing>.
+Architecture doc: <its path, or none recorded>.
 
 Check issue #<n> in <repo> before it is built. Read, in full: the issue
 with every comment (`gh issue view <n> --comments`), the project README
@@ -21,8 +24,9 @@ An issue has four parts, defined in ${CLAUDE_PLUGIN_ROOT}/skills/github-issues/S
 under "What an issue holds": Why, Scenarios, Out of scope, Questions. Read
 that section and the Size rule under it before you check.
 
-Run these six checks, in this order, and keep a verdict for each with its
-evidence (the line of the issue, the source or the comment it rests on):
+Run these checks, in this order, and keep a verdict for each with its
+evidence (the line of the issue, the source or the comment it rests on).
+Checks 1 to 6 run on every issue:
 
 1. Parts: the four parts are present, in that order, under those headings.
 2. The user's lines: every line the user wrote (a comment on the issue, or
@@ -41,6 +45,30 @@ evidence (the line of the issue, the source or the comment it rests on):
    a tech choice). What is true when it works is what stays.
 6. Size: the issue fits one worker session by the Size rule, with the
    reason in one line (what it touches, from code_locate).
+
+Checks 7 to 10 hold the issue to where the design is headed. With
+"Architecture doc: none recorded" above, skip all four and say so in one
+line. Checks 7 to 9 also need the decision record the issue builds from to
+have an `## Architecture Alignment` section; a record without one skips
+them, and you say so.
+
+7. Target shape: the issue quotes the alignment lines it builds toward,
+   word for word, each with the record it comes from. Fails naming each
+   alignment line the work builds toward and the issue leaves out.
+8. Each build: where the record's `Builds:` line names more than one build,
+   the issue has a scenario for each build its work reaches, saying what is
+   true in that build. A build the work does not reach is named in Out of
+   scope with why. Fails naming each build with neither.
+9. Patterns to copy: where the issue tells the worker to do it "the same
+   way" as earlier work, or points at a module, file or issue to copy, open
+   that code (code_locate) and hold it to the alignment lines and the
+   architecture doc's rules. Fails when the pattern breaks one, naming the
+   alignment or doc line and the file:line that breaks it.
+10. Rulings: run agent_search with stance "position" and limit 10 for the
+   issue's area, and read the issue's and the project's comments. Each
+   ruling of the user's that governs what this issue builds is quoted in the
+   issue with its source (the Korium id, or the comment and its date). Fails
+   naming each ruling left out.
 
 Every check passes: change nothing on GitHub. No edit, no comment.
 
@@ -62,6 +90,14 @@ in full; never "as in section 2". Add nothing the sources do not support.
   a question a source settles is written into the issue with the line
   quoted, not asked. A design choice is not a question. Add the
   needs-decision label when a question is open.
+- Check 7 or 10 fails: quote each missing line, with its source, under the
+  scenario it governs.
+- Check 8 fails: add the missing build's scenario when the record or the
+  architecture doc says what is true in that build, citing the line;
+  otherwise ask it as a question.
+- Check 9 fails: take the pointer out, and quote under its scenario the
+  alignment or doc line the pattern breaks, so the worker builds to the
+  line and not to the copy.
 - Write the whole new body to a file inside the checkout with the Write
   tool, then edit with `gh issue edit <n> --body-file <path>`, or, where the
   GitHub connector is loaded, read the issue with its `issue_read` (method
@@ -90,7 +126,7 @@ number and send the brief with these lines in place of their GitHub ones:
   then `list_comments` with `issueId` <key>), the project description
   (`get_project` with `query` the project name), which is the brief in
   place of the project README, then the decision records and mockup pages it
-  names. The checks are the same six, against the same four parts and Size
+  names. The checks are the same ten, against the same four parts and Size
   rule.
 - Check 6 fails: make each part a sub-issue with `save_issue` with
   `parentId` <key>, in the same project, with its own four parts and a

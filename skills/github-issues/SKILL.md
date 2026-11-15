@@ -63,7 +63,11 @@ there. Four parts, in this order, under these headings:
 - **Scenarios:** at least one, each a thing a test can show, written
   "Given <starting state>, When <what happens>, Then <what is true>", and
   each naming what it rests on: a decision record, a project README rule, or
-  the user's words quoted. How much one issue holds is the Size rule's call, never a count of
+  the user's words quoted. Where the decision record has an Architecture
+  Alignment section, the issue quotes the alignment lines it builds toward,
+  and the Scenarios cover each build the ADR names that the work reaches
+  (a build it does not reach is named in Out of scope). Each ruling of the
+  user's that governs the issue's area is quoted with its source. How much one issue holds is the Size rule's call, never a count of
   scenarios. Nothing about modules, calls or where a check runs: that is the
   worker's to decide when it builds.
 - **Out of scope:** what this issue leaves to another, by number when it
