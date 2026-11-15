@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# bash-scope-diagnoser.sh: PreToolUse Bash hook that lets the diagnoser and reader agents run only test runners, read-only git and gh, and read-only inspection, and denies the rest (exit 2). The architecture reviewer is held to the same list without the test runners and with no redirect but /dev/null, since it writes only its findings file; it may ask the plugin's project_fact.py for the tracker or the architecture doc.
+# bash-scope-diagnoser.sh: PreToolUse Bash hook that lets the diagnoser and reader agents run only test runners, read-only git and gh, and read-only inspection, and denies the rest (exit 2). The architecture reviewer gets only three exact command shapes: git diff, show or log with plain revisions and paths, this plugin's project_fact.py with --tracker or --architecture-doc, and gh issue view <n>.
 
 set -uo pipefail
 
@@ -28,7 +28,6 @@ fi
 # The one script the architecture reviewer may run: this plugin's project_fact.py, by its full path.
 FACT_SELF="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd -P)/project_fact.py"
 FACT_ROOT="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/hooks/project_fact.py}"
-is_fact() { [ "$1" = "$FACT_SELF" ] || { [ -n "$FACT_ROOT" ] && [ "$1" = "$FACT_ROOT" ]; }; }
 
 CMD="$(printf '%s' "$INPUT" | jq -r '.tool_input.command // empty')"
 CWD="$(printf '%s' "$INPUT" | jq -r '.cwd // empty')"
@@ -44,6 +43,55 @@ deny() {
   echo "Denied: changing files or git state, the network beyond this machine, credential reads, and anything the guard cannot check (substitution, variables, subshells, braces, input redirects, multi-line commands, path traversal). The diagnoser diagnoses; it does not fix." >&2
   exit 2
 }
+
+# The credential check, applied to every word.
+CRED_RE='(^|[/:=])\.env|\.pgpass|\.netrc|(^|/)\.aws(/|$)|(^|/)\.ssh(/|$)|\.gnupg|\.docker/config|\.kube/config|\.npmrc|\.pypirc|\.git-credentials|id_(rsa|dsa|ecdsa|ed25519)|\.(pem|key|p12|pfx)$|(^|/)credentials(\.json)?$|gh/hosts\.yml|\.config/gcloud|\.azure(/|$)|(^|/)secrets?\.(ya?ml|json|env)$'
+
+# --- 0. the architecture reviewer: exact command shapes, and nothing else ---
+# Robert, November 15 (MAST-34 comment): its shell allows only exact command shapes and refuses everything
+# else, since every list of refused flags left a spelling open. It reads files with Read, Glob and Grep, so it
+# needs only these, each as the whole command, its words split by single spaces:
+#   git diff, git show or git log, then plain revisions and paths: no flag but a lone --, no quote, variable,
+#     glob, pipe, chain or redirect, no path out of the checkout, and nothing set before git or between git and
+#     its subcommand;
+#   python3 <this plugin>/hooks/project_fact.py --tracker, or --architecture-doc;
+#   gh issue view <n>, bare or with --comments.
+if [ "$IS_ARCH" = true ]; then
+  arch_deny() {
+    echo "DENIED by the architecture reviewer's shell guard: $1" >&2
+    echo "Command: $CMD" >&2
+    echo "Allowed, each as the whole command: git diff, git show or git log with plain revisions and paths (no flag but --); python3 $FACT_SELF --tracker, or --architecture-doc; gh issue view <n>, bare or with --comments. Read files with Read, Glob and Grep." >&2
+    exit 2
+  }
+  A="${CMD#"${CMD%%[! ]*}"}"
+  A="${A%"${A##*[! ]}"}"
+  for fact in "$FACT_SELF" "$FACT_ROOT"; do
+    [ -n "$fact" ] || continue
+    case "$A" in
+      "python3 $fact --tracker"|"python3 $fact --architecture-doc") exit 0 ;;
+    esac
+  done
+  [[ "$A" =~ ^gh\ issue\ view\ [0-9]+(\ --comments)?$ ]] && exit 0
+  case "$A" in
+    *[!A-Za-z0-9._/@:^~\ -]*) arch_deny "the command holds a character outside plain revisions and paths (a quote, variable, glob, pipe, chain, redirect, tab or new line)" ;;
+  esac
+  read -r -a AW <<< "$A"
+  [ "${AW[0]:-}" = git ] || arch_deny "'${AW[0]:-}' is not one of its commands"
+  case "${AW[1]:-}" in
+    diff|show|log) ;;
+    *) arch_deny "'git ${AW[1]:-}' is not allowed; only git diff, git show and git log, with nothing between git and the subcommand" ;;
+  esac
+  for w in "${AW[@]:2}"; do
+    case "$w" in
+      --) continue ;;
+      -*) arch_deny "'$w' is a flag; only plain revisions and paths, and a lone --, follow git ${AW[1]}" ;;
+      /*|'~'*) arch_deny "'$w' is a path out of the checkout" ;;
+    esac
+    [[ "$w" =~ (^|[/:])\.\.(/|$) ]] && arch_deny "'$w' climbs out of the checkout with .."
+    printf '%s' "$w" | grep -Eiq "$CRED_RE" && arch_deny "'$w' names a credential file or directory"
+  done
+  exit 0
+fi
 
 # --- 1. what cannot be checked is not allowed ---
 NL='
@@ -102,9 +150,6 @@ S="${S//||/;}"
 S="${S//|/;}"
 S="${S//&/;}"
 
-# --- the credential check, applied to every word ---
-CRED_RE='(^|[/:=])\.env|\.pgpass|\.netrc|(^|/)\.aws(/|$)|(^|/)\.ssh(/|$)|\.gnupg|\.docker/config|\.kube/config|\.npmrc|\.pypirc|\.git-credentials|id_(rsa|dsa|ecdsa|ed25519)|\.(pem|key|p12|pfx)$|(^|/)credentials(\.json)?$|gh/hosts\.yml|\.config/gcloud|\.azure(/|$)|(^|/)secrets?\.(ya?ml|json|env)$'
-
 strip_quotes() { printf '%s' "$1" | tr -d "'\"\\\\"; }
 
 # Allow an absolute path only inside the project or a temp dir.
@@ -113,7 +158,6 @@ check_abs() {
   case "$p" in
     /tmp|/tmp/*|/private/tmp|/private/tmp/*|/dev/null) return 0 ;;
   esac
-  [ "$IS_ARCH" = true ] && is_fact "$p" && return 0
   [ -n "$CWD" ] || deny "'$p' is an absolute path and the payload carried no working directory to check it against"
   case "$p" in
     "$CWD"|"$CWD"/*) return 0 ;;
@@ -156,7 +200,6 @@ check_redirect_target() {
     *..*) deny "path traversal ('..') in a redirect target is not allowed" ;;
     /dev/null) return 0 ;;
   esac
-  [ "$IS_ARCH" = true ] && deny "a redirect into '$t'; the architecture reviewer writes only its findings file, with the Write tool, so its shell redirects only into /dev/null"
   case "$t" in
     /tmp/*|/private/tmp/*) ;;
     *) deny "a redirect into '$t'; the diagnoser writes nothing to the tree, only to /tmp or /dev/null" ;;
@@ -211,7 +254,6 @@ check_git() {
   esac
   i=$((H + 2))
   while [ "$i" -lt "${#W[@]}" ]; do
-    [ "${W[$i]}" = "--" ] && break
     if flag_hits "${W[$i]}" "O" "output exec upload-pack ext-diff no-index open-files-in-pager"; then
       deny "'${W[$i]}' can write or execute, in this spelling or another; the git allowance is read-only"
     fi
@@ -313,7 +355,7 @@ check_reader() {
   while [ "$i" -lt "${#W[@]}" ]; do
     t="${W[$i]}"
     case "$base" in
-      sort) flag_hits "$t" "o" "output" && deny "'sort $t' writes a file, in this spelling or another" ;;
+      sort) flag_hits "$t" "o" "output compress-program" && deny "'sort $t' writes a file, in this spelling or another" ;;
       tree) flag_hits "$t" "o" "" && deny "'tree $t' writes a file" ;;
       file) flag_hits "$t" "C" "compile" && deny "'file $t' writes a compiled magic file" ;;
       date) flag_hits "$t" "s" "set" && deny "'date $t' sets the clock" ;;
@@ -402,16 +444,7 @@ check_segment() {
     git) check_git ;;
     curl) check_curl ;;
     gh) check_gh ;;
-    python|python3)
-      if [ "$IS_ARCH" = true ]; then
-        is_fact "${W[$((H + 1))]:-}" && [ "${#W[@]}" -eq $((H + 3)) ] \
-          && case "${W[$((H + 2))]}" in --tracker|--architecture-doc) true ;; *) false ;; esac \
-          || deny "the architecture reviewer runs python only as '$FACT_SELF --tracker' or '--architecture-doc'"
-      else
-        check_runner "$base"
-      fi ;;
-    mix|npm|pnpm|yarn|node|pytest|cargo|go|bundle|rspec|swift|xcodebuild|dotnet|gradle|gradlew|mvn|make)
-      [ "$IS_ARCH" = true ] && deny "'$base' runs tests, which write build output; the architecture reviewer runs no tests"
+    mix|npm|pnpm|yarn|node|pytest|python|python3|cargo|go|bundle|rspec|swift|xcodebuild|dotnet|gradle|gradlew|mvn|make)
       check_runner "$base" ;;
     ls|cat|head|tail|wc|file|stat|tree|du|grep|egrep|fgrep|rg|find|diff|cmp|sort|uniq|cut|tr|nl|basename|dirname|realpath|readlink|which|type|pwd|echo|printf|date|uname|cd)
       check_reader "$base" ;;

@@ -50,11 +50,11 @@ CMD="$(printf '%s' "$INPUT" | jq -r '.tool_input.command // empty')"
 [ -n "$CMD" ] || exit 0
 
 # The architecture reviewer reads its issue with gh where no GitHub connector is loaded (MAST-34 scenario 5).
-# Only the whole command `gh issue view <n>`, with --comments, -c or --json and a field list, passes: gh reads
+# Only the whole command `gh issue view <n>`, bare or with --comments (Robert, November 15), passes: gh reads
 # GH_REPO, GH_HOST and the proxy settings from its environment as -R does from its flags, so nothing may be set
 # before it, wrapped around it or chained to it. Every other gh call is refused below.
 if [ "$agent" = "architecture-reviewer" ]; then
-  GH_VIEW_RE='^[[:space:]]*gh issue view [0-9]+( (--comments|-c|--json [A-Za-z]+(,[A-Za-z]+)*))*[[:space:]]*$'
+  GH_VIEW_RE='^[[:space:]]*gh issue view [0-9]+( --comments)?[[:space:]]*$'
   [[ "$CMD" =~ $GH_VIEW_RE ]] && exit 0
 fi
 
@@ -155,10 +155,12 @@ judge_segment() {
         push|fetch|pull|clone|remote|ls-remote) deny "git $sub" ;;
       esac
       # git grep -O runs a program on each match, and git takes it bundled (-iO), with the program joined (-Ocurl) or shortened (--open, --op).
+      # A lone -- does not end the scan: given to a flag that takes a value (-e --, -f --), git reads it as that
+      # value and keeps reading flags after it.
       for ((k = j + 1; k < ${#clean[@]}; k++)); do
         w="${clean[$k]}"
         case "$w" in
-          --) break ;;
+          --) ;;
           --*)
             name="${w#--}"; name="${name%%=*}"
             if [ -n "$name" ]; then

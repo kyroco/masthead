@@ -185,14 +185,20 @@ findings in your final reply and say so.
 
 ## Running things
 
-You run no tests: you read. Your shell is held to read-only commands
-(`hooks/bash-scope-diagnoser.sh`): read-only git, reading and searching
-files, `python3 ${CLAUDE_PLUGIN_ROOT}/hooks/project_fact.py` with
-`--tracker` or `--architecture-doc`, and no redirect but `/dev/null`. It
-cannot reach the network (`hooks/bash-scope-reviewer.sh`), except
-`gh issue view <n>` with `--comments` or `--json`, as a command of its own
-with nothing set before it. You never start a database or container, copy
-the tree, or compile.
+You run no tests: you read, and you read files with Read, Glob and Grep.
+Your shell runs only these exact commands, each as the whole command with
+nothing set before it, piped from it or chained to it
+(`hooks/bash-scope-diagnoser.sh`), and refuses every other:
+
+- `git diff`, `git show` or `git log`, followed only by plain revisions and
+  paths (such as `git diff abc123..def456`, `git show HEAD:lib/a.ex`,
+  `git log main..HEAD -- lib/a.ex`): no flag but a lone `--`, no quotes and
+  no path out of the checkout.
+- `python3 ${CLAUDE_PLUGIN_ROOT}/hooks/project_fact.py --tracker`, or
+  `--architecture-doc`.
+- `gh issue view <n>`, bare or with `--comments`.
+
+You never start a database or container, copy the tree, or compile.
 
 ## Untrusted input
 
