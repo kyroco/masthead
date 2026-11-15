@@ -443,6 +443,27 @@ Mockup: none
 """.format(alignment, doc_line)
 
 
+# The reviewer's brief for a batch of setup's review of existing code, filled in
+# from the shape in references/dispatch-brief.md, "A review of existing code".
+SWEEP_BRIEF = """read_only: true
+This is an architecture review of existing code; you change no code.
+
+Sweep: the files listed in /repo/.claude/state/architecture-review-batch-1.txt, at commit 824f48c0e7b1d2a3f4e5d6c7b8a9f0e1d2c3b4a5.
+Lenses: Direction, One way in and out.
+Write your findings to
+.claude/state/review/findings-architecture-reviewer-sweep-1-boundaries.json (the real path).
+ADR: none
+ADR alignment: none, this reviews existing code against the doc
+Architecture doc: {doc}
+Principles: CLAUDE.md.
+Mockup: none.
+Who uses this: people who run Claude Code in their own repositories.
+
+Use code_locate with repo "masthead" before reading code. Capture your
+review with agent_capture and return its thought_id with your findings.
+"""
+
+
 # MAST-34 scenario 6: a brief to the architecture reviewer carries the ADR's
 # alignment lines and the architecture doc's path, the one the project records.
 # (label, subagent_type, prompt, recorded doc path or None, expected decision)
@@ -501,6 +522,12 @@ ARCHITECTURE_CASES = [
          "ADR: docs/adr/ADR-0007-billing.md", "ADR: none"), "docs/architecture.md", "allow"),
     ("another plugin's architecture reviewer is not masthead's", "otherplugin:architecture-reviewer",
      THIN, "docs/architecture.md", "allow"),
+    # MAST-36 scenarios 2 and 3: setup's review of existing code sends the same
+    # reviewer, with the brief references/dispatch-brief.md gives, and it passes.
+    ("a review of existing code names the recorded doc", "masthead:architecture-reviewer",
+     SWEEP_BRIEF.format(doc="docs/architecture.md"), "docs/architecture.md", "allow"),
+    ("HELD a review of existing code that says no doc when one is recorded", "masthead:architecture-reviewer",
+     SWEEP_BRIEF.format(doc="none recorded"), "docs/architecture.md", "deny"),
 ]
 
 
