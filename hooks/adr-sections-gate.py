@@ -156,7 +156,7 @@ def main():
         ti = data.get("tool_input") or {}
         if not isinstance(ti, dict):
             return
-        reasons = []
+        reasons, pr_reasons = [], []
         cwd = data.get("cwd") or os.getcwd()
 
         # Opening a pull request: an ADR it carries or names may not diverge from an unchanged doc.
@@ -166,12 +166,10 @@ def main():
             if reasons:
                 refuse(reasons, PR_INTRO, PR_OUTRO)
             return
+        # The same command may also write an ADR through the shell, so the check below still runs.
         if tool == "Bash" and PR_CREATE.search(ti.get("command") or ""):
             cmd = ti.get("command") or ""
-            reasons = pr_divergences(cwd, pr_base(cmd), cmd + "\n" + body_file(cmd, cwd), where)
-            if reasons:
-                refuse(reasons, PR_INTRO, PR_OUTRO)
-            return
+            pr_reasons = pr_divergences(cwd, pr_base(cmd), cmd + "\n" + body_file(cmd, cwd), where)
 
         if tool == "Write":
             path = ti.get("file_path") or ""
@@ -189,7 +187,7 @@ def main():
             # Refuse a new ADR created through the shell, since its sections cannot be read there.
             cmd = (ti.get("command") or "").replace("~/", os.path.expanduser("~") + "/")
             if where not in cmd:
-                return
+                cmd = ""
             # A target is one shell word: quoted, or unquoted with backslash-escaped spaces, so a spaced name stays whole.
             word = r"(?:\"[^\"]*\"|'[^']*'|(?:\\.|[^\s;|&<>'\"])+)"
             for m in re.finditer(r"(?:>>?\s*|\btee\s+(?:-a\s+)?|\b(?:cp|mv)\s+" + word + r"\s+)(" + word + r")",
@@ -210,7 +208,9 @@ def main():
                     break
 
         if reasons:
-            refuse(reasons)
+            refuse(reasons + pr_reasons, outro=SHAPE_OUTRO + ("\n\n" + PR_OUTRO if pr_reasons else ""))
+        elif pr_reasons:
+            refuse(pr_reasons, PR_INTRO, PR_OUTRO)
     except Exception:
         pass
     sys.exit(0)
