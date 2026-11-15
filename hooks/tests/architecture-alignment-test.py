@@ -379,6 +379,17 @@ check("2: a build the doc does not name is refused, listing the doc's builds",
 why = write_adr(r, adr("## Architecture Alignment\n\n" + ENTRY + "Builds: Hosted (core and billing), Self-hosted\n"))
 check("2: builds the doc names, with words after them, are accepted", why == "", why)
 
+# ------------------------------------------------------------------ round 1: a doc whose parts are top-level headings
+FLAT_DOC = "\n\n".join("# %s\n\nThe core never names an extension." % lens for lens in (
+    "Direction", "One way in and out", "Call shape", "Seams", "What each build carries",
+    "Leftovers", "Tests and checks"))
+r = make_repo("r1-flat-doc", base_doc=FLAT_DOC)
+why = write_adr(r, adr("## Architecture Alignment\n\n- Direction: conforms, the core names no extension.\n\n"
+                       "Builds: Hosted\n"))
+check("1: a doc whose parts are top-level headings has parts an ADR can name", why == "", why)
+why = write_adr(r, adr("## Architecture Alignment\n\nWe follow it.\n\nBuilds: Hosted\n"))
+check("1: and the refusal lists them", "`Direction`" in why and "no headings yet" not in why, why)
+
 shutil.rmtree(T, ignore_errors=True)
 print()
 print("%d passed, %d failed" % (passed, failed))
