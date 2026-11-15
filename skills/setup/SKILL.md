@@ -163,8 +163,10 @@ than guess. Show the whole draft and ask "Shall I write this to
 
 **Either way, check it before showing it or recording it.** Run
 `python3 ${CLAUDE_PLUGIN_ROOT}/skills/setup/architecture-doc.py check <doc> <principles file>`
-(leave out the principles file when the project has none). It passes only when
-the doc:
+(leave out the principles file when the project has none). For a draft you
+made from the template, run it as `check --draft`, which also fails a draft
+that leaves any of the template's four sections empty or holds a placeholder
+anywhere. It passes only when the doc:
 
 - states each of the seven lenses (Direction, One way in and out, Call shape,
   Seams, What each build carries, Leftovers, Tests and checks) as a rule for

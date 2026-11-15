@@ -1100,6 +1100,7 @@ says  skills/setup/SKILL.md 'Write nothing to it, and record nothing, before the
 # Scenarios 3 and 6: the check runs on every doc before it is shown or recorded.
 says  skills/setup/SKILL.md 'Either way, check it before showing it or recording it.'
 says  skills/setup/SKILL.md 'architecture-doc.py check <doc> <principles file>'
+says  skills/setup/SKILL.md 'For a draft you made from the template, run it as `check --draft`'
 says  skills/setup/SKILL.md 'cites the project'"'"'s principles by number, such as P9, and copies none of their text'
 # Scenario 4: a repository set up before is offered the doc alone.
 says  skills/setup/SKILL.md 'before and no `ARCHITECTURE_DOC` is recorded, offer the architecture doc on its own'
