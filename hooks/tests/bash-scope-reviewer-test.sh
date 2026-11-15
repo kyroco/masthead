@@ -480,7 +480,7 @@ for reviewer in verifier security-reviewer; do
   shape_allow "$reviewer" 'bash hooks/tests/json-field-test.sh 2>&1 | tail -20'
   shape_allow "$reviewer" 'python3 hooks/test-brief-gates.py'
   shape_allow "$reviewer" 'python3 -m pytest -q hooks'
-  shape_allow "$reviewer" "python3 -m unittest discover -s hooks -p 'test-*.py'"
+  shape_deny "$reviewer" "python3 -m unittest discover -s hooks -p 'test-*.py'"
   shape_allow "$reviewer" 'mix test test/x_test.exs:42'
   shape_allow "$reviewer" 'MIX_ENV=test mix test --only focus test/x_test.exs'
   shape_allow "$reviewer" 'cargo test --offline -p mycrate'
@@ -519,9 +519,9 @@ shape_deny security-reviewer 'cat =curl'
 shape_deny verifier 'python3 -m unittest antigravity'
 shape_deny verifier 'python3 -m unittest this'
 shape_deny security-reviewer 'GOPROXY=off go test net/http'
-shape_allow verifier 'python3 -m unittest tests.test_x'
-shape_allow verifier 'python3 -m unittest tests/test_x.py'
-shape_allow verifier 'python3 -m unittest discover -s tests'
+shape_deny verifier 'python3 -m unittest tests.test_x'
+shape_deny verifier 'python3 -m unittest tests/test_x.py'
+shape_deny verifier 'python3 -m unittest discover -s tests'
 # SR1: uniq writes its second file name, and a lone - is a file name (standard input).
 shape_deny security-reviewer 'echo planted | uniq - hooks/out'
 shape_deny verifier 'uniq -c - hooks/out'
@@ -609,8 +609,23 @@ shape_allow security-reviewer 'semgrep --metrics=off --disable-version-check --e
 # Python's own package of that name, not the checkout's.
 shape_deny verifier 'python3 -m unittest test.test_urllib2net'
 shape_deny verifier 'python3 -m unittest test/test_urllib2net.py'
-shape_allow verifier 'python3 -m unittest pkg.test_y'
-shape_allow verifier 'python3 -m unittest pkg/test_y.py'
+shape_deny verifier 'python3 -m unittest pkg.test_y'
+shape_deny verifier 'python3 -m unittest pkg/test_y.py'
+
+# --- MAST-43 re-verify round 2: python3 -m unittest is dropped -----------------
+# unittest turns every name, path and start folder into an import, and each
+# round found one more spelling a text check read differently from Python's
+# import: discover -s with a standard library name (F1), and a name whose
+# letter case the disk ignores (F2). Robert, November 15: drop it. A unittest
+# suite still runs through pytest or as python3 <test file>.
+: > "$SHAPES_TREE/Antigravity.py"
+shape_deny verifier 'python3 -m unittest discover -s antigravity'
+shape_deny security-reviewer 'python3 -m unittest discover -s this'
+shape_deny verifier 'python3 -m unittest antigravity'
+shape_deny verifier 'python3 -m unittest antigravity.py'
+shape_deny verifier 'python3 -m unittest'
+shape_allow verifier 'python3 -m pytest pkg/test_y.py'
+shape_allow verifier 'python3 pkg/test_y.py'
 
 rm -rf "$SHAPES_TREE"
 
