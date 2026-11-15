@@ -418,9 +418,19 @@ def earlier_names(d, rel):
 
 
 def check(path, text):
-    """A new record must carry the whole shape; one HEAD already carries must keep the sections it had."""
+    """A new record must carry the whole shape; one HEAD already carries must keep the sections it had.
+
+    A record HEAD carries is not asked for the alignment section, but where it has one, the
+    section it is left with is checked as a new record's is.
+    """
     before = committed(path)
-    return missing(text) if before is None else removed(before, text)
+    return missing(text) if before is None else removed(before, text) + kept_alignment_gaps(text)
+
+
+def kept_alignment_gaps(text):
+    """The reasons the alignment section a record is left with falls short; none without a doc or a section."""
+    doc = architecture_doc()
+    return alignment_gaps(text, doc) if doc else []
 
 
 def main(argv):

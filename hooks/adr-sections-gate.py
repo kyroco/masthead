@@ -203,11 +203,14 @@ def main():
             after = edited(path, old, new, bool(ti.get("replace_all")))
             # Where an architecture doc is recorded, a new record is checked whole, as the Edit
             # would leave it, so an empty Write followed by Edits is held like a Write. Without a
-            # doc the gate stays as it was (MAST-31 scenario 5). A committed one keeps its sections.
+            # doc the gate stays as it was (MAST-31 scenario 5). A committed one keeps its sections,
+            # and the alignment section it is left with, where it has one, is checked whole.
             if after is not None and adr_shape.architecture_doc() and adr_shape.committed(path) is None:
                 reasons = adr_shape.missing(after)
             else:
                 reasons = adr_shape.removed(old, new)
+                if after is not None:
+                    reasons += adr_shape.kept_alignment_gaps(after)
 
         elif tool == "Bash":
             # Refuse a new ADR created through the shell, since its sections cannot be read there.
