@@ -329,6 +329,43 @@ git(r, "switch", "-q", "-c", "feature")
 commit(r, {"lib/orders.ex": "x\n"}, "More reports")
 check("5: with no doc recorded, opening a pull request is not held", pr(r, body="Builds ADR-0007.") == "")
 
+# ------------------------------------------------------------------ round 1: how an entry and its verdict are read
+r = make_repo("r1-entries")
+
+
+def section(body):
+    return adr("## Architecture Alignment\n\n%s\n\nBuilds: Hosted\n" % body)
+
+
+why = write_adr(r, section("- `Core and extensions`: diverges from the doc."))
+check("2: a divergence whose only words name the doc is refused for no why",
+      "diverges from `Core and extensions` but not why" in why, why)
+why = write_adr(r, section("- Diverges from `One way in and out for each body of data`."))
+check("2: a divergence whose only words name the part is refused for no why",
+      "but not why" in why, why)
+why = write_adr(r, section("- `Core and extensions`: does not conform."))
+check("2: 'does not conform' is a divergence and needs its why",
+      "diverges from `Core and extensions` but not why" in why, why)
+why = write_adr(r, section("- `Core and extensions`: billing plugs in.\n\nConformance tests run nightly."))
+check("2: prose after the entry does not give the entry a verdict",
+      "`Core and extensions` with no verdict" in why, why)
+
+CONFORMS_NOT_DIVERGES = ("- `Core and extensions`: conforms; it does not diverge, billing plugs in through the hook.\n\n"
+                         "Nothing else here diverges from the doc.")
+why = write_adr(r, section(CONFORMS_NOT_DIVERGES))
+check("3: 'conforms; it does not diverge' and later prose are read as conforming", why == "", why)
+why = write_adr(r, adr("## Architecture Alignment\n\nBuilds:\n\n- Hosted\n\n"
+                       "- `Core and extensions`: conforms, billing plugs in through the hook.\n"))
+check("3: a part entry after a bulleted Builds list is read as an entry, not a build", why == "", why)
+why = write_adr(r, section("- **Direction**: conforms, the core never names billing.\n  - Seams stay as they are."))
+check("3: a sub-bullet naming another part does not ask that part for a verdict", why == "", why)
+
+r = make_repo("r1-pr-conforms")
+git(r, "switch", "-q", "-c", "feature")
+commit(r, {"docs/adr/ADR-0007-take-orders.md": section(CONFORMS_NOT_DIVERGES)}, "Write ADR-0007")
+why = pr(r)
+check("6: a pull request whose ADR says it does not diverge is allowed", why == "", why)
+
 shutil.rmtree(T, ignore_errors=True)
 print()
 print("%d passed, %d failed" % (passed, failed))
