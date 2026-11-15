@@ -58,9 +58,17 @@ def main():
             cmd = (ti.get("command") or "").replace("~/", os.path.expanduser("~") + "/")
             if where not in cmd:
                 return
-            for m in re.finditer(r"(?:>>?\s*|\btee\s+(?:-a\s+)?|\bcp\s+\S+\s+|\bmv\s+\S+\s+)"
-                                 r"(\S*" + re.escape(where) + r"(?:[^\s/;|&'\"]+/)*[^\s/;|&'\"]+\.md)", cmd):
+            # A target is one shell word: quoted, or unquoted with backslash-escaped spaces, so a spaced name stays whole.
+            word = r"(?:\"[^\"]*\"|'[^']*'|(?:\\.|[^\s;|&<>'\"])+)"
+            for m in re.finditer(r"(?:>>?\s*|\btee\s+(?:-a\s+)?|\b(?:cp|mv)\s+" + word + r"\s+)(" + word + r")",
+                                 cmd):
                 target = m.group(1)
+                if target[:1] in ("'", '"'):
+                    target = target[1:-1]
+                else:
+                    target = re.sub(r"\\(.)", r"\1", target)
+                if where not in target or not target.endswith(".md"):
+                    continue
                 if adr_shape.is_adr(target, where) and adr_shape.committed(target) is None:
                     reasons.append(
                         "This creates a new ADR (%s) through the shell, where its "

@@ -159,9 +159,9 @@ check("the write gate asks a spaced name for every section",
 os.makedirs(os.path.dirname(spaced), exist_ok=True)
 with open(spaced, "w") as f:
     f.write(TITLE_ONLY)
-code, err = structure_gate(repo)
-check("the stop gate holds a spaced name too", code, 2)
-check("and asks it for the same sections", absent(err), names)
+spaced_code, spaced_err = structure_gate(repo)
+check("the stop gate holds a spaced name too", spaced_code, 2)
+check("and asks it for the same sections", absent(spaced_err), names)
 for command in ('echo x > "docs/adr/ADR-0009 new one.md"',
                 "echo x > 'docs/adr/ADR-0009 new one.md'",
                 "echo x > docs/adr/ADR-0009\\ new\\ one.md",

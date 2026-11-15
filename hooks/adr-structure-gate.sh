@@ -39,7 +39,9 @@ CHANGED=""
 if TOP="$(git rev-parse --show-toplevel 2>/dev/null)"; then
   cd "$TOP" || exit 0
   # List changed files from git status, including untracked files one by one.
-  CHANGED="$(git status --porcelain -u 2>/dev/null | awk '{print $NF}' || true)"
+  # -z prints each path whole and unquoted, so a name with a space stays whole. A rename's
+  # old name follows as a bare entry; cut mangles it, and the file check below skips it.
+  CHANGED="$(git status --porcelain -z -u 2>/dev/null | tr '\0' '\n' | cut -c4- || true)"
 else
   echo "WARN (adr-structure-gate): not a git repo - cannot delta-scope; skipping cleanly." >&2
   exit 0
@@ -51,7 +53,7 @@ case "$ADR_DIR" in
       ADR_TOP="$(git -C "$ADR_DIR" rev-parse --show-toplevel 2>/dev/null || true)"
       if [ -n "$ADR_TOP" ]; then
         CHANGED="$CHANGED
-$(git -C "$ADR_TOP" status --porcelain -u 2>/dev/null | awk -v top="$ADR_TOP" '{print top "/" $NF}' || true)"
+$(git -C "$ADR_TOP" status --porcelain -z -u 2>/dev/null | tr '\0' '\n' | cut -c4- | awk -v top="$ADR_TOP" '{print top "/" $0}' || true)"
       fi
     fi
     ;;
