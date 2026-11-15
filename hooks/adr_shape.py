@@ -312,7 +312,8 @@ def alignment_gaps(text, doc):
             reasons.append("`## %s` names `%s` with no verdict. Say it conforms, or that it "
                            "diverges and why." % (ALIGNMENT, part))
             continue
-        if said_verdict == "diverges" and len(reason_words(rest.replace(part, " "))) < MIN_WHY_WORDS:
+        why = re.sub(re.escape(part), " ", rest, flags=re.IGNORECASE)
+        if said_verdict == "diverges" and len(reason_words(why)) < MIN_WHY_WORDS:
             reasons.append("`## %s` says it diverges from `%s` but not why. Say what this "
                            "decision does instead and why." % (ALIGNMENT, part))
     reasons += build_gaps(builds if found else [], known)
