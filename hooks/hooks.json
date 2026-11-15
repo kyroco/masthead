@@ -40,7 +40,7 @@
             "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/run.sh\" engram-protocol.sh gate-edit",
             "timeout": 10,
-            "statusMessage": "Checking Engram lookup",
+            "statusMessage": "Checking the Korium search came first",
             "onFailure": "block"
           }
         ]

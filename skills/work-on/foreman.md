@@ -80,7 +80,7 @@ a question that could have been asked earlier.
 ## Warm up the build
 
 Six workers that each fetch and compile the repo from nothing, all at once,
-fill the disk and the processors: on Kyroco, November 12, 2026, six workers
+fill the disk and the processors: in one repository on November 12, 2026, six workers
 wrote about 18 GB of dependencies between them and drove the load to 22 on
 18 cores. So when the repo names a warm-up, you build once and each worker
 clones your build.

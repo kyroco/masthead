@@ -431,7 +431,7 @@ print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permiss
     fi
     [ "$a" = "$c" ] && exit 0
     case "$c" in "$a"-*|"$a"_*) exit 0 ;; esac
-    deny_tool "This capture is filed under '$claimed' but the agent making it is '$acting'. ADR-0120: source_agent is the one field that answers who decided this, and filing under another name falsifies exactly that. File it as source_agent '$a', your agent name without any plugin prefix. If you are genuinely re-filing for an agent whose own capture failed, keep their source_agent and set captured_by to your name, which this gate allows. MASTHEAD_CAPTURE_GATE=off in the operator's environment turns it off."
+    deny_tool "This capture is filed under '$claimed' but the agent making it is '$acting'. source_agent is the one field that answers who decided this, and filing under another name falsifies exactly that. File it as source_agent '$a', your agent name without any plugin prefix. If you are genuinely re-filing for an agent whose own capture failed, keep their source_agent and set captured_by to your name, which this gate allows. MASTHEAD_CAPTURE_GATE=off in the operator's environment turns it off."
     ;;
 
   # gate-verify-brief: refuse a brief to verifier or security-reviewer that carries no claims list, and a third re-verify round.
