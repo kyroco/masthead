@@ -1385,6 +1385,14 @@ never skills/work-on/worker.md 'A principle break is never an extra'
 says  skills/work-on/worker.md 'is scored as "Decide where it goes" in `agents/adjudicator.md` says'
 # Round 1, arch-3 (Robert: fix): how the trial is turned off is written once, in dispatch-brief.md.
 never references/session-cliffs.md 'until the person sets `ARCHITECTURE_TRIAL` to `off`'
-says  references/session-cliffs.md 'the trial period is on, as the brief'"'"'s `Architecture trial:` line says (`references/dispatch-brief.md`)'
+# Re-verify round 1, fix C4: the worker relays a trial section that lists findings whatever its brief's line said,
+# since the adjudicator reads a missing or misspelled line as on.
+says  references/session-cliffs.md 'whenever that section lists a finding, whatever your brief'"'"'s `Architecture trial:` line said, since the adjudicator reads a missing or misspelled line as on (`references/dispatch-brief.md` has the switch)'
+never references/session-cliffs.md 'the trial period is on, as the brief'"'"'s `Architecture trial:` line says'
+# Re-verify round 1, fix C1: the trial-off half and step 4 are pinned.
+says  references/session-cliffs.md 'once it is off, the section reads "None, the trial is off" and the adjudicator'"'"'s Fix list holds them like any other finding, fixed as step 4 says'
+says  references/session-cliffs.md 'Fix each finding on the adjudicator'"'"'s fix list in this PR, test first'
+# Re-verify round 1, fix C3: the adjudicator follows a build finding's path before keeping it.
+says  agents/adjudicator.md 'One that says a build would behave wrongly holds when the architecture doc names that build and you follow the path the finding gives to the wrong result in that build'
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
