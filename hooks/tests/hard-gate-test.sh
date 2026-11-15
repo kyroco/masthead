@@ -1119,6 +1119,29 @@ run_gate "$d"
 ok "$STATUS" "0" "the old setting does not stop a push"
 ok "$(printf '%s' "$ERR" | grep -ci "abil""ities")" "0" "the gate says nothing about it"
 
+echo "25. a push check the branch does not carry refuses the push, and says how to get it there (MAST-37)"
+# The main checkout's settings name the check, but the script is untracked there, so a worktree's
+# branch has no copy. The rung used to return early when the file was missing, so the push went
+# through untested.
+d="$(newrepo pushcheck-main)"
+echo "# notes" > "$d/README.md"
+( cd "$d" && git add README.md && git commit -qm init ) >/dev/null 2>&1
+mkdir -p "$d/.claude"
+echo '{"env": {"PROJECT_PUSH_CHECK": ".claude/push-check.sh"}}' > "$d/.claude/settings.json"
+printf '#!/usr/bin/env bash\nexit 0\n' > "$d/.claude/push-check.sh"
+( cd "$d" && git worktree add -q "$TMP/pushcheck-side" -b side HEAD ) >/dev/null 2>&1
+echo "# more" >> "$TMP/pushcheck-side/README.md"
+run_gate "$TMP/pushcheck-side"
+ok "$STATUS" "2" "a worktree whose branch lacks the push check script is refused"
+contains "$ERR" ".claude/push-check.sh" "the refusal names the missing script"
+contains "$ERR" "not in this checkout" "it says the script is not in this checkout"
+contains "$ERR" "git add" "it says to commit the script so every branch carries it"
+run_gate "$d"
+ok "$STATUS" "0" "the checkout that has the script, with a passing check, still pushes"
+rm -f "$d/.claude/push-check.sh"
+run_gate "$d"
+ok "$STATUS" "2" "a named push check missing from the main checkout is refused too"
+
 echo ""
 echo "passed $pass, failed $fail"
 [ "$fail" -eq 0 ] || exit 1
