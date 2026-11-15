@@ -1085,5 +1085,31 @@ says  agents/security-reviewer.md "A claim that a test covers something is false
 says  agents/security-reviewer.md "Never write that file with a shell command. If the write is refused, put the findings in your final reply and say so"
 says  agents/security-reviewer.md "Quote it as a false claim"
 says  agents/security-reviewer.md "Your final message is the report: each claim with its answer, false ones first"
+# MAST-37: with no gh, the foreman stops and says so for each step that has no connector call, naming that step.
+says  skills/work-on/foreman.md "With no \`gh\` (\`command -v gh\` finds nothing)"
+says  skills/work-on/foreman.md "\"\`gh\` is needed to queue PR #<pr>\""
+says  skills/work-on/foreman.md "\"\`gh\` is needed to list the issues that issue #<n> unblocks\""
+says  skills/work-on/foreman.md "Never skip one of these steps or report it done"
+never skills/work-on/foreman.md "\`gh\` is needed to queue PR #<n>"
+says  skills/github-issues/SKILL.md "stop and say \`gh\` is needed; neither is skipped"
+
+# MAST-37: on Linear with Korium off, the old text goes to a file the milestone check reads and restores from.
+says  skills/analyze-issues/issue-check.md "the state dir (\`.claude/state\` unless setup named another)"
+says  skills/analyze-issues/milestone-check.md "the state dir (\`.claude/state\` unless setup named another)"
+says  skills/analyze-issues/issue-check.md "With Korium off, write that old text to \`<state dir>/old-text/<key>.md\` before the edit"
+says  skills/analyze-issues/milestone-check.md "With Korium off, read it from \`<state dir>/old-text/<key>.md\` instead"
+says  skills/analyze-issues/milestone-check.md "A line of the user's that the old text holds and the issue lost is restored with a \`patch\`"
+says  skills/analyze-issues/milestone-check.md "cannot be checked or restored, and name it; never call it clean"
+says  skills/analyze-issues/SKILL.md "the check says it cannot restore a dropped line, names the issue, and does not pass it"
+
+# MAST-37: one meaning of Korium off (the install option), handed to agents in the brief.
+says  skills/work-on/SKILL.md "Korium is off when the \`korium\` install option is off"
+says  skills/work-on/SKILL.md "\"Korium is off, so no search.\""
+says  skills/work-on/SKILL.md "put the line \"Korium is off.\" in every brief you send"
+never skills/work-on/SKILL.md "or \`ToolSearch\` finds no Korium tool"
+says  references/agent-preamble.md "When your brief carries the line \"Korium is off.\""
+says  references/agent-preamble.md "\"Korium is off, so nothing was captured\""
+never references/agent-preamble.md "\`ToolSearch\` finds no Korium tool"
+
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
