@@ -165,6 +165,7 @@ CARGO_TEST = ("q", "p", {"offline", "lib", "bins", "tests", "doc", "all-targets"
 GO_TEST = ("", "", {"v", "run", "count", "race", "short", "timeout", "cover", "failfast",
                     "skip", "bench", "benchtime", "cpu", "parallel", "list", "json"})
 # No -c: semgrep reads a c anywhere in a bundle such as -qc as --config, so the rules file is named only by --config.
+SEMGREP_VALUE = {"--config", "--exclude", "--include", "--severity", "--max-target-bytes", "--timeout", "--jobs"}
 SEMGREP = ("q", "", {"metrics", "disable-version-check", "config", "json", "quiet", "error",
                       "no-git-ignore", "sarif", "exclude", "include", "severity", "verbose",
                       "text", "max-target-bytes", "timeout", "jobs"})
@@ -173,6 +174,8 @@ GO_VALUE = {"run", "count", "timeout", "skip", "bench", "benchtime", "cpu", "par
 SWIFT_TEST = ("qv", "c", {"skip-update", "disable-automatic-resolution", "force-resolved-versions",
                           "only-use-versions-from-resolved-file", "filter", "skip", "parallel",
                           "num-workers", "configuration", "quiet", "verbose"})
+SWIFT_VALUE = {"--filter", "--skip", "--num-workers", "--configuration", "-c"}
+CARGO_VALUE = {"-p", "--package", "--test", "--features", "--exclude", "--test-threads"}
 SWIFT_OFFLINE = ("--disable-automatic-resolution", "--force-resolved-versions",
                  "--only-use-versions-from-resolved-file")
 # xcodebuild's flags are single-dash words: those that take the next word as their value, and those that take none.
@@ -260,8 +263,10 @@ def tokenize(cmd):
             refuse(f"'{c}' is rewritten by the shell after this check reads the command "
                    "(a variable, substitution, backslash, subshell, brace, input redirect or glob); "
                    "write the literal words, quoting a pattern")
-        elif c in "#~!=" and not in_word:
-            # zsh, the Bash tool's shell on macOS, turns =name into the full path of a program on PATH.
+        elif (c in "#!" and not in_word) or (c in "~=" and word == ""):
+            # zsh, the Bash tool's shell on macOS, turns =name into the full path of a program on PATH and
+            # ~ into the home folder, even after an empty quote (''=name), so it is the first character
+            # of the word's text that counts, not the first character typed.
             refuse(f"a word starting with '{c}' is rewritten by the shell; quote it")
         else:
             word += c
@@ -331,12 +336,41 @@ def own_path(prog, word, cwd):
         refuse(f"'{prog} {word}' names a path outside the checkout under review")
 
 
+def take_value(prog, words, k):
+    """The word after the flag at k, which the program reads as that flag's value. A value that looks like
+    a flag is refused: the program would read a switch written there as the value, not as the switch."""
+    flag = words[k]
+    if k + 1 >= len(words):
+        refuse(f"'{prog} {flag}' with no value")
+    value = words[k + 1]
+    if value.startswith("-"):
+        refuse(f"'{prog} {flag} {value}': {flag} takes the next word as its value, so a flag cannot go there")
+    return value
+
+
+def flags_as_read(prog, words, value_flags):
+    """The flags the program reads, as it reads them: up to a lone --, after which every word is passed on
+    to something else, and with the word after a value flag read as its value. A switch the shell requires
+    counts only when it is in this list."""
+    flags, k = [], 0
+    while k < len(words) and words[k] != "--":
+        t = words[k]
+        if t.startswith("-"):
+            flags.append(t)
+            if t in value_flags:
+                take_value(prog, words, k)
+                k += 1
+        k += 1
+    return flags
+
+
 def judge_pytest(words, cwd):
     """pytest: the flags it allows, and paths in the checkout. -k, -m and -r take the next word as a value."""
     k = 0
     while k < len(words):
         t = words[k]
         if t in ("-k", "-m", "-r"):
+            take_value("pytest", words, k)
             k += 2
             continue
         if t.startswith("-") and t != "--":
@@ -346,18 +380,29 @@ def judge_pytest(words, cwd):
         k += 1
 
 
+def checkout_module(name, cwd):
+    """True when python -m, which puts the checkout first on the import path, imports this dotted name from
+    the checkout. A folder with no __init__.py loses to a package of the same name elsewhere, such as the
+    standard library's test, so the first part must be a real package of the checkout, or a top-level
+    module of it when the name has one part."""
+    parts = name.split(".")
+    if not all(p.isidentifier() for p in parts):
+        return False
+    if os.path.isfile(os.path.join(cwd, parts[0], "__init__.py")):
+        return True
+    return len(parts) == 1 and os.path.isfile(os.path.join(cwd, parts[0] + ".py"))
+
+
 def judge_unittest(words, cwd):
     """unittest imports what it is given, so each name must be the repository's own: discover with a start
-    folder in the checkout, a test file in the checkout, or a dotted name whose first part is a folder or
-    module in the checkout (python -m puts the checkout first on the import path)."""
+    folder in the checkout, a test file in the checkout, or a dotted name of the checkout's own module."""
     k = 0
     while k < len(words):
         t = words[k]
         if t in ("-s", "-t", "-p", "-k"):
-            if k + 1 >= len(words):
-                refuse(f"unittest {t} with no value")
+            value = take_value("unittest", words, k)
             if t in ("-s", "-t"):
-                own_path("unittest", words[k + 1], cwd)
+                own_path("unittest", value, cwd)
             k += 2
             continue
         if t.startswith("-"):
@@ -365,15 +410,15 @@ def judge_unittest(words, cwd):
         elif t == "discover" and k == 0:
             pass
         elif t.endswith(".py"):
+            # unittest turns a file path into a dotted name and imports that, so it must be the checkout's.
             full = inside(t, cwd)
-            if full is None or not os.path.isfile(full):
-                refuse(f"'unittest {t}' is not a test file in the checkout")
-        else:
-            first = t.split(".", 1)[0]
-            if not first.isidentifier() or not (os.path.isdir(os.path.join(cwd, first))
-                                                or os.path.isfile(os.path.join(cwd, first + ".py"))):
-                refuse(f"'unittest {t}' is not a module of the checkout; unittest imports it, and a standard "
-                       "library module such as antigravity can open the browser")
+            name = os.path.relpath(full, cwd)[:-3].replace(os.sep, ".") if full else ""
+            if full is None or not os.path.isfile(full) or not checkout_module(name, cwd):
+                refuse(f"'unittest {t}' is not a test file of the checkout's own package (a folder with "
+                       "__init__.py, or a file at the top)")
+        elif not checkout_module(t, cwd):
+            refuse(f"'unittest {t}' is not a module of the checkout; unittest imports it, and a standard "
+                   "library module such as antigravity can open the browser")
         k += 1
 
 
@@ -384,6 +429,7 @@ def judge_single_words(prog, words, novalue, value, cwd, paths):
     while k < len(words):
         t = words[k]
         if t in value:
+            take_value(prog, words, k)
             k += 2
             continue
         if t.startswith("-"):
@@ -399,27 +445,26 @@ def judge_single_words(prog, words, novalue, value, cwd, paths):
 
 def judge_xcodebuild(w, cwd):
     """xcodebuild test, with its package fetching off."""
-    if "-skipPackageUpdates" not in w or not ("-disableAutomaticPackageResolution" in w
-                                              or "-onlyUsePackageVersionsFromResolvedFile" in w):
-        refuse("xcodebuild fetches packages over the network unless given -skipPackageUpdates and "
-               "-disableAutomaticPackageResolution")
-    actions, k = [], 1
+    actions, flags, k = [], [], 1
     while k < len(w):
         t = w[k]
         if t in XCODE_VALUE:
-            if k + 1 >= len(w):
-                refuse(f"xcodebuild {t} with no value")
+            value = take_value("xcodebuild", w, k)
             if t in ("-project", "-workspace"):
-                own_path("xcodebuild", w[k + 1], cwd)
+                own_path("xcodebuild", value, cwd)
             k += 2
             continue
         if t.startswith("-only-testing:") or t.startswith("-skip-testing:") or t in XCODE_NOVALUE:
-            pass
+            flags.append(t)
         elif t.startswith("-"):
             refuse(f"'xcodebuild {t}' is not one of the flags this shell allows for xcodebuild")
         else:
             actions.append(t)
         k += 1
+    if "-skipPackageUpdates" not in flags or not ("-disableAutomaticPackageResolution" in flags
+                                                  or "-onlyUsePackageVersionsFromResolvedFile" in flags):
+        refuse("xcodebuild fetches packages over the network unless given -skipPackageUpdates and "
+               "-disableAutomaticPackageResolution")
     if actions != ["test"]:
         refuse("xcodebuild runs here only the test action, with no build setting")
 
@@ -459,17 +504,18 @@ def judge_find(w):
 
 def judge_semgrep(prog, w, cwd):
     judge_flags(prog, w[1:], SEMGREP)
-    if prog == "semgrep" and "--metrics=off" not in w:
+    flags = flags_as_read(prog, w[1:], SEMGREP_VALUE)
+    if prog == "semgrep" and "--metrics=off" not in flags:
         refuse("semgrep sends usage metrics to its server unless given --metrics=off")
     if any(t.startswith("--metrics") and t != "--metrics=off" for t in w):
         refuse(f"{prog} takes --metrics only as --metrics=off")
-    if "--disable-version-check" not in w:
+    if "--disable-version-check" not in flags:
         refuse(f"{prog} asks its server for the newest version unless given --disable-version-check")
     configs = []
     for k, t in enumerate(w):
-        if t == "--config":
-            configs.append(w[k + 1] if k + 1 < len(w) else "")
-        elif t.startswith("--config="):
+        if t == "--config" and t in flags:
+            configs.append(take_value(prog, w, k))
+        elif t.startswith("--config=") and t in flags:
             configs.append(t.split("=", 1)[1])
     if not configs:
         refuse(f"{prog} with no --config; name a rules file in the checkout")
@@ -562,8 +608,9 @@ def judge_command(w, cwd, state):
     if prog == "cargo":
         if sub != "test":
             refuse(f"'cargo {sub}' is not allowed; only cargo test --offline")
-        if "--offline" not in w:
-            refuse("cargo test fetches crates over the network unless given --offline")
+        # After a lone --, cargo passes every word to the test program, so --offline counts only before it.
+        if "--offline" not in flags_as_read("cargo test", w[2:], CARGO_VALUE):
+            refuse("cargo test fetches crates over the network unless given --offline, before any --")
         return judge_flags("cargo test", w[2:], CARGO_TEST)
     if prog == "go":
         if sub != "test":
@@ -579,6 +626,7 @@ def judge_command(w, cwd, state):
                 if name not in GO_TEST[2]:
                     refuse(f"'go test {t}' is not one of the flags this shell allows for go test")
                 if name in GO_VALUE and "=" not in t:
+                    take_value("go test", w, k)
                     k += 1
             elif t != "--":
                 if not (t == "." or t.startswith("./")):
@@ -589,7 +637,8 @@ def judge_command(w, cwd, state):
     if prog == "swift":
         if sub != "test":
             refuse(f"'swift {sub}' is not allowed; only swift test --skip-update --disable-automatic-resolution")
-        if "--skip-update" not in w or not any(t in SWIFT_OFFLINE for t in w):
+        flags = flags_as_read("swift test", w[2:], SWIFT_VALUE)
+        if "--skip-update" not in flags or not any(t in SWIFT_OFFLINE for t in flags):
             refuse("swift test fetches packages over the network unless given --skip-update and --disable-automatic-resolution")
         return judge_flags("swift test", w[2:], SWIFT_TEST)
     if prog == "xcodebuild":
