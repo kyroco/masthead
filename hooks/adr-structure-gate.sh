@@ -1,19 +1,21 @@
 #!/usr/bin/env bash
-# adr-structure-gate.sh: Stop / SubagentStop hook that blocks (exit 2) when a changed ADR lacks a required section or has an unmarked Factual Claims list, and advises when it cites no evidence.
+# adr-structure-gate.sh: Stop hook that, in a repository that opted in with ADR_DIR, blocks (exit 2) when a changed ADR is short of the shape in adr_shape.py or has an unmarked Factual Claims list, and advises when it cites no evidence.
 
 set -uo pipefail
 
 # Stand down when ADR_STRUCTURE_GATE is off; the block message does not mention it.
 [ "${ADR_STRUCTURE_GATE:-on}" = "off" ] && exit 0
 
-# Read the ADR folder from ADR_DIR, falling back to the repo's settings through project_fact.py.
-ADR_DIR="$(python3 "$(dirname "$0")/project_fact.py" ADR_DIR "${ADR_DIR:-docs/adr}" 2>/dev/null)"
-ADR_DIR="${ADR_DIR:-docs/adr}"
-ADR_DIR="${ADR_DIR%/}"
-# Expand a leading ~ in the ADR folder.
-case "$ADR_DIR" in "~/"*) ADR_DIR="$HOME/${ADR_DIR#\~/}" ;; esac
+HERE="$(cd "$(dirname "$0")" && pwd)"
+SHAPE="$HERE/adr_shape.py"
 
-# ---------- self-scoping: skip stop events from other named agents ----------
+# Not opted in: no ADR folder named, so no record is held to Masthead's shape.
+ADR_DIR="$(python3 "$SHAPE" folder 2>/dev/null)"
+[ -n "$ADR_DIR" ] || exit 0
+ADR_DIR="${ADR_DIR%/}"
+
+# ---------- self-scoping: hold only the main session's stop ----------
+# A named agent's stop is skipped: the main session's own stop holds whatever it left.
 PAYLOAD=""
 if [ ! -t 0 ]; then
   PAYLOAD="$(cat 2>/dev/null || true)"
@@ -29,14 +31,13 @@ if [ -n "$PAYLOAD" ]; then
       | head -n 1 \
       | sed -E 's/.*:[[:space:]]*"([^"]*)"/\1/' || true)"
   fi
-  if [ -n "${EVENT_AGENT:-}" ] && [ "$EVENT_AGENT" != "maryam" ]; then
-    exit 0
-  fi
+  [ -n "${EVENT_AGENT:-}" ] && exit 0
 fi
 
 # ---------- in-domain: did this change touch an ADR file? ----------
 CHANGED=""
-if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+if TOP="$(git rev-parse --show-toplevel 2>/dev/null)"; then
+  cd "$TOP" || exit 0
   # List changed files from git status, including untracked files one by one.
   CHANGED="$(git status --porcelain -u 2>/dev/null | awk '{print $NF}' || true)"
 else
@@ -56,58 +57,25 @@ $(git -C "$ADR_TOP" status --porcelain -u 2>/dev/null | awk -v top="$ADR_TOP" '{
     ;;
 esac
 
-# Keep only paths that look like ADR files.
-ADR_FILES=""
-for f in $CHANGED; do
-  base="${f##*/}"
-  is_adr=0
-  case "$base" in
-    ADR-*.md|adr-*.md) is_adr=1 ;;
-  esac
-  case "$f" in
-    */adr/*|"$ADR_DIR"/*|*/"$ADR_DIR"/*)
-      case "$base" in
-        [0-9][0-9][0-9][0-9]-*.md|[0-9][0-9][0-9][0-9]_*.md|ADR-*.md|adr-*.md) is_adr=1 ;;
-      esac
-      ;;
-  esac
-  [ "$is_adr" -eq 1 ] && ADR_FILES="$ADR_FILES $f"
-done
+# Keep only the records inside the opted-in folder.
+ADR_FILES="$(printf '%s\n' "$CHANGED" | python3 "$SHAPE" pick 2>/dev/null)"
 
 # Pass when no ADR file changed.
-[ -z "$(printf '%s' "$ADR_FILES" | tr -d ' ')" ] && exit 0
-
-# List the required section names, matched case-insensitively as a header or a bold or bullet label.
-REQUIRED="Status|Principle Alignment|Context|Options Considered|Decision|Rationale|Falsifiability"
-
-has_section() {
-  # $1 = file content ; $2 = section label
-  local content="$1" label="$2"
-  # Match the label as a markdown header or a bold label, reading the content from a here-string so grep -q cannot break a pipe.
-  grep -Eiq "^[[:space:]]*#{1,6}[[:space:]]+${label}([[:space:]]|$|:)|\*\*[[:space:]]*${label}[[:space:]]*\*\*|^[[:space:]]*-[[:space:]]+\*\*[[:space:]]*${label}" <<<"$content"
-}
+[ -z "$(printf '%s' "$ADR_FILES" | tr -d '[:space:]')" ] && exit 0
 
 fail=0
 advise=0
-for f in $ADR_FILES; do
+while IFS= read -r f; do
+  [ -n "$f" ] || continue
   [ -f "$f" ] || continue   # skip deletions/renames-away
   CONTENT="$(cat "$f" 2>/dev/null || true)"
   [ -z "$CONTENT" ] && continue
 
-  missing=""
-  OLD_IFS="$IFS"; IFS='|'
-  for sec in $REQUIRED; do
-    has_section "$CONTENT" "$sec" || missing="$missing, $sec"
-  done
-  IFS="$OLD_IFS"
-
-  if [ -n "$missing" ]; then
-    missing="${missing#, }"
-    echo "BLOCKED (adr-structure-gate): $f is missing required ADR section(s): $missing" >&2
-    echo "  An ADR records a decision in a fixed shape so the next reader and the" >&2
-    echo "  implementer can act on it. Add the section(s) above. Required set:" >&2
-    echo "    Status / Principle Alignment / Context / Options Considered / Decision /" >&2
-    echo "    Rationale / Falsifiability." >&2
+  # A new record must carry the whole shape; one already committed must keep the sections it had.
+  short="$(python3 "$SHAPE" check "$f" 2>/dev/null)"
+  if [ -n "$short" ]; then
+    echo "BLOCKED (adr-structure-gate): $f is short of the ADR shape this repository asked for:" >&2
+    printf '%s\n' "$short" | sed 's/^/  - /' >&2
     echo "  This gate checks PRESENCE, not quality - a real Falsifiability line still" >&2
     echo "  needs a concrete 'if X happens, revisit', not a hedge." >&2
     fail=1
@@ -127,9 +95,8 @@ for f in $ADR_FILES; do
       if ! grep -Eiq '\[verified:[[:space:]]*[a-z]+\]|\[unverified[^]]*\]|\[no worker[^]]*\]|no resident worker' <<<"$FC_SECTION"; then
         echo "BLOCKED (adr-structure-gate): $f has Factual Claims with no verification marker." >&2
         echo "  Mark each claim [verified: <source>] once checked against the code, docs or" >&2
-        echo "  live state, where the source is one word such as code, hexdocs or aws, or flag" >&2
-        echo "  it '[unverified: <reason>]'. See Factual Claims in $ADR_DIR/_ADR-TEMPLATE.md." >&2
-        echo "  Mark each claim, or flag it unverified, then continue." >&2
+        echo "  live state, where the source is one word such as code, docs or aws, or flag" >&2
+        echo "  it '[unverified: <reason>]'. Mark each claim, or flag it unverified, then continue." >&2
         fail=1
       fi
     fi
@@ -144,7 +111,7 @@ for f in $ADR_FILES; do
     advise=1
   fi
 
-done
+done <<<"$ADR_FILES"
 
 if [ "$fail" -ne 0 ]; then
   echo "ADR structure gate FAILED - add the missing section(s) above, then continue." >&2
