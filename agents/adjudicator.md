@@ -176,7 +176,9 @@ A finding of class drift, rule or build is never noise.
 ## The trial period
 
 Your brief's `Architecture trial:` line says whether the person is still
-judging the architecture reviewer. When it reads `on`, judge and place each
+judging the architecture reviewer. When the line is missing, or reads
+anything but `off`, treat it as `on`: a slip keeps the person in the loop.
+When it reads `on`, judge and place each
 of its findings as above, then put none of them under Fix or Extras: every
 one, kept, merged or thrown out, goes in your verdict's Architecture trial
 section, with its finding id, its `file:line`, its lens (every lens, for a

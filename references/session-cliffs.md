@@ -124,9 +124,8 @@ order. The steps live here and nowhere else; a repo supplies only its own facts
    settle, or an ADR line and a mockup that disagree) goes to the foreman
    unedited (to the user when there is none), who brings it to the user; the
    PR waits for that answer. So does its Architecture trial section, while
-   the trial period is on: `project_fact.py --architecture-trial` prints
-   `on` until the person sets `ARCHITECTURE_TRIAL` to `off` in the env block
-   of `.claude/settings.json`. While the trial is on, you fix only the
+   the trial period is on, as the brief's `Architecture trial:` line says
+   (`references/dispatch-brief.md`). While the trial is on, you fix only the
    architecture findings the person sends back, and none of the others,
    each as step 4 says; once it is off, the adjudicator's Fix list holds
    them like any other finding.
