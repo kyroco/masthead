@@ -1440,5 +1440,12 @@ says  "$RD" 'that the alignment does not mention is a finding that names the par
 # Scenario 5: stale doc lines are reported before the ADR is reviewed against the doc.
 says  "$RD" 'a module or door it names that the code no longer has, or an app or part the code has that the doc does not name'
 says  "$RD" 'Report each stale line before you review the ADR against the doc'
+# Round 1, F1: a doc recorded but moved or gone is a finding, not "no doc recorded".
+says  "$RD" 'look for `ARCHITECTURE_DOC` in the env block of the main checkout'"'"'s `.claude/settings.local.json` and `.claude/settings.json`'
+says  "$RD" 'When one holds a path, the doc has moved or gone: that is the first finding. Say which path is recorded and that no file is there, and ask the user where the doc is now before the alignment review.'
+# Round 1, F2: the gate asks a why only of a divergence, so a bare conforms is hollow too.
+never "$RD" 'with a verdict and a why on each entry'
+says  "$RD" 'a verdict on each entry, and a why only on a divergence'
+says  "$RD" 'says only "conforms" with no word of how,'
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
