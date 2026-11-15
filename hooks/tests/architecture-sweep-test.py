@@ -318,6 +318,18 @@ expect("a sweep reviews code in folders named like build output, and build files
        covered, {"lib/shop/build/release.ex", "lib/shop/target/campaign.ex", "src/doc/render.py",
                  "lib/shop.ex", "CMakeLists.txt", "requirements.txt"})
 
+# Re-verify 2, claim 1 (Robert, November 15: "every tracked .txt counts as code except the licence
+# and notes files left out by name"): a dependency list under any name is reviewed.
+lists = repo({"dev-requirements.txt": 4, "test-requirements.txt": 4, "requirements/base.txt": 6,
+              "requirements/production.txt": 3, "deps.txt": 2, "LICENSE.txt": 200, "NOTICE.txt": 20,
+              "notes.txt": 9, "README.txt": 12})
+ledger = os.path.join(lists, ".claude", "state", "architecture-review.json")
+run(lists, "plan", "--ledger", ledger)
+covered, _ = ledger_files(lists, ledger)
+expect("every tracked .txt is reviewed but the licence, notice, notes and readme",
+       covered, {"dev-requirements.txt", "test-requirements.txt", "requirements/base.txt",
+                 "requirements/production.txt", "deps.txt"})
+
 # Re-verify 1, claim 6: every batch reviewed, the session ended before its judge.
 ended = repo({"src/a.py": 10})
 ledger = os.path.join(ended, ".claude", "state", "architecture-review.json")
