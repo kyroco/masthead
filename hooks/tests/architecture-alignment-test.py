@@ -476,6 +476,19 @@ why = write_adr(r, adr("## Architecture Alignment\n\nBuilds:\n\n- Hosted\n"
 check("3: an entry with its verdict on the next line, after a bulleted Builds list, is read as an entry",
       why == "", why)
 
+# ------------------------------------------------------------------ round 2: an Edit with an empty old string
+r = make_repo("r2-empty-old")
+path = os.path.join(r, "docs/adr/ADR-0007-take-orders.md")
+write(path, "")
+why = gate(r, "Edit", {"file_path": path, "old_string": "", "new_string": adr()})
+check("1: an Edit with an empty old string that fills an empty new ADR is held like a Write",
+      "`## Architecture Alignment` is absent" in why, why)
+os.remove(path)
+why = gate(r, "Edit", {"file_path": path, "old_string": "", "new_string": adr()})
+check("1: and so is one that creates the file", "`## Architecture Alignment` is absent" in why, why)
+why = gate(r, "Edit", {"file_path": path, "old_string": "", "new_string": adr(ALIGNED)})
+check("1: an Edit that creates it with the whole shape is allowed", why == "", why)
+
 shutil.rmtree(T, ignore_errors=True)
 print()
 print("%d passed, %d failed" % (passed, failed))
