@@ -48,6 +48,11 @@ check "an agent file with no model line"                   deny  "$(run plain ""
 check "Plan inherits the session model"                    deny  "$(run Plan "" "$NONE")"
 check "a Model-choice line that is not the first line"     deny  "$(run general-purpose "" $'Do the work.\nModel-choice: opus, because')"
 check "a Model-choice line naming another tier"            deny  "$(run general-purpose opus $'Model-choice: haiku, cheap\nDo it.')"
+# MAST-39: the option text names only the project's and the plugin's agents
+# folders, so a helper kept in the user's own ~/.claude/agents is asked.
+mkdir -p "$ROOT/home/.claude/agents"
+printf -- '---\nname: mine\nmodel: haiku\n---\nbody\n' > "$ROOT/home/.claude/agents/mine.md"
+check "a user-folder agent whose file sets haiku is asked"  deny  "$(HOME="$ROOT/home" run mine "" "$NONE")"
 
 echo "--- and everything else goes through ---"
 check "general-purpose with model haiku"                   allow "$(run general-purpose haiku "$NONE")"
