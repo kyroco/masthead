@@ -27,7 +27,7 @@ Quietly gather these, with commands that read and change nothing:
   Masthead was set up before, say so and
   offer to change answers rather than starting over. When it was set up
   before and no `ARCHITECTURE_DOC` is recorded, offer the architecture doc on
-  its own: go straight to step 8, then step 9, and ask none of the other
+  its own: go straight to step 8, then steps 9 and 10, and ask none of the other
   questions unless the person asks to change an answer. The fact goes to the
   settings file that already holds the other answers. On such a run, step 9
   does not ask the `.gitignore` question again: it was asked the first time.
@@ -206,3 +206,13 @@ asked them: connect Korium memory (off), keep a code index in Korium (off),
 keep AI attribution out of commits (on), ask for a reason before a helper runs
 on the biggest model (off), all under `/plugin configure masthead@masthead`. End with: "Run `/masthead:setup`
 again to change any of this."
+
+## 10. Bring the code in line with the doc
+
+When an architecture doc is recorded and passes the check, and the
+repository holds code, ask whether the person wants a targeted review, a
+full sweep, or neither, and follow
+`${CLAUDE_PLUGIN_ROOT}/skills/setup/architecture-review.md`. Ask on every
+run of `/masthead:setup`, a first one or not, since drift builds up between
+runs. With no doc recorded, say nothing of a review: the reviewers need the
+doc's seven rules to hold the code to.
