@@ -263,13 +263,13 @@
         ]
       },
       {
-        "matcher": "Write|Edit|Bash",
+        "matcher": "Write|Edit|Bash|mcp__.*__create_pull_request",
         "hooks": [
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/run.sh\" adr-sections-gate.py",
             "timeout": 10,
-            "statusMessage": "Checking the ADR carries its criteria",
+            "statusMessage": "Checking the ADR carries its criteria and its architecture alignment",
             "onFailure": "block"
           }
         ]

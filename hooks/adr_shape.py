@@ -12,6 +12,10 @@ Command line, for the shell gate:
     adr_shape.py pick            reads paths on stdin, prints those that are records in that folder
     adr_shape.py check FILE      prints one reason per line that FILE is short of the shape
                                  (a new record: every section; a changed one: no section removed)
+
+Where the project recorded an architecture doc (ARCHITECTURE_DOC), a new record also carries
+an Architecture Alignment section: each part of the doc it touches, with conforms or diverges
+and why, and a Builds line naming every build its work must work in.
 """
 import os
 import re
@@ -40,6 +44,18 @@ SECTIONS = [
 
 MIN_CRITERIA = 2
 
+# Asked of a new record only where the project recorded an architecture doc (ARCHITECTURE_DOC).
+ALIGNMENT = "Architecture Alignment"
+ALIGNMENT_WANT = (
+    "one list item or heading for each part of the architecture doc (%s) this decision touches, "
+    "named as the doc titles it, saying it conforms, or diverges and why; then a `Builds:` line listing every "
+    "build this decision's work must work in. Leave out the parts it does not touch")
+# Words of reason a divergence needs after the word that declares it.
+MIN_WHY_WORDS = 3
+VERDICT = re.compile(r"(?i)\b(?:conform|diverg)\w*")
+DIVERGES = re.compile(r"(?i)\bdiverg\w*")
+BUILDS = re.compile(r"(?i)^\s*(?:[-*]\s+)?(?:\*\*|__)?\s*builds?\s*(?::\s*(?:\*\*|__)?|(?:\*\*|__)\s*:?)(.*)$")
+
 # File names a record may carry inside the folder: ADR-NNNN-x.md, adr-N-x.md, NNNN-x.md, NNNN_x.md.
 NAME = re.compile(r"(?i)^(adr-.+|\d{4}[-_].+)\.md$")
 
@@ -59,6 +75,140 @@ def folder():
     if value.startswith("/"):
         return value.rstrip("/") + "/"
     return value.strip("/") + "/"
+
+
+def architecture_doc():
+    """(full path, repo-relative path) of the project's recorded architecture doc, or None."""
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    try:
+        import project_fact
+        path = project_fact.architecture_doc()
+        if not path:
+            return None
+        top = project_fact.checkout_top(project_fact.project_root())
+        return path, os.path.relpath(path, top)
+    except Exception:
+        return None
+
+
+def sections(doc=None):
+    """The required (title, what to write) pairs: the alignment section too when a doc is recorded."""
+    if not doc:
+        return list(SECTIONS)
+    return list(SECTIONS) + [(ALIGNMENT, ALIGNMENT_WANT % doc[1])]
+
+
+def _plain(text):
+    """A heading or label reduced to its words: no markup, no closing punctuation."""
+    text = re.sub(r"[`*_]", "", text)
+    return re.sub(r"\s+", " ", text).strip().rstrip(".:").strip()
+
+
+def doc_parts(doc_text):
+    """The parts an ADR can name: each heading below the title, and each bold label opening a list item."""
+    parts = []
+    for line in doc_text.splitlines():
+        m = re.match(r"^\s{0,3}#{2,6}\s+(.+?)\s*#*\s*$", line) \
+            or re.match(r"^\s*[-*]\s+(?:\*\*|__)(.+?)(?:\*\*|__)", line)
+        if m:
+            name = _plain(m.group(1))
+            if name and name.lower() not in [p.lower() for p in parts]:
+                parts.append(name)
+    return parts
+
+
+def section_body(text, title):
+    """The lines under the section's heading, up to the next heading of the same or a higher level."""
+    t = re.escape(title)
+    m = re.search(r"(?mi)^\s{0,3}(#{1,6})\s+%s\s*:?\s*$" % t, text)
+    if m:
+        rest = text[m.end():]
+        nxt = re.search(r"(?m)^\s{0,3}#{1,%d}\s+\S" % len(m.group(1)), rest)
+        return rest[:nxt.start()] if nxt else rest
+    m = re.search(r"(?mi)^\s*(?:[-*]\s+)?\*\*\s*%s\s*:?\s*\*\*:?(.*)$" % t, text)
+    if m:
+        rest = text[m.end():]
+        nxt = re.search(r"(?m)^\s{0,3}#{1,6}\s+\S", rest)
+        return m.group(1) + (rest[:nxt.start()] if nxt else rest)
+    return ""
+
+
+def _names(line, parts):
+    """The longest part of the doc this line names, when it is a list item or a heading; else None."""
+    if not re.match(r"^\s*(?:#{1,6}\s|[-*+]\s|\d+[.)]\s)", line):
+        return None
+    low = " ".join(re.sub(r"[`*_]", "", line).lower().split())
+    hits = [p for p in parts if re.search(r"(?<![a-z0-9])%s(?![a-z0-9])" % re.escape(p.lower()), low)]
+    return max(hits, key=len) if hits else None
+
+
+def alignment(text, parts):
+    """Read the alignment section: ({part: the entry's text}, [each build listed], whether a Builds line was found)."""
+    entries, builds, found, current, listing = {}, [], False, None, False
+    for line in section_body(text, ALIGNMENT).splitlines():
+        b = BUILDS.match(line)
+        if b:
+            found, current = True, None
+            rest = b.group(1).strip()
+            builds += [x.strip() for x in re.split(r"[,;]", rest) if x.strip()]
+            listing = not rest
+            continue
+        if listing:
+            item = re.match(r"^\s*[-*]\s+(.+)$", line)
+            if item:
+                builds.append(item.group(1).strip())
+                continue
+            if line.strip():
+                listing = False
+        part = _names(line, parts)
+        if part:
+            current = part
+            entries[part] = entries.get(part, "") + " " + line
+        elif current:
+            entries[current] += " " + line
+    return entries, builds, found
+
+
+def diverging(text, parts):
+    """The parts of the doc a record's alignment section says it diverges from."""
+    entries, _, _ = alignment(text, parts)
+    return sorted(p for p, said in entries.items() if DIVERGES.search(said))
+
+
+def read_doc(doc):
+    try:
+        with open(doc[0]) as handle:
+            return handle.read()
+    except (OSError, TypeError):
+        return ""
+
+
+def alignment_gaps(text, doc):
+    """The reasons a new record's alignment section falls short of what the issue asks, one per gap."""
+    if not has_section(text, ALIGNMENT):
+        return []
+    parts = doc_parts(read_doc(doc))
+    listed = "; ".join("`%s`" % p for p in parts) or "(the doc has no headings yet)"
+    entries, builds, found = alignment(text, parts)
+    reasons = []
+    if not entries:
+        reasons.append(
+            "`## %s` names no part of the architecture doc (%s). Name each part this decision "
+            "touches as the doc titles it, and only those. Its parts: %s." % (ALIGNMENT, doc[1], listed))
+    for part, said in entries.items():
+        if not VERDICT.search(said):
+            reasons.append("`## %s` names `%s` with no verdict. Say it conforms, or that it "
+                           "diverges and why." % (ALIGNMENT, part))
+            continue
+        m = DIVERGES.search(said)
+        if m and len(re.findall(r"[A-Za-z0-9']+", said[m.end():])) < MIN_WHY_WORDS:
+            reasons.append("`## %s` says it diverges from `%s` but not why. Say what this "
+                           "decision does instead and why." % (ALIGNMENT, part))
+    if not found or not builds:
+        reasons.append(
+            "`## %s` lists no builds. Add a `Builds:` line naming every build this decision's "
+            "work must work in, as the doc's parts name them." % ALIGNMENT)
+    return reasons
 
 
 def is_adr(path, where=None):
@@ -92,10 +242,16 @@ def criteria_count(text):
     return len(re.findall(r"(?mi)^\s*[-*]?\s*`?AC-\d+", body))
 
 
-def missing(text):
-    """The reasons a new record is short of the shape, one per gap; empty when it has it all."""
+def missing(text, doc=False):
+    """The reasons a new record is short of the shape, one per gap; empty when it has it all.
+
+    `doc` is the recorded architecture doc as architecture_doc() gives it; left out, it is looked up.
+    """
+    doc = architecture_doc() if doc is False else doc
     reasons = ["`## %s` is absent. Add it: %s." % (title, want)
-               for title, want in SECTIONS if not has_section(text, title)]
+               for title, want in sections(doc) if not has_section(text, title)]
+    if doc:
+        reasons += alignment_gaps(text, doc)
     if has_section(text, "Acceptance Criteria") and criteria_count(text) < MIN_CRITERIA:
         reasons.append(
             "`## Acceptance Criteria` carries %d numbered criteria and needs at least %d. "
@@ -110,7 +266,8 @@ def removed(old, new):
     return ["This change removes the `## %s` section. If the section is being rewritten, keep "
             "its heading. If the decision genuinely no longer needs it, that is the user's "
             "call, not an edit's." % title
-            for title, _ in SECTIONS if has_section(old, title) and not has_section(new, title)]
+            for title, _ in sections(architecture_doc())
+            if has_section(old, title) and not has_section(new, title)]
 
 
 def committed(path):
