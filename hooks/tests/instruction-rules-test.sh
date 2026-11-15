@@ -535,9 +535,9 @@ done
 says  references/gate-catalog.md "except \`gate-verify-brief\`"
 never references/gate-catalog.md "none of these refuses anything"
 # A model named on the call is checked whatever the agent's file says.
-says  README.md "a call that names no model for a helper whose own file names one is not asked"
+says  README.md "a call that names no model is not asked for a helper whose own file names one"
 never README.md "A helper with no model in its own file"
-says  docs/explainer.template.html "a call that names no model for a helper whose own file names one is not asked"
+says  docs/explainer.template.html "a call that names no model is not asked for a helper whose own file names one"
 never docs/explainer.template.html "A helper with no model in its own file"
 says  references/gate-catalog.md "are not covered when the call names no model"
 says  references/dispatch-brief.md "Not covered when the call names no model"

@@ -235,7 +235,7 @@ To change an install option later, run `/plugin configure masthead@masthead`:
 | Connect Korium memory | off | Each session looks up what earlier sessions learned before its first change, and saves what it learned at the end. Needs a [Korium](https://kyroco.ai) account; there's a free plan. Everything else works without it. |
 | Keep a code index in Korium | off | Only with Korium memory on and korium-cli installed. The names and structure of the code in each repository you open, and the names you search for, go to your Korium account, so Claude can ask the index before it greps. Leave it off for a repository you may not send to Korium. |
 | Keep AI attribution out of commits | on | Refuses a commit message or pull request body with an AI co-author line, a session link or a generated-with footer. |
-| Ask for a reason before a helper runs on the biggest model | off | A helper sent to the big model, by the call or by inheriting this session's, runs there only when the brief says why; a call that names no model for a helper whose own file names one is not asked. |
+| Ask for a reason before a helper runs on the biggest model | off | A helper sent to the big model, by the call or by inheriting this session's, runs there only when the brief says why; a call that names no model is not asked for a helper whose own file names one, or for another plugin's helper. |
 
 To remove it: `claude plugin uninstall masthead@masthead`. The settings file
 setup wrote and the push check script (`.claude/push-check.sh`) are yours to
@@ -319,7 +319,7 @@ own files and its own line.
 | `capture-finding-reminder.py` | Connect Korium memory | nothing; reminders only |
 | `korium-index-on-stop.sh` and the code index gates in `engram-protocol.sh` | Keep a code index in Korium | a grep for a name the code index holds until the index is asked (and every grep while korium-cli is signed out or Korium does not answer), a search that repeats a name it just answered, and, once, a whole-file read of a file it just placed; the index refresh at the end of a session refuses nothing |
 | `commit-attribution-gate.py` | Keep AI attribution out of commits | a commit message or pull request body with an AI co-author line, a session link or a generated-with footer |
-| `model-choice-gate.sh` | Ask for a reason before a helper runs on the biggest model | a helper sent to the big model, by the call or by inheriting this session's, with no reason on the first line of its brief; a call that names no model for a helper whose own file names one is not asked |
+| `model-choice-gate.sh` | Ask for a reason before a helper runs on the biggest model | a helper sent to the big model, by the call or by inheriting this session's, with no reason on the first line of its brief; a call that names no model is not asked for a helper whose own file names one, or for another plugin's helper |
 
 The off switches are environment variables read from the check's own
 environment, so a session can't switch a check off for itself:

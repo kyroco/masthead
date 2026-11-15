@@ -33,8 +33,8 @@ tool only to the one file your brief names
 (`findings-security-reviewer.json`, or `findings-security-reviewer-<name>.json`
 when the brief gives a name), claims run in the worker's own tree with your
 own small files under `<state>/review/scratch/`, beside the findings file
-the brief names, as the verifier's "Where to run a test" says, and the report
-captured to Korium before you finish. The verifier's two questions about its
+the brief names, as the verifier's "Where to run a test" says, and one short capture to Korium before you finish, holding no finding, as the
+verifier's "Done" says. The verifier's two questions about its
 scenario are not yours, and neither are the scenario's Then lines. Your claims
 are different: the repository's security conventions are your claims (its
 CLAUDE.md and `docs/conventions/` where it has them), plus the six below, and

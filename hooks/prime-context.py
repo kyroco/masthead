@@ -245,6 +245,11 @@ def show(lead):
     """Print one procedure exactly as user_prompt would inject it from this folder."""
     # Only a lead the hook declares, named with or without its closing period.
     leads = [known for known, _ in CLIFFS if known.rstrip(".") == lead.rstrip(".")]
+    # A worker's Bash tool sets no CLAUDE_PROJECT_DIR, which the hook has. The worker
+    # runs show from its own worktree, so that checkout stands in for the session's
+    # repo; when CLAUDE_PROJECT_DIR is set, the hook's own rule applies unchanged.
+    if not os.environ.get("CLAUDE_PROJECT_DIR"):
+        os.environ["CLAUDE_PROJECT_DIR"] = os.getcwd()
     text = cliff_source(os.getcwd())
     block = cliff_block(text, leads[0]) if text and leads else None
     if block:
