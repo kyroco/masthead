@@ -46,11 +46,16 @@ Checks 1 to 6 run on every issue:
 6. Size: the issue fits one worker session by the Size rule, with the
    reason in one line (what it touches, from code_locate).
 
-Checks 7 to 10 hold the issue to where the design is headed. With
-"Architecture doc: none recorded" above, skip all four and say so in one
-line. Checks 7 to 9 also need the decision record the issue builds from to
-have an `## Architecture Alignment` section; a record without one skips
-them, and you say so.
+Checks 7 to 9 hold the issue to where the design is headed. With
+"Architecture doc: none recorded" above, skip checks 7 to 9 and say so in
+one line. Otherwise read the architecture doc named above, in full, before
+them. They also need the decision record the issue builds from to have an
+`## Architecture Alignment` section; a record without one skips them, and
+you say so. An issue that names no decision record: look in the project
+README and the architecture doc for the record whose part this issue
+builds. When there is one with an alignment section, check 7 fails naming
+that record, and checks 8 and 9 run against it. Check 10 runs on every
+issue, doc or none.
 
 7. Target shape: the issue quotes the alignment lines it builds toward,
    word for word, each with the record it comes from. Fails naming each
@@ -65,7 +70,8 @@ them, and you say so.
    architecture doc's rules. Fails when the pattern breaks one, naming the
    alignment or doc line and the file:line that breaks it.
 10. Rulings: run agent_search with stance "position" and limit 10 for the
-   issue's area, and read the issue's and the project's comments. Each
+   issue's area (with Korium off, say so and use the comments alone), and
+   read the issue's and the project's comments. Each
    ruling of the user's that governs what this issue builds is quoted in the
    issue with its source (the Korium id, or the comment and its date). Fails
    naming each ruling left out.
