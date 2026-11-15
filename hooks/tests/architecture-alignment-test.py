@@ -519,6 +519,23 @@ why = gate(r, "Edit", {"file_path": path, "old_string": OLD_ENTRY,
 check("6: an Edit that states the divergence at its opening is allowed, for the pull request to hold",
       why == "", why)
 
+# ------------------------------------------------------------------ round 3: an ADR in git history after the doc changes
+r = make_repo("r3-doc-changed")
+path = os.path.join(r, "docs/adr/ADR-0007-take-orders.md")
+commit(r, {"docs/adr/ADR-0007-take-orders.md": adr(ALIGNED)}, "Write ADR-0007")
+commit(r, {"docs/architecture.md": DOC.replace("Self-hosted", "On-premises")
+           .replace("## Core and extensions", "## The core and its extensions")}, "Rename a build and a part")
+why = gate(r, "Edit", {"file_path": path, "old_string": "Proposed", "new_string": "Superseded"})
+check("4: after the doc renames a part and a build, an Edit of an ADR in git history is allowed", why == "", why)
+why = write_adr(r, adr(ALIGNED).replace("Proposed", "Superseded"))
+check("4: and so is a Write", why == "", why)
+write(path, adr(ALIGNED).replace("Proposed", "Superseded"))
+code, err = stop_gate(r)
+check("4: and the Stop gate passes it", code == 0, "%s %s" % (code, err))
+why = gate(r, "Edit", {"file_path": path, "old_string": "- **Direction**: conforms, the core never names billing.",
+                       "new_string": "- **Direction**: the core never names billing."})
+check("2: an Edit that leaves one of its entries with no verdict is still refused", "with no verdict" in why, why)
+
 shutil.rmtree(T, ignore_errors=True)
 print()
 print("%d passed, %d failed" % (passed, failed))
