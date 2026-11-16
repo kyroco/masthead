@@ -1,7 +1,7 @@
 # Masthead
 
 Masthead is a plugin for [Claude Code](https://code.claude.com). You give it
-a list of things to build, as GitHub issues, and it builds them: each one in
+a list of things to build, as GitHub or Linear issues, and it builds them: each one in
 its own session, checked, reviewed by people who weren't in the room, tested
 on the exact commit that ships, and merged. You decide the things only you
 can decide.
