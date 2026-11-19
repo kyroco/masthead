@@ -30,12 +30,15 @@ that Gate with `gh workflow run`, so the stored Gate must list
 | One commit fails a check | Drops that commit |
 | No commit fails alone, but some fail together | Drops the latest-landed of them, and names each commit it fails with. Robert, November 19, 2026: "(and we send back the latest one) it is its job to figure out what needs to be fixed and fix it" |
 | No Gate run the search starts goes red, and a run of the whole batch again is green | Drops nothing, and says the red did not happen again |
+| A commit of the batch was already dropped by a revert pushed after the red run started (the batch run queued behind a red one, or the same run searched twice) | Drops nothing more and starts no Gate run: the batch run on that revert is the one to search |
 | The commit cannot be taken off cleanly, because later commits change the same lines | Drops nothing, and says to hand it back by hand |
 | The batch run's own plan or move job could not start or fetch the code | Reruns the run's failed jobs and drops nothing |
 | The plan job stopped the batch run, the Gate passed and the move of main failed, or the run is not on landing | Drops nothing, and says why |
 
 How it finds the commit: the batch is the commits on landing after main, up
-to the red run's commit, oldest first. Landing is linear, so testing the first
+to the red run's commit, oldest first. Main does not move past a drop, so a
+batch can still hold a commit an earlier search dropped, with its revert; the
+search leaves both out, reading them from the records. Landing is linear, so testing the first
 k of them is running the Gate on the k-th commit itself. The search halves the
 batch until it finds the first commit after which the Gate is red, then runs
 the Gate on main with only that commit. Red: it fails alone. Green: it fails

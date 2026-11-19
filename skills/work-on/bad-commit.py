@@ -288,6 +288,22 @@ def issue_of(sha, root):
     return NO_ISSUE
 
 
+DROPPED_LINE = re.compile(r"^{}: ([0-9a-f]{{40}})\s*$".format(T_DROPPED), re.MULTILINE)
+
+
+def drops(base, tip):
+    """{dropped commit: the revert that took it off landing}, for every record between base and tip."""
+    out = git("log", "--format=%H%x1f%B%x1e", "--grep=^{}:".format(T_DROPPED), "{}..{}".format(base, tip)).stdout
+    found = {}
+    for entry in out.split("\x1e"):
+        if "\x1f" not in entry:
+            continue
+        revert, body = entry.split("\x1f", 1)
+        for m in DROPPED_LINE.finditer(body):
+            found.setdefault(m.group(1), revert.strip())
+    return found
+
+
 def apply_on(base, commits):
     """A commit holding `commits` cherry-picked onto `base` in order, or None when one does not apply cleanly."""
     head = base
@@ -306,13 +322,18 @@ def apply_on(base, commits):
 # ---- Running the stored Gate on one commit set -------------------------------
 
 class Search:
-    def __init__(self, root, gate_workflow, main, commits, red_run):
+    """The search over a batch's live commits: those not already dropped. `clean` holds the live
+    commits whose own tree is main with exactly the live commits up to them, because every
+    dropped commit before them has its revert before them too; the Gate runs on those directly."""
+
+    def __init__(self, root, gate_workflow, main, commits, red_run, batch, clean):
         self.root = root
         self.workflow = os.path.basename(gate_workflow)
         self.verdicts = verdict_names(root, gate_workflow)
         self.main = main
         self.commits = commits
-        self.batch = commits[-1]
+        self.batch = batch
+        self.clean = clean
         self.red_run = red_run
         self.cache = {(): ("green", None)}
         self.cache[tuple(commits)] = ("red", red_run)
@@ -325,7 +346,7 @@ class Search:
         key = tuple(chosen)
         if key in self.cache:
             return self.cache[key]
-        if list(key) == self.commits[:len(key)]:
+        if list(key) == self.commits[:len(key)] and key[-1] in self.clean:
             sha = key[-1]
         else:
             sha = apply_on(self.main, key)
@@ -527,13 +548,38 @@ def search(run_id, root):
     if not rev(batch) or git("merge-base", "--is-ancestor", main_sha, batch, check=False).returncode != 0:
         raise Stop("Batch {} does not sit on main, so the search cannot tell which commits are new. "
                    "Nothing is dropped.".format(batch[:9]))
-    commits = git("rev-list", "--reverse", "--first-parent", "{}..{}".format(main_sha, batch)).stdout.split()
-    if not commits:
+    history = git("rev-list", "--reverse", "--first-parent", "{}..{}".format(main_sha, batch)).stdout.split()
+    if not history:
         raise Stop("Batch {} holds no commit main does not, so nothing is dropped.".format(batch[:9]))
-    say("Batch {} holds {} commits after main {}. Searching with the stored Gate, {}.".format(
-        batch[:9], len(commits), main_sha[:9], stored["workflow"]))
+    in_batch = set(history)
+    # Main does not move past a drop, so a batch can hold commits already dropped. A revert made
+    # after this run started means landing has moved on: the batch run after it is the one to search.
+    done = drops(main_sha, rev("refs/remotes/{}/{}".format(REMOTE, LANDING)))
+    later = {d: r for d, r in done.items() if d in in_batch and r not in in_batch}
+    if later:
+        say("Batch {} holds {}, which revert {} already took off landing after this run started. The batch run "
+            "on that revert tests the rest; search that run if it goes red. Nothing more is dropped.".format(
+                batch[:9], ", ".join(d[:9] for d in later), ", ".join(r[:9] for r in later.values())))
+        return 0
+    pairs = {d: r for d, r in done.items() if d in in_batch and r in in_batch}
+    commits, clean, open_drops = [], set(), set()
+    reverted_by = {r: d for d, r in pairs.items()}
+    for sha in history:
+        if sha in pairs:
+            open_drops.add(sha)
+        elif sha in reverted_by:
+            open_drops.discard(reverted_by[sha])
+        else:
+            commits.append(sha)
+            if not open_drops:
+                clean.add(sha)
+    if not commits:
+        raise Stop("Every commit of batch {} was already dropped, so nothing more is dropped.".format(batch[:9]))
+    say("Batch {} holds {} commits after main {}{}. Searching with the stored Gate, {}.".format(
+        batch[:9], len(commits), main_sha[:9],
+        ", leaving out {} already dropped".format(len(pairs)) if pairs else "", stored["workflow"]))
 
-    finder = Search(root, stored["workflow"], main_sha, commits, run)
+    finder = Search(root, stored["workflow"], main_sha, commits, run, batch, clean)
     dropped, partners, evidence = finder.find()
     if len(commits) > 1 and not finder.saw_red:
         # Every run the search started was green, so the only red is the batch run itself. Run the
