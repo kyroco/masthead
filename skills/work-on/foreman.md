@@ -252,11 +252,14 @@ checkout of the repository, with the red run's id:
     python3 ${CLAUDE_PLUGIN_ROOT}/skills/work-on/bad-commit.py <run id>
 
 It reruns a batch that went red only because a runner could not start, or
-drops the bad commit from `landing` and prints its record
-(`references/bad-commit.md`). Left for INFRA-263: opening the dropped commit's
-issue again and handing it back to its worker, and reading the batch run's
-record to know which issues it carried. Until then, the record the search
-prints goes to the person as it stands.
+drops the bad commit from `landing`, with any later commit whose change is in
+the way, and prints a record for each (`references/bad-commit.md`). Otherwise
+it drops nothing and prints why, for example when the Gate passed and only
+the move of main failed, or when the red did not happen again. Left for
+INFRA-263: opening a dropped commit's issue again and handing it back to its
+worker, and reading the batch run's record to know which issues it carried.
+Until then, what the search prints, a record or its reason for dropping
+nothing, goes to the person as it stands.
 
 Every report to the person carries the count of issues closed after a green
 batch in the run. A split is not a stop: its sub-issues join the run like any
