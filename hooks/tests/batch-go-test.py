@@ -391,6 +391,25 @@ with tempfile.TemporaryDirectory() as top:
           "{} Fixes UTF-8 decoding of names (names no issue)".format(utf[:9]) in out and "UTF-8 named" not in out, out)
     check("J-1 the refusal asks to name only the real issues", "say go again with ENG-7 ENG-8 named too" in out, out)
 
+# s3-J1, round 2: a key written in lower case on a refs line is read as that key, upper case, and
+# never crashes the go.
+with tempfile.TemporaryDirectory() as top:
+    repo = Repo(top)
+    repo.land("Add the go script (INFRA-285)")
+    lower = repo.land("Tidy the copy\n\nrefs eng-8")
+    code, out = repo.go("INFRA-285")
+    check("s3-J1 a lower-case key of another team on a refs line gives a refusal, not a crash",
+          code != 0 and "Traceback" not in out and repo.calls() == [], out)
+    check("s3-J1 that commit is named by its key, upper case, and the refusal says to name it",
+          "{} Tidy the copy (ENG-8)".format(lower[:9]) in out and "say go again with ENG-8 named too" in out, out)
+with tempfile.TemporaryDirectory() as top:
+    repo = Repo(top)
+    repo.land("Add the go script (INFRA-285)")
+    repo.land("Follow up on the go script\n\nrefs infra-285")
+    code, out = repo.go("INFRA-285")
+    check("s3-J1 a lower-case key of the go's own issue on a refs line belongs to it, and the go starts",
+          code == 0 and "Traceback" not in out and len(dispatches(repo.calls())) == 1, out)
+
 # arch-1: after a red batch, the search's drop record and a worker's `git revert` of it bring a
 # commit back. The record is the search's commit, no issue's work, and the revert of it belongs to
 # the record's issue, the way batch-issues.py reads them, though git's message names no issue.
