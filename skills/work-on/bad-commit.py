@@ -288,6 +288,46 @@ def issue_of(sha, root):
     return NO_ISSUE
 
 
+def later_of_issue(commits, sha, root):
+    """The last commit after `sha` in `commits` that names the same issue: its fix on top, when
+    it has one. None when the issue is unknown or no later commit names it."""
+    issue = issue_of(sha, root)
+    if issue == NO_ISSUE:
+        return None
+    later = [c for c in commits[commits.index(sha) + 1:] if issue_of(c, root) == issue]
+    return later[-1] if later else None
+
+
+# The search's own memory of the changes it named, in the foreman's checkout, so a red batch that
+# still holds a named change with no fix on top is not searched and handed back again.
+NAMED_FILE = "named-changes.tsv"
+
+
+def named_path(root):
+    return os.path.join(project_fact.state_path(root), NAMED_FILE)
+
+
+def named(root):
+    """{commit: issue} for every change this checkout's searches named."""
+    found = {}
+    try:
+        with open(named_path(root)) as handle:
+            for line in handle:
+                parts = line.rstrip("\n").split("\t")
+                if len(parts) >= 2 and re.fullmatch(r"[0-9a-f]{40}", parts[0]):
+                    found[parts[0]] = parts[1]
+    except OSError:
+        pass
+    return found
+
+
+def remember(root, sha, issue, run):
+    path = named_path(root)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "a") as handle:
+        handle.write("{}\t{}\t{}\n".format(sha, issue, run.get("url") or run.get("databaseId")))
+
+
 def apply_on(base, commits):
     """A commit holding `commits` cherry-picked onto `base` in order, or None when one does not apply cleanly."""
     head = base
@@ -433,12 +473,16 @@ def record(bad, partners, checks, run, batch, root):
     return "\n".join(lines)
 
 
-def hand_back(bad, partners, checks, run, batch, root):
+def hand_back(bad, partners, checks, run, batch, root, tried=None):
     """The message for the worker of the bad change's issue, with the record at its end. A returned
-    worker is a fresh session with no memory, so it carries everything the record holds."""
+    worker is a fresh session with no memory, so it carries everything the record holds. `tried` is
+    the fix on top it already landed, when the Gate is still red there."""
     issue = issue_of(bad, root)
     lines = ["Your commit {} ({}) for {} turned the batch ending at {} red in {}.".format(
         bad, subject(bad), issue, batch[:9], run.get("url") or run.get("databaseId"))]
+    if tried:
+        lines.append("Your fix on top, {} ({}), is on landing, and the Gate is still red there: the change "
+                     "is not fixed yet.".format(tried, subject(tried)))
     lines.append("Failed check: {}.".format(", ".join(checks) if checks else "not named by the run"))
     if partners:
         named = ", ".join("{} ({})".format(sha[:9], issue_of(sha, root)) for sha in partners)
@@ -518,28 +562,55 @@ def search(run_id, root):
     commits = git("rev-list", "--reverse", "--first-parent", "{}..{}".format(main_sha, batch)).stdout.split()
     if not commits:
         raise Stop("Batch {} holds no commit main does not, so nothing is named.".format(batch[:9]))
+    # Main does not move past a red batch, so a batch can hold a change already named. With no fix
+    # on top yet, it is the red the foreman already handed back: search nothing, send nothing again.
+    known = named(root)
+    waiting = [c for c in commits if c in known and not later_of_issue(commits, c, root)]
+    if waiting:
+        say("Batch {} holds {}, already named and handed back, with no fix on top yet. It is red for that "
+            "reason; no Gate run is started and nothing is named again. Search the batch that holds the fix "
+            "if it goes red.".format(batch[:9], ", ".join("{} ({})".format(c[:9], known[c]) for c in waiting)))
+        return 0
     say("Batch {} holds {} commits after main {}. Searching with the stored Gate, {}.".format(
         batch[:9], len(commits), main_sha[:9], stored["workflow"]))
 
-    finder = Search(root, stored["workflow"], main_sha, commits, run, batch)
-    bad, partners, evidence = finder.find()
-    if len(commits) > 1 and not finder.saw_red:
+    # A change fixed on top makes the batch green again after it, so a red found before its fix
+    # is not this batch's red. Test the fix: still red, the change is named again; green, the
+    # search starts over from the fix, on the commits after it.
+    base, pending, spent, tried = main_sha, commits, 0, None
+    while True:
+        finder = Search(root, stored["workflow"], base, pending, run, batch)
+        bad, partners, evidence = finder.find()
+        fix = later_of_issue(pending, bad, root)
+        if not fix:
+            break
+        verdict, fix_run = finder.test(pending[:pending.index(fix) + 1])
+        if verdict == "red":
+            tried, evidence = fix, fix_run
+            break
+        say("  {} ({}) is fixed on top by {}: searching the commits after it".format(
+            bad[:9], issue_of(bad, root), fix[:9]))
+        spent += finder.runs
+        base, pending = fix, pending[pending.index(fix) + 1:]
+    if len(pending) > 1 and not finder.saw_red and not tried:
         # Every run the search started was green, so the only red is the batch run itself. Run the
         # Gate once more on the batch: a red that does not come back blames no change.
-        verdict, again = finder.run_gate(batch, tuple(commits))
+        verdict, again = finder.run_gate(batch, tuple(pending))
         if verdict != "red":
             raise Stop("None of the search's {} Gate runs went red, the batch itself included, so the red of "
-                       "run {} did not happen again. No change is named.".format(finder.runs, run_id))
+                       "run {} did not happen again. No change is named.".format(spent + finder.runs, run_id))
         if evidence is run:
             evidence = again
+    runs = spent + finder.runs
     jobs = evidence.get("jobs") or []
     checks = failed_checks([j for j in jobs if part_of(j) == "gate"] if evidence is run else jobs, finder.verdicts)
 
     issue = issue_of(bad, root)
+    remember(root, bad, issue, evidence)
     say("")
     say("Named {} ({}) as the change that turned batch {} red, after {} Gate runs. Nothing was pushed to landing "
         "or main: the change stays on the pile, and its worker fixes it on top.".format(
-            bad[:9], issue, batch[:9], finder.runs))
+            bad[:9], issue, batch[:9], runs))
     say("")
     if issue == NO_ISSUE:
         say("{} names no issue: tell the person, with this record.".format(bad[:9]))
@@ -547,7 +618,7 @@ def search(run_id, root):
         say(record(bad, partners, checks, evidence, batch, root))
         return 0
     say(BLOCK_START.format(issue=issue))
-    say(hand_back(bad, partners, checks, evidence, batch, root))
+    say(hand_back(bad, partners, checks, evidence, batch, root, tried))
     say(BLOCK_END)
     return 0
 

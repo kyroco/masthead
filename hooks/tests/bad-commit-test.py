@@ -121,6 +121,10 @@ class Repo:
         for key, value in (("user.name", "Test"), ("user.email", "test@example.com"), ("commit.gpgsign", "false")):
             git(self.work, "config", key, value)
         git(self.work, "switch", "--quiet", "-c", "main")
+        # As setup leaves a real checkout: the state folder, where the search remembers what it
+        # named, is kept out of git.
+        with open(os.path.join(self.work, ".git", "info", "exclude"), "a") as handle:
+            handle.write(".claude/state/\n")
         self.write(".claude/settings.json", json.dumps({"env": {"ISSUE_TRACKER": "linear", "LINEAR_TEAM_KEY": "INFRA"}}))
         self.workflow = ".github/workflows/real-gate.yml" if decoy else GATE
         self.write(self.workflow, workflow)

@@ -1800,6 +1800,20 @@ says  skills/work-on/worker.md "it stays on landing: fix it on top"
 never skills/work-on/worker.md "If a batch drops your commit"
 never references/session-cliffs.md "If a batch drops your commit"
 says  references/session-cliffs.md "it stays on landing and comes back to you to fix on top"
+# Round 1, V-S2-J1: a named change with no fix on top is not handed back again.
+says  "$FM" "that is the red you already handed back: it starts no Gate run, and you hand nothing back again"
+says  "$FM" "A block that says the worker's fix on top is still red goes back the same way"
+says  references/bad-commit.md "(no fix on top yet) | Starts no Gate run and names nothing again"
+# Round 1, V-S2-1: a change fixed on top is passed over when its fix is green.
+says  references/bad-commit.md "green, the search starts over from that commit, on the commits after it"
+# Round 1, arch-3: the issue field says none found when the commit names none, as the code prints.
+says  references/bad-commit.md "the Linear key or \`#<number>\` its message names, or \`none found\`"
+# INFRA-285 arch-2: a push to landing starts no batch run; the search pushes nothing, and a run starts on a go.
+for f in skills/work-on/bad-commit.py references/bad-commit.md; do
+  never "$f" "That push starts the next batch run"
+  never "$f" "which tests the rest again"
+done
+says  references/bad-commit.md "Main does not move until a later go runs green."
 # Scenario 3: main waits for a later go that runs green.
 says  "$FM" "main does not move until a later go runs green"
 echo "$pass passed, $fail failed"

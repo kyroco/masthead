@@ -332,7 +332,11 @@ only naming the bad change: "so why are you asking me?" When it names
 nothing, what it prints, its reason, goes to the person as it stands, for
 example when the Gate passed and only the move of main failed, or when the
 red did not happen again. A bad change whose commit names no issue goes to
-the person with the record the script prints.
+the person with the record the script prints. When it says the batch holds a
+change already named and handed back with no fix on top yet, that is the red
+you already handed back: it starts no Gate run, and you hand nothing back
+again. Run the search from the same checkout each time, since that checkout
+keeps its memory of what it named.
 
 When it names a change, it prints one block for that change's issue: the
 message for its worker, with the record at its end. A change that fails only
@@ -340,7 +344,8 @@ together with an earlier one is the later one's, and its message tells its
 worker to own the fix end to end, to read the earlier issue and every comment
 on it first, and to comment on both issues once its fix lands. Robert,
 November 19, 2026: "it is its job to figure out what needs to be fixed and
-fix it, and not say: welp not my commit sorry, moving on". Hand it back:
+fix it, and not say: welp not my commit sorry, moving on". A block that says
+the worker's fix on top is still red goes back the same way. Hand it back:
 
 1. Never set the issue Done. Set it back to In Progress (`set-status.sh`).
 2. Post the block on the issue as a comment, word for word. That comment is
