@@ -36,7 +36,7 @@ import project_fact  # noqa: E402  (gate.py puts hooks/ on the path)
 
 PLUGIN = os.path.dirname(os.path.dirname(HERE))
 README = os.path.join(PLUGIN, "README.md")
-STARTER_PATH = ".github/workflows/masthead-batch.yml"
+STARTER_PATH = project_fact.STARTER_FILE  # project_fact.ships() reads the same file (INFRA-276)
 ENVIRONMENT = "masthead-batch"
 LANDING = "landing"
 MAIN = "refs/heads/main"

@@ -420,21 +420,12 @@ def read_repo_file(top, relative, limit=REPO_FILE_LIMIT):
         return None
 
 
-def gate(root=None):
-    """How the repository's Gate is run, as setup stored it after the person's yes (INFRA-268), or None.
+def gate_answer(text, has_file):
+    """The stored Gate in `text`, the body of .claude/gate.json, as {"workflow", "starts"}, or None.
 
-    Read from .claude/gate.json at the top of the checkout `root` is in, a file
-    the repository commits so the batch run on GitHub reads the same answer
-    (references/gate-fact.md). Returns {"workflow": path, "starts": [...]} only
-    when the path is a workflow file in the checkout and at least one way to
-    start it is named; anything else is None, and the repository ships the old
-    way. Never works the Gate out: with nothing stored, nothing is returned.
+    `has_file(path)` says whether the workflow it names is a plain file where
+    the answer is read from. One set of rules for gate() and ships().
     """
-    root = root or project_root()
-    if not trusted(root):
-        return None
-    top = checkout_top(root)
-    text = read_repo_file(top, GATE_FILE)
     if text is None:
         return None
     try:
@@ -451,9 +442,90 @@ def gate(root=None):
     if not isinstance(starts, list):
         return None
     starts = sorted({s for s in starts if s in GATE_STARTS})
-    if not starts or not repo_file(top, workflow):
+    if not starts or not has_file(workflow):
         return None
     return {"workflow": workflow, "starts": starts}
+
+
+def gate(root=None):
+    """How the repository's Gate is run, as setup stored it after the person's yes (INFRA-268), or None.
+
+    Read from .claude/gate.json at the top of the checkout `root` is in, a file
+    the repository commits so the batch run on GitHub reads the same answer
+    (references/gate-fact.md). Returns {"workflow": path, "starts": [...]} only
+    when the path is a workflow file in the checkout and at least one way to
+    start it is named; anything else is None, and the repository ships the old
+    way. Never works the Gate out: with nothing stored, nothing is returned.
+    """
+    root = root or project_root()
+    if not trusted(root):
+        return None
+    top = checkout_top(root)
+    return gate_answer(read_repo_file(top, GATE_FILE), lambda path: bool(repo_file(top, path)))
+
+
+# The batch run's starter file, which only setup writes, after the person's yes to the batch run.
+STARTER_FILE = ".github/workflows/masthead-batch.yml"
+# Where a session reads whether the repository opted in: the landing branch as last fetched from origin.
+SHIPS_REF = "origin/landing"
+SHIPS_BATCH = "batch"
+SHIPS_PR = "pull-request"
+
+
+def committed_file(top, ref, relative, limit=REPO_FILE_LIMIT):
+    """The text of `relative` as committed at `ref`, or None when it is not a plain
+    file there (a symlink or a folder is not), is larger than `limit`, or is not UTF-8."""
+    try:
+        listed = subprocess.run(["git", "-C", top, "ls-tree", "-z", ref, "--", relative],
+                                capture_output=True, timeout=10)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if listed.returncode != 0:
+        return None
+    entries = [e for e in listed.stdout.split(b"\0") if e]
+    if len(entries) != 1:
+        return None
+    head, _, path = entries[0].partition(b"\t")
+    parts = head.split()
+    if len(parts) != 3 or parts[0] not in (b"100644", b"100755") or parts[1] != b"blob" \
+            or path.decode("utf-8", "replace") != relative:
+        return None
+    try:
+        blob = subprocess.run(["git", "-C", top, "cat-file", "blob", parts[2].decode()],
+                              capture_output=True, timeout=10)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if blob.returncode != 0 or len(blob.stdout) > limit:
+        return None
+    try:
+        return blob.stdout.decode("utf-8")
+    except UnicodeDecodeError:
+        return None
+
+
+def ships(root=None):
+    """Which way a change reaches main here (INFRA-276): "batch" or "pull-request".
+
+    "batch" only when the repository opted in to the batch run: the stored Gate
+    (.claude/gate.json, naming a workflow that is there too) and the starter
+    file setup writes are both committed on origin/landing, as last fetched.
+    Anything else, a part-way setup included, is "pull-request", the way
+    Masthead 0.3.1 ships. Robert, November 19, 2026: "yes that's the right
+    recommendation, keep the old way, new way is an option".
+    """
+    root = root or project_root()
+    if not trusted(root):
+        return SHIPS_PR
+    top = checkout_top(root)
+
+    def committed(path):
+        return committed_file(top, SHIPS_REF, path)
+
+    if committed(STARTER_FILE) is None:
+        return SHIPS_PR
+    if not gate_answer(committed(GATE_FILE), lambda path: committed(path) is not None):
+        return SHIPS_PR
+    return SHIPS_BATCH
 
 
 def main(argv):
@@ -470,7 +542,7 @@ def main(argv):
     # CLAUDE_PROJECT_DIR (it sets it for hooks only), so there the repository
     # the shell is in is the session's. trusted() still guards --root.
     if argv in (["--tracker"], ["--linear-team"], ["--architecture-doc"], ["--architecture-trial"], ["--state-path"],
-                ["--gate"]) and root is None \
+                ["--gate"], ["--ships"]) and root is None \
             and not os.environ.get("CLAUDE_PROJECT_DIR"):
         os.environ["CLAUDE_PROJECT_DIR"] = checkout_top(os.getcwd())
     # --state-path prints the full path of the checkout's state folder; the
@@ -517,6 +589,11 @@ def main(argv):
         if not stored:
             return 1
         print(json.dumps(stored))
+        return 0
+    # --ships prints batch or pull-request: which way a change reaches main here
+    # (references/session-cliffs.md, Opening a PR). Read after git fetch origin.
+    if argv == ["--ships"]:
+        print(ships(root))
         return 0
     as_path = bool(argv) and argv[0] == "--path"
     if as_path:
