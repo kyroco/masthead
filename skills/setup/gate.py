@@ -9,6 +9,9 @@ workflow uses it) or by `workflow_dispatch` (started by hand or by `gh`).
     gate.py look  [--root DIR]            what setup should say, as JSON; writes nothing
     gate.py store WORKFLOW [--root DIR]   write .claude/gate.json, after the person's yes
 
+A workflow named Gate is the Gate; failing that, a workflow that runs on a
+pull request or the merge queue, or a reusable workflow one of those runs.
+
 `look` reads a stored answer first and never works the Gate out again while one
 is stored (scenarios 2 and 4). Its "status" is one of:
 
@@ -31,6 +34,8 @@ import project_fact  # noqa: E402
 
 STARTS = project_fact.GATE_STARTS
 GATE_WORDS = ("pull_request", "pull_request_target", "merge_group")
+# A job that runs a reusable workflow of the same repository: `uses: ./.github/workflows/checks.yml`.
+CALLS = re.compile(r"""^\s*(?:-\s+)?uses\s*:\s*['"]?\./(\.github/workflows/[A-Za-z0-9._-]+\.ya?ml)['"]?\s*$""", re.M)
 OLD_WAY = "Masthead could not work out how this repository's Gate is run, so it keeps shipping the way it does today."
 
 
@@ -62,7 +67,8 @@ def triggers(text):
     and a block of keys or a block list under `on:`. YAML 1.1 reads a bare
     `on` key as true, so `true:` and quoted `"on":` count too.
     """
-    lines = [strip_comment(l) for l in text.splitlines()]
+    # A byte order mark is not part of the first key (V-S1-2).
+    lines = [strip_comment(l) for l in text.lstrip("\ufeff").splitlines()]
     for i, line in enumerate(lines):
         m = re.match(r"""^(on|'on'|"on"|true)\s*:\s*(.*)$""", line)
         if not m:
@@ -79,13 +85,14 @@ def triggers(text):
             if not child.strip():
                 continue
             depth = len(child) - len(child.lstrip())
-            if depth == 0:
+            body = child.strip()
+            # YAML lets a list sit flush with its key: `on:` then `- push` (V-S1-2).
+            if depth == 0 and not (indent in (None, 0) and body.startswith("- ")):
                 break
             if indent is None:
                 indent = depth
             if depth != indent:
                 continue
-            body = child.strip()
             if body.startswith("- "):
                 found.add(unquote(body[2:]))
             else:
@@ -121,7 +128,8 @@ def workflows(top):
         text = project_fact.read_repo_file(top, rel, limit=1024 * 1024)
         if text is None:
             continue
-        found.append({"workflow": rel, "name": workflow_name(text), "triggers": triggers(text)})
+        found.append({"workflow": rel, "name": workflow_name(text), "triggers": triggers(text),
+                      "calls": set(CALLS.findall(text))})
     return found
 
 
@@ -142,14 +150,18 @@ def look(top):
     flows = workflows(top)
     # A workflow named Gate is the Gate; failing that, what runs on a pull request or the merge queue.
     named = [f for f in flows if is_gate_named(f)]
-    candidates = named or [f for f in flows if f["triggers"] & set(GATE_WORDS)]
+    on_pull = [f for f in flows if f["triggers"] & set(GATE_WORDS)]
+    # A pull-request workflow often hands its checks to a reusable one, which
+    # workflow_call can start on its own (V-S1-J1).
+    called = {c for f in on_pull for c in f["calls"]}
+    candidates = named or on_pull + [f for f in flows if f["workflow"] in called and f not in on_pull]
     startable = [f for f in candidates if f["triggers"] & set(STARTS)]
     if not startable:
         if candidates:
             why = "{} cannot be started on its own: it has neither workflow_call nor workflow_dispatch.".format(
                 ", ".join(f["workflow"] for f in candidates))
         else:
-            why = "No workflow is named Gate or runs on a pull request or the merge queue."
+            why = "No workflow is named Gate, runs on a pull request or the merge queue, or is run by one."
         return {"status": "none", "why": why, "say": OLD_WAY}
     if len(startable) == 1:
         return dict(answer(startable[0]), status="found")
