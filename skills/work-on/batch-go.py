@@ -67,12 +67,14 @@ over a merge that brings in only commits main already holds.
 `origin/landing`, or with `--hotfix`, `origin/hotfix` while a hotfix waits
 there and `origin/main` otherwise. It starts nothing.
 """
+import datetime
 import importlib.util
 import json
 import os
 import re
 import subprocess
 import sys
+import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PLUGIN = os.path.dirname(os.path.dirname(HERE))
@@ -326,9 +328,9 @@ def gh_json(*args):
         return None, "gh {} did not answer with JSON".format(" ".join(args[:2]))
 
 
-def runs_for(head):
-    """The batch runs GitHub holds for `head` on landing, newest first, or (None, why) when it cannot say."""
-    runs, error = gh_json("run", "list", "--workflow", STARTER, "--branch", LANDING, "--event", "workflow_dispatch",
+def runs_for(head, branch):
+    """The batch runs GitHub holds for `head` on the pile's branch, newest first, or (None, why) when it cannot say."""
+    runs, error = gh_json("run", "list", "--workflow", STARTER, "--branch", branch, "--event", "workflow_dispatch",
                           "--json", "databaseId,headSha,status,conclusion,createdAt", "--limit", "50")
     if error:
         return None, error
@@ -356,19 +358,70 @@ def verdict(jobs):
     return None
 
 
-def earlier(head):
-    """Stop, or rerun only a move, when GitHub already holds a batch run for `head`. Returns True when it
-    started the move again, False when a new run should start."""
+# GitHub lists a run a few seconds after the go starts it, so the go also remembers, in the repository's
+# own git folder, which commit it last started a run for and when (J1). A go for that commit inside this
+# many seconds, while GitHub lists no run made since, starts nothing.
+GO_MARKER = "masthead-batch-go.json"
+JUST_STARTED = 300
+
+
+def marker_path():
+    folder = git("rev-parse", "--path-format=absolute", "--git-common-dir", check=False).stdout.strip()
+    return os.path.join(folder, GO_MARKER) if folder else None
+
+
+def remember_go(head):
+    path = marker_path()
+    if not path:
+        return
+    try:
+        with open(path, "w", encoding="utf-8") as handle:
+            json.dump({"sha": head, "at": time.time()}, handle)
+    except OSError:
+        pass
+
+
+def started_moments_ago(head, runs):
+    """Seconds since this checkout's last go started a run for `head`, when GitHub lists no run made since; else None."""
+    path = marker_path()
+    try:
+        with open(path or "", encoding="utf-8") as handle:
+            said = json.load(handle)
+        at = float(said["at"])
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+    ago = time.time() - at
+    if said.get("sha") != head or not 0 <= ago < JUST_STARTED:
+        return None
+    for run in runs:
+        try:
+            made = datetime.datetime.fromisoformat((run.get("createdAt") or "").replace("Z", "+00:00")).timestamp()
+        except ValueError:
+            continue
+        if made >= at - 5:
+            return None
+    return int(ago)
+
+
+def earlier(head, branch):
+    """Stop, or rerun only a move, when GitHub already holds a batch run for `head` on `branch`. Returns True
+    when it started the move again, False when a new run should start."""
     # GitHub not answering starts nothing: a new run could test a commit that already passed (s1-J1).
-    runs, error = runs_for(head)
+    runs, error = runs_for(head, branch)
     if runs is None:
         raise Stop("GitHub did not list the earlier batch runs ({}), so the go cannot tell whether {} was tested "
                    "already, and nothing starts. Say go again in a minute.".format(error, head[:9]))
     for run in runs:
         if run.get("status") != "completed":
-            raise Stop("Batch run {} is already testing landing at {} ({}). A second go would test the same commit "
+            raise Stop("Batch run {} is already testing {} at {} ({}). A second go would test the same commit "
                        "again, so nothing starts. Watch it: gh run watch {}".format(
-                           run.get("databaseId"), head[:9], run.get("status") or "waiting", run.get("databaseId")))
+                           run.get("databaseId"), branch, head[:9], run.get("status") or "waiting",
+                           run.get("databaseId")))
+    ago = started_moments_ago(head, runs)
+    if ago is not None:
+        raise Stop("A go for {} started a batch run {} seconds ago, moments ago, and GitHub does not list it yet. A "
+                   "second run would test the same commit again, so nothing starts. Watch it: gh run list --workflow "
+                   "{} --event workflow_dispatch --branch {} --limit 1".format(head[:9], ago, STARTER, branch))
     for run in runs:
         found, error = gh_json("run", "view", str(run.get("databaseId")), "--json", "jobs")
         if error or not isinstance(found, dict):
@@ -389,15 +442,16 @@ def earlier(head):
                            "not run the move again: {}\nNothing starts, so the Gate does not test the same commit "
                            "again. Tell the person.".format(run.get("databaseId"), head[:9],
                                                              (r.stderr or r.stdout).strip()))
+            remember_go(head)
             print("Batch run {} already passed the Gate on {}; only its move of main failed. Its move runs again, "
                   "with no Gate run: gh run watch {}".format(run.get("databaseId"), head[:9], run.get("databaseId")))
             return True
     return False
 
 
-def starter_skips_documents():
-    """Whether the starter on landing skips the Gate for a pile of only documents (INFRA-287)."""
-    text = git("show", "refs/remotes/{}/{}:{}".format(REMOTE, LANDING, project_fact.STARTER_FILE), check=False).stdout
+def starter_skips_documents(branch):
+    """Whether the starter on the pile's branch skips the Gate for a pile of only documents (INFRA-287)."""
+    text = git("show", "refs/remotes/{}/{}:{}".format(REMOTE, branch, project_fact.STARTER_FILE), check=False).stdout
     return "needs.plan.outputs.test" in text
 
 
@@ -492,19 +546,19 @@ def go(argv):
     main_ref = "refs/remotes/{}/{}".format(REMOTE, MAIN)
     only_documents = project_fact.documents_only(top, main_ref, head)
     if only_documents:
-        if starter_skips_documents():
+        if starter_skips_documents(branch):
             print("The pile changes only documents since main, as main's .claude/gate.json names them, so the run "
                   "moves main with no Gate run.")
         else:
-            print("The pile changes only documents since main, but the starter on landing is older and runs the "
+            print("The pile changes only documents since main, but the starter on {} is older and runs the "
                   "Gate anyway. Run /masthead:setup to write it again (batch.py write), with the person's OK for the "
-                  "change to .github/.")
+                  "change to .github/.".format(branch))
     if check_only:
         if behind:
             print("Main holds work {} does not; a go first brings main into {} with one merge.".format(branch, branch))
         print("Checked only; nothing started.")
         return 0
-    if earlier(head):
+    if earlier(head, branch):
         return 0
 
     r = subprocess.run(["gh", "workflow", "run", STARTER, "--ref", branch,
@@ -515,6 +569,7 @@ def go(argv):
                    "also on the default branch, so the starter must be on main, as well as on landing, before the "
                    "first go. If main lacks {}, put it there once, as setup's step 5 says, then say go again."
                    .format((r.stderr or r.stdout).strip(), project_fact.STARTER_FILE))
+    remember_go(head)
     print("Started one batch run on {} at {} for {}. Main moves to {} only when it is green.".format(
         branch, head[:9], name, head[:9]))
     print("Watch it: gh run list --workflow {} --event workflow_dispatch --branch {} --limit 1".format(STARTER, branch))

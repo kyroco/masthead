@@ -164,15 +164,16 @@ jobs:
             fi
             count=0
             while IFS= read -r -d '' path; do
-              hit=""
               case "$path" in
-                .github/* | .claude/gate.json) ;;
-                *)
-                  while IFS= read -r pattern; do
-                    case "$path" in $pattern) hit=1; break ;; esac
-                  done <<< "$patterns"
+                .github/* | .claude/gate.json)
+                  echo "The batch changes $path, a check or the stored Gate itself, and a change to those always runs the Gate, whatever main's .claude/gate.json names."
+                  return 1
                   ;;
               esac
+              hit=""
+              while IFS= read -r pattern; do
+                case "$path" in $pattern) hit=1; break ;; esac
+              done <<< "$patterns"
               if [ -z "$hit" ]; then
                 echo "The batch changes $path, which is not a document by main's .claude/gate.json, so it changes more than documents."
                 return 1
