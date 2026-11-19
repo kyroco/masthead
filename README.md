@@ -347,9 +347,11 @@ Make the private key:
     so move it somewhere safe outside every repository. The install below does
     not ask for it. If you lose it, make a new key the same way; the App can
     hold several at once. Store the new key in every repository that uses the
-    App, with the second command below, before you delete the old key under
-    **Key pairs**: each of those repositories still moves main with the old
-    one until then.
+    App before you delete the old key under **Key pairs**: each of those
+    repositories still moves main with the old one until then. To see which
+    repositories use it, open the App's **Configure** page (steps 15 to 17
+    below) and read the list under **Repository access**. Run the second
+    command below once for each of them, with its name after `--repo`.
 
 Install the App:
 

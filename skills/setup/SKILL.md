@@ -259,7 +259,9 @@ batch run can move it would never move again.
    they register it, copy its App ID, make the key and install it on this
    repository alone. With one already, reuse it: they follow
    "Add this repository to an App you already have" and keep its App ID and
-   `.pem` file. Wait until they say they are done, then ask for the App ID, the
+   `.pem` file. If no one has the `.pem` file any more, also show steps 11 and
+   12 as printed: they make a new key and store it in every repository that
+   uses the App before deleting the old one. Wait until they say they are done, then ask for the App ID, the
    number on the App's page.
 2. Say what the next three change, and ask one question, "Shall I make
    these?": the starter file `.github/workflows/masthead-batch.yml`, the
