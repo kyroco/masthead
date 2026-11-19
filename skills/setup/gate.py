@@ -335,9 +335,7 @@ SNAG_LOOKUP = re.compile(r"""\b(?:check_name|check-name|context)\s*[=:]\s*['"]?(
                          re.I)
 # What, this many lines away or nearer, shows a line already has its fix beside it.
 NEAR = 4
-FIXED = {"event": ("masthead-batch.yml",), "base": ("masthead-batch.yml",),
-         "check": ("gate / ", "masthead batch")}
-
+FIXED = {"event": ("masthead-batch.yml",), "base": ("masthead-batch.yml",)}
 
 def trigger_lines(lines):
     """The indices of the top-level `on:` key and every line under it: they declare, they test nothing."""
@@ -432,13 +430,16 @@ def snags(top):
                 hits.append(("event", MISSES["event"]))
             if SNAG_BASE.search(line) and not fixed("base"):
                 hits.append(("base", MISSES["base"]))
-            if not fixed("check"):
-                for m in SNAG_LOOKUP.finditer(line):
-                    name = (m.group(1) or m.group(3) or "").strip()
-                    if name.lower() in jobs:
-                        hits.append(("check", MISSES["job"].format(name=name)))
-                    elif name.lower() in names:
+            # A name lookup is fixed only by a lookup of the batch's own name for it
+            # nearby, never by the words in a workflows: list (arch-1, round 2).
+            for m in SNAG_LOOKUP.finditer(line):
+                name = (m.group(1) or m.group(3) or "").strip()
+                run_test = m.group(3) is not None and line[:m.start()].lower().endswith("workflow_run.")
+                if run_test or (name.lower() in names and name.lower() not in jobs):
+                    if name.lower() in names and not re.search(r"==\s*['\"]masthead batch['\"]", near):
                         hits.append(("check", MISSES["run"].format(name=name)))
+                elif name.lower() in jobs and "gate / " + name.lower() not in near:
+                    hits.append(("check", MISSES["job"].format(name=name)))
             for kind, misses in hits:
                 found.append({"workflow": rel, "line": i + 1, "kind": kind, "text": raw[i].strip(),
                               "misses": misses})

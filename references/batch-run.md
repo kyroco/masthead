@@ -123,8 +123,11 @@ if: >-
 the three, in the stored Gate, every workflow it calls with `uses: ./...`,
 and every `workflow_run` helper that names it, and says what a batch run
 would miss there. A line that only declares a trigger is never pointed at, and
-a line with its fix within four lines (a batch arm naming `masthead-batch.yml`,
-or the names `gate / ` or `Masthead batch`) counts as fixed. It reads workflow files only: a script the Gate
+a line with its own fix within four lines counts as fixed: a batch arm naming
+`masthead-batch.yml` beside a `workflow_dispatch` test or `github.event.before`,
+a test for `== 'Masthead batch'` beside a test of the run's name, or
+`gate / <job>` beside a lookup of that job's check. A `workflows:` list that
+names Masthead batch fixes the list, not a name test below it. It reads workflow files only: a script the Gate
 runs (Kyroco's runner picker was one) needs the same search by hand. Setup
 runs it before the starter lands, so the first batch is not where these show.
 Masthead changes no repository's Gate; fixing a snag is the repository's
