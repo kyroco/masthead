@@ -439,7 +439,8 @@ def gate(root=None):
         return None
     try:
         data = json.loads(text)
-    except ValueError:
+    except (ValueError, RecursionError):
+        # Deep nesting raises RecursionError, not ValueError: still nothing stored.
         return None
     if not isinstance(data, dict):
         return None
