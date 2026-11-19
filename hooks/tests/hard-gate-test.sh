@@ -1200,7 +1200,7 @@ d="$(ci_repo ci-workflow)"
 run_gate "$d" "git push origin HEAD:landing"
 ok "$STATUS" "2" "a commit that changes a workflow, with no OK, is refused"
 contains "$ERR" ".github/workflows/gate.yml" "the refusal names the file"
-contains "$ERR" "OK" "the refusal says the person's OK is needed"
+contains "$ERR" "without the person's OK on record" "the refusal says the person's OK is needed"
 contains "$ERR" "CI-change-OK:" "the refusal says which line records the OK"
 run_gate "$d" "git push -u origin HEAD"
 ok "$STATUS" "2" "the same commit pushed to any branch is refused too"
@@ -1267,6 +1267,63 @@ run_gate "$d" "git push origin side:landing"
 ok "$STATUS" "2" "pushing another branch's CI commit is refused the same way"
 run_gate "$d" "git push origin --delete side"
 ok "$STATUS" "0" "deleting a remote branch sends no commit, so it goes through"
+
+echo "40b. INFRA-274 round 1: the check reads what each push sends"
+# F1: a commit made in the same line as the push.
+d="$(ci_repo ci-commit-and-push)"
+echo 'jobs: {}' >> "$d/.github/workflows/gate.yml"
+run_gate "$d" "git commit -qam 'Add a lane' && git push origin HEAD:landing"
+ok "$STATUS" "2" "a CI edit committed in the same line as the push is refused"
+contains "$ERR" ".github/workflows/gate.yml" "the refusal names the uncommitted CI file"
+( cd "$d" && git checkout -q .github ) >/dev/null 2>&1
+echo more >> "$d/README.md"
+run_gate "$d" "git commit -qam 'Docs' && git push origin HEAD:landing"
+ok "$STATUS" "0" "a docs edit committed in the same line as the push goes through"
+run_gate "$d" "git merge side && git push origin HEAD:landing"
+ok "$STATUS" "2" "a merge in the same line as the push is refused, since what it brings is not known yet"
+# F2: --all, --branches and --mirror.
+d="$(ci_repo ci-push-all)"
+( cd "$d" && git checkout -qb side && echo 'jobs: {}' >> .github/workflows/gate.yml && git commit -qam "Add a lane" \
+    && git checkout -q - ) >/dev/null 2>&1
+for how in "git push --all origin" "git push origin --branches" "git push --mirror origin"; do
+  run_gate "$d" "$how"
+  ok "$STATUS" "2" "'$how' carrying a CI commit with no OK is refused"
+done
+# F3: two refspecs, and two pushes in one line.
+d="$(ci_repo ci-two-specs)"
+( cd "$d" && git branch side && echo 'jobs: {}' >> .github/workflows/gate.yml && git commit -qam "Add a lane" ) >/dev/null 2>&1
+run_gate "$d" "git push origin side:side HEAD:landing"
+ok "$STATUS" "2" "a CI commit sent as the second refspec is refused"
+run_gate "$d" "git push origin side:side && git push origin HEAD:landing"
+ok "$STATUS" "2" "a CI commit sent by the second push of the line is refused"
+# F4: a file name git would quote.
+d="$(ci_repo ci-quoted-name)"
+( cd "$d" && echo 'on: push' > ".github/workflows/déploy.yml" && git add -A && git commit -qm "Add a lane" ) >/dev/null 2>&1
+run_gate "$d" "git push origin HEAD:landing"
+ok "$STATUS" "2" "a workflow whose name has a non-ASCII letter is caught"
+# F5: another branch with HEAD's tree but its own history.
+d="$(ci_repo ci-same-tree)"
+base_name="$(cd "$d" && git branch --show-current)"
+( cd "$d" && git checkout -qb feature && echo 'jobs: {}' >> .github/workflows/gate.yml && git commit -qam "Try a lane" \
+    && git revert --no-edit HEAD && echo more >> README.md && git commit -qam "Docs" \
+    && git checkout -q "$base_name" && echo more >> README.md && git commit -qam "Docs only" \
+    && git checkout -q feature ) >/dev/null 2>&1
+run_gate "$d" "git push origin $base_name"
+ok "$STATUS" "0" "a docs-only branch with HEAD's tree is judged by its own commits, not by HEAD's"
+# F6: a merge that brings in a CI change already on origin.
+d="$(ci_repo ci-merge-main)"
+( cd "$d" && git checkout -qb feature && echo more >> README.md && git commit -qam "Docs" \
+    && git checkout -q - && echo 'jobs: {}' >> .github/workflows/gate.yml \
+    && git commit -qam "Add a lane" -m "$OKLINE" && git update-ref refs/remotes/origin/main HEAD \
+    && git checkout -q feature && git merge -q --no-edit "$(git rev-parse refs/remotes/origin/main)" ) >/dev/null 2>&1
+run_gate "$d" "git push -u origin HEAD"
+ok "$STATUS" "0" "merging main's approved CI change into a branch asks for no second OK"
+# F7: the OK line copied with the indent the refusal prints it with.
+d="$(ci_repo ci-ok-indented)"
+( cd "$d" && echo 'jobs: {}' >> .github/workflows/gate.yml \
+    && git commit -qam "Add a lane (INFRA-1)" -m "  $OKLINE" ) >/dev/null 2>&1
+run_gate "$d" "git push origin HEAD:landing"
+ok "$STATUS" "0" "the OK line copied with its indent still counts"
 
 echo ""
 echo "passed $pass, failed $fail"
