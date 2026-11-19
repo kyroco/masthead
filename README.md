@@ -345,8 +345,11 @@ Make the private key:
 12. Your browser saves a file ending in `.private-key.pem` to your Downloads
     folder. It downloads once, when the key is made, and GitHub keeps no copy,
     so move it somewhere safe outside every repository. The install below does
-    not ask for it. If you lose it, make a new key the same way and delete the
-    old one.
+    not ask for it. If you lose it, make a new key the same way; the App can
+    hold several at once. Store the new key in every repository that uses the
+    App, with the second command below, before you delete the old key under
+    **Key pairs**: each of those repositories still moves main with the old
+    one until then.
 
 Install the App:
 
@@ -362,7 +365,9 @@ Add this repository to an App you already have:
 One batch App serves the whole organization. For each further repository that
 chooses the batch run, skip the steps above and do these instead, then store
 the two secrets below in that repository too, with the same App ID and the
-same `.pem` file.
+same `.pem` file. If no one has the `.pem` file any more, make a new key as
+step 11 says and follow step 12: the new key goes into every repository that
+uses the App before you delete the old one.
 
 15. Click your profile picture, click **Your organizations**, then click
     **Settings** to the right of the organization.
