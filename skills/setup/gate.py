@@ -10,6 +10,9 @@ workflow uses it) or by `workflow_dispatch` (started by hand or by `gh`).
     gate.py store WORKFLOW [--root DIR]   write .claude/gate.json, after the person's yes
     gate.py starter [--root DIR]          print the batch run's starter file for the stored Gate (INFRA-270)
     gate.py snags [--root DIR]            the stored Gate's lines a batch run would miss, as JSON; writes nothing (INFRA-283)
+    gate.py documents [--root DIR]        the stored document paths, or what to ask, as JSON; writes nothing (INFRA-287)
+    gate.py documents --store PATTERN... | --none [--root DIR]
+                                          store which paths hold only documents, after the person's yes (INFRA-287)
 
 A workflow named Gate is the Gate; failing that, a workflow that runs on a
 pull request or the merge queue, or a reusable workflow one of those runs.
@@ -163,7 +166,7 @@ def answer(flow):
 def look(top):
     stored = project_fact.gate(top)
     if stored:
-        return dict(stored, status="stored")
+        return dict(stored, status="stored", documents=stored_documents(top))
     flows = workflows(top)
     # A workflow named Gate is the Gate; failing that, what runs on a pull request or the merge queue.
     named = [f for f in flows if is_gate_named(f)]
@@ -342,6 +345,9 @@ MISSES = {
     "landing-push": ("This workflow starts on every push to landing, so each change a worker lands runs it and "
                      "uses minutes, outside the batch run, which starts only on a go. To keep it off landing, add "
                      "branches-ignore: [landing] under its push trigger, or list only the branches it should run on."),
+    "main-push": ("This workflow starts on every push to main, so when the batch run moves main it runs again on "
+                  "the commit the batch run just proved, or on a pile of only documents. If it tests, keep it off main "
+                  "with branches-ignore: [main] under its push trigger; if it deploys or releases, leave it."),
 }
 SNAG_EVENT = re.compile(r"\bgithub\.workflow_ref\b")
 # A test for a push: the batch arm INFRA-283 advised, when it sits by a test for landing or the starter.
@@ -547,11 +553,12 @@ def snags(top):
         if flow["workflow"] == project_fact.STARTER_FILE or "push" not in flow["triggers"]:
             continue
         text = read(flow["workflow"]) or ""
-        line = push_to(text, "landing")
-        if line:
-            found.append({"workflow": flow["workflow"], "line": line, "kind": "landing-push",
-                          "text": text.lstrip("\ufeff").splitlines()[line - 1].strip(),
-                          "misses": MISSES["landing-push"]})
+        for branch, kind in (("landing", "landing-push"), ("main", "main-push")):
+            line = push_to(text, branch)
+            if line:
+                found.append({"workflow": flow["workflow"], "line": line, "kind": kind,
+                              "text": text.lstrip("\ufeff").splitlines()[line - 1].strip(),
+                              "misses": MISSES[kind]})
     found.sort(key=lambda s: (s["workflow"], s["line"], s["kind"]))
     return {"status": "snags" if found else "clear", "snags": found, "read": sorted(texts)}
 
@@ -564,8 +571,20 @@ def store(top, workflow):
     record = answer(flow)
     if not record["starts"]:
         return None, "{} cannot be started on its own, so nothing was stored. {}".format(workflow, OLD_WAY)
-    # Never write through a symlink a cloned repository committed (SEC-1): the
-    # .claude folder must be a real folder, and gate.json a plain file or absent.
+    # Storing the Gate again keeps the document paths the person already gave (INFRA-287 s3).
+    written = {"workflow": record["workflow"], "starts": record["starts"]}
+    kept = stored_documents(top)
+    if kept is not None:
+        written["documents"] = kept
+    _, error = write_gate_json(top, written)
+    if error:
+        return None, error
+    return record, None
+
+
+def write_gate_json(top, record):
+    """Write .claude/gate.json. Never through a symlink a cloned repository committed (SEC-1): the
+    .claude folder must be a real folder, and gate.json a plain file or absent."""
     folder = os.path.join(top, ".claude")
     if os.path.islink(folder) or (os.path.lexists(folder) and not os.path.isdir(folder)):
         return None, ".claude is not a plain folder in this repository, so nothing was stored. " + OLD_WAY
@@ -574,7 +593,7 @@ def store(top, workflow):
     refused = "{} is not a plain file, so nothing was stored. {}".format(project_fact.GATE_FILE, OLD_WAY)
     if os.path.lexists(path) and not project_fact.repo_file(top, project_fact.GATE_FILE):
         return None, refused
-    body = json.dumps({"workflow": record["workflow"], "starts": record["starts"]}, indent=2) + "\n"
+    body = json.dumps(record, indent=2) + "\n"
     try:
         fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_NOFOLLOW", 0), 0o644)
     except OSError:
@@ -582,6 +601,72 @@ def store(top, workflow):
     with os.fdopen(fd, "w", encoding="utf-8") as handle:
         handle.write(body)
     return record, None
+
+
+# ---- Which paths hold only documents (INFRA-287) ------------------------------
+# Robert, November 19, 2026: "Why do we run ANYTHING for a document commit? Why?" Setup asks once
+# and stores the answer beside the Gate; the batch run reads it from main and runs no Gate for a pile
+# that changes only those paths. It is never guessed on a run (the project description, decision 4).
+
+def stored_documents(top):
+    """The document patterns stored in .claude/gate.json: a list, empty when the person said none, or None
+    when they were never asked (or the stored list cannot be read), so setup asks once."""
+    return project_fact.document_patterns(project_fact.read_repo_file(top, project_fact.GATE_FILE))
+
+
+# What setup offers, for the person to change before the yes: a docs folder and the plain text files at
+# the top of the repository, each named on its own, since * reaches into every folder.
+TOP_DOCUMENTS = re.compile(r"(?i)^((readme|changelog|changes|history|contributing|code_of_conduct|security|support|"
+                           r"authors|notice|license|licence|copying)(\.(md|markdown|txt|rst))?|.+\.(md|markdown|rst))$")
+DOC_FOLDERS = ("docs", "doc", "documentation")
+
+
+def suggest_documents(top):
+    found = []
+    for folder in DOC_FOLDERS:
+        full = os.path.join(top, folder)
+        if os.path.isdir(full) and not os.path.islink(full):
+            found.append(folder + "/*")
+    try:
+        leaves = sorted(os.listdir(top))
+    except OSError:
+        leaves = []
+    for leaf in leaves:
+        full = os.path.join(top, leaf)
+        if os.path.isfile(full) and not os.path.islink(full) and TOP_DOCUMENTS.match(leaf) \
+                and project_fact.good_document_pattern(leaf):
+            found.append(leaf)
+    return found
+
+
+def documents(top):
+    """What setup says about document paths: the stored answer, or what to ask."""
+    if not project_fact.gate(top):
+        return {"status": "none", "say": "No Gate is stored, so there is no Gate run to skip for documents."}
+    stored = stored_documents(top)
+    if stored is not None:
+        return {"status": "stored", "documents": stored}
+    return {"status": "ask", "suggest": suggest_documents(top), "never": list(project_fact.NEVER_DOCUMENTS)}
+
+
+def store_documents(top, patterns):
+    """Write the document patterns into .claude/gate.json beside the stored Gate, after the person's yes.
+    An empty list records that no path holds only documents, so setup does not ask again."""
+    stored = project_fact.gate(top)
+    if not stored:
+        return None, "No Gate is stored in .claude/gate.json, so there is nowhere to store document paths. " + OLD_WAY
+    bad = [p for p in patterns if not project_fact.good_document_pattern(p)]
+    if bad:
+        return None, ("{} {} not a path pattern Masthead reads: use letters, digits, . _ - + @ and /, with * for any "
+                      "run of characters and ? for one, with a letter or digit, not starting with /. Nothing was "
+                      "stored.").format(", ".join(repr(p) for p in bad), "is" if len(bad) == 1 else "are")
+    # A pattern that reaches .github/ or gate.json is stored as given: those paths are never documents
+    # (project_fact.NEVER_DOCUMENTS), whatever a pattern says.
+    unique = []
+    for p in patterns:
+        if p not in unique:
+            unique.append(p)
+    return write_gate_json(top, {"workflow": stored["workflow"], "starts": stored["starts"], "documents": unique})
 
 
 def main(argv):
@@ -609,6 +694,16 @@ def main(argv):
     if argv == ["snags"]:
         print(json.dumps(snags(top), indent=2))
         return 0
+    if argv == ["documents"]:
+        print(json.dumps(documents(top), indent=2))
+        return 0
+    if argv[:1] == ["documents"] and (argv[1:] == ["--none"] or (len(argv) > 2 and argv[1] == "--store")):
+        record, error = store_documents(top, [] if argv[1] == "--none" else argv[2:])
+        if error:
+            print(error, file=sys.stderr)
+            return 1
+        print(json.dumps(record, indent=2))
+        return 0
     if argv == ["starter"]:
         text, error = starter(top)
         if error:
@@ -617,7 +712,8 @@ def main(argv):
         sys.stdout.write(text)
         return 0
     print(__doc__.strip().splitlines()[0], file=sys.stderr)
-    print("usage: gate.py look | gate.py store WORKFLOW | gate.py starter | gate.py snags  [--root DIR]",
+    print("usage: gate.py look | gate.py store WORKFLOW | gate.py starter | gate.py snags | "
+          "gate.py documents [--store PATTERN... | --none]  [--root DIR]",
           file=sys.stderr)
     return 2
 

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Read one fact about the repo a session is working in, from the env block of its .claude/settings.json."""
+import fnmatch
 import json
 import os
 import re
@@ -462,6 +463,72 @@ def gate(root=None):
         return None
     top = checkout_top(root)
     return gate_answer(read_repo_file(top, GATE_FILE), lambda path: bool(repo_file(top, path)))
+
+
+# Which paths hold only documents (INFRA-287). Setup asks the person once and stores the answer in
+# .claude/gate.json as "documents", a list of patterns; a pile that changes only those paths moves main
+# with no Gate run. Robert, November 19, 2026: "Why do we run ANYTHING for a document commit? Why?"
+# A pattern is a path from the top of the repository where * stands for any run of characters, a /
+# included, and ? for any one character, as both Python's fnmatch and a shell `case` read it; the batch
+# run's workflows read the same patterns with the same rule (DOCUMENT_PATTERN is written there too).
+DOCUMENT_PATTERN = r"^[A-Za-z0-9._*?+@-][A-Za-z0-9._*?/+@-]*$"
+DOCUMENT_PATTERN_LIMIT = 200
+# Never a document, whatever a pattern says: the checks themselves and the stored answer.
+NEVER_DOCUMENTS = (".github/*", ".claude/gate.json")
+
+
+def document_patterns(text):
+    """The document patterns stored in `text`, the body of .claude/gate.json: a list, possibly empty
+    (the person said no path holds only documents), or None when nothing is stored yet or the stored
+    list is not one Masthead can read the same way everywhere. A list with one bad entry is None as a
+    whole, so a typo never widens or narrows what counts as a document."""
+    try:
+        data = json.loads(text) if text is not None else None
+    except (ValueError, RecursionError):
+        return None
+    if not isinstance(data, dict) or not isinstance(data.get("documents"), list):
+        return None
+    patterns = data["documents"]
+    for p in patterns:
+        if not isinstance(p, str) or not good_document_pattern(p):
+            return None
+    return list(patterns)
+
+
+def good_document_pattern(pattern):
+    """A pattern the workflows read the same way: plain characters, * and ?, at least one letter or digit."""
+    return (len(pattern) <= DOCUMENT_PATTERN_LIMIT and re.match(DOCUMENT_PATTERN, pattern) is not None
+            and re.search(r"[A-Za-z0-9]", pattern) is not None)
+
+
+def is_document(path, patterns):
+    if any(fnmatch.fnmatchcase(path, never) for never in NEVER_DOCUMENTS):
+        return False
+    return any(fnmatch.fnmatchcase(path, p) for p in patterns or ())
+
+
+def changed_paths(top, base, head):
+    """Every path that differs between the trees of `base` and `head`, a rename as both its names; None when git cannot say."""
+    try:
+        r = subprocess.run(["git", "-C", top, "diff", "--no-renames", "--name-only", "-z", base, head, "--"],
+                           capture_output=True, timeout=30)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if r.returncode != 0:
+        return None
+    return [p.decode("utf-8", "replace") for p in r.stdout.split(b"\0") if p]
+
+
+def documents_only(top, base, head):
+    """Whether `head` differs from `base` only in document paths, read from `base`'s own .claude/gate.json
+    (never the pile's, so a pile cannot widen its own exemption). Nothing changed counts as only documents."""
+    paths = changed_paths(top, base, head)
+    if paths is None:
+        return False
+    if not paths:
+        return True
+    patterns = document_patterns(committed_file(top, base, GATE_FILE))
+    return bool(patterns) and all(is_document(p, patterns) for p in paths)
 
 
 # The batch run's starter file, which only setup writes, after the person's yes to the batch run.

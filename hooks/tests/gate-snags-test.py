@@ -342,8 +342,8 @@ plain_push = "name: Gate\non:\n  push:\n    branches: [main]\n  workflow_call:\n
              "    if: github.event_name == 'push'\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo ok\n"
 root = repo({".claude/gate.json": STORED, ".github/workflows/gate.yml": plain_push})
 code, out, err = snags(root)
-check("INFRA-285 a push test with no landing or starter beside it is not a batch arm and is clear",
-      out and out.get("status") == "clear", out or err)
+check("INFRA-285 a push test with no landing or starter beside it is not a batch arm",
+      out and [s["kind"] for s in out.get("snags", [])] == ["main-push"], out or err)
 
 # s1-C2: a workflow of the repository that runs on every push runs on each push to landing too,
 # costing minutes outside the batch run. Snags points at each one; one kept off landing is clear.
@@ -380,6 +380,35 @@ found, out = landing_runs("on: push\n")
 lp = [s for s in out.get("snags", []) if s["kind"] == "landing-push"] if isinstance(out, dict) else []
 check("s1-C2 the snag says each landed change runs it and how to keep it off landing",
       lp and "every push to landing" in lp[0]["misses"] and "branches-ignore: [landing]" in lp[0]["misses"], lp)
+
+
+# INFRA-287 S1, the move step: a workflow that runs on a push to main runs again on what the batch run
+# just proved when the move pushes main. Snags names each one; one kept off main is clear.
+def main_runs(on):
+    text = "name: Tests\n" + on + "jobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo ok\n"
+    root = repo({".claude/gate.json": STORED, ".github/workflows/gate.yml": AFTER, ".github/workflows/tests.yml": text,
+                 ".github/workflows/masthead-batch.yml": "name: Masthead batch\non:\n  workflow_dispatch:\njobs: {}\n"})
+    code, out, err = snags(root)
+    return [(s["workflow"], s["line"]) for s in (out or {}).get("snags", []) if s["kind"] == "main-push"], out or err
+
+
+for label, on, line in (("on: push", "on: push\n", 2),
+                        ("a push to main", "on:\n  push:\n    branches: [main]\n", 3),
+                        ("a push that ignores only landing", "on:\n  push:\n    branches-ignore: [landing]\n", 3)):
+    found, out = main_runs(on)
+    check("INFRA-287 S1 a workflow that runs again when the move pushes main is named ({})".format(label),
+          found == [(".github/workflows/tests.yml", line)], out)
+for label, on in (("main ignored", "on:\n  push:\n    branches-ignore: [main]\n"),
+                  ("landing only", "on:\n  push:\n    branches: [landing]\n"),
+                  ("no push", "on:\n  pull_request:\n")):
+    found, out = main_runs(on)
+    check("INFRA-287 S1 a workflow that does not run on a push to main is not named ({})".format(label), found == [], out)
+found, out = main_runs("on: push\n")
+mp = [s for s in out.get("snags", []) if s["kind"] == "main-push"] if isinstance(out, dict) else []
+check("INFRA-287 S1 the snag says the move reruns it on proved code and how to keep it off main",
+      mp and "just proved" in mp[0]["misses"] and "branches-ignore: [main]" in mp[0]["misses"], mp)
+check("INFRA-287 the starter itself is never named", all(s["workflow"] != ".github/workflows/masthead-batch.yml"
+                                                         for s in out.get("snags", [])), out)
 
 # A workflow_ref test with no batch arm nearby is still pointed at, even when the
 # file names masthead-batch.yml somewhere else.

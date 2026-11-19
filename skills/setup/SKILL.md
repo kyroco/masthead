@@ -297,7 +297,11 @@ batch run can move it would never move again.
      that runs on every push still runs on each push to `landing` and uses
      minutes there. `gate.py snags` names each one as `landing-push`; keeping
      it off `landing` (`branches-ignore: [landing]`) is a change to
-     `.github/`, so suggest it and never make it here.
+     `.github/`, so suggest it and never make it here. A workflow that runs
+     on a push to main runs again when the batch run moves main, on the
+     commit the batch run just proved; `gate.py snags` names each one as
+     `main-push`. One that only tests is kept off main the same way
+     (`branches-ignore: [main]`); one that deploys or releases stays.
    - The names. The starter calls the Gate from its job named `gate`, so each
      of the Gate's checks is named `gate / <job>`, the Gate's own job name
      after `gate / ` (Kyroco's verdict job is named `gate`, so its check is
@@ -344,6 +348,32 @@ batch run can move it would never move again.
    check again. When "other rules on main" is not ok, name each rule it
    names and say main will not move until it lets the App through; change
    none of them here.
+
+### Then which paths hold only documents, asked once
+
+Robert, November 19, 2026: "Why do we run ANYTHING for a document commit?
+Why?" A pile that changes only documents since main moves main with no Gate
+run, and setup decides once, with the person, which paths are documents; the
+batch run never guesses. Ask this only when the batch run is in place or was
+just chosen. Run `python3 ${CLAUDE_PLUGIN_ROOT}/skills/setup/gate.py documents`:
+
+- `stored`: say "Documents here: <the list>, stored before." (or "No path
+  here holds only documents, stored before." for an empty list) and ask
+  nothing, unless the person asks to change it.
+- `ask`: show its `suggest` list and ask "A pile that changes only these
+  paths would reach main with no Gate run. Are these the paths that hold only
+  documents here? Change the list as you like, or say none." A pattern is a
+  path from the top of the repository, `*` stands for any run of characters,
+  folders included, and `?` for one character; say that `*.md` would take in
+  every Markdown file in every folder, instructions an agent reads included.
+  On yes, run `gate.py documents --store <pattern> ...` with the list they
+  agreed; on none, `gate.py documents --none`, so this is not asked again.
+  Say its `never` list in one line: changes to the checks and to
+  `.claude/gate.json` always run the Gate, whatever the list says.
+
+Say to commit `.claude/gate.json` and land it like any change: the batch run
+reads the list from main, so it applies to the piles after the one that
+carries it.
 
 ## 10. Write, then show what is on
 

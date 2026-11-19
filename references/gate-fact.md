@@ -14,7 +14,8 @@ after a yes. No repository writes it by hand.
 ```json
 {
   "workflow": ".github/workflows/gate.yml",
-  "starts": ["workflow_call", "workflow_dispatch"]
+  "starts": ["workflow_call", "workflow_dispatch"],
+  "documents": ["docs/*", "README.md"]
 }
 ```
 
@@ -23,6 +24,16 @@ after a yes. No repository writes it by hand.
 - `starts`: the ways it can be started on its own, one or both of
   `workflow_call` (another workflow runs it with `uses: ./<workflow>`) and
   `workflow_dispatch` (`gh workflow run <workflow> --ref <branch>`).
+- `documents` (INFRA-287, optional): the paths that hold only documents, as
+  the person agreed in setup (`gate.py documents --store`). Each is a path
+  from the top of the repository where `*` stands for any run of characters,
+  a `/` included, and `?` for one character; only letters, digits, `. _ - +
+  @ /`, `*` and `?`, with a letter or digit, not starting with `/`. An empty
+  list means the person said no path holds only documents. Missing means
+  never asked, and setup asks. A list with one entry outside those rules is
+  read as missing, everywhere. Changes under `.github/` and to
+  `.claude/gate.json` are never documents. The batch run reads this list from
+  main, never from the pile it tests (`references/batch-run.md`).
 
 ## How to read it
 

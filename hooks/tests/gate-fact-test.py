@@ -341,5 +341,63 @@ for label, text, want in (
         ("jobs key named on", "name: x\njobs:\n  on:\n    runs-on: x\n", set())):
     expect("triggers " + label, gate_py.triggers(text), want)
 
+# ==== INFRA-287 scenario 3: setup asks once which paths are documents, and stores the answer ====
+# The project description, November 19 decision 4: setup "asks for one yes and stores it; it is not
+# guessed fresh on every run".
+def documents_look(root):
+    code, out, err = run_gate(root, "documents")
+    return json.loads(out) if code == 0 else {"error": err}
+
+
+root = repo()
+write(root, ".github/workflows/gate.yml", GATE_YML)
+write(root, "docs/guide.md", "guide\n")
+write(root, "README.md", "readme\n")
+write(root, "LICENSE", "license\n")
+write(root, "mix.exs", "code\n")
+write(root, "notes.txt", "not offered: .txt only for the named files\n")
+expect("287 s3 no Gate stored: nothing to ask", documents_look(root).get("status"), "none")
+run_gate(root, "store", ".github/workflows/gate.yml")
+before = snapshot(root)
+got = documents_look(root)
+expect("287 s3 never asked: setup asks", got.get("status"), "ask")
+expect("287 s3 it offers the docs folder and the top-level documents", got.get("suggest"),
+       ["docs/*", "LICENSE", "README.md"])
+expect("287 s3 it says what is never a document", got.get("never"), [".github/*", ".claude/gate.json"])
+expect("287 s3 asking writes nothing", snapshot(root), before)
+expect("287 s3 look says nothing is stored yet", look(root).get("documents"), None)
+
+code, out, err = run_gate(root, "documents", "--store", "docs/*", "README.md", "docs/*")
+expect("287 s3 the yes stores the paths", (code, err), (0, ""))
+with open(os.path.join(root, ".claude", "gate.json")) as handle:
+    stored = json.load(handle)
+expect("287 s3 stored beside the Gate, once each", stored,
+       {"workflow": ".github/workflows/gate.yml", "starts": ["workflow_call", "workflow_dispatch"],
+        "documents": ["docs/*", "README.md"]})
+expect("287 s3 asked again, setup asks nothing: the answer is stored", documents_look(root),
+       {"status": "stored", "documents": ["docs/*", "README.md"]})
+expect("287 s3 look carries the stored answer", look(root).get("documents"), ["docs/*", "README.md"])
+# Files that would now suggest something else change nothing: the answer is never worked out again.
+write(root, "doc/other.md", "x\n")
+expect("287 s3 a new docs folder does not reopen the question", documents_look(root).get("status"), "stored")
+run_gate(root, "store", ".github/workflows/gate.yml")
+expect("287 s3 storing the Gate again keeps the stored paths", documents_look(root),
+       {"status": "stored", "documents": ["docs/*", "README.md"]})
+expect("287 s3 the Gate reader still reads the file", read_fact(root, root)[0], 0)
+
+code, out, err = run_gate(root, "documents", "--none")
+expect("287 s3 a no is stored too, as an empty list", (code, documents_look(root)), (0, {"status": "stored", "documents": []}))
+
+for bad in ("docs/[ab]*", "*", "/docs/*", "docs/*\nlib/*", "a b.md", "!docs/*", "x" * 201):
+    before = snapshot(root)
+    code, out, err = run_gate(root, "documents", "--store", "docs/*", bad)
+    expect("287 s3 a pattern the batch run would read differently is refused: {!r}".format(bad[:20]),
+           (code != 0, "Nothing was stored" in err, snapshot(root) == before), (True, True, True))
+
+# A hand-edited list that cannot be read is no answer: setup asks again rather than guess.
+write(root, ".claude/gate.json", json.dumps({"workflow": ".github/workflows/gate.yml", "starts": ["workflow_call"],
+                                            "documents": ["docs/*", 7]}))
+expect("287 s3 a stored list with a bad entry is read as not stored", documents_look(root).get("status"), "ask")
+
 print("{} passed, {} failed".format(passed, failed))
 sys.exit(1 if failed else 0)
