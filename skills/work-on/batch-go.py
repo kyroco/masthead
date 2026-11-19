@@ -234,7 +234,10 @@ def base(branch):
 def merge_main_into(branch, head, pattern):
     """One merge of main into the pile's head, made with no checkout (INFRA-286). Stops on a
     conflict, and on a change to the CI checks the push check would refuse (INFRA-274)."""
-    r = git("merge-tree", "--write-tree", "--messages", head, tracking(MAIN), check=False)
+    # git speaks the person's language, and the conflict lines are read by their English word, so this
+    # one call runs in English (r2-J2).
+    r = subprocess.run(["git", "merge-tree", "--write-tree", "--messages", head, tracking(MAIN)],
+                       capture_output=True, text=True, env=dict(os.environ, LC_ALL="C", LANGUAGE="C"))
     if r.returncode == 1:
         # git stops on any kind of conflict, so the stop gives git's own line for each one rather than
         # guess the kind, and lists no file name of its own: git's working names are in neither branch
