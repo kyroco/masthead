@@ -528,9 +528,8 @@ def ships(root=None):
         return SHIPS_PR
     top = checkout_top(root)
 
-    # Each file by the rule its other reader uses: the starter and gate.json are read, as
-    # batch.py and gate() read them; the Gate's workflow need only be a plain file, as
-    # gate() asks of it on disk, whatever its size (INFRA-276 arch-2).
+    # The starter and the Gate's workflow need only be plain files, at any size, as gate()
+    # asks of the workflow on disk (INFRA-276 arch-2); gate.json is read, as gate() reads it.
     if committed_blob(top, SHIPS_REF, STARTER_FILE) is None:
         return SHIPS_PR
     stored = committed_file(top, SHIPS_REF, GATE_FILE)
