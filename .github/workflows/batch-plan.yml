@@ -72,9 +72,11 @@ jobs:
             printf '%s\n' "$1" >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
             exit 1
           }
-          if [ "${GITHUB_REF:-}" != "refs/heads/landing" ]; then
-            stop "The batch run tests only the landing branch, and this run is on ${GITHUB_REF:-no branch}. It does not start, and main does not move."
-          fi
+          # Two piles: the milestone pile on landing, and a hotfix's own pile on hotfix (INFRA-286).
+          case "${GITHUB_REF:-}" in
+            refs/heads/landing | refs/heads/hotfix) branch="${GITHUB_REF#refs/heads/}" ;;
+            *) stop "The batch run tests only the landing and hotfix branches, and this run is on ${GITHUB_REF:-no branch}. It does not start, and main does not move." ;;
+          esac
           # Only a go starts a batch (INFRA-285). An older starter still starts on every push to landing.
           if [ "${GITHUB_EVENT_NAME:-}" != "workflow_dispatch" ]; then
             stop "A batch run starts only when the person says go, and this run started on a ${GITHUB_EVENT_NAME:-unknown} event, so it does not start and main does not move. This starter file is older than that: run /masthead:setup to write it again."
@@ -83,7 +85,7 @@ jobs:
             stop "This run names no commit for the go, so it does not start and main does not move. Start it with batch-go.py, which checks the pile first."
           fi
           if [ "$GO_SHA" != "${GITHUB_SHA:-}" ]; then
-            stop "Landing moved after the go: the go checked $GO_SHA, and landing is now at ${GITHUB_SHA:-nothing}. The run does not start and main does not move. Say go again so the new commits are checked too."
+            stop "The $branch branch moved after the go: the go checked $GO_SHA, and $branch is now at ${GITHUB_SHA:-nothing}. The run does not start and main does not move. Say go again so the new commits are checked too."
           fi
           if [ -L "$file" ] || [ ! -f "$file" ]; then
             stop "No Gate is stored in .claude/gate.json, so the batch run does not start and main does not move. $oldway"

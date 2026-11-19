@@ -4,8 +4,9 @@
 # after its Gate passed on the batch's last commit. It moves main to exactly
 # that commit, forward only, as the GitHub App the main ruleset lets through
 # (Robert, November 19, 2026: "app route confirmed"; proven in INFRA-256). It
-# never moves main when the Gate did not pass, when the commit is not on
-# `landing`, or when main holds a commit the batch does not.
+# never moves main when the Gate did not pass, when the commit is not on the
+# pile's branch (`landing`, or `hotfix` for a hotfix's own pile, INFRA-286), or
+# when main holds a commit the batch does not.
 #
 # references/batch-run.md says how the parts fit.
 name: Masthead batch move
@@ -30,7 +31,7 @@ on:
 jobs:
   move:
     runs-on: ubuntu-latest
-    # The App key lives in this environment, which only `landing` may use, and
+    # The App key lives in this environment, which only `landing` and `hotfix` may use, and
     # GitHub hands its secrets only to a job that names it: this one, not the
     # repository's Gate, which the starter calls with `secrets: inherit` (INFRA-272).
     environment: masthead-batch
@@ -67,19 +68,21 @@ jobs:
           if [ "$GATE_RESULT" != "success" ]; then
             stop "The Gate ended '$GATE_RESULT' on $SHA, so main does not move."
           fi
-          if [ "${GITHUB_REF:-}" != "refs/heads/landing" ]; then
-            stop "The batch run moves main only from the landing branch, and this run is on ${GITHUB_REF:-no branch}. Main does not move."
-          fi
+          # The milestone pile on landing, or a hotfix's own pile on hotfix (INFRA-286).
+          case "${GITHUB_REF:-}" in
+            refs/heads/landing | refs/heads/hotfix) branch="${GITHUB_REF#refs/heads/}" ;;
+            *) stop "The batch run moves main only from the landing or hotfix branch, and this run is on ${GITHUB_REF:-no branch}. Main does not move." ;;
+          esac
           case "$SHA" in
             *[!0-9a-f]* | "") stop "'$SHA' is not a full commit id, so main does not move." ;;
           esac
           [ "${#SHA}" -eq 40 ] || stop "'$SHA' is not a full commit id, so main does not move."
-          git fetch --quiet --no-tags origin +refs/heads/main:refs/remotes/origin/main +refs/heads/landing:refs/remotes/origin/landing ||
-            stop "Could not read main and landing from GitHub, so main does not move."
+          git fetch --quiet --no-tags origin +refs/heads/main:refs/remotes/origin/main "+refs/heads/$branch:refs/remotes/origin/$branch" ||
+            stop "Could not read main and $branch from GitHub, so main does not move."
           main="$(git rev-parse --verify --quiet 'refs/remotes/origin/main^{commit}')" || stop "This repository has no main branch, so main does not move."
           git cat-file -e "$SHA^{commit}" 2>/dev/null || stop "Commit $SHA is not in this repository, so main does not move."
-          git merge-base --is-ancestor "$SHA" refs/remotes/origin/landing ||
-            stop "Commit $SHA is no longer on landing, so main does not move."
+          git merge-base --is-ancestor "$SHA" "refs/remotes/origin/$branch" ||
+            stop "Commit $SHA is no longer on $branch, so main does not move."
           if [ "$main" = "$SHA" ]; then
             printf 'Main is already at %s; nothing to move.\n' "$SHA" | tee -a "${GITHUB_STEP_SUMMARY:-/dev/null}"
             exit 0
