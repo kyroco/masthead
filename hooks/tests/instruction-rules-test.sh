@@ -1631,5 +1631,41 @@ never skills/work-on/worker.md "The PR body says \`Fixes KOR-12\`"
 never skills/work-on/worker.md "Once the PR is open, set the Status to In Review"
 never skills/linear-issues/SKILL.md "sets In Review once the PR is open"
 never skills/github-issues/SKILL.md "body closes the issue on merge"
+# INFRA-260 round 1, F1 and arch-1: the foreman takes a landed report, frees
+# the worker's slot, and closes the issue only after a green batch moves main.
+F=skills/work-on/foreman.md
+never "$F" "Queue the PR when all of these hold"
+never "$F" "enqueuePullRequest"
+never "$F" "Its first message is a question, a split or its PR"
+never "$F" "before you queue its PR"
+never "$F" "close its issue if the \`Fixes\` line did not"
+never "$F" "Queuing the PR is unchanged"
+says  "$F" "Its first message is a question, a split or its report of the commits it landed"
+says  "$F" "Accept a landing when all of these hold"
+says  "$F" "its slot is free once it answers \"cleaned up\""
+says  "$F" "Once a green batch moves main past an issue's commits"
+says  "$F" "An issue whose blocker is still open waits until a green batch moves main past that blocker's commits"
+says  "$F" "Left for INFRA-263"
+says  skills/work-on/worker.md "when your foreman accepts your landing"
+# arch-3: the tracker skills no longer restate Done as a pull request's.
+for f in skills/github-issues/SKILL.md skills/linear-issues/SKILL.md; do
+  never "$f" "passes on the PR's head"
+  never "$f" "One issue is one PR"
+  says  "$f" "One issue is one landing"
+  says  "$f" "passes on the commit it lands"
+done
+# arch-5: with no gh, nothing waits on a pull request body to link the branch.
+never skills/work-on/worker.md "let \`Fixes #<n>\` link it"
+never skills/github-issues/SKILL.md "let \`Fixes #<n>\` in the PR body do the linking"
+says  skills/work-on/worker.md "the record comment of step 10 names the branch"
+says  skills/github-issues/SKILL.md "the record comment names the branch"
+# arch-4: the README tells the landing story.
+never README.md "the push check passes and the pull request is open"
+never README.md "Then one pull request goes up"
+never README.md "the foreman queues it to be merged"
+never README.md "fixes in the same pull request"
+never README.md "One issue is one pull request"
+says  README.md "lands its commits on the \`landing\` branch"
+says  README.md "a green batch moves main"
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
