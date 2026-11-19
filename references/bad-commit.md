@@ -31,7 +31,7 @@ that Gate with `gh workflow run`, so the stored Gate must list
 | No commit fails alone, but some fail together | Drops the latest-landed of them, and names each commit it fails with. Robert, November 19, 2026: "(and we send back the latest one) it is its job to figure out what needs to be fixed and fix it" |
 | No Gate run the search starts goes red, and a run of the whole batch again is green | Drops nothing, and says the red did not happen again |
 | A commit of the batch was already dropped by a revert pushed after the red run started (the batch run queued behind a red one, or the same run searched twice) | Drops nothing more and starts no Gate run: the batch run on that revert is the one to search |
-| The commit cannot be taken off cleanly, because later commits change the same lines | Drops nothing, and says to hand it back by hand |
+| Later commits change the same files as the bad commit, so its change cannot come off alone | Drops it together with those later commits, each with its own record saying what it builds on |
 | The batch run's own plan or move job could not start or fetch the code | Reruns the run's failed jobs and drops nothing |
 | The plan job stopped the batch run, the Gate passed and the move of main failed, or the run is not on landing | Drops nothing, and says why |
 
@@ -76,6 +76,14 @@ landing. The bad change is gone from landing's code; the commit itself stays
 in landing's history. That push starts the next batch run, which tests the
 rest of the batch again.
 
+When commits landed after the bad one change the same files, its revert may
+not apply on its own. The search then also takes off each later commit that
+changes a file the bad commit, or one of those later commits, changes: one
+revert each, newest first, all in the same push. Each of those records names
+the bad commit in `Masthead-Builds-On` and no failed check, since it failed
+none of its own. Commits already dropped, and their reverts, are never taken
+off this way.
+
 ## The record
 
 The revert's message carries the record as git trailers. The foreman reads
@@ -91,8 +99,9 @@ trailers, so their names do not change without it:
 |---|---|---|
 | `Masthead-Dropped` | the full id of the dropped commit | one |
 | `Masthead-Issue` | its issue: the Linear key or `#<number>` its message names, or `none found` | one |
-| `Masthead-Failed-Check` | the name of a Gate job that failed with it | one or more |
+| `Masthead-Failed-Check` | the name of a Gate job that failed with it | one or more; none on a record with `Masthead-Builds-On` |
 | `Masthead-Fails-With` | `<full commit id> <issue>`, for each commit it fails only together with | none when it fails alone |
+| `Masthead-Builds-On` | `<full commit id> <issue>` of the bad commit, when this commit came off only because it changes the same files | none, or one |
 | `Masthead-Red-Run` | the link to the Gate run that showed it red | one |
 | `Masthead-Batch` | the full id of the red batch's last commit | one |
 | `Masthead-Bring-Back` | `revert-this-commit-and-fix-in-one-push` | one |
@@ -113,5 +122,6 @@ revert keeps the record and the change linked in landing's history. When the
 dropped commit failed together with others, the fixing worker reads each of
 their issues and comments first, and comments on each issue its fix touches.
 Robert, November 19, 2026: "yes the fixing worker should add a comment to both
-issues it was working on to make sure they stay in sync". Handing it back is
-INFRA-263's.
+issues it was working on to make sure they stay in sync". A commit that came
+off only because it builds on the bad one waits until the bad one is back
+with its fix, then comes back the same way. Handing it back is INFRA-263's.

@@ -51,6 +51,7 @@ T_DROPPED = "Masthead-Dropped"
 T_ISSUE = "Masthead-Issue"
 T_CHECK = "Masthead-Failed-Check"
 T_WITH = "Masthead-Fails-With"
+T_BUILDS_ON = "Masthead-Builds-On"
 T_RUN = "Masthead-Red-Run"
 T_BATCH = "Masthead-Batch"
 T_BRING_BACK = "Masthead-Bring-Back"
@@ -442,10 +443,12 @@ class Search:
 
 # ---- Dropping the commit ------------------------------------------------------
 
-def trailer_block(dropped, partners, checks, run, batch, root):
+def trailer_block(dropped, partners, checks, run, batch, root, builds_on=None):
     lines = ["{}: {}".format(T_DROPPED, dropped), "{}: {}".format(T_ISSUE, issue_of(dropped, root))]
     lines += ["{}: {}".format(T_CHECK, name) for name in checks]
     lines += ["{}: {} {}".format(T_WITH, sha, issue_of(sha, root)) for sha in partners]
+    if builds_on:
+        lines += ["{}: {} {}".format(T_BUILDS_ON, builds_on, issue_of(builds_on, root))]
     lines += ["{}: {}".format(T_RUN, run.get("url") or run.get("databaseId")),
               "{}: {}".format(T_BATCH, batch), "{}: {}".format(T_BRING_BACK, BRING_BACK)]
     return "\n".join(lines)
@@ -469,28 +472,85 @@ def revert_message(dropped, partners, checks, run, batch, root):
     return "\n".join(body) + "\n"
 
 
-def drop(dropped, text, tries=5):
-    """Push a revert of `dropped` onto the newest landing, as a plain push. Its new sha."""
+def builds_on_message(later, dropped, run, batch, root):
+    body = [
+        "Drop {} from landing: it builds on {}, which turned batch {} red".format(later[:9], dropped[:9], batch[:9]),
+        "",
+        "Dropped with {} ({}): {} ({}) changes the same lines, so {} could not come off landing".format(
+            dropped[:9], issue_of(dropped, root), subject(later), issue_of(later, root), dropped[:9]),
+        "without it. It failed no check of its own.",
+        "",
+        "To bring it back, its worker waits until {} is back with its fix, then reverts this".format(dropped[:9]),
+        "commit, fixes what no longer fits, and pushes both to landing at once.",
+        "",
+        trailer_block(later, [], [], run, batch, root, builds_on=dropped),
+    ]
+    return "\n".join(body) + "\n"
+
+
+def touched(sha):
+    return set(git("diff-tree", "--no-commit-id", "--name-only", "-r", sha).stdout.split())
+
+
+def revert_tree(head, sha):
+    """The tree of `head` with `sha`'s change taken off, or None when that does not apply cleanly."""
+    parents = git("rev-list", "--parents", "-n", "1", sha).stdout.split()[1:]
+    if len(parents) != 1:
+        return None
+    r = git("merge-tree", "--write-tree", "--merge-base=" + sha, head, parents[0], check=False)
+    return r.stdout.split()[0] if r.returncode == 0 else None
+
+
+def take_off(main, dropped, tip):
+    """The commits to take off landing, newest first, ending with `dropped`: alone when its revert
+    applies on `tip`, else with each later commit that changes a file it or one of those changes.
+    Records, and commits already dropped, are never taken off. None when even that does not apply."""
+    if revert_tree(tip, dropped):
+        return [dropped]
+    done = drops(main, tip)
+    skip = set(done) | set(done.values())
+    paths, builds = touched(dropped), []
+    for sha in git("rev-list", "--reverse", "--first-parent", "{}..{}".format(dropped, tip)).stdout.split():
+        if sha in skip:
+            continue
+        files = touched(sha)
+        if files & paths:
+            builds.append(sha)
+            paths |= files
+    order = list(reversed(builds)) + [dropped]
+    head = tip
+    for sha in order:
+        tree = revert_tree(head, sha)
+        if not tree:
+            return None
+        head = git("commit-tree", tree, "-p", head, "-m", "check").stdout.strip()
+    return order
+
+
+def drop(main, dropped, message_for, tries=5):
+    """Take `dropped` off the newest landing, with the later commits that build on its lines, one
+    revert each, in one plain push. The commits taken off, newest first, and landing's new tip; or
+    None when landing already took `dropped` off."""
     for _ in range(tries):
         git("fetch", "--quiet", "--no-tags", REMOTE, "+refs/heads/{0}:refs/remotes/{1}/{0}".format(LANDING, REMOTE))
         tip = rev("refs/remotes/{}/{}".format(REMOTE, LANDING))
         if not tip:
             raise Stop("This repository has no landing branch, so nothing is dropped.")
-        parent = git("rev-list", "--parents", "-n", "1", dropped).stdout.split()[1:]
-        if len(parent) != 1:
-            raise Stop("{} is a merge, and the search drops only plain commits. Nothing is dropped.".format(dropped[:9]))
-        r = git("merge-tree", "--write-tree", "--merge-base=" + dropped, tip, parent[0], check=False)
-        if r.returncode != 0:
-            raise Stop("{} cannot be taken off landing cleanly: commits landed after it change the same lines. "
-                       "Nothing is dropped; hand it back by hand.".format(dropped[:9]))
-        tree = r.stdout.split()[0]
-        made = subprocess.run(["git", "commit-tree", tree, "-p", tip, "-F", "-"], input=text,
-                              capture_output=True, text=True)
-        if made.returncode != 0:
-            raise Stop("git commit-tree failed: " + made.stderr.strip())
-        sha = made.stdout.strip()
-        if git("push", "--quiet", REMOTE, "{}:refs/heads/{}".format(sha, LANDING), check=False).returncode == 0:
-            return sha
+        if dropped in drops(main, tip):
+            return None
+        order = take_off(main, dropped, tip)
+        if not order:
+            raise Stop("{} cannot be taken off landing cleanly, even with the later commits that change the same "
+                       "files. Nothing is dropped; hand it back by hand.".format(dropped[:9]))
+        head = tip
+        for sha in order:
+            made = subprocess.run(["git", "commit-tree", revert_tree(head, sha), "-p", head, "-F", "-"],
+                                  input=message_for(sha), capture_output=True, text=True)
+            if made.returncode != 0:
+                raise Stop("git commit-tree failed: " + made.stderr.strip())
+            head = made.stdout.strip()
+        if git("push", "--quiet", REMOTE, "{}:refs/heads/{}".format(head, LANDING), check=False).returncode == 0:
+            return order, head
         say("  landing moved while the revert was made; trying again on the newest landing")
     raise Stop("landing kept moving, so the revert could not be pushed after {} tries. Nothing is dropped.".format(tries))
 
@@ -592,13 +652,29 @@ def search(run_id, root):
             evidence = again
     jobs = evidence.get("jobs") or []
     checks = failed_checks([j for j in jobs if part_of(j) == "gate"] if evidence is run else jobs, finder.verdicts)
-    text = revert_message(dropped, partners, checks, evidence, batch, root)
-    revert = drop(dropped, text)
+
+    def message_for(sha):
+        if sha == dropped:
+            return revert_message(dropped, partners, checks, evidence, batch, root)
+        return builds_on_message(sha, dropped, evidence, batch, root)
+
+    result = drop(main_sha, dropped, message_for)
+    if result is None:
+        say("{} is already off landing: a revert pushed while the search ran took it off. "
+            "Nothing more is dropped.".format(dropped[:9]))
+        return 0
+    order, tip = result
     say("")
-    say("Dropped {} from landing with revert {}, after {} Gate runs. That push starts the next batch run, "
-        "which tests the rest again.".format(dropped[:9], revert[:9], finder.runs))
+    with_it = order[:-1]
+    say("Dropped {} from landing{}, after {} Gate runs; landing is now {}. That push starts the next batch run, "
+        "which tests the rest again.".format(
+            dropped[:9], " with {}, which build on its lines".format(", ".join(c[:9] for c in with_it))
+            if with_it else "", finder.runs, tip[:9]))
     say("")
     say(trailer_block(dropped, partners, checks, evidence, batch, root))
+    for sha in with_it:
+        say("")
+        say(trailer_block(sha, [], [], evidence, batch, root, builds_on=dropped))
     return 0
 
 
