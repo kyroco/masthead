@@ -90,7 +90,7 @@ jobs:
           # The two piles run apart (INFRA-286), so the other one can reach main while this batch runs.
           # The Gate passed on code that lacks what main now holds: it is retested, never blamed (s2-J1).
           git merge-base --is-ancestor "$main" "$SHA" ||
-            stop "Main moved to $main while this batch ran, and holds work batch $SHA was not tested with (most often the other pile, landing or hotfix, reached main first), so moving it would drop work. Main does not move. Nothing in this batch is to blame: give the same go again, which brings main in with one merge and tests the two together."
+            stop "Main moved to $main while this batch ran, and holds work batch $SHA was not tested with (most often the other pile, landing or hotfix, reached main first), so moving it would drop work. Main does not move. Nothing in this batch is to blame: give the same go again. It brings main in with one merge and tests the two together, or, when git cannot put the two together on its own, it stops and says to merge by hand first."
           {
             printf 'Main moves from %s to %s, carrying:\n\n' "$main" "$SHA"
             git log --format='- %h %s (%an)' "$main..$SHA"
