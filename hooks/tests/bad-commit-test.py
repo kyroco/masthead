@@ -623,8 +623,11 @@ check("r1-c3-b with no newer fix since, the next red batch starts no Gate run an
       (r.dispatches(), out.stdout + out.stderr))
 r.done()
 
-# r1-judge-1: a bad change whose commit names no issue goes to the person and is not held
-# forever: once fixed on top, a later break is still found.
+# r1-judge-1: a bad change whose commit names no issue goes to the person and is never held
+# as waiting: a later red batch is always searched and a change named. What is not
+# guaranteed, and is accepted as a known limit (references/bad-commit.md): with no issue,
+# no later commit can be told apart as its fix, so the search may name it again, to the
+# person, instead of the later break.
 r = Repo()
 r.land({"a": "1\n"}, "Add a (INFRA-630)")
 loose = r.land({"breaks": "x\n"}, "Break it with no issue named")

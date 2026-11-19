@@ -1812,6 +1812,10 @@ says  references/bad-commit.md "landed after the batch it was last named in; its
 says  references/bad-commit.md "so a break another commit brought in meanwhile is never blamed on the fix"
 # Re-verify round 1, r1-judge-1: a change naming no issue is not held.
 says  references/bad-commit.md "A change whose commit names no issue is not written"
+# Known limits, accepted rather than built (the foreman, after re-verify round 2):
+# a no-issue change may be named again, and a fix that cannot be tested apart goes to the person.
+says  references/bad-commit.md "and a later search may name it again"
+says  references/bad-commit.md "When the fix cannot be tested apart from other commits, or the rest is green without the fixed changes, the search names nothing and says to tell the person."
 # Round 1, arch-3: the issue field says none found when the commit names none, as the code prints.
 says  references/bad-commit.md "the Linear key or \`#<number>\` its message names, or \`none found\`"
 # INFRA-285 arch-2: a push to landing starts no batch run; the search pushes nothing, and a run starts on a go.
