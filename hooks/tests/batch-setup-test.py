@@ -294,8 +294,9 @@ with tempfile.TemporaryDirectory() as top:
     for word in ("Your organizations", "Settings", "Developer settings", "GitHub Apps", "New GitHub App",
                  "GitHub App name", "Homepage URL", "Active", "Contents", "Workflows", "Read and write",
                  "Only on this account", "Create GitHub App", "App ID", "Edit", "Credentials", "Key pairs",
-                 "New key", ".pem", "Install App", "Install", "All repositories", "Only select repositories",
-                 "Select repositories", "masthead-batch"):
+                 "New key", ".pem", "Install App", "Install", "Only select repositories",
+                 "Select repositories", "masthead-batch", "Third-party Access", "Configure", "Repository access",
+                 "Save"):
         check("S4 the steps name {!r}".format(word), word in steps)
     check("S4 the steps give the exact command for the App id, with this repository filled in",
           "gh secret set BATCH_APP_ID --env masthead-batch --repo acme/site --body " in steps, steps)
@@ -450,6 +451,19 @@ check("F2 setup stops when a batch.py step fails, before the lock",
 section = read(README).split("### The optional batch run", 1)[-1].split("### Set up the batch run", 1)[0]
 check("F3 the README no longer says setup asks for each part on its own", "after your yes to each part" not in section)
 check("F3 the README says the lock gets a yes of its own", "a yes of its own" in section, section)
+
+# SEC-272-1, Robert, November 19, 2026: "OH the app should be shared yes". One App per organization,
+# installed only on the repositories that chose the batch run: setup and the README never offer "All repositories".
+with tempfile.TemporaryDirectory() as top:
+    gh = GitHub(top)
+    steps = batch(gh, repo_with_gate(top), "steps").stdout
+    check("SEC-272-1 the App steps never offer All repositories", "All repositories" not in steps, steps)
+    check("SEC-272-1 the App steps say how to add this repository to an App already installed",
+          "Add this repository to an App you already have" in steps and "Only select repositories" in steps, steps)
+skill_batch = read(SKILL).split("### Then the batch run", 1)[-1].split("## 10.", 1)[0]
+check("SEC-272-1 setup never offers All repositories", "All repositories" not in read(SKILL))
+check("SEC-272-1 setup reuses the organization's App and adds this repository to it",
+      "reuse" in skill_batch and "Add this repository to an App you already have" in skill_batch, skill_batch[:600])
 
 # F4: a repository on a personal account gets no offer, since the App steps are for an organization.
 with tempfile.TemporaryDirectory() as top:
