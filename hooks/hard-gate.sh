@@ -235,6 +235,8 @@ if len(sys.argv) > 3 and sys.argv[3] == "revs":
                 src = spec.lstrip("+").split(":", 1)[0]
                 if src:
                     out.append(src)
+                elif spec.lstrip("+") == ":":
+                    out.append("--branches")  # ":" alone pushes every branch origin also has
     print("\n".join(dict.fromkeys(out)))
     sys.exit(0)
 for ordered in (readings[:], second):
@@ -425,24 +427,13 @@ CHANGED="$( {
 # OK; ci_change_ok.py says how it reads them. It runs in every repository, push check named or not, and before
 # the early exit below, since a push can send commits that change nothing against origin/main (another branch).
 gate_ci_change() {
-  local revs moved out
-  # The sources of every push in the line, read from the command; when it cannot be read, HEAD.
+  local revs out
+  # The sources of every push in the line, one per line, and "moves SUB" when a git command that makes or
+  # moves a commit runs ahead of a push; when the command cannot be read, HEAD. ci_change_ok.py reads them
+  # on stdin, so a source with a space or a * in it reaches it whole.
   revs="$(python3 -c "$_CMD_READER" "$_CMD" "" revs 2>/dev/null)" || revs=HEAD
-  moved="$(printf '%s\n' "$revs" | sed -n 's/^moves //p' | head -1)"
-  revs="$(printf '%s\n' "$revs" | grep -v '^moves ' || true)"
-  case "$moved" in
-    # A rebase or pull keeps each unsent commit's message, so its CI-change-OK line goes with it; a commit
-    # made in the line is read from what it would commit (ci_change_ok.py --uncommitted).
-    ""|rebase|pull) ;;
-    commit) set -- --uncommitted ;;
-    *)
-      echo "BLOCK: this command runs 'git $moved' before it pushes, so the commits it would push are not made yet and the check of CI changes cannot read them. Run 'git $moved' on its own, then push." >&2
-      return 1
-      ;;
-  esac
-  [ -n "$revs" ] || [ "$moved" = commit ] || return 0
-  # shellcheck disable=SC2086 # one ref per line, split on purpose; a ref holds no space
-  out="$(python3 "$_HOOK_DIR/ci_change_ok.py" "$@" $revs 2>&1)" && return 0
+  [ -n "$revs" ] || return 0
+  out="$(printf '%s\n' "$revs" | python3 "$_HOOK_DIR/ci_change_ok.py" 2>&1)" && return 0
   echo "BLOCK: $out" >&2
   return 1
 }
