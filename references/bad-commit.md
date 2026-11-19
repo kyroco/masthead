@@ -14,7 +14,8 @@ the red batch run:
 
     python3 ${CLAUDE_PLUGIN_ROOT}/skills/work-on/bad-commit.py <run id>
 
-It needs `gh` signed in to the repository and git 2.38 or newer. It reads the
+It needs `gh` signed in to the repository and git 2.40 or newer (for
+`git merge-tree --merge-base`; the git macOS ships may be older). It reads the
 Gate setup stored in `.claude/gate.json` (`references/gate-fact.md`) and never
 works the Gate out: with none stored it stops with "No Gate is stored in
 .claude/gate.json, so the search does not start and drops nothing." It starts

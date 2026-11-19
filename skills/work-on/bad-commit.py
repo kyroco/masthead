@@ -406,14 +406,15 @@ def main(argv):
 
 
 def git_new_enough():
-    """git 2.38 or newer, for merge-tree --write-tree; an older one would make every commit look unappliable."""
+    """git 2.40 or newer, for merge-tree --write-tree --merge-base (2.40 added --merge-base); an older
+    git would make every commit set look as if it does not apply."""
     m = re.search(r"(\d+)\.(\d+)", git("--version").stdout)
-    return bool(m) and (int(m.group(1)), int(m.group(2))) >= (2, 38)
+    return bool(m) and (int(m.group(1)), int(m.group(2))) >= (2, 40)
 
 
 def search(run_id, root):
     if not git_new_enough():
-        raise Stop("The search needs git 2.38 or newer (git merge-tree --write-tree). Nothing is dropped.")
+        raise Stop("The search needs git 2.40 or newer (git merge-tree --merge-base). Nothing is dropped.")
     stored = project_fact.gate(root)
     if not stored:
         raise Stop("No Gate is stored in .claude/gate.json, so the search does not start and drops nothing. "

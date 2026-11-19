@@ -67,8 +67,8 @@ jobs:
 """
 
 _version = re.search(r"(\d+)\.(\d+)", subprocess.run(["git", "--version"], capture_output=True, text=True).stdout)
-if not _version or (int(_version.group(1)), int(_version.group(2))) < (2, 38):
-    print("skipped: the search needs git 2.38 or newer (merge-tree --write-tree), and this git is older")
+if not _version or (int(_version.group(1)), int(_version.group(2))) < (2, 40):
+    print("skipped: the search needs git 2.40 or newer (merge-tree --merge-base), and this git is older")
     sys.exit(77)
 
 passed = 0
