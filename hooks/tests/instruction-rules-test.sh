@@ -60,8 +60,8 @@ says  skills/github-issues/SKILL.md "issues/<parent>/sub_issues"
 says  skills/work-on/foreman.md "Pass the branch it left on GitHub to the user to delete"
 never skills/work-on/worker.md "git/refs/heads"
 says  skills/work-on/foreman.md "that worker is free"
-says  skills/work-on/foreman.md "stop that session as after a merge"
-says  skills/work-on/foreman.md "set the merged issue and each parent to Done"
+says  skills/work-on/foreman.md "stop that session as after a landing"
+says  skills/work-on/foreman.md "then each parent up the chain that has no open sub-issue left, set to Done the same way"
 says  skills/work-on/foreman.md "A worker that split its issue sends the sub-issue numbers"
 says  skills/work-on/foreman.md "Close now any parent whose sub-issues are all closed"
 says  skills/work-on/foreman.md "each parent up the chain"
@@ -80,7 +80,7 @@ never skills/work-on/foreman.md "fix-later"
 never skills/work-on/foreman.md "fix later"
 never references/session-cliffs.md "fix later"
 says  skills/work-on/foreman.md "the question goes to the user first"
-says  skills/work-on/foreman.md "its next ready issue, those first"
+says  skills/work-on/foreman.md "and start those first"
 never skills/work-on/foreman.md "run no builds or tests"
 says  skills/work-on/foreman.md "warm-build.sh build"
 says  skills/work-on/foreman.md "Start no worker while the warm-up is still running"
@@ -416,8 +416,8 @@ never skills/analyze-issues/milestone-check.md "--body-file - <<"
 # The GitHub connector is used where it is loaded, gh is the fallback, and git and the merge queue stay off it (issue #27).
 says  skills/github-issues/SKILL.md "## Which tool makes the call"
 says  skills/github-issues/SKILL.md "**Commits and pushes go through git.**"
-says  skills/github-issues/SKILL.md "**The merge queue goes through \`gh\`.**"
-says  skills/work-on/foreman.md "That goes through \`gh api graphql\` even where the GitHub"
+says  skills/github-issues/SKILL.md "**What an issue unblocks goes through \`gh\`.**"
+never skills/work-on/foreman.md "That goes through \`gh api graphql\` even where the GitHub"
 says  skills/github-issues/SKILL.md "\`labels\` replaces the issue's whole set"
 says  skills/github-issues/SKILL.md "No single connector call says which projects an issue is in, so find them"
 never skills/github-issues/SKILL.md "the run's own project, the number in its URL"
@@ -568,7 +568,7 @@ says  skills/work-on/foreman.md "What the product does, what it says, what it ch
 says  skills/work-on/foreman.md "one question at a time; never fill the gap yourself"
 never skills/work-on/foreman.md "**Proceed**"
 never skills/work-on/foreman.md "This is the only issue a foreman files"
-says  skills/work-on/foreman.md "sessions alive, the ones waiting for the merge queue"
+says  skills/work-on/foreman.md "That number is sessions alive: a worker counts from its start until you accept its landing"
 says  skills/work-on/foreman.md "Some things are not yours to settle and go to the person as they stand"
 says  skills/work-on/foreman.md "and file no issue."
 never skills/work-on/foreman.md "file no issue except"
@@ -840,10 +840,10 @@ says  "$F" "a second failure sets the issue's status to \`Needs Human\` with \`s
 # Scenario 5 is gone: no issue is filed from a review, on Linear either (see 11).
 never "$F" "**Fix later.**"
 # Scenario 6: merge sets Done up the chain and lists what it blocked from Linear.
-says  "$F" "set the merged issue to \`Done\` with \`save_issue\` if the \`Fixes\` line did not, then each parent up the chain with no open sub-issue left"
+says  "$F" "Set the issue to \`Done\` with \`save_issue\`, then each parent up the chain with no open sub-issue left"
 says  "$F" "list what it blocked from \`get_issue\` with \`includeRelations\` true, its \`relations.blocks\`"
 # Scenario 7: the merge queue stays on GitHub.
-says  "$F" "Queuing the PR is unchanged: it goes to GitHub's merge queue"
+says  "$F" "**Once a green batch moves main.** Set the issue to \`Done\`"
 # Workers start on the Linear key and the status is set through Linear.
 says  "$F" "\`/work-on KOR-12 dispatched\`"
 says  "$F" "\`--name \"KOR-12-issue\"\`"
@@ -1084,11 +1084,11 @@ says  agents/security-reviewer.md "Quote it as a false claim"
 says  agents/security-reviewer.md "Your final message is the report: each claim with its answer, false ones first"
 # MAST-37: with no gh, the foreman stops and says so for each step that has no connector call, naming that step.
 says  skills/work-on/foreman.md "With no \`gh\` (\`command -v gh\` finds nothing)"
-says  skills/work-on/foreman.md "\"\`gh\` is needed to queue PR #<pr>\""
-says  skills/work-on/foreman.md "\"\`gh\` is needed to list the issues that issue #<n> unblocks\""
-says  skills/work-on/foreman.md "Never skip one of these steps or report it done"
+never skills/work-on/foreman.md "\"\`gh\` is needed to queue PR #<pr>\""
+says  skills/work-on/foreman.md "\"\`gh\` is needed to list the issues that issue #<n> unblocks"
+says  skills/work-on/foreman.md "Never skip it or report it done"
 never skills/work-on/foreman.md "\`gh\` is needed to queue PR #<n>"
-says  skills/github-issues/SKILL.md "stop and say \`gh\` is needed; neither is skipped"
+says  skills/github-issues/SKILL.md "that step stops and says \`gh\` is needed; it is never skipped"
 
 # MAST-37: setup's no-jq row names only what really stays off: the stop gates, capture reports and shell searches now hold without jq.
 says  skills/setup/SKILL.md "the code index gate cannot tell a fresh code_locate answer from a stale one, so any lookup of a name lets a search for it through"
@@ -1407,7 +1407,7 @@ says  agents/adjudicator.md 'every one, kept, merged or thrown out, goes in your
 says  agents/adjudicator.md 'The worker fixes only the ones the person sends back'
 says  references/session-cliffs.md 'You fix only the architecture findings the person sends back'
 says  skills/work-on/foreman.md 'the adjudicator'"'"'s Architecture trial section goes to the person too, whole and unedited'
-says  skills/work-on/foreman.md 'every architecture finding the person sent back is fixed in it'
+says  skills/work-on/foreman.md 'every architecture finding the person sent back is fixed;'
 says  README.md 'every one of its findings reaches you too, kept or thrown out'
 says  docs/explainer.html 'every one of its findings reaches you too, kept or thrown out'
 # Scenario 9: with the trial off, the placement stands with no one in between.
@@ -1422,7 +1422,7 @@ says  references/session-cliffs.md 'While the trial is on, you fix only the arch
 # Round 1, fix F2: the waiting and the relay are pinned.
 says  references/session-cliffs.md 'who brings it to the user; your commits wait for that answer before they land'
 says  references/session-cliffs.md 'So does its Architecture trial section, while the trial period is on'
-says  skills/work-on/foreman.md 'A PR with one of those unanswered is not queued'
+says  skills/work-on/foreman.md 'does not land its commits until it has the answer'
 # Round 1, fix F3: the README says the fix list rule holds once the trial is off.
 says  README.md 'Once the trial is off, an architecture finding that breaks one of the doc'"'"'s seven rules'
 never README.md 'customer score; one where the decision record and a mockup disagree comes to you. That placement'
@@ -1667,5 +1667,8 @@ never README.md "fixes in the same pull request"
 never README.md "One issue is one pull request"
 says  README.md "lands its commits on the \`landing\` branch"
 says  README.md "a green batch moves main"
+# F2: the README and the gate catalog name the new refusal.
+says  README.md "a command line that changes the commit before it pushes"
+says  references/gate-catalog.md "refuses a command line that changes the commit before it pushes"
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]

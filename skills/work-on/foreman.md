@@ -7,8 +7,8 @@ blocks what, and what is already decided. Then keep the right number of
 workers busy on it, bring the person only the decisions that are theirs, one
 at a time, in the words they use, and get out of the way.
 
-You decide how the work runs: the order, who starts next, when a PR is ready
-to queue, when a worker is done. What the product does, what it says, what it
+You decide how the work runs: the order, who starts next, when a worker's
+landing is accepted, when a worker is done. What the product does, what it says, what it
 charges, and who may do what are the person's to decide. When the issue, its
 decision record and their past answers do not settle such a question, ask
 them, one question at a time; never fill the gap yourself.
@@ -59,11 +59,10 @@ show it to them.
 When you understand the work, say in one sentence what you are about to do and
 ask how many workers. Say the count three ways and never mix them: how many
 issues are ready (scenarios written, no open question), how many of those can
-start now (every blocker merged), and how many wait on a merge. "Six are ready"
+start now (every blocker on main), and how many wait on a blocker. "Six are ready"
 when seventy are ready and six can start is false, and the person reads it as
-a problem with the issues. That number is sessions alive, the ones waiting for the
-merge queue included: a worker counts from its start until its session is
-stopped after its merge. Nothing starts before the person gives it.
+a problem with the issues. That number is sessions alive: a worker counts
+from its start until you accept its landing and it answers "cleaned up". Nothing starts before the person gives it.
 
 Then name the issues that fill those slots, in order, each with what the
 customer gets from it. When one carries a question that is the person's, the
@@ -146,21 +145,22 @@ For each issue, in order, up to the person's number:
    `SendMessage` it that this session is its foreman, with `notify_when_idle`,
    and pass on the person's instructions for the run in their words.
 
-An issue whose blocker is still open waits until that blocker merges.
+An issue whose blocker is still open waits until a green batch moves main past that blocker's commits,
+since a worker branches from main.
 
 ## While they work
 
 Rely on `notify_when_idle` notices, or in the desktop app on the notes it
 sends when a worker ends a turn, and on `Monitor`, not a shell loop, for a
-queued PR or a CI run. A worker silent past reason gets one message
+batch Gate run. A worker silent past reason gets one message
 asking for status. Never read a worker's transcript into this session.
 
 A worker writes no plan and waits for no go: it builds as soon as it has
-read its sources. Its first message is a question, a split or its PR.
+read its sources. Its first message is a question, a split or its report of the commits it landed.
 
 A worker that split its issue sends the sub-issue numbers and stops, and that
 worker is free: start one worker per sub-issue, in blocked-by order. In the
-terminal, stop that session as after a merge. Pass the branch it left on
+terminal, stop that session as after a landing. Pass the branch it left on
 GitHub to the user to delete.
 
 A worker's question: first re-read that issue's comments, then search Korium
@@ -183,7 +183,7 @@ the architecture doc and the mockups. Never write "build what the issue says".
 
 A worker's report must quote a line from the project README and give its
 agent-run count. One that does not skipped the README: send it back to read it
-before you queue its PR.
+before you accept its landing.
 
 Some things are not yours to settle and go to the person as they stand, one at
 a time: what the second re-verify round left on the fix list, a security finding the adjudicator could not settle, and an ADR line and a
@@ -192,8 +192,8 @@ trial is on, the adjudicator's Architecture trial section goes to the person
 too, whole and unedited: every architecture finding with its lens, smell,
 class, scores and placement, so the person can judge how the reviewer
 performs. Send the worker the person's answer word for word; it fixes only
-the findings that answer sends back. A PR with one of those unanswered is not
-queued. Everything else the adjudicator placed is final for the worker and for
+the findings that answer sends back. A worker with one of those unanswered
+does not land its commits until it has the answer. Everything else the adjudicator placed is final for the worker and for
 you, whichever round placed it, and you rule on none of it.
 
 Permission prompts belong to the person: tell them which session and what it
@@ -207,62 +207,69 @@ what happened. The issues it blocks wait with it; name them when you report
 the park. Tell a worker main moved only when it has a reason to bring main in: a
 conflict, a dependency, or changes that interact. Say which.
 
-## Merge and clean up
+## Land and clean up
 
 An extra, whoever found it, is settled by its worker, as `worker.md` **What
-done is** says, never by you or the person. When a worker reports its PR with
-an extra that rule says to fix and it did not fix, send it back to fix it,
-without asking the person.
+done is** says, never by you or the person. When a worker reports its landing
+with an extra that rule says to fix and it did not fix, send it back to fix
+it, without asking the person.
 
-Queue the PR when all of these hold: CI is green; nothing is left on the
-adjudicator's fix list; every architecture finding the person sent back is fixed in it; every extra the worker's rule says to fix is fixed in it; the PR body's
-unproven list holds nothing a customer would see; and the worker, told you are
-ready to queue, has answered "cleaned up" (its test stack and code index are
-gone; its worktree and branch stay). Otherwise park it with the reason. Auto
-merge is off, so queue with the `enqueuePullRequest` GraphQL mutation, using
-the PR's node id. That goes through `gh api graphql` even where the GitHub
-connector is loaded: the connector has no call that queues a PR. Every other
-GitHub call here goes through the connector when it is loaded, as **Which
-tool makes the call** in the github-issues skill says.
+A worker lands its commits on `landing` itself and opens no pull request
+(**Opening a PR**, steps 9 and 10). Accept a landing when all of these hold:
+its commits are on `origin/landing` (`git fetch origin landing`, then
+`git log origin/landing` shows them); nothing is left on the adjudicator's fix
+list; every architecture finding the person sent back is fixed; every extra
+the worker's rule says to fix is fixed; and the record comment on the issue
+holds an unproven list with nothing a customer would see. Otherwise send it
+back with the reason; a second failure parks it. Then tell the worker its
+landing is accepted. It brings down its test stack and deletes its code
+index, and its slot is free once it answers "cleaned up" (its worktree and
+branch stay). Give that worker its next ready issue. In the terminal, stop the
+worker's session (its id and worktree come from `claude agents --json`, not
+from memory) and start the next issue in a new one.
 
-With no `gh` (`command -v gh` finds nothing), park an issue through the
-connector's label call. Queueing a PR and listing what a merge unblocks have
-no connector call, so at either one stop and tell the person which step waits,
-with "(brew install gh, then gh auth login)" after it: "`gh` is needed to queue
-PR #<pr>" before the merge, or "`gh` is needed to list the issues that issue
-#<n> unblocks" after it. Never skip one of these steps or report it done.
-
-Once it merges: close its issue if the `Fixes` line did not, then each parent
-up the chain that has no open sub-issue left, and set the merged issue and
-each parent to Done with `set-status.sh` (GitHub deletes the merged branch).
+Main moves forward only from `landing`, by one run of the repo's Gate on the
+batch, never by a worker. Until Masthead runs that batch itself, start the
+Gate run by hand on `landing` once the batch is in, and move main to
+`landing` only when it is green. Once a green batch moves main past an issue's commits, close the issue (on GitHub,
+`gh issue close <n>`, then set it to Done with `set-status.sh`), then each
+parent up the chain that has no open sub-issue left, set to Done the same way.
 List what it blocked:
 
     gh api repos/{owner}/{repo}/issues/<n>/dependencies/blocking --jq '.[] | "#\(.number) \(.state) \(.title)"'
 
-Then give that worker its next ready issue, those first. In the terminal, stop
-the worker's session (its id and worktree come from `claude agents --json`,
-not from memory) and start the next issue in a new one.
+and start those first. With no `gh` (`command -v gh` finds nothing), park an
+issue through the connector's label call, and stop at the list of what an
+issue unblocks and tell the person "`gh` is needed to list the issues that
+issue #<n> unblocks (brew install gh, then gh auth login)". Never skip it or
+report it done. Every other GitHub call here goes through the connector when
+it is loaded, as **Which tool makes the call** in the github-issues skill
+says.
 
-Every report to the person carries the count of issues closed by a merge in
-the run. A split is not a stop: its sub-issues join the run like any other
-issue.
+Left for INFRA-263: when a batch goes red, finding the commit that broke it,
+dropping it from `landing`, opening its issue again and handing it back to its
+worker; and reading the batch run's record to know which issues it carried.
+Until then, a red batch goes to the person as it stands.
+
+Every report to the person carries the count of issues closed after a green
+batch in the run. A split is not a stop: its sub-issues join the run like any
+other issue.
 
 ## End the run
 
-Every issue is merged, parked or skipped. Stop any remaining workers (in the
+Every issue is on main, parked or skipped. Stop any remaining workers (in the
 desktop app, archive them, which also removes their worktrees), remove the
 warm trees with `${CLAUDE_PLUGIN_ROOT}/skills/work-on/warm-build.sh end`, capture one
-Korium handoff (what merged, what parked and why, and the person's answers,
+Korium handoff (what reached main, what parked and why, and the person's answers,
 verbatim), and tell the person: one line per issue with its outcome, what each
-parked issue needs, and the count of issues merged.
+parked issue needs, and the count of issues on main.
 
 ## On Linear
 
 When `python3 ${CLAUDE_PLUGIN_ROOT}/hooks/project_fact.py --tracker` prints
 `linear`, the project and its issues live in Linear, and every issue, project
 and status call goes through the Linear connector, as the `linear-issues`
-skill says. Pull requests, CI, the merge queue and the decision records stay
-on GitHub. Every section above holds, with these changes, shown for KOR-12:
+skill says. The code, CI and the decision records stay on GitHub. Every section above holds, with these changes, shown for KOR-12:
 
 - **Naming.** Say "KOR-12", never a `#` number.
 - **Understand the work.** Read the project description with `get_project`
@@ -294,11 +301,8 @@ on GitHub. Every section above holds, with these changes, shown for KOR-12:
 - **Park.** A second failure sets the issue's status to `Needs Human` with
   `save_issue` and adds one comment saying what happened, never a `parked`
   label.
-- **Queue.** Queuing the PR is unchanged: it goes to GitHub's merge queue
-  with the `enqueuePullRequest` mutation, as above.
-- **Once it merges.** Set the merged issue to `Done` with `save_issue` if the
-  `Fixes` line did not, then each parent up the chain with no open sub-issue
-  left, and list what it blocked from `get_issue` with `includeRelations`
+- **Once a green batch moves main.** Set the issue to `Done` with
+  `save_issue`, then each parent up the chain with no open sub-issue left, and list what it blocked from `get_issue` with `includeRelations`
   true, its `relations.blocks`.
 
 On a repository whose issues live on GitHub, none of this section applies.

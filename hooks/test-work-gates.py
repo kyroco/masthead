@@ -1677,16 +1677,18 @@ def main():
           show_as(REPO_ROOT, REPO_ROOT, "No such lead").strip(), "")
     shutil.rmtree(own_pr, ignore_errors=True)
     steps = ["Build on a branch", "verification of the finished diff", "Fix each finding on the adjudicator's fix list",
-             "changelog entry", "pre-push check on that last commit", "open one PR"]
+             "changelog entry", "pre-push check on that last commit", "push origin HEAD:landing",
+             "Post the change's record on the issue"]
     positions = [proof_cliff.find(step) for step in steps]
-    check("the injected PR procedure keeps review, fixes, changelog and the push check before the PR",
+    check("the injected PR procedure keeps review, fixes, changelog and the push check before the landing",
           all(position >= 0 for position in positions) and positions == sorted(positions), True)
     check("a substrate prompt gets the repo's substrate cliff",
           "REPO-SUBSTRATE-CLIFF" in cliff("set up a fresh test substrate"), True)
     main_cliff = " ".join(cliff("push this to main").split())
-    check("an update-main prompt requires a reviewed PR and forbids direct pushes",
+    check("an update-main prompt lands on landing and forbids direct pushes",
           "Never commit or push directly to main" in main_cliff
-          and "merging the reviewed PR" in main_cliff
+          and "main moves forward only from `landing`" in main_cliff
+          and "merging the reviewed PR" not in main_cliff
           and "git push origin HEAD:main" not in main_cliff, True)
     check("a prod-apply prompt gets the repo's apply cliff",
           "REPO-APPLY-CLIFF" in cliff("do the tofu apply on prod"), True)

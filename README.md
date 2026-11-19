@@ -102,14 +102,15 @@ the code exists, and the architecture reviewer checks the code against the
 design. Where a mockup page has become a template in the app, the
 worker starts that screen from the template and keeps its words and layout.
 A worker is done when every scenario has a test that passes, the screens the
-issue touches work, the push check passes and the pull request is open. Then
-it stops.
+issue touches work, the push check passes, and it lands its commits on the
+`landing` branch and posts the change's record on the issue. No pull request
+is opened. Then it stops.
 
 ![Three workers, each with its own session and its own copy of the repository](docs/images/day-5-workers.svg)
 
 Then they build. A bug is fixed test first: a failing test in its own
 commit, then the fix. Anything a worker notices that the issue didn't ask
-for is an extra. It scores each one, fixes in the same pull request the ones
+for is an extra. It scores each one, fixes in the same change the ones
 that score high enough, and drops the rest without filing them; the rule is
 in `skills/work-on/worker.md`.
 
@@ -158,7 +159,7 @@ agent types, not code it runs: a test, a test runner, semgrep, or a probe
 script it wrote itself in its scratch folder can still do anything (MAST-43). Then a judge, given the same product
 context and nothing from the worker, reads the code along each verifier's
 path without running the tests a third time, and places each finding that
-holds: fixed in this pull request when a scenario's Then is false or no
+holds: fixed in this change when a scenario's Then is false or no
 test proves it, a bug's test did not come first, something
 that worked before broke, or words a person reads are now wrong; otherwise
 an extra, which the worker scores like its own. Once the trial is off, an
@@ -170,9 +171,11 @@ anything. The worker fixes the list, test first again, and only the claims
 the fix broke go back to a verifier, and only the architecture findings it
 fixed to the architecture reviewer, at most twice. The tests run on the final commit and leave a
 receipt that names it, and nothing can be pushed until the receipt matches.
-Then one pull request goes up, with `Fixes #41`, the list of what wasn't
-proved, the number of agent dispatches it took, and the issue moves to In
-Review.
+Then the worker rebases onto the `landing` branch, runs the push check on
+that commit, and pushes it there, with no pull request. A comment on the
+issue holds the change's record: what wasn't proved, the extras it fixed with
+their scores, and the number of agent dispatches it took, and the issue moves
+to In Review.
 
 Meanwhile you're having coffee. A worker's question lands at the foreman,
 which re-reads the issue's comments and Korium for an answer you already
@@ -186,22 +189,24 @@ happened, and the run goes on without it.
 
 ![You have coffee; questions reach you only when nothing settles them](docs/images/day-6-coffee.svg)
 
-When a pull request is ready, every extra its worker's rule says to fix is
-already fixed in it, and nothing else reaches you unless a security finding
+When a worker's commits land, every extra its worker's rule says to fix is
+already fixed in them, and nothing else reaches you unless a security finding
 could not be settled or the decision record and a mockup disagree; that
 comes one item at a time, and you answer it. While the architecture
 reviewer is on trial, every one of its findings reaches you too, kept or
 thrown out, with its lens, smell, class, scores and the judge's placement,
 and the worker fixes only the ones you send back. The trial is on from the
 first run until you set `"ARCHITECTURE_TRIAL": "off"` in the env block of
-`.claude/settings.json`. No issue is ever filed from a review. When its checks pass, its review
+`.claude/settings.json`. No issue is ever filed from a review. When its review
 is clean, every line is answered and the worker has cleaned up after itself,
-the foreman queues it to be merged. It closes the issue, and any big issue
-whose pieces are now all done, then starts the next issue, one that waited on
-this one first, in that worker in the desktop app or in a
-fresh session in the terminal. By the end of the day every issue is merged,
+the foreman accepts the landing and starts the next issue in that worker in
+the desktop app or in a fresh session in the terminal. Main moves forward only
+from `landing`: once a batch of landed commits is in, one run of the repo's
+Gate tests it, and when a green batch moves main, the foreman closes each issue
+it carried, and any big issue whose pieces are now all done, and starts the
+issues that waited on them. By the end of the day every issue is on main,
 parked or skipped, and you get one line per issue saying which, with how
-many merged.
+many reached main.
 
 ![A run: issues checked, a foreman plan, workers in parallel, merges](docs/images/workflow.svg)
 
@@ -292,7 +297,7 @@ when known), **Scenarios** (at least one line of "Given, When, Then", each
 naming the decision, README rule or your own words it rests on), **Out of
 scope** (what this issue leaves to another), and **Questions** (what the
 sources don't settle, each marked `[NEEDS CLARIFICATION]`). One issue is one
-pull request, built and proved by one worker in one session. The
+landing, built and proved by one worker in one session. The
 `analyze-issues` skill checks each issue against this shape and its sources,
 fixes only the part that fails, and splits the ones that are too big, so you
 don't have to write them this way yourself.
@@ -330,7 +335,7 @@ reason Claude can act on.
 
 | Check | Runs | Refuses | Needs |
 |---|---|---|---|
-| `hard-gate.sh` | before `git push`, `gh pr create` or a GitHub connector's `create_pull_request`; the test receipt and the secret scan first, then the stack checks, which are skipped when this exact commit already passed them | a push that carries something shaped like a secret, or fails a changed stack's format, compile, lint or type check; with the test command, a push until the push check reports the tests passed on this exact commit, and a push of any other commit | nothing for the secret scan and the stack checks; the test command from setup (`PROJECT_PUSH_CHECK`) for the test receipt |
+| `hard-gate.sh` | before `git push`, `gh pr create` or a GitHub connector's `create_pull_request`; the test receipt and the secret scan first, then the stack checks, which are skipped when this exact commit already passed them | a push that carries something shaped like a secret, or fails a changed stack's format, compile, lint or type check; with the test command, a push until the push check reports the tests passed on this exact commit, a push of any other commit, and a command line that changes the commit before it pushes (a rebase, commit or pull ahead of the push) | nothing for the secret scan and the stack checks; the test command from setup (`PROJECT_PUSH_CHECK`) for the test receipt |
 | `adr-sections-gate.py`, `adr-structure-gate.sh`, `wiki-refresh.sh` | before a write; at stop; at session start | a decision record written without the sections in `hooks/adr_shape.py`, or an edit that drops one; with an architecture doc recorded, a new record that does not say how it applies the doc and which builds it must work in, and a pull request whose record diverges from the doc while leaving the doc unchanged; a finish that leaves one short of them or with an unchecked claims list; keeps the records folder fresh | the two gates only with a decision records folder named (`ADR_DIR`, which setup writes when you ask for the fixed shape), and nothing is held in a repository that named none; the refresh only with `ADR_DIR` set to an absolute path |
 | `elixir-toolchain-env.sh`, `elixir-format-after-edit.sh` | at session start; after an edit | nothing; pins the Elixir toolchain and formats an edited file | an Elixir root (`PROJECT_ELIXIR_ROOT`) |
 
@@ -338,12 +343,13 @@ Where these three fall short, together: the fact names a file, and the copy
 that runs is the one in the checkout you are in. A branch can change the push
 check script or the toolchain file, the same way CI runs a pull request's own
 tests. The record of which commit passed is a file in the checkout too. So the
-push check is a guard against forgetting, not against intent; a pull request
-review is the guard against intent.
+push check is a guard against forgetting, not against intent; the guard
+against intent is you, since a change to the checks themselves waits for your
+OK.
 
 The push gate also remembers that a commit passed its stack checks, in one
-line in the checkout's git folder, so a second push or the pull request on the
-same commit does not wait for them again. The line holds for the same files,
+line in the checkout's git folder, so a second push of the same commit does
+not wait for them again. The line holds for the same files,
 the same base on main, the same gate script, the same pinned toolchain and the
 same place on the path for the main tools the checks call, and
 only while nothing is uncommitted or untracked and no file git ignores

@@ -79,10 +79,9 @@ there. Four parts, in this order, under these headings:
   `needs-decision` label and is not dispatched.
 
 Done is the same for every issue and is not restated in one: every scenario
-has a passing test, and the repository's pre-push check passes on the PR's
-head.
+has a passing test, and the repository's pre-push check passes on the commit it lands.
 
-**Size.** One issue is one PR, built and proved by one worker in one fresh
+**Size.** One issue is one landing, built and proved by one worker in one fresh
 session. Split it the way scrum splits user stories, into thin slices that
 each work on their own and fit one worker session. Then merge neighbouring
 slices that share a file until each fills one worker session with room to
@@ -103,14 +102,13 @@ it: "the user"). Three things stay off the connector, whichever is loaded:
   `create_or_update_file` and `delete_file` build a commit on GitHub from file
   contents, which skips the local test receipt; `connector-commit-gate.py`
   refuses them.
-- **The merge queue goes through `gh`.** The connector has no call that adds
-  a pull request to the queue, so the foreman queues with the
-  `enqueuePullRequest` GraphQL mutation through `gh api graphql`. With no
-  `gh`, that step, and the list of issues a merge unblocks, stop and say
-  `gh` is needed; neither is skipped.
+- **What an issue unblocks goes through `gh`.** The connector has no call
+  that lists an issue's blocking links, so the foreman lists them with
+  `gh api`. With no `gh`, that step stops and says `gh` is needed; it is
+  never skipped.
 - **The branch linked to the issue comes from `gh issue develop`.** The
   connector's `create_branch` makes a branch without the link; with no `gh`,
-  make the branch with git and let `Fixes #<n>` in the PR body do the linking.
+  make the branch with git, and the record comment names the branch.
 
 The connector's call for each `gh` form below:
 
