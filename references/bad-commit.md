@@ -31,8 +31,8 @@ that Gate with `gh workflow run`, so the stored Gate must list
 | One commit fails a check | Names that commit |
 | No commit fails alone, but some fail together | Names the latest-landed of them, and each commit it fails with. Robert, November 19, 2026: "(and we send back the latest one) it is its job to figure out what needs to be fixed and fix it" |
 | No Gate run the search starts goes red, and a run of the whole batch again is green | Names nothing, and says the red did not happen again |
-| The batch holds a change this checkout's search already named, with no later commit naming its issue (no fix on top yet) | Starts no Gate run and names nothing again: that change is the red the foreman already handed back |
-| The search lands on a change named earlier, and a later commit naming its issue is its fix on top | Runs the Gate on that fix. Still red: names the change again and tells its worker the fix is still red. Green: searches only the commits after the fix |
+| The batch holds a change this checkout's search already named, and no commit naming its issue has landed since that naming (no fix on top yet) | Starts no Gate run and names nothing again: that change is the red the foreman already handed back |
+| The batch holds a change named earlier, and commits naming its issue have landed since (its fix on top) | Runs the Gate on the change and its issue's commits alone, on what landed before it. Still red: names the change again and tells its worker the fix is still red. Green: leaves the change and those commits out, and searches the rest |
 | The batch run's own plan or move job could not start or fetch the code | Reruns the run's failed jobs and names nothing |
 | The plan job stopped the batch run, the Gate passed and the move of main failed, or the run is not on landing | Names nothing, and says why |
 
@@ -50,17 +50,26 @@ Gate run.
 
 Main does not move past a red batch, so a later batch can still hold a change
 named before, with its fix on top. The batch is then green again after the
-fix, and halving can land on the old change. So when the change it finds has
-a later commit naming the same issue, the search runs the Gate on the last
-such commit: red, the fix did not work and the change is named again; green,
-the search starts over from that commit, on the commits after it. That costs
-one Gate run more for each fixed change it meets.
+fix, and halving could land on the old change. So the search first takes each
+change it named before. Its fix on top is the commits naming its issue that
+landed after the batch it was last named in; its own other commits, landed
+with it, and a fix already judged are not. With none, the batch waits for that
+fix (above). With some, the search runs the Gate on main with the commits that
+landed before the change, then the change and its issue's commits up to the
+last fix, and nothing else, so a break another commit brought in meanwhile is
+never blamed on the fix. Red: the fix did not work, and the change is named
+again. Green: the change and its issue's commits are left out, and the rest is
+searched on main the same way, each set built with cherry-picks. That costs
+one Gate run more for each fixed change, and one for the rest. When the fix
+cannot be tested apart from other commits, or the rest is green without the
+fixed changes, the search names nothing and says to tell the person.
 
 Each change it names is written to `named-changes.tsv` in the checkout's state
-folder (`project_fact.py --state-path`), with its issue and the red run. That
-is the search's own memory, not the record: it lets a later red batch that
-still holds a named change, with no fix on top yet, stop before any Gate run.
-A search run from another checkout has no such memory and searches again.
+folder (`project_fact.py --state-path`), with its issue and the batch it was
+named in. That is the search's own memory, not the record. A search run from
+another checkout has no such memory and searches again. A change whose commit
+names no issue is not written: it goes to the person, nothing can be told
+apart as its fix, and a later search may name it again.
 
 Each Gate run is on a throwaway branch, `masthead-search/<batch>-<n>`, deleted
 when its run ends. A search run whose runner could not start is run again (up
@@ -78,7 +87,7 @@ Each row is full Gate runs, each billed like any other Gate run.
 | Commits that fail only together | about log2(n) + 1 more for each commit it fails with |
 | A red that does not happen again | the same as one bad commit, plus 1 run of the whole batch |
 | A batch holding a named change with no fix on top yet | 0 |
-| A batch holding a named change with its fix on top | 1 more for each fix, to run the Gate on it |
+| A batch holding a named change with its fix on top | 1 more for each fix, to run the Gate on it, and 1 for the rest |
 
 ## The record, and where it lives
 

@@ -1805,7 +1805,13 @@ says  "$FM" "that is the red you already handed back: it starts no Gate run, and
 says  "$FM" "A block that says the worker's fix on top is still red goes back the same way"
 says  references/bad-commit.md "(no fix on top yet) | Starts no Gate run and names nothing again"
 # Round 1, V-S2-1: a change fixed on top is passed over when its fix is green.
-says  references/bad-commit.md "green, the search starts over from that commit, on the commits after it"
+never references/bad-commit.md "green, the search starts over from that commit, on the commits after it"
+# Re-verify round 1, r1-c2 and r1-c3: a fix is a commit on the issue landed after the naming,
+# tested with only its issue's commits.
+says  references/bad-commit.md "landed after the batch it was last named in; its own other commits, landed with it, and a fix already judged are not"
+says  references/bad-commit.md "so a break another commit brought in meanwhile is never blamed on the fix"
+# Re-verify round 1, r1-judge-1: a change naming no issue is not held.
+says  references/bad-commit.md "A change whose commit names no issue is not written"
 # Round 1, arch-3: the issue field says none found when the commit names none, as the code prints.
 says  references/bad-commit.md "the Linear key or \`#<number>\` its message names, or \`none found\`"
 # INFRA-285 arch-2: a push to landing starts no batch run; the search pushes nothing, and a run starts on a go.

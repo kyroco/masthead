@@ -637,9 +637,14 @@ r.land({"b": "fixed\n"}, "Fix the break by hand")
 later = r.land({"half-a": "a\n", "half-b": "b\n"}, "Break it another way (INFRA-631)")
 r.red_batch()
 out = r.search()
-check("r1-judge-1 a change with no issue is not held as waiting: the later break is searched and named",
-      "already named" not in out.stdout and record(out.stdout).get("Masthead-Bad-Change") == [later],
-      out.stdout + out.stderr)
+# With no issue, no later commit can be told apart as its fix, so halving may still land on it;
+# it goes to the person again, never held as waiting with nothing named.
+check("r1-judge-1 a change with no issue is not held as waiting: the later batch is searched and a change named",
+      out.returncode == 0 and "already named" not in out.stdout and r.dispatches() and
+      record(out.stdout).get("Masthead-Bad-Change") in ([later], [loose]), out.stdout + out.stderr)
+check("r1-judge-1 nothing with no issue is written to the search's memory",
+      loose not in open(os.path.join(r.work, ".claude", "state", "named-changes.tsv")).read()
+      if os.path.exists(os.path.join(r.work, ".claude", "state", "named-changes.tsv")) else True)
 r.done()
 
 # ---- V-S3-1, V-S3-2: the batch run's own plan and move jobs ---------------------
