@@ -5,6 +5,7 @@ It keeps a pretend repository on GitHub in the JSON file FAKE_GH_STATE and logs
 each call, one JSON line, to FAKE_GH_LOG. A missing thing answers the way gh
 does: "gh: Not Found (HTTP 404)" on stderr and exit 1.
 """
+import base64
 import json
 import os
 import sys
@@ -67,6 +68,9 @@ def main(argv):
         print("gh: Forbidden (HTTP 403)", file=sys.stderr)
         sys.exit(1)
     route, _, query = path.partition("?")
+    if route == "repos/" + state["repo"] and method == "GET":
+        owner = state["repo"].split("/")[0]
+        answer({"full_name": state["repo"], "owner": {"login": owner, "type": state.get("owner_type", "Organization")}})
     prefix = "repos/{}/".format(state["repo"])
     if not route.startswith(prefix):
         missing()
@@ -116,6 +120,13 @@ def main(argv):
             answer({"total_count": len(env["secrets"]), "secrets": [{"name": n} for n in env["secrets"]]})
         missing()
 
+    if rest[0] == "contents" and method == "GET":
+        ref = dict(p.split("=", 1) for p in query.split("&") if "=" in p).get("ref", "main")
+        text = state.get("files", {}).get(ref, {}).get("/".join(rest[1:]))
+        if text is None:
+            missing()
+        answer({"path": "/".join(rest[1:]), "encoding": "base64",
+                "content": base64.b64encode(text.encode()).decode()})
     if rest == ["actions", "secrets"]:
         names = state.get("repo_secrets", [])
         answer({"total_count": len(names), "secrets": [{"name": n} for n in names]})

@@ -122,6 +122,26 @@ def parts(run):
         return {"error": {"ok": False, "say": "{}: {}".format(error, run.stdout + run.stderr)}}
 
 
+def ready_for_lock(gh, work, **leave_out):
+    """GitHub as setup leaves it just before the lock: landing holds the starter, the environment both secrets."""
+    state = gh.state()
+    state["refs"]["landing"] = MAIN_SHA
+    secrets = [s for s in ("BATCH_APP_ID", "BATCH_APP_PRIVATE_KEY") if s not in leave_out.get("secrets", ())]
+    state["environments"]["masthead-batch"] = {"custom": True, "protected": False, "secrets": secrets,
+                                               "policies": [{"id": 1, "name": "landing", "type": "branch"}]}
+    if not leave_out.get("starter"):
+        state.setdefault("files", {}).setdefault("landing", {})[STARTER_PATH] = leave_out.get("starter_text") or starter_text(work)
+    gh.save(state)
+
+
+def offer(run):
+    try:
+        found = json.loads(run.stdout)
+        return found.get("offer"), found.get("why", "")
+    except ValueError:
+        return None, run.stdout + run.stderr
+
+
 # ---- Scenario 1: setup writes the small starter file -------------------------
 with tempfile.TemporaryDirectory() as top:
     gh = GitHub(top)
@@ -164,6 +184,7 @@ with tempfile.TemporaryDirectory() as top:
 with tempfile.TemporaryDirectory() as top:
     gh = GitHub(top)
     work = repo_with_gate(top)
+    ready_for_lock(gh, work)
     run = batch(gh, work, "lock", "--app-id", "5832645")
     rulesets = gh.state()["rulesets"]
     mine = [r for r in rulesets if r["name"] == RULESET]
@@ -203,6 +224,7 @@ OTHER = {"id": 7, "name": "Merge queue", "target": "branch", "source_type": "Org
 with tempfile.TemporaryDirectory() as top:
     gh = GitHub(top, rulesets=[OTHER], classic_protection=True)
     work = repo_with_gate(top)
+    ready_for_lock(gh, work)
     batch(gh, work, "lock", "--app-id", "5832645")
     p = parts(batch(gh, work, "check", "--app-id", "5832645"))
     check("S2 check says the lock is in place", p.get("lock", {}).get("ok") is True, p)
@@ -335,6 +357,7 @@ with tempfile.TemporaryDirectory() as top:
     gh = GitHub(top, environments=READY, refs={"main": MAIN_SHA, "landing": MAIN_SHA})
     work = repo_with_gate(top)
     batch(gh, work, "write")
+    ready_for_lock(gh, work)
     batch(gh, work, "lock", "--app-id", "5832645")
     before = len(gh.writes())
     run = batch(gh, work, "check", "--app-id", "5832645")
@@ -379,6 +402,62 @@ with tempfile.TemporaryDirectory() as top:
     check("S5 check on a repository with nothing set up fails and names each missing part",
           run.returncode == 1 and all(p[k]["ok"] is False for k in
                                       ("starter file", "landing branch", "environment", "key in the environment", "lock")), p)
+
+# ---- Round 1 fixes: offer the batch run only where it can work, lock only once it can move main ----
+# F1: a stored Gate that workflow_call cannot start gets no offer, before the person registers an App.
+with tempfile.TemporaryDirectory() as top:
+    gh = GitHub(top)
+    work = repo_with_gate(top)
+    with open(os.path.join(work, ".claude", "gate.json"), "w", encoding="utf-8") as handle:
+        json.dump({"workflow": GATE, "starts": ["workflow_dispatch"]}, handle)
+    ok, why = offer(batch(gh, work, "check"))
+    check("F1 check does not offer the batch run when the stored Gate cannot be started with workflow_call",
+          ok is False and "workflow_call" in why, why)
+with tempfile.TemporaryDirectory() as top:
+    gh = GitHub(top)
+    work = repo_with_gate(top)
+    ok, why = offer(batch(gh, work, "check"))
+    check("F1 check offers the batch run in an organization's repository whose Gate can be started", ok is True, why)
+    ready_for_lock(gh, work)
+    batch(gh, work, "write")
+    batch(gh, work, "lock", "--app-id", "5832645")
+    ok, why = offer(batch(gh, work, "check", "--app-id", "5832645"))
+    check("F1 check does not offer the batch run again once it is in place", ok is False, why)
+check("F1 setup asks the batch run question only when check offers it", '"offer"' in read(SKILL))
+
+# F2: lock refuses, and writes nothing, until landing holds the starter and the environment both secrets.
+for label, leave in (("the starter is not on landing", {"starter": True}),
+                     ("the starter on landing is not what setup writes", {"starter_text": "name: other\n"}),
+                     ("the environment lacks the App key", {"secrets": ("BATCH_APP_PRIVATE_KEY",)})):
+    with tempfile.TemporaryDirectory() as top:
+        gh = GitHub(top)
+        work = repo_with_gate(top)
+        ready_for_lock(gh, work, **leave)
+        run = batch(gh, work, "lock", "--app-id", "5832645")
+        check("F2 lock is refused when " + label + ", and no ruleset is made",
+              run.returncode == 1 and gh.state()["rulesets"] == [] and run.stderr.strip() != "",
+              run.stdout + run.stderr)
+with tempfile.TemporaryDirectory() as top:
+    gh = GitHub(top)
+    work = repo_with_gate(top)
+    run = batch(gh, work, "lock", "--app-id", "5832645")
+    check("F2 lock on a repository with nothing set up is refused", run.returncode == 1 and gh.state()["rulesets"] == [],
+          run.stdout + run.stderr)
+check("F2 setup stops when a batch.py step fails, before the lock",
+      re.search(r"(?i)if any of (them|these) fails?.*stop", read(SKILL), re.DOTALL) is not None)
+
+# F3: the README says how setup really asks: one yes for three parts, the lock a yes of its own.
+section = read(README).split("### The optional batch run", 1)[-1].split("### Set up the batch run", 1)[0]
+check("F3 the README no longer says setup asks for each part on its own", "after your yes to each part" not in section)
+check("F3 the README says the lock gets a yes of its own", "a yes of its own" in section, section)
+
+# F4: a repository on a personal account gets no offer, since the App steps are for an organization.
+with tempfile.TemporaryDirectory() as top:
+    gh = GitHub(top, owner_type="User")
+    work = repo_with_gate(top)
+    ok, why = offer(batch(gh, work, "check"))
+    check("F4 check does not offer the batch run for a repository on a personal account",
+          ok is False and "organization" in why, why)
 
 print("{} passed, {} failed".format(passed, failed))
 sys.exit(1 if failed else 0)
