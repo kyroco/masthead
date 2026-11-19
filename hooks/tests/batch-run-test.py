@@ -318,12 +318,18 @@ code, out, _, output = plan({"workflow": GATE, "starts": ["workflow_call"]}, ref
 check("S4 a batch run off landing does not start", code != 0 and output.strip() == "", out)
 
 # s1-C1: a starter written before INFRA-285 still starts on every push and calls the plan at @main.
-# The plan job itself is skipped unless a go started the run, so GitHub gives it no runner and bills
-# no minutes; the Gate and the move need it, so they are skipped too.
+# The plan job must fail there, not be skipped: GitHub documents that a job whose need failed is
+# skipped, but not what a caller sees when every job of a called workflow was skipped, and a
+# "success" there would run the whole Gate on every push. So the plan job carries no `if:` and its
+# step stops any run a go did not start (checked above with a push event).
 plan_job = read(PLAN).split("\njobs:\n  plan:\n", 1)[-1]
-check("s1-C1 the plan job runs only on a go: a push from an older starter gets no runner and uses no minutes",
-      re.match(r"    if: github\.event_name == 'workflow_dispatch'\n", plan_job) is not None, plan_job[:200])
-check("s1-C1 the Gate and the move wait on the plan, so they are skipped with it",
+check("s1-C1 the plan job has no condition of its own, so an older starter's push run fails at the plan",
+      re.match(r"    if:", plan_job) is None and not re.search(r"^    if:", plan_job.split("\n    steps:\n", 1)[0], re.M),
+      plan_job[:300])
+code, out, _, output = plan({"workflow": GATE, "starts": ["workflow_call"]}, event="push")
+check("s1-C1 that failure comes before any sha is handed on, so the Gate (needs: plan) and the move are skipped",
+      code != 0 and output.strip() == "", out)
+check("s1-C1 the older starter's Gate and move both need the plan",
       re.search(r"^  gate:\n    needs: plan\n", starter, re.M) and re.search(r"^    needs: \[plan, gate\]$", starter, re.M))
 
 # ---- The starter calls this repository's workflows as they are written -------

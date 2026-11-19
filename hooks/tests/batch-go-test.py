@@ -375,6 +375,22 @@ with tempfile.TemporaryDirectory() as top:
     code, out = repo.go("INFRA-285", "ENG-5")
     check("s3-J1 naming it too lets the go start", code == 0 and len(dispatches(repo.calls())) == 1, out)
 
+# s3-J1 on a Fixes or refs line, and J-1: a word shaped like a key in a sentence is not an issue.
+with tempfile.TemporaryDirectory() as top:
+    repo = Repo(top)
+    repo.land("Add the go script (INFRA-285)")
+    fixes = repo.land("Tidy the sign-in copy\n\nFixes ENG-7")
+    refs = repo.land("Move the sign-in copy\n\nrefs ENG-8")
+    utf = repo.land("Fixes UTF-8 decoding of names")
+    code, out = repo.go("INFRA-285")
+    check("s3-J1 a Fixes line naming another team's issue names the commit by it",
+          "{} Tidy the sign-in copy (ENG-7)".format(fixes[:9]) in out, out)
+    check("s3-J1 a refs line naming another team's issue names the commit by it",
+          "{} Move the sign-in copy (ENG-8)".format(refs[:9]) in out, out)
+    check("J-1 a Fixes sentence holding a word shaped like a key (UTF-8) names no issue",
+          "{} Fixes UTF-8 decoding of names (names no issue)".format(utf[:9]) in out and "UTF-8 named" not in out, out)
+    check("J-1 the refusal asks to name only the real issues", "say go again with ENG-7 ENG-8 named too" in out, out)
+
 # arch-1: after a red batch, the search's drop record and a worker's `git revert` of it bring a
 # commit back. The record is the search's commit, no issue's work, and the revert of it belongs to
 # the record's issue, the way batch-issues.py reads them, though git's message names no issue.
