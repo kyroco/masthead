@@ -6,8 +6,9 @@ Run by /masthead:setup, each part only after the person's yes:
     batch.py write        write the starter file, .github/workflows/masthead-batch.yml
     batch.py landing      make the landing branch from main, when it is missing
     batch.py environment  make the masthead-batch environment, open to `landing` only
-    batch.py lock --app-id N   lock main: only the batch App may update, force-push or delete it
-    batch.py check [--app-id N]   say, as JSON, which parts are in place; changes nothing
+    batch.py lock --app-id N   lock main: only the batch App may update, force-push or delete it;
+                               refused until landing holds the starter and the environment both secrets
+    batch.py check [--app-id N]   say, as JSON, which parts are in place and whether to offer the batch run; changes nothing
     batch.py steps        print the click-by-click GitHub App steps, from the README
 
 Every command takes [--root DIR] (the repository's checkout) and
@@ -179,6 +180,48 @@ def own_ruleset(repo):
     return mine[0] if mine else None
 
 
+def landed_starter(repo):
+    """The starter file as the landing branch holds it on GitHub, or None when it holds none."""
+    import base64
+    try:
+        found = gh_api("repos/{}/contents/{}?ref={}".format(repo, STARTER_PATH, LANDING))
+    except GitHubError as error:
+        if not_found(error):
+            return None
+        raise
+    return base64.b64decode(found.get("content", "")).decode("utf-8", "replace")
+
+
+def environment_secrets(repo):
+    listed = gh_api("repos/{}/environments/{}/secrets?per_page=100".format(repo, ENVIRONMENT))
+    return {s.get("name") for s in (listed or {}).get("secrets", [])}
+
+
+def lock_refusal(top, repo):
+    """Why main must not be locked yet, or None. A lock with nothing able to move main would freeze it (F2)."""
+    want, error = gate.starter(top)
+    if error:
+        return error
+    have = landed_starter(repo)
+    if have is None:
+        return ("The landing branch on GitHub does not hold {} yet. Commit it with .claude/gate.json and land it on "
+                "landing first; locking main before that would leave nothing able to move it.").format(STARTER_PATH)
+    if have != want:
+        return ("The starter file on the landing branch differs from what setup writes for the stored Gate. Run "
+                "batch.py write, land the file, then lock main.")
+    try:
+        names = environment_secrets(repo)
+    except GitHubError as error:
+        if not not_found(error):
+            raise
+        names = set()
+    gone = [s for s in SECRETS if s not in names]
+    if gone:
+        return ("The {} environment lacks {}, so the batch run could not move main. The person stores them first "
+                "(batch.py steps gives the commands).").format(ENVIRONMENT, " and ".join(gone))
+    return None
+
+
 def lock(repo, app_id):
     mine = own_ruleset(repo)
     if mine:
@@ -314,6 +357,23 @@ def check(top, repo, app_id):
     return found
 
 
+def offer(top, repo, found):
+    """Whether setup should ask the batch run question here, and why not (F1, F4)."""
+    _, error = gate.starter(top)
+    if error:
+        return False, error
+    try:
+        owner = (gh_api("repos/{}".format(repo)) or {}).get("owner", {}).get("type")
+    except GitHubError as e:
+        return False, "GitHub would not say who owns {}: {}".format(repo, e)
+    if owner != "Organization":
+        return False, ("The batch run's GitHub App steps are for a repository an organization owns, and {} is on a "
+                       "personal account, so it keeps shipping the way it does today.").format(repo)
+    if all(p["ok"] for p in found):
+        return False, "The batch run is already in place here."
+    return True, ""
+
+
 def steps(repo):
     text = open(README, encoding="utf-8").read()
     start = text.find("\n" + STEPS_HEADING + "\n")
@@ -377,8 +437,14 @@ def main(argv):
         if argv == ["check"]:
             found = check(top, repo, app_id)
             ready = all(p["ok"] for p in found)
-            print(json.dumps({"repo": repo, "ready": ready, "parts": found}, indent=2))
+            ask, why = offer(top, repo, found)
+            print(json.dumps({"repo": repo, "ready": ready, "offer": ask, "why": why, "parts": found}, indent=2))
             return 0 if ready else 1
+        if argv == ["lock"]:
+            why = lock_refusal(top, repo)
+            if why:
+                print("Main was not locked. " + why, file=sys.stderr)
+                return 1
         print({"landing": lambda: landing(repo), "environment": lambda: environment(repo),
                "lock": lambda: lock(repo, app_id)}[argv[0]]())
         return 0

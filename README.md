@@ -279,18 +279,22 @@ did not review, and the next `/masthead:setup` goes on from there.
 ### The optional batch run
 
 With a Gate stored, setup asks whether to put the batch run into the
-repository. Say no and nothing changes: the repository ships the way it does
-today. Say yes and work lands on a branch named `landing`, one Gate run tests
-each batch, and main moves to the batch only when that run is green. Setup
-then, after your yes to each part: writes a small starter file,
-`.github/workflows/masthead-batch.yml`, which calls the batch run kept in
-this repository; makes the `landing` branch from main if it is missing; makes
-an environment named `masthead-batch` that only `landing` may use, to hold
-the App's two secrets; and, last, locks main with a ruleset whose only bypass
-is your batch App, so no person, session or pull request merge can push main
-again. Commit the starter file and `.claude/gate.json` to `landing`.
-`batch.py check` (setup runs it) says which parts are in place. Rulesets and
-environments on a private repository need a paid GitHub plan.
+repository, unless it is already there, the Gate cannot be started the way
+the batch run starts it, or the repository is on a personal account, which
+the App steps below do not cover. Say no and nothing changes: the repository
+ships the way it does today. Say yes and work lands on a branch named
+`landing`, one Gate run tests each batch, and main moves to the batch only
+when that run is green. On one more yes, setup then writes a small starter
+file, `.github/workflows/masthead-batch.yml`, which calls the batch run kept
+in this repository; makes the `landing` branch from main if it is missing;
+and makes an environment named `masthead-batch` that only `landing` may use,
+to hold the App's two secrets. Once you have stored the secrets and the
+starter file is on `landing`, setup locks main, on a yes of its own, with a
+ruleset whose only bypass is your batch App, so no person, session or pull
+request merge can push main again. It will not lock main before then, since
+nothing could move it. `batch.py check` (setup runs it) says which parts are
+in place. Rulesets and environments on a private repository need a paid
+GitHub plan.
 
 The batch run moves main as a GitHub App you own, because a ruleset lets
 nothing else through. Registering it takes a person, once per organization,
@@ -361,8 +365,8 @@ gh secret set BATCH_APP_PRIVATE_KEY --env masthead-batch --repo OWNER/REPO < ~/k
 
 Keep the two only on the environment. As a repository or organization secret
 the key would reach every workflow on every branch, the Gate included, and
-any of them could move main with it. Once the secrets are in, tell setup, and
-it locks main.
+any of them could move main with it. Once the secrets are in and the starter
+file is on `landing`, tell setup, and it locks main.
 
 ### Install options
 

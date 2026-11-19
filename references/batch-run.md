@@ -62,6 +62,12 @@ environment named `masthead-batch` that only `landing` may use, holding the
 App's id and key as the secrets `BATCH_APP_ID` and `BATCH_APP_PRIVATE_KEY`,
 which a person stores; and, last, the lock on main, a ruleset refusing every
 update, force push and delete of main whose only bypass is the batch App.
+`batch.py lock` refuses until the landing branch on GitHub holds the starter
+file setup writes and the environment holds both secrets, since a main locked
+before the batch run can move it would never move again. `batch.py check`
+answers `"offer"` false, and setup asks nothing, when the batch run is already
+in place, the stored Gate cannot be started with `workflow_call`, or the
+repository is on a personal account, which the App steps do not cover.
 `batch.py check` says which parts are in place, changes nothing, and names any
 other rule on main that would refuse the App. The README's "Set up the batch
 run's GitHub App" holds the click-by-click App steps; `batch.py steps` prints
