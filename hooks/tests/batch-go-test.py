@@ -707,5 +707,39 @@ with tempfile.TemporaryDirectory() as top:
     check("s3-2 the stop names deleting a file as a cause, not only the same lines changed",
           "deletes or renames a file the other changes" in out, out)
 
+# ---- Re-verify round 1 fixes of INFRA-286 --------------------------------------------------------
+# S2/S3-msg-move: the move's stop says what the same go does next in every case, a hand merge included,
+# when the hotfix and the milestone pile cannot be put together on their own.
+with tempfile.TemporaryDirectory() as top:
+    repo = Repo(top)
+    repo.land("Change the greeting (INFRA-285)", name="greeting.txt", text="hello from the milestone")
+    repo.go("--milestone", "Batch on go", "INFRA-285")
+    milestone = dispatches(repo.calls())[-1]
+    repo.land_hotfix("Fix the greeting (INFRA-290)", name="greeting.txt", text="hello from the hotfix")
+    repo.go("--hotfix", "INFRA-290")
+    repo.run_batch(dispatches(repo.calls())[-1])
+    where, code, move_out = repo.run_batch(milestone)
+    code, go_out = repo.go("--milestone", "Batch on go", "INFRA-285")
+    check("msg-move setup: the same go given again stops and asks for a merge by hand",
+          code != 0 and "merges origin/main into landing by hand" in go_out, go_out)
+    check("msg-move the move's stop says the same go may stop and ask for a merge by hand",
+          where == "move" and "merge by hand" in move_out, move_out)
+
+# S2/S3-msg-go: a hotfix that adds a file where the pile has a folder of that name stops the go, and the
+# stop gives git's own account of each conflict and names no file that is in neither branch.
+with tempfile.TemporaryDirectory() as top:
+    repo = Repo(top)
+    repo.land("Add the app settings (INFRA-285)", name="config/app.yml", text="name: app")
+    repo.land_hotfix("Add a config file (INFRA-290)", name="config", text="debug: false")
+    repo.go("--hotfix", "INFRA-290")
+    repo.run_batch(dispatches(repo.calls())[-1])
+    code, out = repo.go("INFRA-285")
+    check("msg-go a file against a folder stops the go", code != 0 and len(dispatches(repo.calls())) == 1, out)
+    check("msg-go the stop names no made-up file that is in neither branch", "~refs_remotes" not in out
+          or "CONFLICT" in out.split("~refs_remotes")[0].rsplit("\n", 1)[-1], out)
+    check("msg-go the stop gives git's own words for the conflict",
+          "CONFLICT (file/directory)" in out and "config" in out, out)
+    check("msg-go the stop does not list git's made-up name as one of the files", "The files: config~" not in out, out)
+
 print("{} passed, {} failed".format(passed, failed))
 sys.exit(1 if failed else 0)
