@@ -204,7 +204,11 @@ supplies only its own facts (its pre-push check, its changelog format) in its
 9. Land your commits on the landing branch, `landing`, with no pull request:
    `git push origin HEAD:landing`. Each commit message
    is a short summary that names the issue (`#<issue>`, or its key, such as
-   `KOR-12`). When the push is refused because `landing` moved (another
+   `KOR-12`). A commit that changes a file under `.github/` or `scripts/ci/`
+   needs the person's OK first: ask, with the reason for the change, and once
+   they say OK in a comment on the issue, add the line
+   `CI-change-OK: <link to that comment>` to that commit's message;
+   `hard-gate.sh` refuses the push without it. When the push is refused because `landing` moved (another
    worker landed first), fetch, rebase onto `origin/landing` again, run the
    check again on the new commit, and push again. Never force-push
    `landing`. Never commit or push to main: main moves forward only from

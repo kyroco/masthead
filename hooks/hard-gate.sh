@@ -380,8 +380,33 @@ CHANGED="$( {
   git status --porcelain --untracked-files=all 2>/dev/null | awk '{print $NF}'
 } | sort -u | sed "s|^|$TOP/|")"
 
+# A change to the CI checks waits for the person's OK (INFRA-274). Robert, November 19, 2026: "any time we add
+# a lane to CI I want to know why" and "I want it caught before it hits github". Each commit the push sends
+# that touches .github/ or scripts/ci/ must carry a CI-change-OK line pointing to the comment that holds the
+# OK; ci_change_ok.py says how it reads them. It runs in every repository, push check named or not, and before
+# the early exit below, since a push can send commits that change nothing against origin/main (another branch).
+gate_ci_change() {
+  local sends rev out
+  sends="$(python3 -c "$_CMD_READER" "$_CMD" "$(git rev-parse --verify -q 'HEAD^{tree}' 2>/dev/null)" 2>/dev/null || echo check)"
+  case "$sends" in
+    skip) return 0 ;;
+    "other --"*) return 0 ;;  # --all, --mirror, --branches: not read here; the receipt rung refuses them where a push check is named
+    other*) rev="${sends#other }"; rev="${rev#+}"; rev="${rev%%:*}" ;;
+    *) rev=HEAD ;;  # HEAD, and a line that moves HEAD first: the commits as they stand before the line runs
+  esac
+  [ -n "$rev" ] || return 0
+  out="$(python3 "$_HOOK_DIR/ci_change_ok.py" "$rev" 2>&1)" && return 0
+  echo "BLOCK: $out" >&2
+  return 1
+}
+
 # With no origin/main an empty list does not mean nothing new is pushed, so the receipt rung still runs (MAST-37).
-[ -z "$CHANGED" ] && [ -n "$BASE" ] && exit 0
+if [ -z "$CHANGED" ] && [ -n "$BASE" ]; then
+  gate_ci_change && exit 0
+  echo "" >&2
+  echo "Nothing was pushed. Fix the failures above and push again; the gate re-runs on the branch." >&2
+  exit 2
+fi
 # Warn that uncommitted edits are checked on disk but the push carries the committed copy.
 _DIRTY="$(git diff --name-only HEAD 2>/dev/null | head -5)"
 [ -n "$_DIRTY" ] && echo "WARN: uncommitted edits are checked as they are on disk, but this push carries the committed version of: $(printf '%s' "$_DIRTY" | tr '\n' ' ')" >&2
@@ -779,6 +804,7 @@ gate_local_tests() {
 # either one stops the gate here, so it costs seconds and not the minutes the stack rungs can take.
 SLOW="$ELIXIR$NODE$SWIFT$KOTLIN$TF"
 gate_local_tests
+gate_ci_change || fail=1
 [ -n "$SECRETSCAN" ] && gate_secrets
 if [ "$fail" -ne 0 ]; then
   echo "" >&2

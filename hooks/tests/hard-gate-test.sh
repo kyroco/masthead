@@ -1001,7 +1001,7 @@ ran yes "a changed toolchain file runs them"
 remembered "and the new toolchain is then remembered"
 # The gate script: a copy with the same bytes is the same gate, one more line is not.
 mkdir -p "$TMP/gatecopy"
-cp "$GATE" "$(dirname "$GATE")/project_fact.py" "$TMP/gatecopy/"
+cp "$GATE" "$(dirname "$GATE")/project_fact.py" "$(dirname "$GATE")/ci_change_ok.py" "$TMP/gatecopy/"
 GATE_UNDER_TEST="$TMP/gatecopy/hard-gate.sh"
 remembered "the same gate script from another folder still matches"
 echo '# one more line, as a plugin update would bring' >> "$TMP/gatecopy/hard-gate.sh"
