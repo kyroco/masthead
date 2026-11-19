@@ -26,7 +26,7 @@ that Gate with `gh workflow run`, so the stored Gate must list
 
 | The red batch | What the search does |
 |---|---|
-| Red only because a runner could not start or fetch the code: every failed job failed at "Set up job", "Checkout" or "Run actions/checkout@...", not counting a verdict job that ran after all the others | Reruns the run's failed jobs (`gh run rerun --failed`) and drops nothing |
+| Red only because a runner could not start or fetch the code: every failed job failed at "Set up job", "Checkout" or "Run actions/checkout@...", not counting the Gate's verdict jobs: the jobs its own workflow file runs, after others, on `always()` or `failure()`, such as Kyroco's `gate` | Reruns the run's failed jobs (`gh run rerun --failed`) and drops nothing |
 | One commit fails a check | Drops that commit |
 | No commit fails alone, but some fail together | Drops the latest-landed of them, and names each commit it fails with. Robert, November 19, 2026: "(and we send back the latest one) it is its job to figure out what needs to be fixed and fix it" |
 | No Gate run the search starts goes red, and a run of the whole batch again is green | Drops nothing, and says the red did not happen again |

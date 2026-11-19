@@ -134,38 +134,84 @@ def could_not_start(job):
     return bool(START_STEPS.match(failed_step(job).strip()))
 
 
-def is_verdict(job, jobs):
-    """A job that started only after every other job ended, such as a Gate's own
-    verdict job: it fails because others failed, so it says nothing of its own."""
-    started = job.get("startedAt") or ""
-    others = [j.get("completedAt") or "" for j in jobs if j is not job and j.get("conclusion") != "skipped"]
-    return bool(started) and bool(others) and all(c and c <= started for c in others)
+# Not !cancelled(): Gates use it to run a check when an earlier job was skipped (Kyroco's Static
+# job does), and such a job's failure is its own.
+VERDICT_IF = re.compile(r"\b(always|failure)\(\s*\)")
 
 
-def own_failures(jobs):
+def verdict_names(root, workflow):
+    """The names of the stored Gate's verdict jobs, read from its own workflow file: a job that
+    needs others and runs even when they failed (its `if:` holds always() or failure()), as
+    Kyroco's `gate` job does. Such a job fails because others failed, so it says nothing of its own."""
+    text = project_fact.read_repo_file(project_fact.checkout_top(root), workflow) or ""
+    jobs, current, in_jobs, in_if = [], None, False, False
+    for line in text.replace("\r", "").splitlines():
+        if re.match(r"^jobs:\s*(#.*)?$", line):
+            in_jobs = True
+            continue
+        if re.match(r"^\S", line):
+            in_jobs = False
+        if not in_jobs:
+            continue
+        m = re.match(r"^  ([A-Za-z0-9_-]+):\s*(#.*)?$", line)
+        if m:
+            current = {"id": m.group(1), "name": None, "if": "", "needs": False}
+            jobs.append(current)
+            in_if = False
+            continue
+        if current is None:
+            continue
+        m = re.match(r"^    (name|if|needs):\s*(.*)$", line)
+        if m:
+            key, value = m.groups()
+            in_if = key == "if"
+            if key == "name":
+                current["name"] = value.split(" #")[0].strip().strip("'\"")
+            elif key == "if":
+                current["if"] += value
+            else:
+                current["needs"] = True
+            continue
+        if re.match(r"^    \S", line):
+            in_if = False
+        elif in_if and re.match(r"^      ", line):
+            current["if"] += line
+    return {j["name"] or j["id"] for j in jobs if j["needs"] and VERDICT_IF.search(j["if"])}
+
+
+def is_verdict(job, verdicts):
+    """One of the Gate's verdict jobs, as the batch run ("gate / <name>") or the Gate itself names it.
+    A job that failed while starting is never one: its runner failed, whatever the job is."""
+    if could_not_start(job):
+        return False
+    name = job.get("name", "")
+    return name in verdicts or (name.startswith("gate / ") and name[len("gate / "):] in verdicts)
+
+
+def own_failures(jobs, verdicts):
     """The failed jobs that say something of their own: verdict jobs left out."""
-    return [j for j in failed_jobs(jobs) if not is_verdict(j, jobs)]
+    return [j for j in failed_jobs(jobs) if not is_verdict(j, verdicts)]
 
 
-def judge(jobs):
+def judge(jobs, verdicts):
     """One Gate's jobs: "green", "start" (red only because a runner could not start or fetch
     the code), or "red"."""
     if not failed_jobs(jobs):
         return "green"
-    failures = own_failures(jobs)
+    failures = own_failures(jobs, verdicts)
     if failures and all(could_not_start(j) for j in failures):
         return "start"
     return "red"
 
 
-def classify(run):
+def classify(run, verdicts):
     """A Gate run the search started, judged as judge() says. One that ended without
     passing and with no failed job (cancelled) counts as a run to start again."""
     if run.get("conclusion") == "success":
         return "green"
     if run.get("conclusion") == "startup_failure":
         return "start"
-    verdict = judge(run.get("jobs") or [])
+    verdict = judge(run.get("jobs") or [], verdicts)
     return "start" if verdict == "green" else verdict
 
 
@@ -175,7 +221,7 @@ def part_of(job):
     return first if first in ("plan", "move") else "gate"
 
 
-def batch_verdict(run, run_id):
+def batch_verdict(run, run_id, verdicts):
     """The red batch run judged part by part: the plan, then the Gate, then the move of main.
     Only the Gate's jobs say whether the batch's code is red; a plan or move job whose runner
     could not start or fetch the code makes the batch one to run again."""
@@ -190,7 +236,7 @@ def batch_verdict(run, run_id):
                    "Read the plan's message in the run.".format(run_id))
     if run.get("conclusion") == "startup_failure":
         return "start"
-    verdict = judge(parts["gate"])
+    verdict = judge(parts["gate"], verdicts)
     if verdict != "green":
         return verdict
     move_failed = failed_jobs(parts["move"])
@@ -202,9 +248,9 @@ def batch_verdict(run, run_id):
     raise Stop("Run {} is not red: its Gate did not fail. Nothing is dropped.".format(run_id))
 
 
-def failed_checks(jobs):
+def failed_checks(jobs, verdicts):
     """The names of the checks that failed in a red run, without verdict jobs and runner failures."""
-    names = [j.get("name", "") for j in own_failures(jobs) if not could_not_start(j)]
+    names = [j.get("name", "") for j in own_failures(jobs, verdicts) if not could_not_start(j)]
     return names or [j.get("name", "") for j in failed_jobs(jobs)]
 
 
@@ -263,6 +309,7 @@ class Search:
     def __init__(self, root, gate_workflow, main, commits, red_run):
         self.root = root
         self.workflow = os.path.basename(gate_workflow)
+        self.verdicts = verdict_names(root, gate_workflow)
         self.main = main
         self.commits = commits
         self.batch = commits[-1]
@@ -303,7 +350,7 @@ class Search:
             run_id = self.find_run(branch, sha)
             run = wait(run_id)
             reruns = 0
-            while classify(run) == "start":
+            while classify(run, self.verdicts) == "start":
                 if reruns >= START_RERUNS:
                     raise Stop("The Gate run {} on {} could not start or fetch the code {} times, so the search "
                                "cannot tell if it is red. Nothing is dropped.".format(
@@ -315,7 +362,7 @@ class Search:
                 gh("run", "rerun", str(run_id), "--failed")
                 self.runs += 1
                 run = wait(run_id, attempt)
-            verdict = classify(run)
+            verdict = classify(run, self.verdicts)
             if verdict == "red":
                 self.saw_red = True
             say("  {}: {} ({})".format(self.label(key), verdict, run.get("url", run_id)))
@@ -466,7 +513,7 @@ def search(run_id, root):
     if run.get("headBranch") != LANDING:
         raise Stop("Run {} is on {}, not landing, so it is not a batch run. Nothing is dropped.".format(
             run_id, run.get("headBranch")))
-    if batch_verdict(run, run_id) == "start":
+    if batch_verdict(run, run_id, verdict_names(root, stored["workflow"])) == "start":
         gh("run", "rerun", str(run_id), "--failed")
         say("Run {} went red only because a runner could not start or fetch the code. Its failed jobs run again; "
             "no commit is dropped.".format(run_id))
@@ -498,7 +545,7 @@ def search(run_id, root):
         if evidence is run:
             evidence = again
     jobs = evidence.get("jobs") or []
-    checks = failed_checks([j for j in jobs if part_of(j) == "gate"] if evidence is run else jobs)
+    checks = failed_checks([j for j in jobs if part_of(j) == "gate"] if evidence is run else jobs, finder.verdicts)
     text = revert_message(dropped, partners, checks, evidence, batch, root)
     revert = drop(dropped, text)
     say("")
