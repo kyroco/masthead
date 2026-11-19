@@ -95,6 +95,7 @@ def records(tip):
         if not re.fullmatch(r"[0-9a-f]{40}", dropped):
             continue
         found.append({
+            "body": body,
             "revert": revert,
             "dropped": dropped,
             "issue": one(values, bc.T_ISSUE) or bc.NO_ISSUE,
@@ -106,7 +107,23 @@ def records(tip):
             "run": one(values, bc.T_RUN),
             "batch": one(values, bc.T_BATCH),
         })
+    # A dropped commit whose message names no issue may be a worker's revert of an earlier record,
+    # bringing that record's commit back: it belongs to that record's issue (arch-3).
+    by_revert = {r["revert"]: r for r in found}
+    for r in found:
+        if r["issue"] == bc.NO_ISSUE and known(r["dropped"]):
+            brought = brings_back(bc.message(r["dropped"]), by_revert)
+            if brought:
+                r["issue"] = brought["issue"]
     return found
+
+
+def brings_back(body, by_revert):
+    """The drop record a commit brings back, when its message says it reverts that record's revert."""
+    for sha in REVERTS.findall(body):
+        if sha in by_revert:
+            return by_revert[sha]
+    return None
 
 
 def open_records(tip):
@@ -167,15 +184,21 @@ def merged(run_id, since, root):
     if not known(base):
         raise Stop("--since {} is not a commit in this checkout.".format(base))
 
+    # Judged at the run's own commit, never at landing's tip: a commit brought back after this run
+    # did not reach main with it (s2-1).
+    by_revert = {r["revert"]: r for r in records(head)}
     issues = []
     for sha, body in commits("{}..{}".format(base, head)):
-        if trailers(body).get(bc.T_DROPPED) or REVERTS.search(body):
-            continue  # a drop record, or a commit bringing one back: not an issue's own work
-        issue = bc.issue_of(sha, root)
+        if sha in by_revert:
+            continue  # a drop record: the search's commit, no issue's work
+        brought = brings_back(body, by_revert)
+        # A revert of a record is the work of that record's issue, whatever its message names
+        # (s3-1); any other revert is an ordinary commit of the issue it names (arch-2).
+        issue = brought["issue"] if brought else bc.issue_of(sha, root)
         if issue != bc.NO_ISSUE and issue not in issues:
             issues.append(issue)
     back = {}
-    for r in open_records(LANDING_REF):
+    for r in open_records(head):
         back.setdefault(r["issue"], r)
     done = [i for i in issues if i not in back]
     held = [i for i in issues if i in back]
@@ -186,6 +209,11 @@ def merged(run_id, since, root):
     if held:
         say("Sent back, not merged, leave open: {}".format(
             ", ".join("{} (dropped {})".format(i, back[i]["dropped"][:9]) for i in held)))
+        # The dropped commit and its revert both reached main, so a "Fixes <issue>" line in the
+        # dropped commit can have closed the issue on GitHub or set it Done in Linear (s4-judge-1).
+        for i in held:
+            say("If its commit's closing words closed {} or set it Done, reopen it and set it back to "
+                "In Progress.".format(i))
     return 0
 
 
@@ -235,6 +263,13 @@ def returned():
         say("No dropped commit is waiting to come back.")
         return 0
     for r in found:
+        if r["issue"] == bc.NO_ISSUE:
+            # No issue to hand it to: never a worker of an issue called "none found" (arch-3).
+            say("{} names no issue: tell the person. It was dropped from landing by the revert {}, which "
+                "failed {} in {}.".format(r["dropped"][:9], r["revert"][:9],
+                                         ", ".join(r["checks"]) or "no check of its own", r["run"]))
+            say()
+            continue
         say("{} goes back to its worker: {} was dropped from landing. Do not set {} Done.".format(
             r["issue"], r["dropped"][:9], r["issue"]))
         say("--- message for the worker ---")

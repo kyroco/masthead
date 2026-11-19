@@ -243,7 +243,9 @@ each counts as merged. Close each one (on GitHub, `gh issue close <n>`, then
 set it to Done with `set-status.sh`), then each parent up the chain that has
 no open sub-issue left, set to Done the same way. An issue it lists as sent
 back is not merged, though its commit sits on main with its revert: leave it
-open and never set it Done. On the first batch it may ask for `--since <the
+open and never set it Done. When that commit's closing words (`Fixes <issue>`)
+closed it or set it Done on reaching main, reopen it (`gh issue reopen <n>`)
+and set it back to In Progress, as the script's line for it says. On the first batch it may ask for `--since <the
 commit main was on before this batch>`. List what each closed issue blocked:
 
     gh api repos/{owner}/{repo}/issues/<n>/dependencies/blocking --jq '.[] | "#\(.number) \(.state) \(.title)"'
@@ -279,8 +281,10 @@ to the worker of the later one, whose message tells it to own the fix end to
 end, to read the earlier issue and every comment on it first, and to comment
 on both issues once its fix lands. Robert, November 19, 2026: "it is its job
 to figure out what needs to be fixed and fix it, and not say: welp not my
-commit sorry, moving on". For each issue it names, one you have not handed
-back already in this run:
+commit sorry, moving on". A dropped commit that names no issue goes to the
+person as the script prints it. For each dropped commit it lists, one whose
+drop you have not handed back already (each drop is its own revert, so a
+second drop of the same issue is handed back again):
 
 1. Never set it Done. Set it back to In Progress (`set-status.sh`).
 2. Post the message on the issue as a comment, word for word, so any session
