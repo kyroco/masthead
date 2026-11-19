@@ -131,8 +131,8 @@ step7 = section(worker, "## 7. Report", "## A question")
 expect("worker.md step 4 names <state>/dispatches.tsv", "`<state>/dispatches.tsv`" in step4, True)
 expect("worker.md step 4 notes how many rows the log holds", "how many rows the dispatch log holds" in step4, True)
 expect("worker.md step 7 counts from the number noted in step 4", "since the count you noted in\nstep 4" in step7 or "since the count you noted in step 4" in step7, True)
-step9 = section(cliffs, "9. Push and open one PR", "10. Once it merges")
-expect("session-cliffs step 9 counts rows of <state>/dispatches.tsv", "`<state>/dispatches.tsv`" in step9, True)
+step10 = section(cliffs, "10. Post the change's record", "11. Once the batch")
+expect("session-cliffs step 10 counts rows of <state>/dispatches.tsv", "`<state>/dispatches.tsv`" in step10, True)
 
 # Round 0, A6: no instruction says a fact comes from settings.json alone, now that the personal file wins.
 with open(os.path.join(ROOT, "references", "dispatch-brief.md")) as handle:
