@@ -61,9 +61,14 @@ LINEAR_KEY = re.compile(r"^([A-Z][A-Z0-9]{0,9})-\d+$")
 GITHUB_KEY = re.compile(r"^#?(\d+)$")
 OWNER_LINE = re.compile(r"\s*(fixes|closes|resolves|refs)\b", re.I)
 # Any Linear key, for a commit that names an issue of another team or tracker than the go's (s3-J1):
-# read only on a Fixes or refs line, or in brackets at the end of the subject, as the house style writes it.
-ANY_KEY = re.compile(r"\b[A-Z][A-Z0-9]{1,9}-\d+\b")
-SUBJECT_KEY = re.compile(r"\(([A-Z][A-Z0-9]{1,9}-\d+)\)\s*$")
+# read only from a Fixes or refs line that names keys and nothing else ("Fixes ENG-5", "refs ENG-5,
+# ENG-6"), or in brackets at the end of the subject, as the house style writes them. A sentence such as
+# "Fixes UTF-8 decoding" names no issue (J-1).
+_KEY = r"[A-Z][A-Z0-9]{1,9}-\d+"
+ANY_KEY = re.compile(r"\b{}\b".format(_KEY))
+KEYS_ONLY = re.compile(r"^\s*(?:fixes|closes|resolves|refs)\s+{0}(?:\s*,?\s*(?:and\s+)?{0})*\s*\.?\s*$".format(_KEY),
+                       re.I)
+SUBJECT_KEY = re.compile(r"\(({})\)\s*$".format(_KEY))
 
 
 class Stop(Exception):
@@ -123,9 +128,8 @@ def owner(body, pattern):
         if found:
             return found[-1].upper()
     for line in owning:
-        found = ANY_KEY.findall(line)
-        if found:
-            return found[-1]
+        if KEYS_ONLY.match(line):
+            return ANY_KEY.findall(line)[-1]
     m = SUBJECT_KEY.search(lines[0]) if lines else None
     return m.group(1) if m else None
 

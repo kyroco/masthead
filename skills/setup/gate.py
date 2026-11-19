@@ -388,13 +388,30 @@ def workflow_run_lists(text):
     return found
 
 
+def items(lines, i):
+    """The indices of a block list's items under the key on line i. YAML lets the list sit deeper than
+    its key or flush with it (`branches:` then `- main` at the same indent); both are read (s1-C2)."""
+    indent = len(lines[i]) - len(lines[i].lstrip())
+    found = []
+    for j in range(i + 1, len(lines)):
+        body = lines[j].strip()
+        if not body:
+            continue
+        depth = len(lines[j]) - len(lines[j].lstrip())
+        if depth < indent or (depth == indent and not body.startswith("- ")):
+            break
+        if body.startswith("- "):
+            found.append(j)
+    return found
+
+
 def pattern_list(lines, i, rest):
     """The values of a `branches:`-like key: a flow list, one value, or a block list under it."""
     if rest.startswith("["):
         return [unquote(w) for w in rest.strip("[]").split(",") if unquote(w)]
     if rest:
         return [unquote(rest)]
-    return [unquote(lines[j].strip()[2:]) for j in children(lines, i) if lines[j].strip().startswith("- ")]
+    return [unquote(lines[j].strip()[2:]) for j in items(lines, i)]
 
 
 def matches(branch, patterns):
@@ -422,7 +439,7 @@ def push_to(text, branch):
             words = {unquote(w.split(":")[0]) for w in rest.strip("[]{}").split(",")}
             return i + 1 if "push" in words else None
         under = children(lines, i)
-        for j in under:
+        for j in items(lines, i):
             if lines[j].strip() in ("- push", "- 'push'", '- "push"'):
                 return j + 1  # a block list of events: every push, every branch
         for j, key, value in keys(lines, under):

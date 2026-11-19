@@ -55,8 +55,12 @@ the go was for), `issues` (the named issues found on the pile) and `sha`
 The run's event is `workflow_dispatch`, its ref `refs/heads/landing`, and its
 `github.sha` the last commit of `landing` when the go reached GitHub. `plan`
 stops the run when its event is anything but `workflow_dispatch` (an older
-starter, written before INFRA-285, still starts on every push: setup writes
-it again), and when that commit is not the `sha` the go checked: `landing`
+starter, written before INFRA-285, still starts on every push, and each such
+run costs one short plan job that fails, so the Gate and the move are
+skipped, until setup writes the starter again; `batch-go.py` refuses a go
+until then. The plan job fails rather than being skipped on purpose:
+GitHub documents that a failed need skips the jobs after it, but not how a
+caller reads a called workflow whose every job was skipped), and when that commit is not the `sha` the go checked: `landing`
 moved in between, and the person says go again so the new commits are
 checked too.
 
