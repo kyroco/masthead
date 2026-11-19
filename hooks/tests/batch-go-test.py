@@ -177,8 +177,9 @@ class Repo:
             raise SystemExit("--hotfix --base failed: " + out)
         return self.land(message, name=name, branch="hotfix", onto=out.splitlines()[0], text=text)
 
-    def go(self, *args):
+    def go(self, *args, extra_env=None):
         env = dict(ENV, PATH=self.path, CLAUDE_PROJECT_DIR=self.work)
+        env.update(extra_env or {})
         r = subprocess.run([sys.executable, GO, *args], cwd=self.work, env=env, capture_output=True, text=True)
         return r.returncode, r.stdout + r.stderr
 
@@ -740,6 +741,50 @@ with tempfile.TemporaryDirectory() as top:
     check("msg-go the stop gives git's own words for the conflict",
           "CONFLICT (file/directory)" in out and "config" in out, out)
     check("msg-go the stop does not list git's made-up name as one of the files", "The files: config~" not in out, out)
+
+# ---- Re-verify round 2 findings of INFRA-286 -----------------------------------------------------
+# r2-J1: the move's stop is true too when the same go stops for the CI push check, not for a git conflict:
+# a clean merge that leaves a CI file unlike both sides.
+with tempfile.TemporaryDirectory() as top:
+    repo = Repo(top)
+    lint = "\n".join("line {}".format(n) for n in range(1, 21))
+    repo.write(".github/workflows/lint.yml", lint + "\n")
+    git(repo.work, "add", "-A")
+    git(repo.work, "commit", "-q", "-m", "Add lint")
+    git(repo.work, "push", "-q", "origin", "HEAD:refs/heads/main", "HEAD:refs/heads/landing")
+    repo.land("Tune lint (INFRA-285)\n\nCI-change-OK: https://linear.app/x/issue/INFRA-285/x#comment-2",
+              name=".github/workflows/lint.yml", text=lint.replace("line 20", "line twenty"))
+    repo.go("INFRA-285")
+    milestone = dispatches(repo.calls())[-1]
+    repo.land_hotfix("Fix lint (INFRA-290)\n\nCI-change-OK: https://linear.app/x/issue/INFRA-290/x#comment-1",
+                     name=".github/workflows/lint.yml", text=lint.replace("line 1\n", "line one\n", 1))
+    repo.go("--hotfix", "INFRA-290")
+    repo.run_batch(dispatches(repo.calls())[-1])
+    where, code, move_out = repo.run_batch(milestone)
+    code, go_out = repo.go("INFRA-285")
+    check("r2-J1 setup: the same go given again stops at the push check, not at a git conflict",
+          code != 0 and "push check refuses" in go_out and "cannot be put together" not in go_out, go_out)
+    check("r2-J1 the move's stop covers a go that cannot push its merge on its own, not only a git conflict",
+          where == "move" and "cannot make or push that merge on its own" in move_out, move_out)
+
+# r2-J2: git speaks the person's language, so the conflict stop must read git's lines whatever it is.
+GERMAN_GIT = "/opt/homebrew/bin/git"
+german = os.path.exists(GERMAN_GIT) and "Auf Branch" in subprocess.run(
+    [GERMAN_GIT, "status"], cwd=PLUGIN, env=dict(os.environ, LC_ALL="de_DE.UTF-8", LANGUAGE="de"),
+    capture_output=True, text=True).stdout
+if not german:
+    print("note: r2-J2 not run here: no git on this machine speaks German")
+else:
+    with tempfile.TemporaryDirectory() as top:
+        repo = Repo(top)
+        repo.land("Change the greeting (INFRA-285)", name="greeting.txt", text="hello from the milestone")
+        repo.land_hotfix("Fix the greeting (INFRA-290)", name="greeting.txt", text="hello from the hotfix")
+        repo.go("--hotfix", "INFRA-290")
+        repo.run_batch(dispatches(repo.calls())[-1])
+        code, out = repo.go("INFRA-285", extra_env={
+            "PATH": os.path.dirname(GERMAN_GIT) + os.pathsep + repo.path, "LC_ALL": "de_DE.UTF-8", "LANGUAGE": "de"})
+        check("r2-J2 with git speaking German, the stop still gives git's line for the conflict",
+              code != 0 and "nothing more" not in out and "greeting.txt" in out.split("git said:")[-1], out)
 
 print("{} passed, {} failed".format(passed, failed))
 sys.exit(1 if failed else 0)
