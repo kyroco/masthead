@@ -176,7 +176,7 @@ jobs:
   plan:
     runs-on: ubuntu-latest
     env:
-      BASE: ${{ (github.ref == 'refs/heads/landing' && endsWith(github.workflow_ref, '/.github/workflows/masthead-batch.yml@refs/heads/landing')) && 'origin/main' || github.event.before }}
+      BASE: ${{ ((github.ref == 'refs/heads/landing' && endsWith(github.workflow_ref, '/.github/workflows/masthead-batch.yml@refs/heads/landing')) || (github.ref == 'refs/heads/hotfix' && endsWith(github.workflow_ref, '/.github/workflows/masthead-batch.yml@refs/heads/hotfix'))) && 'origin/main' || github.event.before }}
     steps:
       - run: gh api "repos/x/y/commits/$SHA/check-runs" --jq '.check_runs[] | select(.name == "gate" or .name == "gate / gate")'
 """

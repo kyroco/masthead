@@ -288,7 +288,8 @@ batch run can move it would never move again.
      batch run; one keyed on `github.workflow_ref` (a runner picker, a plan
      check) is false. The match for a batch run: event `workflow_dispatch`,
      ref `refs/heads/landing`, and `github.workflow_ref` ending in
-     `masthead-batch.yml@refs/heads/landing`. A batch arm keyed on the event
+     `masthead-batch.yml@refs/heads/landing`, and the same three with
+     `hotfix` for a hotfix's own run. A batch arm keyed on the event
      `push`, as Kyroco's first was, is never true now.
    - The diff base. A go is not a push, so `github.event.before` is empty.
      Diff a batch run against main.

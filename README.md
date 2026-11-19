@@ -227,7 +227,8 @@ parked or skipped, and you get one line per issue saying which, with how
 many merged.
 
 With the batch run, the foreman instead accepts the landing and starts the
-next issue in that worker. Main moves forward only from `landing`: once a
+next issue in that worker. Main moves forward only from `landing`, or from
+`hotfix` for an urgent fix that does not wait for the milestone: once a
 batch of landed commits is in, one run of the repo's Gate tests it, and when
 a green batch moves main, the foreman closes each issue it carried, and any
 big issue whose pieces are now all done, and starts the issues that waited on
@@ -448,18 +449,22 @@ not read scripts. Masthead changes none of these files: they are yours.
    decides whether plan checks run. A batch run is a `workflow_dispatch` run,
    so a test for `workflow_dispatch` alone is true for it, but
    `github.workflow_ref` names `masthead-batch.yml`, not your Gate. Its
-   event is `workflow_dispatch` and its ref is `refs/heads/landing`.
+   event is `workflow_dispatch` and its ref is `refs/heads/landing`, or
+   `refs/heads/hotfix` for a hotfix's own run.
 2. Beside each one, add a test that matches a batch run on all three of
    those:
 
    ```yaml
    || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/landing'
    && endsWith(github.workflow_ref, '/.github/workflows/masthead-batch.yml@refs/heads/landing'))
+   || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/hotfix'
+   && endsWith(github.workflow_ref, '/.github/workflows/masthead-batch.yml@refs/heads/hotfix'))
    ```
 
    In a shell script, Kyroco passes the three in as `GATE_EVENT_NAME`,
    `GATE_REF` and `GATE_WORKFLOW_REF` and checks that the workflow ref ends in
-   `/.github/workflows/masthead-batch.yml@refs/heads/landing`. A Gate that
+   `/.github/workflows/masthead-batch.yml@refs/heads/landing`, or the same
+   with `hotfix`. A Gate that
    matched a batch run on the event `push`, as Kyroco's did, must change that
    test to `workflow_dispatch`: a batch run never starts on a push now.
 3. Find every use of `github.event.before`. A batch run starts on a go, not a

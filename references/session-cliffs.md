@@ -253,8 +253,8 @@ In the batch way (`--ships` printed `batch`):
    worker landed first), fetch, rebase onto `origin/landing` again, run the
    check again on the new commit, and push again. Never force-push
    `landing`. Never commit or push to main: main moves forward only from
-   `landing`, after one run of the repo's Gate passes on the batch, and the
-   foreman does that, not you. When your foreman's prompt says the issue is
+   `landing`, or from `hotfix` for a hotfix, after one run of the repo's Gate
+   passes on the batch, and the foreman does that, not you. When your foreman's prompt says the issue is
    a hotfix, it has its own pile, `hotfix`, and nothing of it lands on
    `landing`: in step 8, rebase onto the branch
    `python3 ${CLAUDE_PLUGIN_ROOT}/skills/work-on/batch-go.py --hotfix --base`

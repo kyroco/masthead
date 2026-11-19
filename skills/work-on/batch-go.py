@@ -237,8 +237,11 @@ def merge_main_into(branch, head, pattern):
     r = git("merge-tree", "--write-tree", "--name-only", "--no-messages", head, tracking(MAIN), check=False)
     if r.returncode == 1:
         files = [l for l in r.stdout.splitlines()[1:] if l.strip()]
-        raise Stop("Main and {0} change the same lines, so the go cannot bring main into {0} and nothing starts. "
-                   "A worker merges origin/main into {0} by hand and lands the merge, then say go again. "
+        # git stops on any conflict: the same lines changed on both sides, or a file one side deletes or
+        # renames and the other changes (s3-2).
+        raise Stop("Main and {0} cannot be put together on their own: they change the same lines of a file, or one "
+                   "deletes or renames a file the other changes. So the go cannot bring main into {0}, and nothing "
+                   "starts. A worker merges origin/main into {0} by hand and lands the merge, then say go again. "
                    "The files: {1}".format(branch, ", ".join(files) or "not named by git"))
     if r.returncode != 0:
         raise Stop("git could not merge main into {}: {}".format(branch, (r.stderr or r.stdout).strip()))
@@ -335,9 +338,12 @@ def go(argv):
         commits = pile(pattern, head)
         check_pile(commits, keys, name, branch)
         behind = not is_ancestor(tracking(MAIN), head)
-        if not behind or check_only:
+        if not behind:
             break
+        # --check makes the merge too, pushing nothing, so it promises a merge only the go could make (s3-1).
         merged = merge_main_into(branch, head, pattern)
+        if check_only:
+            break
         push = git("push", "--quiet", REMOTE, "{}:refs/heads/{}".format(merged, branch), check=False)
         if push.returncode == 0:
             git("update-ref", tracking(branch), merged)

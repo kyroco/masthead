@@ -314,11 +314,15 @@ def starter(top):
 # Kyroco's first batch run showed three things a Gate that routes by event misses.
 # Since INFRA-285 a batch run starts on a go, as a workflow_dispatch run on
 # landing, never on a push, so a batch arm keyed on a push is never true.
+# Since INFRA-286 a hotfix has its own pile, so a batch run is on landing or on
+# hotfix, and a batch arm that names landing alone misses a hotfix's run.
 # Each rule reads what a line does (a test, a lookup of a name), never a line that
 # only declares a trigger or names a job, and a line with the fix beside it is
 # taken as fixed, the way its message says to fix it.
-BATCH_MATCH = ("github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/landing' && "
-               "endsWith(github.workflow_ref, '/.github/workflows/masthead-batch.yml@refs/heads/landing')")
+BATCH_MATCH = ("(github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/landing' && "
+               "endsWith(github.workflow_ref, '/.github/workflows/masthead-batch.yml@refs/heads/landing')) || "
+               "(github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/hotfix' && "
+               "endsWith(github.workflow_ref, '/.github/workflows/masthead-batch.yml@refs/heads/hotfix'))")
 MISSES = {
     "event": ("In a batch run github.workflow_ref names masthead-batch.yml, the starter that calls the Gate, not "
               "the Gate, so this test is false for a batch run. Add a batch arm beside it: " + BATCH_MATCH + "."),
@@ -332,6 +336,9 @@ MISSES = {
             "batch run. Match both names."),
     "helper": ("A batch run is named \"Masthead batch\", not by the Gate's own name, so this workflow_run helper "
                "never starts after a batch. List \"Masthead batch\" beside the Gate's name."),
+    "hotfix": ("A hotfix has its own pile, and its batch run is on refs/heads/hotfix, with a workflow_ref "
+               "ending masthead-batch.yml@refs/heads/hotfix, so a batch arm that matches landing alone misses "
+               "it. Match both piles: " + BATCH_MATCH + "."),
     "landing-push": ("This workflow starts on every push to landing, so each change a worker lands runs it and "
                      "uses minutes, outside the batch run, which starts only on a go. To keep it off landing, add "
                      "branches-ignore: [landing] under its push trigger, or list only the branches it should run on."),
@@ -341,6 +348,8 @@ SNAG_EVENT = re.compile(r"\bgithub\.workflow_ref\b")
 SNAG_PUSH = re.compile(r"""event_name\s*==\s*['"]push['"]""")
 PUSH_ARM = ("refs/heads/landing", "masthead-batch")
 SNAG_BASE = re.compile(r"github\.event\.before\b")
+# A batch arm written before a hotfix had its own pile: it names the starter on landing alone (INFRA-286).
+SNAG_HOTFIX = re.compile(r"masthead-batch\.yml@refs/heads/landing")
 # A lookup of a check or run by name: check_name=test, check-name: test, context: test, .name == "test".
 SNAG_LOOKUP = re.compile(r"""\b(?:check_name|check-name|context)\s*[=:]\s*['"]?([^\s&"'),]+)|\bname\s*==\s*(['"])(.*?)\2""",
                          re.I)
@@ -515,6 +524,8 @@ def snags(top):
                 hits.append(("push", MISSES["push"]))
             if SNAG_BASE.search(line) and not fixed("base"):
                 hits.append(("base", MISSES["base"]))
+            if SNAG_HOTFIX.search(line) and "hotfix" not in near:
+                hits.append(("hotfix", MISSES["hotfix"]))
             # A name lookup is fixed only by a lookup of the batch's own name for it
             # nearby, never by the words in a workflows: list (arch-1, round 2).
             for m in SNAG_LOOKUP.finditer(line):

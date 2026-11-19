@@ -1,6 +1,6 @@
 # The batch run
 
-How a repository's commits on `landing` reach main (INFRA-270). In a
+How a repository's commits on `landing`, or a hotfix's on `hotfix`, reach main (INFRA-270, INFRA-286). In a
 repository that opted in, workers land verified commits on `landing` with no
 pull request. A repository opted in when `project_fact.py --ships` prints
 `batch`: its stored Gate and this starter file are both committed on
@@ -102,9 +102,11 @@ push that fix to main." A hotfix has its own pile, the branch `hotfix` (INFRA-28
    race with a worker landing at the same moment, the go reads the new pile,
    checks it again and makes the merge on it, up to three tries.
 
-The go stops, and pushes nothing, when main and the pile change the same
-lines (it names the files; a worker merges `origin/main` into the pile by
-hand and lands the merge), or when the merge leaves a file under `.github/`
+The go stops, and pushes nothing, when git cannot put main and the pile
+together on its own: they change the same lines of a file, or one deletes or
+renames a file the other changes (it names the files; a worker merges
+`origin/main` into the pile by hand and lands the merge). It stops too when
+the merge leaves a file under `.github/`
 or `scripts/ci/` unlike both sides, which INFRA-274's push check refuses
 without the person's OK. A change to the CI checks on one side only is
 already OKed there and passes.
@@ -112,7 +114,8 @@ already OKed there and passes.
 A hotfix's run has event `workflow_dispatch`, ref `refs/heads/hotfix`, and a
 `github.workflow_ref` ending `/.github/workflows/masthead-batch.yml@refs/heads/hotfix`.
 A Gate arm that matches a batch run on `refs/heads/landing` alone does not
-match it, and treats it as a run started by hand on a branch.
+match it, and treats it as a run started by hand on a branch; `gate.py snags`
+points at such an arm (see What the Gate sees in a batch run).
 
 ## Green, red, and no Gate
 
@@ -187,14 +190,15 @@ three ways (INFRA-283). Any Gate that routes by event meets the same three.
 
 | What the Gate reads | In a batch run | What breaks | Kyroco's fix |
 |---|---|---|---|
-| `github.event_name`, `github.workflow_ref` | `workflow_dispatch`, and the ref of `masthead-batch.yml@refs/heads/landing`, because the starter calls the Gate as a job | A test keyed on `workflow_dispatch` alone is true, but one on `github.workflow_ref` naming the Gate is false; a batch arm keyed on `push` is never true | Match a batch run on all three: event `workflow_dispatch`, `github.ref` `refs/heads/landing`, and `github.workflow_ref` ending in `masthead-batch.yml@refs/heads/landing` |
+| `github.event_name`, `github.workflow_ref` | `workflow_dispatch`, and the ref of `masthead-batch.yml@refs/heads/landing`, because the starter calls the Gate as a job | A test keyed on `workflow_dispatch` alone is true, but one on `github.workflow_ref` naming the Gate is false; a batch arm keyed on `push` is never true | Match a batch run on all three: event `workflow_dispatch`, `github.ref` `refs/heads/landing`, and `github.workflow_ref` ending in `masthead-batch.yml@refs/heads/landing`; and the same three with `hotfix` for a hotfix's own run (INFRA-286) |
 | `github.event.before` | Empty: a go is not a push | A diff from there sees nothing of the batch | Diff a batch run against main, as a run started by hand does |
 | The check's and the run's names | Each check is `gate / <job>`, the starter's job `gate` then the Gate's own job name (Kyroco's verdict job is `gate`, so its check is `gate / gate`); the run is `Masthead batch`, not `Gate` | A script looking for the check by the job's name alone, or a `workflow_run` helper listening to "Gate", sees nothing | Match both names: `workflows: [Gate, Masthead batch]`, and both `gate` and `gate / gate` |
 
 Kyroco's first batch run started on a push, before INFRA-285. The batch arms
 of its plan-check test, part of the `if:` in its `gate.yml` (the whole test
 adds two more conditions), match a batch run started by a go once the last
-arm tests `workflow_dispatch`, not `push`:
+arm tests `workflow_dispatch`, not `push`, and a hotfix's run once an arm for
+`hotfix` stands beside it (INFRA-286):
 
 ```yaml
 if: >-
@@ -202,6 +206,8 @@ if: >-
   || (github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main')
   || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/landing'
   && endsWith(github.workflow_ref, '/.github/workflows/masthead-batch.yml@refs/heads/landing'))
+  || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/hotfix'
+  && endsWith(github.workflow_ref, '/.github/workflows/masthead-batch.yml@refs/heads/hotfix'))
 ```
 
 `python3 skills/setup/gate.py snags` points at each line that keys on one of
@@ -213,7 +219,9 @@ a line with its own fix within four lines counts as fixed: a batch arm naming
 a test for `== 'Masthead batch'` beside a test of the run's name, or
 `gate / <job>` beside a lookup of that job's check. A test for a `push` beside
 `refs/heads/landing` or `masthead-batch` is a batch arm from before INFRA-285
-and is pointed at: it is never true now. And every other workflow of the
+and is pointed at: it is never true now. A batch arm naming
+`masthead-batch.yml@refs/heads/landing` with no `hotfix` within four lines is
+from before INFRA-286 and is pointed at as `hotfix`: it misses a hotfix's run. And every other workflow of the
 repository that starts on a push to `landing` (a push trigger with no branch
 filter, or one that takes `landing`) is named as `landing-push`: it runs on
 each landed change and uses minutes outside the batch run, until it is kept

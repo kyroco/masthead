@@ -292,8 +292,8 @@ branch stay). Give that worker its next ready issue. In the terminal, stop the
 worker's session (its id and worktree come from `claude agents --json`, not
 from memory) and start the next issue in a new one.
 
-Main moves forward only from `landing`, by one run of the repo's Gate on the
-batch, never by a worker and never by you. You queue nothing and open nothing
+Main moves forward only from `landing`, or from `hotfix` for a hotfix, by one
+run of the repo's Gate on the batch, never by a worker and never by you. You queue nothing and open nothing
 on GitHub: no pull request, no merge queue, no merge. Landed work piles up on
 `landing`, and a push starts no run. The run starts only when the person says
 go: for a milestone, or, where no milestone exists, for the issues they name
@@ -327,9 +327,18 @@ merge before its run starts, so a green run moves main to both. When that go
 stops because main and the pile change the same lines, or because the merge
 changes a CI file in a way neither side did, a worker merges `origin/main`
 into `landing` by hand (with the person's OK line for a CI file) and lands
-the merge; then start the go again. A red hotfix run goes back to the
-hotfix's worker to fix on top on `hotfix`, then start its run again: the
-search for a red batch's bad change reads `landing` only.
+the merge; then start the go again. Read a finished hotfix run with
+`batch-issues.py merged <run id>` like any batch run. When its Gate failed,
+the hotfix goes back to its worker to fix on top on `hotfix`, then start its
+run again: the search for a red batch's bad change reads `landing` only.
+
+Each pile runs on its own, so the other pile can reach main while a batch
+runs. Its Gate then passes on code that lacks what main now holds, and its
+move stops, saying main moved while the batch ran and nothing in it is to
+blame. Run the same go again at once, the person's go still standing:
+`--hotfix` for a hotfix, the same milestone or issues for `landing`. It
+brings main in with one merge and tests the two together. Hand nothing back
+to a worker for it.
 
 When a batch run ends, read it, from a checkout of the repository:
 
