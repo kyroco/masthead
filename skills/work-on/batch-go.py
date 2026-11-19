@@ -28,14 +28,30 @@ checked and no other: the run's plan step stops when landing moved in between.
 
 `--check` checks the pile and starts nothing.
 """
+import importlib.util
 import os
 import re
 import subprocess
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(HERE)), "hooks"))
+PLUGIN = os.path.dirname(os.path.dirname(HERE))
+sys.path.insert(0, os.path.join(PLUGIN, "hooks"))
 import project_fact  # noqa: E402
+
+
+def _load(name, path):
+    spec = importlib.util.spec_from_file_location(name, path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+# Drop records and the commits that bring a dropped commit back are read the way batch-issues.py
+# reads them, so the two cannot disagree on whose such a commit is (arch-1). The starter's triggers
+# are read the way setup reads every workflow's.
+batch_issues = _load("batch_issues", os.path.join(HERE, "batch-issues.py"))
+gate = _load("gate", os.path.join(PLUGIN, "skills", "setup", "gate.py"))
 
 REMOTE = "origin"
 LANDING = "landing"
@@ -44,6 +60,10 @@ STARTER = "masthead-batch.yml"
 LINEAR_KEY = re.compile(r"^([A-Z][A-Z0-9]{0,9})-\d+$")
 GITHUB_KEY = re.compile(r"^#?(\d+)$")
 OWNER_LINE = re.compile(r"\s*(fixes|closes|resolves|refs)\b", re.I)
+# Any Linear key, for a commit that names an issue of another team or tracker than the go's (s3-J1):
+# read only on a Fixes or refs line, or in brackets at the end of the subject, as the house style writes it.
+ANY_KEY = re.compile(r"\b[A-Z][A-Z0-9]{1,9}-\d+\b")
+SUBJECT_KEY = re.compile(r"\(([A-Z][A-Z0-9]{1,9}-\d+)\)\s*$")
 
 
 class Stop(Exception):
@@ -97,15 +117,26 @@ def owner(body, pattern):
     """The issue a commit belongs to, the way bad-commit.py reads it: a Fixes or refs line first,
     then the subject, then the rest, and within a line the last key. None when it names none."""
     lines = body.splitlines()
-    for line in [l for l in lines if OWNER_LINE.match(l)] + lines:
+    owning = [l for l in lines if OWNER_LINE.match(l)]
+    for line in owning + lines:
         found = pattern.findall(line)
         if found:
             return found[-1].upper()
-    return None
+    for line in owning:
+        found = ANY_KEY.findall(line)
+        if found:
+            return found[-1]
+    m = SUBJECT_KEY.search(lines[0]) if lines else None
+    return m.group(1) if m else None
 
 
-def pile(pattern):
-    """[(sha, subject, issue)] for each commit on landing past main, oldest first."""
+def pile(pattern, head):
+    """[(sha, subject, issue)] for each commit on landing past main, oldest first.
+
+    A drop record a red batch left (references/bad-commit.md) belongs to the issue of the commit it
+    dropped, and so does a commit that reverts it to bring that commit back, whatever its message
+    names: the rule batch-issues.py reads them by."""
+    by_revert = {r["revert"]: r for r in batch_issues.records(head)}
     out = git("log", "--reverse", "--format=%H%x1f%s%x1f%B%x1e",
               "refs/remotes/{0}/{1}..refs/remotes/{0}/{2}".format(REMOTE, MAIN, LANDING)).stdout
     found = []
@@ -113,8 +144,25 @@ def pile(pattern):
         if "\x1f" not in entry:
             continue
         sha, subject, body = entry.split("\x1f", 2)
-        found.append((sha.strip(), subject.strip(), owner(body, pattern)))
+        sha = sha.strip()
+        record = by_revert.get(sha) or batch_issues.brings_back(body, by_revert)
+        if record:
+            issue = record["issue"] if record["issue"] != batch_issues.bc.NO_ISSUE else None
+        else:
+            issue = owner(body, pattern)
+        found.append((sha, subject.strip(), issue))
     return found
+
+
+def starter_on_landing():
+    """Stop unless the starter on landing starts on a go and on nothing else (s3-C1)."""
+    path = project_fact.STARTER_FILE
+    text = git("show", "refs/remotes/{}/{}:{}".format(REMOTE, LANDING, path), check=False).stdout
+    starts = gate.triggers(text)
+    if "workflow_dispatch" not in starts or "push" in starts:
+        raise Stop("The starter on landing, {}, is the older one: it runs on every push to landing and a go cannot "
+                   "start it, so nothing starts. Run /masthead:setup to write it again (batch.py write), and land "
+                   "it with the person's OK for the change to .github/.".format(path))
 
 
 def go(argv):
@@ -151,12 +199,13 @@ def go(argv):
         raise Stop("This repository has no batch run: landing on GitHub holds no {} starter with a stored Gate, so "
                    "nothing starts. Run /masthead:setup to opt in, or start the Gate on landing by hand."
                    .format(STARTER))
+    starter_on_landing()
     head = git("rev-parse", "refs/remotes/{}/{}^{{commit}}".format(REMOTE, LANDING)).stdout.strip()
     if git("merge-base", "--is-ancestor", "refs/remotes/{}/{}".format(REMOTE, MAIN), head, check=False).returncode:
         raise Stop("Main holds a commit landing does not, so a green run could not move main to landing. "
                    "Nothing starts.")
 
-    commits = pile(key_pattern(keys, project_fact.linear_team(top)))
+    commits = pile(key_pattern(keys, project_fact.linear_team(top)), head)
     if not commits:
         raise Stop("Landing holds nothing main does not, so there is nothing to test and nothing starts.")
     strays = [(sha, subject, issue) for sha, subject, issue in commits if issue not in keys]
@@ -188,7 +237,10 @@ def go(argv):
                         "-f", "pile=" + name, "-f", "issues=" + " ".join(carried), "-f", "sha=" + head],
                        capture_output=True, text=True)
     if r.returncode != 0:
-        raise Stop("GitHub did not start the batch run: {}".format((r.stderr or r.stdout).strip()))
+        raise Stop("GitHub did not start the batch run: {}\nGitHub starts a workflow by hand only when its file is "
+                   "also on the default branch, so the starter must be on main, as well as on landing, before the "
+                   "first go. If main lacks {}, put it there once, as setup's step 5 says, then say go again."
+                   .format((r.stderr or r.stdout).strip(), project_fact.STARTER_FILE))
     print("Started one batch run on landing at {} for {}. Main moves to {} only when it is green.".format(
         head[:9], name, head[:9]))
     print("Watch it: gh run list --workflow {} --event workflow_dispatch --limit 1".format(STARTER))

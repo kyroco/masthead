@@ -291,6 +291,11 @@ batch run can move it would never move again.
      `push`, as Kyroco's first was, is never true now.
    - The diff base. A go is not a push, so `github.event.before` is empty.
      Diff a batch run against main.
+   - Other workflows. A batch run starts only on a go, but any workflow
+     that runs on every push still runs on each push to `landing` and uses
+     minutes there. `gate.py snags` names each one as `landing-push`; keeping
+     it off `landing` (`branches-ignore: [landing]`) is a change to
+     `.github/`, so suggest it and never make it here.
    - The names. The starter calls the Gate from its job named `gate`, so each
      of the Gate's checks is named `gate / <job>`, the Gate's own job name
      after `gate / ` (Kyroco's verdict job is named `gate`, so its check is
@@ -317,7 +322,13 @@ batch run can move it would never move again.
    pull request, as the batch way's steps 8 and 9 of **Opening a PR** say.
    The push starts no run: GitHub runs the starter only from a commit on that
    branch, and only when the person says go (`skills/work-on/batch-go.py`,
-   `references/batch-run.md`). That first go is the first proof it works. This push is the switch: `project_fact.py --ships` prints `batch` only
+   `references/batch-run.md`). GitHub starts a workflow by hand only when its
+   file is on the default branch too, so the starter must be on main before
+   the first go: in a repository whose main does not hold
+   `.github/workflows/masthead-batch.yml` yet, put that same commit on main
+   once as well, by the repository's usual way to change main (a pull
+   request where main needs one), before step 6 locks main. That first go is
+   the first proof it works. This push is the switch: `project_fact.py --ships` prints `batch` only
    once both files are committed on `origin/landing`, and until then every
    session ships the pull request way (**Opening a PR** in
    `references/session-cliffs.md`).

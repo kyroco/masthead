@@ -310,8 +310,9 @@ repository, unless it is already there, the Gate cannot be started the way
 the batch run starts it, or the repository is on a personal account, which
 the App steps below do not cover. Say no and nothing changes: the repository
 ships the way it does today. Say yes and work lands on a branch named
-`landing` and piles up there: a push to `landing` starts nothing. When you
-say go, for a milestone, or for a set of issues you name where there is no
+`landing` and piles up there: a push to `landing` starts no batch run. Setup
+names any other workflow of yours that still runs on every push, so you can
+keep it off `landing`. When you say go, for a milestone, or for a set of issues you name where there is no
 milestone, the foreman starts one Gate run on the pile, then and there, and
 main moves to the pile only when that run is green. The foreman refuses a go
 while `landing` holds commits of an issue the go does not name, and says

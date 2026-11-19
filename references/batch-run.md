@@ -165,7 +165,15 @@ a line with its own fix within four lines counts as fixed: a batch arm naming
 a test for `== 'Masthead batch'` beside a test of the run's name, or
 `gate / <job>` beside a lookup of that job's check. A test for a `push` beside
 `refs/heads/landing` or `masthead-batch` is a batch arm from before INFRA-285
-and is pointed at: it is never true now. A `workflows:` list that
+and is pointed at: it is never true now. And every other workflow of the
+repository that starts on a push to `landing` (a push trigger with no branch
+filter, or one that takes `landing`) is named as `landing-push`: it runs on
+each landed change and uses minutes outside the batch run, until it is kept
+off `landing`.
+
+GitHub starts a workflow by hand only when its file is on the default branch,
+so the starter must be on main before the first go, as well as on `landing`.
+When GitHub refuses the go, `batch-go.py` says so. A `workflows:` list that
 names Masthead batch fixes the list, not a name test below it. It reads workflow files only: a script the Gate
 runs (Kyroco's runner picker was one) needs the same search by hand. Setup
 runs it before the starter lands, so the first batch is not where these show.

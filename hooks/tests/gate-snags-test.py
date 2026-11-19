@@ -330,7 +330,8 @@ for label, on, line in (("on: push", "on: push\n", 2),
                         ("a push block with no filter", "on:\n  push:\n  pull_request:\n", 3),
                         ("a push to every branch", "on:\n  push:\n    branches: ['**']\n", 3),
                         ("a push that names landing", "on:\n  push:\n    branches: [main, landing]\n", 3),
-                        ("a push that ignores only main", "on:\n  push:\n    branches-ignore:\n      - main\n", 3)):
+                        ("a push that ignores only main", "on:\n  push:\n    branches-ignore:\n      - main\n", 3),
+                        ("a block list of events", "on:\n  - pull_request\n  - push\n", 4)):
     found, out = landing_runs(on)
     check("s1-C2 a workflow that runs on a push to landing is pointed at ({})".format(label),
           found == [(".github/workflows/tests.yml", line)], out)

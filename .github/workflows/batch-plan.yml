@@ -41,6 +41,10 @@ on:
 
 jobs:
   plan:
+    if: github.event_name == 'workflow_dispatch'
+    # Only a go starts a batch (INFRA-285). A starter written before then still starts on every push to
+    # landing; its plan job is skipped here, so GitHub gives it no runner and bills no minutes, and the
+    # Gate and the move, which need it, are skipped too. Setup writes the starter again.
     runs-on: ubuntu-latest
     permissions:
       contents: read

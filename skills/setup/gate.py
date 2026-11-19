@@ -26,6 +26,7 @@ Nothing here changes how a repository ships unless `store` runs (scenario 5).
 The stored file's shape is read by project_fact.py --gate and described in
 references/gate-fact.md, for the batch run and the search to read.
 """
+import fnmatch
 import json
 import os
 import re
@@ -331,6 +332,9 @@ MISSES = {
             "batch run. Match both names."),
     "helper": ("A batch run is named \"Masthead batch\", not by the Gate's own name, so this workflow_run helper "
                "never starts after a batch. List \"Masthead batch\" beside the Gate's name."),
+    "landing-push": ("This workflow starts on every push to landing, so each change a worker lands runs it and "
+                     "uses minutes, outside the batch run, which starts only on a go. To keep it off landing, add "
+                     "branches-ignore: [landing] under its push trigger, or list only the branches it should run on."),
 }
 SNAG_EVENT = re.compile(r"\bgithub\.workflow_ref\b")
 # A test for a push: the batch arm INFRA-283 advised, when it sits by a test for landing or the starter.
@@ -384,8 +388,63 @@ def workflow_run_lists(text):
     return found
 
 
+def pattern_list(lines, i, rest):
+    """The values of a `branches:`-like key: a flow list, one value, or a block list under it."""
+    if rest.startswith("["):
+        return [unquote(w) for w in rest.strip("[]").split(",") if unquote(w)]
+    if rest:
+        return [unquote(rest)]
+    return [unquote(lines[j].strip()[2:]) for j in children(lines, i) if lines[j].strip().startswith("- ")]
+
+
+def matches(branch, patterns):
+    """Whether GitHub's branch filter `patterns` takes `branch`: later patterns win, and ! takes one away."""
+    taken = False
+    for p in patterns:
+        if p.startswith("!"):
+            if fnmatch.fnmatchcase(branch, p[1:]):
+                taken = False
+        elif fnmatch.fnmatchcase(branch, p):
+            taken = True
+    return taken
+
+
+def push_to(text, branch):
+    """The line number of a workflow's push trigger when it starts on a push to `branch`, or None."""
+    lines = [strip_comment(l) for l in text.lstrip("\ufeff").splitlines()]
+    for i, line in enumerate(lines):
+        m = re.match(r"""^(on|'on'|"on"|true)\s*:\s*(.*)$""", line)
+        if not m:
+            continue
+        rest = m.group(2).strip()
+        if rest:
+            # `on: push` or `on: [push, ...]`: every push, every branch. A flow map is read the same way.
+            words = {unquote(w.split(":")[0]) for w in rest.strip("[]{}").split(",")}
+            return i + 1 if "push" in words else None
+        under = children(lines, i)
+        for j in under:
+            if lines[j].strip() in ("- push", "- 'push'", '- "push"'):
+                return j + 1  # a block list of events: every push, every branch
+        for j, key, value in keys(lines, under):
+            if key != "push":
+                continue
+            if value and not value.startswith("{"):
+                return j + 1
+            filters = {k: pattern_list(lines, n, v) for n, k, v in keys(lines, children(lines, j))}
+            if "branches" in filters:
+                return j + 1 if matches(branch, filters["branches"]) else None
+            if "branches-ignore" in filters:
+                return None if any(fnmatch.fnmatchcase(branch, p) for p in filters["branches-ignore"]) else j + 1
+            if "tags" in filters or "tags-ignore" in filters:
+                return None  # a push filtered by tags alone never starts on a branch
+            return j + 1
+        return None
+    return None
+
+
 def snags(top):
-    """The lines of the stored Gate, what it calls, and its workflow_run helpers that a batch run would miss."""
+    """The lines of the stored Gate, what it calls, and its workflow_run helpers that a batch run would miss,
+    and each workflow of the repository that starts on every push to landing (INFRA-285 s1-C2)."""
     stored = project_fact.gate(top)
     if not stored:
         return {"status": "none", "snags": [], "read": [],
@@ -455,6 +514,16 @@ def snags(top):
     for rel, line in helpers:
         found.append({"workflow": rel, "line": line, "kind": "helper",
                       "text": texts[rel].splitlines()[line - 1].strip(), "misses": MISSES["helper"]})
+    # A batch run starts only on a go, but any other workflow that runs on a push still runs on each landing.
+    for flow in workflows(top):
+        if flow["workflow"] == project_fact.STARTER_FILE or "push" not in flow["triggers"]:
+            continue
+        text = read(flow["workflow"]) or ""
+        line = push_to(text, "landing")
+        if line:
+            found.append({"workflow": flow["workflow"], "line": line, "kind": "landing-push",
+                          "text": text.lstrip("\ufeff").splitlines()[line - 1].strip(),
+                          "misses": MISSES["landing-push"]})
     found.sort(key=lambda s: (s["workflow"], s["line"], s["kind"]))
     return {"status": "snags" if found else "clear", "snags": found, "read": sorted(texts)}
 
