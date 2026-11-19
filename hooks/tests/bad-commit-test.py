@@ -647,6 +647,31 @@ check("r1-judge-1 nothing with no issue is written to the search's memory",
       if os.path.exists(os.path.join(r.work, ".claude", "state", "named-changes.tsv")) else True)
 r.done()
 
+# ---- Re-verify round 2, scenario-2-then: a change that failed together, whose fix is still red ----
+# It is handed back with the commit it fails with and INFRA-263's rule, never as failing alone.
+r = Repo()
+p = r.land({"half-a": "a\n"}, "Add the first half (INFRA-700)")
+r.land({"e": "e\n"}, "Add e (INFRA-702)")
+c = r.land({"half-b": "b\n"}, "Add the second half (INFRA-701)")
+r.red_batch()
+out = r.search()
+check("r2-s2 setup: the first search names the later half with the earlier one it fails with",
+      record(out.stdout).get("Masthead-Fails-With") == ["{} INFRA-700".format(p)], out.stdout + out.stderr)
+tried = r.land({"b-note": "not fixed\n"}, "Try to fix the halves (INFRA-701)")
+r.red_batch()
+out = r.search()
+rec = record(out.stdout)
+text = block(out.stdout)[1]
+check("r2-s2 a still-red fix names the same change again, still with the commit it fails with",
+      rec.get("Masthead-Bad-Change") == [c] and rec.get("Masthead-Fails-With") == ["{} INFRA-700".format(p)],
+      out.stdout + out.stderr)
+check("r2-s2 its worker is told the fix is still red, and never that it fails on its own",
+      "Your fix on top, {}".format(tried[:9]) in text and "fails that check on its own" not in text, text)
+check("r2-s2 INFRA-263's rule is kept: read the earlier issue and comment on both",
+      "Before you change anything, read INFRA-700 and every comment on it" in text and
+      "add a comment to INFRA-701 and to INFRA-700" in text, text)
+r.done()
+
 # ---- V-S3-1, V-S3-2: the batch run's own plan and move jobs ---------------------
 
 for part, broken in (("move", job("move / move", "failure", [("Run actions/checkout@v5", "failure")], 11, 12)),
