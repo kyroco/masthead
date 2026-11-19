@@ -106,9 +106,10 @@ three ways (INFRA-283). Any Gate that routes by event meets the same three.
 |---|---|---|---|
 | `github.event_name`, `github.workflow_ref` | `push`, and the ref of `masthead-batch.yml@refs/heads/landing`, because the starter calls the Gate as a job | A test keyed on `workflow_dispatch` (its runner picker, its plan checks) is false | Match a batch run on all three: event `push`, `github.ref` `refs/heads/landing`, and `github.workflow_ref` ending in `masthead-batch.yml@refs/heads/landing` |
 | `github.event.before` | The commit before the last push only | A diff from there misses every commit landed earlier in the batch | Diff a batch run against main, as a run started by hand does |
-| The check's and the run's names | The verdict check is `gate / gate`, not `gate`; the run is `Masthead batch`, not `Gate` | A script looking for the check `gate`, or a `workflow_run` helper listening to "Gate", sees nothing | Match both names: `workflows: [Gate, Masthead batch]` |
+| The check's and the run's names | Each check is `gate / <job>`, the starter's job `gate` then the Gate's own job name (Kyroco's verdict job is `gate`, so its check is `gate / gate`); the run is `Masthead batch`, not `Gate` | A script looking for the check by the job's name alone, or a `workflow_run` helper listening to "Gate", sees nothing | Match both names: `workflows: [Gate, Masthead batch]`, and both `gate` and `gate / gate` |
 
-Kyroco's plan-check test, as it reads now in its `gate.yml`:
+The batch arms of Kyroco's plan-check test, part of the `if:` in its
+`gate.yml` (the whole test adds two more conditions):
 
 ```yaml
 if: >-
@@ -121,8 +122,9 @@ if: >-
 `python3 skills/setup/gate.py snags` points at each line that keys on one of
 the three, in the stored Gate, every workflow it calls with `uses: ./...`,
 and every `workflow_run` helper that names it, and says what a batch run
-would miss there. A test for `workflow_dispatch` with a batch arm within four
-lines of it counts as fixed. It reads workflow files only: a script the Gate
+would miss there. A line that only declares a trigger is never pointed at, and
+a line with its fix within four lines (a batch arm naming `masthead-batch.yml`,
+or the names `gate / ` or `Masthead batch`) counts as fixed. It reads workflow files only: a script the Gate
 runs (Kyroco's runner picker was one) needs the same search by hand. Setup
 runs it before the starter lands, so the first batch is not where these show.
 Masthead changes no repository's Gate; fixing a snag is the repository's

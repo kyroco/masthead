@@ -288,9 +288,11 @@ batch run can move it would never move again.
      `masthead-batch.yml@refs/heads/landing`.
    - The diff base. `github.event.before` is only the push before this one,
      not the whole batch. Diff a batch run against main.
-   - The names. The verdict check is named `gate / gate`, not `gate`, and the
-     run is named `Masthead batch`, so a `workflow_run` helper listening to
-     the name "Gate" never starts after a batch.
+   - The names. The starter calls the Gate from its job named `gate`, so each
+     of the Gate's checks is named `gate / <job>`, the Gate's own job name
+     after `gate / ` (Kyroco's verdict job is named `gate`, so its check is
+     `gate / gate`). The run is named `Masthead batch`, so a `workflow_run`
+     helper listening to the name "Gate" never starts after a batch.
 
    Then run `python3 ${CLAUDE_PLUGIN_ROOT}/skills/setup/gate.py snags` and
    show each snag it prints in a table: the file and line, the line itself,

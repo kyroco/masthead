@@ -311,6 +311,9 @@ def starter(top):
 
 # What a batch run looks like from inside the Gate (INFRA-283, Korium 601448c5):
 # Kyroco's first batch run showed three things a Gate that routes by event misses.
+# Each rule reads what a line does (a test, a lookup of a name), never a line that
+# only declares a trigger or names a job, and a line with the fix beside it is
+# taken as fixed, the way its message says to fix it.
 BATCH_MATCH = ("github.event_name == 'push' && github.ref == 'refs/heads/landing' && "
                "endsWith(github.workflow_ref, '/.github/workflows/masthead-batch.yml@refs/heads/landing')")
 MISSES = {
@@ -318,17 +321,43 @@ MISSES = {
               "to landing, so this test is false for a batch run. Add a batch arm beside it: " + BATCH_MATCH + "."),
     "base": ("github.event.before is only the push before this one, so a batch of several commits is diffed "
              "against its own middle. Diff a batch run against main instead, as a run started by hand does."),
-    "check": ("Under the starter the Gate's verdict check is named \"gate / gate\" and its run is named "
-              "\"Masthead batch\", so a test for the name gate or Gate does not see a batch run. Match both names."),
+    "job": ("Under the starter this check is named \"gate / {name}\": the starter's job gate calls the Gate's "
+            "job {name}. A lookup of \"{name}\" alone does not see a batch run. Match both names."),
+    "run": ("A batch run is named \"Masthead batch\", not \"{name}\", so a test for that name does not see a "
+            "batch run. Match both names."),
     "helper": ("A batch run is named \"Masthead batch\", not by the Gate's own name, so this workflow_run helper "
                "never starts after a batch. List \"Masthead batch\" beside the Gate's name."),
 }
 SNAG_EVENT = re.compile(r"workflow_dispatch")
-SNAG_TRIGGER = re.compile(r"""^\s*(?:-\s+)?['"]?workflow_dispatch['"]?\s*:?\s*$""")
 SNAG_BASE = re.compile(r"github\.event\.before\b")
-SNAG_CHECK = re.compile(r"""(['"])gate\1|\b(?:check_name|check-name|context)\s*[=:]\s*['"]?gate\b""", re.I)
-# A dispatch test with a batch arm this many lines away or nearer is taken as fixed.
+# A lookup of a check or run by name: check_name=test, check-name: test, context: test, .name == "test".
+SNAG_LOOKUP = re.compile(r"""\b(?:check_name|check-name|context)\s*[=:]\s*['"]?([^\s&"'),]+)|\bname\s*==\s*(['"])(.*?)\2""",
+                         re.I)
+# What, this many lines away or nearer, shows a line already has its fix beside it.
 NEAR = 4
+FIXED = {"event": ("masthead-batch.yml",), "base": ("masthead-batch.yml",),
+         "check": ("gate / ", "masthead batch")}
+
+
+def trigger_lines(lines):
+    """The indices of the top-level `on:` key and every line under it: they declare, they test nothing."""
+    for i, line in enumerate(lines):
+        if re.match(r"""^(on|'on'|"on"|true)\s*:""", line):
+            return {i, *children(lines, i)}
+    return set()
+
+
+def job_names(text):
+    """Each job's key and display name in a workflow, lowercased: what its checks are named for."""
+    lines = [strip_comment(l) for l in text.splitlines()]
+    found = set()
+    for i, line in enumerate(lines):
+        if re.match(r"^jobs\s*:\s*$", line):
+            for j, key, _ in keys(lines, children(lines, i)):
+                found.add(key.lower())
+                found.update(unquote(rest).lower() for _, k, rest in keys(lines, children(lines, j))
+                             if k == "name" and unquote(rest))
+    return found
 
 
 def workflow_run_lists(text):
@@ -370,9 +399,10 @@ def snags(top):
             continue
         texts[rel] = text.lstrip("﻿")
         todo.extend(sorted(calls(texts[rel])))
-    gate_text = texts.get(stored["workflow"])
+    gate_text = texts.get(stored["workflow"], "")
     gate_name = workflow_name(gate_text) if gate_text else ""
     names = {n.lower() for n in (gate_name, "Gate") if n}
+    jobs = job_names(gate_text)
     helpers = []
     for flow in workflows(top):
         if "workflow_run" not in flow["triggers"] or flow["workflow"] in texts:
@@ -388,21 +418,30 @@ def snags(top):
     for rel in sorted(texts):
         raw = texts[rel].splitlines()
         lines = [strip_comment(l) for l in raw]
+        declared = trigger_lines(lines)
         for i, line in enumerate(lines):
-            if not line.strip() or re.match(r"^(on|'on'|\"on\"|true|name)\s*:", line):
+            if not line.strip() or i in declared:
                 continue
-            kinds = []
-            if SNAG_EVENT.search(line) and not SNAG_TRIGGER.match(line):
-                near = lines[max(0, i - NEAR):i + NEAR + 1]
-                if not any("masthead-batch.yml" in n for n in near):
-                    kinds.append("event")
-            if SNAG_BASE.search(line):
-                kinds.append("base")
-            if SNAG_CHECK.search(line):
-                kinds.append("check")
-            for kind in kinds:
+            near = " ".join(lines[max(0, i - NEAR):i + NEAR + 1]).lower()
+
+            def fixed(kind):
+                return any(word in near for word in FIXED[kind])
+
+            hits = []
+            if SNAG_EVENT.search(line) and not fixed("event"):
+                hits.append(("event", MISSES["event"]))
+            if SNAG_BASE.search(line) and not fixed("base"):
+                hits.append(("base", MISSES["base"]))
+            if not fixed("check"):
+                for m in SNAG_LOOKUP.finditer(line):
+                    name = (m.group(1) or m.group(3) or "").strip()
+                    if name.lower() in jobs:
+                        hits.append(("check", MISSES["job"].format(name=name)))
+                    elif name.lower() in names:
+                        hits.append(("check", MISSES["run"].format(name=name)))
+            for kind, misses in hits:
                 found.append({"workflow": rel, "line": i + 1, "kind": kind, "text": raw[i].strip(),
-                              "misses": MISSES[kind]})
+                              "misses": misses})
     for rel, line in helpers:
         found.append({"workflow": rel, "line": line, "kind": "helper",
                       "text": texts[rel].splitlines()[line - 1].strip(), "misses": MISSES["helper"]})

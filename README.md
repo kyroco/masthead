@@ -454,9 +454,11 @@ not read scripts. Masthead changes none of these files: they are yours.
    commit before the last push, so a diff from it misses every other commit in
    the batch. For a batch run, diff against main instead, the way a run you
    start by hand does.
-4. Find every place that looks for a check named `gate`. In a batch run the
-   verdict check is named `gate / gate`, because the starter's job is named
-   `gate` and so is your Gate's job.
+4. Find every place that looks up one of your Gate's checks by name. In a
+   batch run each check is named `gate / <job>`: the starter's job is named
+   `gate`, and your Gate's own job name follows it. Kyroco's verdict job is
+   named `gate`, so its check is `gate / gate`; a job named `test` would give
+   `gate / test`. Look for both names, the old and the new.
 5. Find every `workflow_run` workflow that lists your Gate by name, such as
    `workflows: [Gate]`. A batch run is named `Masthead batch`, so add it:
    `workflows: [Gate, Masthead batch]`.
