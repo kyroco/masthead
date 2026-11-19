@@ -5,7 +5,8 @@ it as you go. That is the pull request way. In a repository that opted in to
 the batch run, the batch way, you build to commits landed on the `landing`
 branch instead, and no pull request is opened. **Opening a PR** says how to
 tell which way applies: `project_fact.py --ships` prints `pull-request` or
-`batch`. You were started either by the person, with `/work-on #1418`,
+`batch`, and a foreman's prompt that says to land by hand on `landing` puts
+you on the batch way whatever it prints. You were started either by the person, with `/work-on #1418`,
 who is waiting and wants to see your brief before you build, or by a foreman,
 with `/work-on #1418 dispatched`, who wants you to build through to the PR,
 or to the landing in the batch way, and send every question and report to it with `SendMessage`. Nothing else

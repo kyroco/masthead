@@ -66,6 +66,16 @@ it) unless the repository opted in to the batch run, when it prints `batch`
 moves main). **Opening a PR** in `references/session-cliffs.md` says which
 committed files decide it. Say the way in the plan you give the person.
 
+The batch way by hand: when the person tells you to land by hand on
+`landing` before the repository has the batch run, run the batch way anyway.
+Say it in each worker's prompt in the person's words, and that its worker
+follows the batch way's steps whatever `--ships` prints; start the Gate run
+on each batch by hand, as **The batch way** below says. Robert, November 19,
+2026: "by hand is fine, I don't care how we do it, I want to see it done with
+this work, and I want this whole milestone list to go as one shot." Never
+choose it yourself: without the person's word, a repository whose `--ships`
+prints `pull-request` ships the pull request way.
+
 When you understand the work, say in one sentence what you are about to do and
 ask how many workers. Say the count three ways and never mix them: how many
 issues are ready (scenarios written, no open question), how many of those can

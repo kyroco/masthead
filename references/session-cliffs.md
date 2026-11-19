@@ -81,6 +81,11 @@ with no pull request. Anything else, a repository part way through setting it
 up included, prints `pull-request`: that is the pull request way, one
 reviewed PR per issue, as it always was. Robert, November 19, 2026: "yes
 that's the right recommendation, keep the old way, new way is an option".
+The one other way in is by hand: when the person has told the foreman to land
+by hand on `landing` before the repository has the batch run, the foreman's
+prompt to you says so, and you follow the batch way's steps whatever
+`--ships` prints; the foreman starts the Gate run on the batch by hand. By
+hand is the person's choice, never inferred from a `landing` branch alone.
 Steps 1 to 8 are the same for both; from step 9 on, follow only your way's
 steps. The lead keeps its old name so a repository's own version still
 replaces it. The steps live here and nowhere else; a repo supplies only its

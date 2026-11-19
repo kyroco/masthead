@@ -1733,6 +1733,15 @@ says  README.md "the foreman queues it to be merged"
 never README.md "fixes in the same pull request"
 says  README.md "One issue is one pull request, or one landing with the batch run"
 says  README.md "which says \`batch\` only once setup's two batch files are committed on \`landing\`"
+# INFRA-276 round 1, s2-c1: the batch way by hand is reachable, only on the person's word,
+# through the foreman's prompt, and the by-hand Gate run sits in the batch way it reaches.
+# The foreman's answer on the issue: by hand "rests on the project description ... item 1".
+says  references/session-cliffs.md "when the person has told the foreman to land by hand on \`landing\` before the repository has the batch run, the foreman's prompt to you says so, and you follow the batch way's steps whatever \`--ships\` prints"
+says  references/session-cliffs.md "By hand is the person's choice, never inferred from a \`landing\` branch alone"
+says  skills/work-on/worker.md "a foreman's prompt that says to land by hand on \`landing\` puts you on the batch way whatever it prints"
+says  skills/work-on/foreman.md "The batch way by hand: when the person tells you to land by hand on \`landing\` before the repository has the batch run, run the batch way anyway"
+says  skills/work-on/foreman.md "Never choose it yourself: without the person's word, a repository whose \`--ships\` prints \`pull-request\` ships the pull request way"
+part_says "foreman.md, the batch way," "$FB" "Until Masthead runs the batch itself, start the Gate run by hand on \`landing\`"
 # INFRA-276 round 1, s2-judge-1 and arch-1: setup's switch push carries the CI-change OK and the push check.
 says  skills/setup/SKILL.md "The commit changes a file under \`.github/\`, so it needs the person's OK like any change to the checks"
 says  skills/setup/SKILL.md "add the line \`CI-change-OK: <link to that comment>\` to the commit's message; \`hard-gate.sh\` refuses the push without it"
