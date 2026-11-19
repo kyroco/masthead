@@ -472,9 +472,10 @@ SHIPS_BATCH = "batch"
 SHIPS_PR = "pull-request"
 
 
-def committed_file(top, ref, relative, limit=REPO_FILE_LIMIT):
-    """The text of `relative` as committed at `ref`, or None when it is not a plain
-    file there (a symlink or a folder is not), is larger than `limit`, or is not UTF-8."""
+def committed_blob(top, ref, relative):
+    """The object id of `relative` as committed at `ref` when it is a plain file
+    there (a symlink or a folder is not), else None. Reads no content, so it
+    answers at any size, as repo_file() does for a file on disk."""
     try:
         listed = subprocess.run(["git", "-C", top, "ls-tree", "-z", ref, "--", relative],
                                 capture_output=True, timeout=10)
@@ -490,8 +491,17 @@ def committed_file(top, ref, relative, limit=REPO_FILE_LIMIT):
     if len(parts) != 3 or parts[0] not in (b"100644", b"100755") or parts[1] != b"blob" \
             or path.decode("utf-8", "replace") != relative:
         return None
+    return parts[2].decode()
+
+
+def committed_file(top, ref, relative, limit=REPO_FILE_LIMIT):
+    """The text of `relative` as committed at `ref`, or None when it is not a plain
+    file there (a symlink or a folder is not), is larger than `limit`, or is not UTF-8."""
+    blob_id = committed_blob(top, ref, relative)
+    if not blob_id:
+        return None
     try:
-        blob = subprocess.run(["git", "-C", top, "cat-file", "blob", parts[2].decode()],
+        blob = subprocess.run(["git", "-C", top, "cat-file", "blob", blob_id],
                               capture_output=True, timeout=10)
     except (OSError, subprocess.SubprocessError):
         return None
@@ -518,12 +528,13 @@ def ships(root=None):
         return SHIPS_PR
     top = checkout_top(root)
 
-    def committed(path):
-        return committed_file(top, SHIPS_REF, path)
-
-    if committed(STARTER_FILE) is None:
+    # Each file by the rule its other reader uses: the starter and gate.json are read, as
+    # batch.py and gate() read them; the Gate's workflow need only be a plain file, as
+    # gate() asks of it on disk, whatever its size (INFRA-276 arch-2).
+    if committed_blob(top, SHIPS_REF, STARTER_FILE) is None:
         return SHIPS_PR
-    if not gate_answer(committed(GATE_FILE), lambda path: committed(path) is not None):
+    stored = committed_file(top, SHIPS_REF, GATE_FILE)
+    if not gate_answer(stored, lambda path: committed_blob(top, SHIPS_REF, path) is not None):
         return SHIPS_PR
     return SHIPS_BATCH
 
