@@ -299,7 +299,8 @@ def named_path(root):
 
 
 def named(root):
-    """{commit: (issue, batch it was last named in)} for every change this checkout's searches named."""
+    """{commit: (issue, batch it was last named in, [commits it fails together with])} for every
+    change this checkout's searches named."""
     found = {}
     try:
         with open(named_path(root)) as handle:
@@ -307,21 +308,24 @@ def named(root):
                 parts = line.rstrip("\n").split("\t")
                 if len(parts) >= 3 and re.fullmatch(r"[0-9a-f]{40}", parts[0]) and \
                         re.fullmatch(r"[0-9a-f]{40}", parts[2]):
-                    found[parts[0]] = (parts[1], parts[2])
+                    partners = [p for p in (parts[3].split(",") if len(parts) > 3 else [])
+                                if re.fullmatch(r"[0-9a-f]{40}", p)]
+                    found[parts[0]] = (parts[1], parts[2], partners)
     except OSError:
         pass
     return found
 
 
-def remember(root, sha, issue, batch):
-    """Remember a named change with an issue. One with no issue goes to the person, and is not
-    held: nothing can be told apart as its fix."""
+def remember(root, sha, issue, batch, partners):
+    """Remember a named change with an issue, and the commits it fails together with, so a fix
+    on top that is still red is handed back with them. One with no issue goes to the person,
+    and is not held: nothing can be told apart as its fix."""
     if issue == NO_ISSUE:
         return
     path = named_path(root)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "a") as handle:
-        handle.write("{}\t{}\t{}\n".format(sha, issue, batch))
+        handle.write("{}\t{}\t{}\t{}\n".format(sha, issue, batch, ",".join(partners)))
 
 
 def is_ancestor(a, b):
@@ -331,7 +335,7 @@ def is_ancestor(a, b):
 def new_fixes(commits, sha, known, root):
     """The commits after named change `sha` that name its issue and landed after the batch it was
     last named in: its fixes on top since then, oldest first."""
-    issue, seen = known[sha]
+    issue, seen = known[sha][0], known[sha][1]
     return [c for c in commits[commits.index(sha) + 1:]
             if issue_of(c, root) == issue and not (rev(seen) and is_ancestor(c, seen))]
 
@@ -603,7 +607,9 @@ def search(run_id, root):
             raise Stop("The fix on top of {} ({}) does not apply without other commits of the batch, so the "
                        "search cannot tell if it works. Nothing is named; tell the person.".format(sha[:9], issue))
         if verdict == "red":
-            bad, partners, evidence, tried = sha, [], fix_run, last_fix
+            # The commits it failed together with when first named still go with it.
+            bad, evidence, tried = sha, fix_run, last_fix
+            partners = [p for p in known[sha][2] if p in commits]
             break
         say("  {} ({}) is fixed on top by {}: left out of the search".format(sha[:9], issue, last_fix[:9]))
         left_out += own
@@ -637,7 +643,7 @@ def search(run_id, root):
     checks = failed_checks([j for j in jobs if part_of(j) == "gate"] if evidence is run else jobs, verdicts)
 
     issue = issue_of(bad, root)
-    remember(root, bad, issue, batch)
+    remember(root, bad, issue, batch, partners)
     say("")
     say("Named {} ({}) as the change that turned batch {} red, after {} Gate runs. Nothing was pushed to landing "
         "or main: the change stays on the pile, and its worker fixes it on top.".format(

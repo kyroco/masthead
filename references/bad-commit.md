@@ -65,8 +65,10 @@ cannot be tested apart from other commits, or the rest is green without the
 fixed changes, the search names nothing and says to tell the person.
 
 Each change it names is written to `named-changes.tsv` in the checkout's state
-folder (`project_fact.py --state-path`), with its issue and the batch it was
-named in. That is the search's own memory, not the record. A search run from
+folder (`project_fact.py --state-path`), with its issue, the batch it was
+named in, and the commits it fails together with, so a fix on top that is
+still red goes back with them and with INFRA-263's rule. That is the search's
+own memory, not the record. A search run from
 another checkout has no such memory and searches again. A change whose commit
 names no issue is not written: it goes to the person, nothing can be told
 apart as its fix, and a later search may name it again.
