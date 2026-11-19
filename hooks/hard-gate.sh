@@ -178,9 +178,36 @@ for seg in parts(cmd):
     except ValueError:
         readings.append(loose_words(seg))
 try:
-    readings.extend([shell_words(seg) for seg in shell_parts(cmd)[0]])
+    second = [shell_words(seg) for seg in shell_parts(cmd)[0]]
 except ValueError:
-    pass  # a quote left open: only the first reading stands
+    second = []  # a quote left open: only the first reading stands
+
+
+def git_sub(words):
+    """The git subcommand a command runs, past git's own options, or None when it is not git."""
+    words = drop_assignments(list(words))
+    if not words or words[0] != "git":
+        return None, []
+    i = 1
+    while i < len(words) and words[i].startswith("-"):
+        i += 2 if words[i] in ("-C", "-c") else 1
+    return (words[i], words[i + 1:]) if i < len(words) else (None, [])
+
+
+# The receipt and the tree are read once, before the line runs (INFRA-260 F2). A git command earlier in the
+# same line that makes or moves a commit means the push sends a commit nobody checked, so that line is refused
+# however the receipt reads. Each reading is walked in order, so a command after the push changes nothing.
+MOVERS = {"rebase", "commit", "pull", "merge", "cherry-pick", "reset", "am", "revert", "checkout", "switch"}
+for ordered in (readings[:], second):
+    moved = None
+    for words in ordered:
+        sub, rest = git_sub(words)
+        if sub in MOVERS:
+            moved = moved or sub
+        elif sub == "push" and moved and not any(a in ("--delete", "-d") for a in rest):
+            print("moves " + moved)
+            sys.exit(0)
+readings.extend(second)
 for words in readings:
     words = drop_assignments(words)
     if not words:
@@ -733,6 +760,10 @@ gate_local_tests() {
   sends="$(python3 -c "$_CMD_READER" "$_CMD" "$(git rev-parse --verify -q 'HEAD^{tree}' 2>/dev/null)" 2>/dev/null || echo check)"
   case "$sends" in
     skip) return 0 ;;
+    moves*)
+      block "this command changes the commit before it pushes ('git ${sends#moves }' runs first), and the local test receipt is read before the line runs, so it says nothing about the commit that would be pushed. Run 'git ${sends#moves }' on its own, then 'bash $check_rel', then push."
+      return 0
+      ;;
     other*)
       block "this push sends '${sends#other }', not HEAD, and the local test receipt is only for HEAD. Check that branch out, run 'bash $check_rel' there, and push it from there."
       return 0
