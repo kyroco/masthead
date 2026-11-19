@@ -94,3 +94,36 @@ the whole run before any job starts.
 
 `plan` reads the starter's own `uses: ./...` lines, the workflow GitHub runs
 as the Gate, and stops unless they name the stored Gate and nothing else.
+
+## What the Gate sees in a batch run
+
+The Gate runs the same code in a batch run as anywhere else, but what GitHub
+tells it differs. Kyroco's first batch run (run 44591628232, November 19,
+2026, 1:48 to 2:07 PM Eastern) went green only after its Gate changed in
+three ways (INFRA-283). Any Gate that routes by event meets the same three.
+
+| What the Gate reads | In a batch run | What breaks | Kyroco's fix |
+|---|---|---|---|
+| `github.event_name`, `github.workflow_ref` | `push`, and the ref of `masthead-batch.yml@refs/heads/landing`, because the starter calls the Gate as a job | A test keyed on `workflow_dispatch` (its runner picker, its plan checks) is false | Match a batch run on all three: event `push`, `github.ref` `refs/heads/landing`, and `github.workflow_ref` ending in `masthead-batch.yml@refs/heads/landing` |
+| `github.event.before` | The commit before the last push only | A diff from there misses every commit landed earlier in the batch | Diff a batch run against main, as a run started by hand does |
+| The check's and the run's names | The verdict check is `gate / gate`, not `gate`; the run is `Masthead batch`, not `Gate` | A script looking for the check `gate`, or a `workflow_run` helper listening to "Gate", sees nothing | Match both names: `workflows: [Gate, Masthead batch]` |
+
+Kyroco's plan-check test, as it reads now in its `gate.yml`:
+
+```yaml
+if: >-
+  github.event_name == 'pull_request'
+  || (github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main')
+  || (github.event_name == 'push' && github.ref == 'refs/heads/landing'
+  && endsWith(github.workflow_ref, '/.github/workflows/masthead-batch.yml@refs/heads/landing'))
+```
+
+`python3 skills/setup/gate.py snags` points at each line that keys on one of
+the three, in the stored Gate, every workflow it calls with `uses: ./...`,
+and every `workflow_run` helper that names it, and says what a batch run
+would miss there. A test for `workflow_dispatch` with a batch arm within four
+lines of it counts as fixed. It reads workflow files only: a script the Gate
+runs (Kyroco's runner picker was one) needs the same search by hand. Setup
+runs it before the starter lands, so the first batch is not where these show.
+Masthead changes no repository's Gate; fixing a snag is the repository's
+change to `.github/`.

@@ -276,7 +276,32 @@ batch run can move it would never move again.
    from the steps, filled in with this repository and the App ID, and ask the
    person to run them in their own terminal: no session may set a secret.
    Wait until they say they are done.
-4. Land the starter. Commit `.github/workflows/masthead-batch.yml` with
+4. Ready the Gate, before the first batch. A Gate that routes by event can
+   miss a batch run in three ways, all found on Kyroco's first batch run
+   (November 19, 2026). Say each to the person in plain words:
+   - The event. Under the starter the Gate runs as a called workflow on a
+     push to `landing`, not as a `workflow_dispatch` run, and
+     `github.workflow_ref` names `masthead-batch.yml`, not the Gate. A test
+     keyed on `workflow_dispatch` (a runner picker, a plan check) is false
+     for a batch run. Kyroco's match for a batch run: event `push`, ref
+     `refs/heads/landing`, and `github.workflow_ref` ending in
+     `masthead-batch.yml@refs/heads/landing`.
+   - The diff base. `github.event.before` is only the push before this one,
+     not the whole batch. Diff a batch run against main.
+   - The names. The verdict check is named `gate / gate`, not `gate`, and the
+     run is named `Masthead batch`, so a `workflow_run` helper listening to
+     the name "Gate" never starts after a batch.
+
+   Then run `python3 ${CLAUDE_PLUGIN_ROOT}/skills/setup/gate.py snags` and
+   show each snag it prints in a table: the file and line, the line itself,
+   and what a batch run would miss. It reads the stored Gate, every workflow
+   it calls, and every `workflow_run` helper that names it; it does not read
+   scripts they run, so ask the person to search those for the same words.
+   With `"clear"`, say the Gate keys on none of the three. Fixing a snag is a
+   change to `.github/`, so suggest it and never make it here; the starter
+   may still land, but say which snag will misroute or skip what in the
+   first batch.
+5. Land the starter. Commit `.github/workflows/masthead-batch.yml` with
    `.claude/gate.json`. The commit changes a file under `.github/`, so it
    needs the person's OK like any change to the checks: ask which issue holds
    this setup, ask them to say OK in a comment on it, with the reason (it
@@ -290,12 +315,12 @@ batch run can move it would never move again.
    once both files are committed on `origin/landing`, and until then every
    session ships the pull request way (**Opening a PR** in
    `references/session-cliffs.md`).
-5. The lock, last, with a yes of its own. Ask "Shall I lock main so only the
+6. The lock, last, with a yes of its own. Ask "Shall I lock main so only the
    batch App (App ID <n>) can move it?" On yes, run
    `batch.py lock --app-id <n>`. It refuses until the landing branch on
    GitHub holds the starter file setup wrote and the environment holds both
    secrets; do what its line says, then ask again.
-6. Run `batch.py check --app-id <n>` and show each part in a table with its
+7. Run `batch.py check --app-id <n>` and show each part in a table with its
    line. A part not ok says what to do; do that, or tell the person, and
    check again. When "other rules on main" is not ok, name each rule it
    names and say main will not move until it lets the App through; change

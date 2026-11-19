@@ -417,6 +417,53 @@ the key would reach every workflow on every branch, the Gate included, and
 any of them could move main with it. Once the secrets are in and the starter
 file is on `landing`, tell setup, and it locks main.
 
+### Make your Gate ready for a batch run
+
+Do this before the first batch, so the first batch is not where you find out.
+In a batch run your Gate's code is the same, but GitHub tells it different
+things: the starter calls it as a job on a push to `landing`. Kyroco's first
+batch run went green only after its Gate changed in the three ways below.
+Setup runs `gate.py snags` and shows you each line of your Gate that needs
+one of them; you can run it yourself the same way:
+
+```
+python3 ~/.claude/plugins/cache/masthead/masthead/<version>/skills/setup/gate.py snags --root .
+```
+
+It reads the Gate stored in `.claude/gate.json`, each workflow the Gate runs
+with `uses: ./...`, and each `workflow_run` workflow that names it. It does
+not read scripts. Masthead changes none of these files: they are yours.
+
+1. Find every test for `workflow_dispatch` in your Gate and in the scripts it
+   runs, such as a step that picks which machine runs a job, or one that
+   decides whether plan checks run. A batch run is not a `workflow_dispatch`
+   run: its event is `push`, its ref is `refs/heads/landing`, and
+   `github.workflow_ref` names `masthead-batch.yml`, not your Gate.
+2. Beside each one, add a test that matches a batch run on all three of
+   those. Kyroco's reads:
+
+   ```yaml
+   || (github.event_name == 'push' && github.ref == 'refs/heads/landing'
+   && endsWith(github.workflow_ref, '/.github/workflows/masthead-batch.yml@refs/heads/landing'))
+   ```
+
+   In a shell script, Kyroco passes the three in as `GATE_EVENT_NAME`,
+   `GATE_REF` and `GATE_WORKFLOW_REF` and checks that the workflow ref ends in
+   `/.github/workflows/masthead-batch.yml@refs/heads/landing`.
+3. Find every use of `github.event.before`. In a batch run it is only the
+   commit before the last push, so a diff from it misses every other commit in
+   the batch. For a batch run, diff against main instead, the way a run you
+   start by hand does.
+4. Find every place that looks for a check named `gate`. In a batch run the
+   verdict check is named `gate / gate`, because the starter's job is named
+   `gate` and so is your Gate's job.
+5. Find every `workflow_run` workflow that lists your Gate by name, such as
+   `workflows: [Gate]`. A batch run is named `Masthead batch`, so add it:
+   `workflows: [Gate, Masthead batch]`.
+6. Commit the changes, with your own OK for a change to `.github/`, and run
+   `gate.py snags` again. It answers `"clear"` when none of the three is
+   left in the files it reads.
+
 ### Install options
 
 To change an install option later, run `/plugin configure masthead@masthead`:
