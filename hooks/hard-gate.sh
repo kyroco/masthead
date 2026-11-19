@@ -198,6 +198,45 @@ def git_sub(words):
 # same line that makes or moves a commit means the push sends a commit nobody checked, so that line is refused
 # however the receipt reads. Each reading is walked in order, so a command after the push changes nothing.
 MOVERS = {"rebase", "commit", "pull", "merge", "cherry-pick", "reset", "am", "revert", "checkout", "switch"}
+# The CI change rung (INFRA-274) asks another question: which commits does each push of the line send? It
+# prints one source per line (a ref, HEAD, or --branches, --all, --tags for a push of many), and "moves SUB"
+# when a git command that makes or moves a commit runs ahead of a push.
+if len(sys.argv) > 3 and sys.argv[3] == "revs":
+    out = ["HEAD"] if "create-pr.sh" in cmd else []
+    for ordered in (readings[:], second):
+        moved = None
+        for words in ordered:
+            words = drop_assignments(list(words))
+            if re.search(r"(^|\s)gh\s+pr\s+create(\s|$)", " ".join(words)):
+                out.append("HEAD")
+                continue
+            sub, rest = git_sub(words)
+            if sub in MOVERS:
+                moved = moved or sub
+                continue
+            if sub != "push" or any(a in ("--delete", "-d") for a in rest):
+                continue
+            if moved:
+                out.append("moves " + moved)
+            positional, many, j = [], False, 0
+            while j < len(rest):
+                a = rest[j]
+                if a in ("--all", "--branches", "--mirror", "--tags"):
+                    out.append({"--all": "--branches", "--mirror": "--all"}.get(a, a))
+                    many = True
+                elif a in VALUED:
+                    j += 1
+                elif not a.startswith("-"):
+                    positional.append(a)
+                j += 1
+            if not positional[1:] and not many:
+                out.append("HEAD")
+            for spec in positional[1:]:
+                src = spec.lstrip("+").split(":", 1)[0]
+                if src:
+                    out.append(src)
+    print("\n".join(dict.fromkeys(out)))
+    sys.exit(0)
 for ordered in (readings[:], second):
     moved = None
     for words in ordered:
@@ -386,16 +425,24 @@ CHANGED="$( {
 # OK; ci_change_ok.py says how it reads them. It runs in every repository, push check named or not, and before
 # the early exit below, since a push can send commits that change nothing against origin/main (another branch).
 gate_ci_change() {
-  local sends rev out
-  sends="$(python3 -c "$_CMD_READER" "$_CMD" "$(git rev-parse --verify -q 'HEAD^{tree}' 2>/dev/null)" 2>/dev/null || echo check)"
-  case "$sends" in
-    skip) return 0 ;;
-    "other --"*) return 0 ;;  # --all, --mirror, --branches: not read here; the receipt rung refuses them where a push check is named
-    other*) rev="${sends#other }"; rev="${rev#+}"; rev="${rev%%:*}" ;;
-    *) rev=HEAD ;;  # HEAD, and a line that moves HEAD first: the commits as they stand before the line runs
+  local revs moved out
+  # The sources of every push in the line, read from the command; when it cannot be read, HEAD.
+  revs="$(python3 -c "$_CMD_READER" "$_CMD" "" revs 2>/dev/null)" || revs=HEAD
+  moved="$(printf '%s\n' "$revs" | sed -n 's/^moves //p' | head -1)"
+  revs="$(printf '%s\n' "$revs" | grep -v '^moves ' || true)"
+  case "$moved" in
+    # A rebase or pull keeps each unsent commit's message, so its CI-change-OK line goes with it; a commit
+    # made in the line is read from what it would commit (ci_change_ok.py --uncommitted).
+    ""|rebase|pull) ;;
+    commit) set -- --uncommitted ;;
+    *)
+      echo "BLOCK: this command runs 'git $moved' before it pushes, so the commits it would push are not made yet and the check of CI changes cannot read them. Run 'git $moved' on its own, then push." >&2
+      return 1
+      ;;
   esac
-  [ -n "$rev" ] || return 0
-  out="$(python3 "$_HOOK_DIR/ci_change_ok.py" "$rev" 2>&1)" && return 0
+  [ -n "$revs" ] || [ "$moved" = commit ] || return 0
+  # shellcheck disable=SC2086 # one ref per line, split on purpose; a ref holds no space
+  out="$(python3 "$_HOOK_DIR/ci_change_ok.py" "$@" $revs 2>&1)" && return 0
   echo "BLOCK: $out" >&2
   return 1
 }
