@@ -495,6 +495,23 @@ ok "$STATUS" "2" "pushing another commit to a new name is refused"
 run_gate "$d" "git push --all origin"
 ok "$STATUS" "2" "pushing every branch is refused"
 
+echo "28b. INFRA-260: a worker lands on the landing branch, gated by the same receipt"
+# Step 9 of Opening a PR lands HEAD with `git push origin HEAD:landing`. That
+# push is read as a push of HEAD, so it needs the receipt like any other.
+run_gate "$d" "git push origin HEAD:landing"
+ok "$STATUS" "0" "landing HEAD with a passing check goes through"
+run_gate "$d" "git push origin HEAD:refs/heads/landing"
+ok "$STATUS" "0" "landing HEAD by the full ref name goes through"
+run_gate "$d" "git push origin other:landing"
+ok "$STATUS" "2" "landing another branch's commit is refused"
+echo 1 > "$d/scripts/code"
+run_gate "$d" "git push origin HEAD:landing"
+ok "$STATUS" "2" "landing HEAD is refused when the check has not passed on it"
+contains "$ERR" "local tests have not passed" "it says the local tests have not passed"
+run_gate "$d" "git fetch origin landing && git rebase origin/landing && git push origin HEAD:landing"
+ok "$STATUS" "2" "a rebase and push in one command line is refused the same way"
+echo 0 > "$d/scripts/code"
+
 echo "29. a shell redirect after the push is not read as a branch"
 # Found 2026-11-11: `git push -u origin BRANCH 2>&1 | tail -3` was refused as
 # sending '2>&1', because every word after the remote was read as a refspec.

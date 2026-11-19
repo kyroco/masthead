@@ -16,8 +16,8 @@ Read the text typed after `/work-on`:
 - **`#1418`**: you are the **worker** for that issue, started by the user,
   who is waiting. Read `${CLAUDE_PLUGIN_ROOT}/skills/work-on/worker.md` and follow it.
 - **`#1418 dispatched`**: you are a worker a foreman started. The word
-  `dispatched` means you write no sheet and build through to the PR without
-  waiting for a go; a question the issue, its ADR, the architecture doc, the
+  `dispatched` means you write no sheet and build through to the landing
+  without waiting for a go; a question the issue, its ADR, the architecture doc, the
   mockups and Korium do not answer goes to your foreman. Read `worker.md`.
 - **A Linear key** such as `KOR-12` (the team's key, which may hold
   letters and digits, such as `K8S-12`, then a hyphen and a number), in a repo whose issues live in Linear: the same as `#1418`, so you
@@ -60,7 +60,7 @@ prints them from the worktree: the repo's own version when its
 `.claude/references/session-cliffs.md` has that lead, otherwise the plugin's,
 the same steps the hook injects. When a step names a
 file this repo does not have, do what the step is for with what the repo has,
-and list in the PR body each check the repo lacks. The `verifier`,
+and list in the issue's closing record each check the repo lacks. The `verifier`,
 `security-reviewer` and `architecture-reviewer` agents live in `${CLAUDE_PLUGIN_ROOT}/agents` and review every repo;
 `/code-review` is not part of the flow.
 
@@ -94,8 +94,9 @@ falls short:
 
 - `gate-edit` refuses the first edit until a Korium search has run, with the
   Korium memory option on.
-- `hard-gate.sh` refuses `git push` and `gh pr create` until the repo's local
-  test receipt matches the commit, when the repo names a push check.
+- `hard-gate.sh` refuses `git push`, the landing push included, and
+  `gh pr create` until the repo's local test receipt matches the commit, when
+  the repo names a push check.
 - `agent-brief-gates.sh` refuses a verifier brief with no claims list and a third re-verify round (the architecture reviewer's re-check counts toward it),
   and an architecture reviewer's brief without the ADR alignment lines or the
   architecture doc's path, and `dispatch-record-gate.sh` writes the dispatch

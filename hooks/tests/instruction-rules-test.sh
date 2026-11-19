@@ -583,7 +583,7 @@ never agents/adjudicator.md "**New issue**"
 never agents/adjudicator.md "the worker files a new issue"
 never agents/adjudicator.md "goes on the New issue list"
 says  agents/verifier.md "Nothing else is a claim"
-says  skills/work-on/worker.md "An extra that scores 8 or more is fixed in this PR, test first when it is a bug"
+says  skills/work-on/worker.md "An extra that scores 8 or more is fixed in this change, test first when it is a bug"
 says  skills/work-on/worker.md "One that scores under 8 is dropped: you bring it to no one"
 never skills/work-on/worker.md "Then the extras you are bringing"
 never skills/work-on/worker.md "Bring them the rest"
@@ -742,11 +742,12 @@ says  "$W" "never \`gh issue develop\`"
 # Scenario 4: In Progress through the Linear connector, never set-status.sh.
 says  "$W" "\`save_issue\` with \`id\` the key and \`state\` \`In Progress\`"
 says  "$W" "never \`set-status.sh\`, which knows only GitHub projects"
-# Scenario 5: the PR body says Fixes KOR-12, and merging moves it to Done.
-says  references/session-cliffs.md "\`Fixes <key>\`, such as \`Fixes KOR-12\`, when the issue lives in Linear"
-says  "$W" "the PR body says \`Fixes KOR-12\`"
-says  "$W" "set \`In Review\` the same way once the PR is open"
-says  "$W" "check its status reads Done, and set it with \`save_issue\` if not"
+# Scenario 5, replaced by INFRA-260: commits name the key, and the worker closes
+# the issue itself with the change's record, since a commit message moves nothing.
+says  references/session-cliffs.md "or its key, such as \`KOR-12\`"
+says  "$W" "Each commit message names \`KOR-12\`"
+says  "$W" "post the change's record with \`save_comment\`, then set \`Done\` with \`save_issue\`"
+says  "$W" "Check the issue's status still reads Done, and set it with \`save_issue\` if not"
 # Scenario 6: a question nothing answers sets Needs Human until the answer comes.
 says  "$W" "set the issue's status to \`Needs Human\` with \`save_issue\` before you ask"
 says  "$W" "put the answer on the issue as a comment in the words it came in, and set the status back to \`In Progress\`"
@@ -754,10 +755,10 @@ says  "$W" "put the answer on the issue as a comment in the words it came in, an
 says  "$W" "gh issue develop 1418 --name <user>/1418-<short-slug> --base main"
 says  "$W" "Work in a worktree named after the issue, so #1418 is \`1418-issue\`."
 says  "$W" "Status to In Progress with \`\${CLAUDE_PLUGIN_ROOT}/skills/work-on/set-status.sh\` unless a foreman already did."
-says  "$W" "set the Status to In Review with \`set-status.sh\`"
+says  references/session-cliffs.md "set the project Status to Done with \`set-status.sh\`"
 says  "$W" "On a repository whose issues live on GitHub, none of this section applies"
 says  skills/work-on/SKILL.md "- **\`#1418\`**: you are the **worker** for that issue"
-says  references/session-cliffs.md "\`Fixes #<issue>\`"
+says  references/session-cliffs.md "names the issue (\`#<issue>\`"
 says  README.md "\`/work-on KOR-12\`"
 says  docs/explainer.template.html "<code>/work-on KOR-12</code>"
 says  docs/explainer.html "<code>/work-on KOR-12</code>"
@@ -1130,7 +1131,7 @@ says  agents/security-reviewer.md "the repository's security conventions are you
 says  agents/security-reviewer.md "A fault the change brings in that breaks one of your claims is a finding wherever its lines are"
 # Scenario 3: the extras rule is written once, in the worker's "What done is",
 # and the pre-push rule once, in step 8 of Opening a PR; every other file points.
-says  skills/work-on/worker.md "An extra that scores 8 or more is fixed in this PR, test first when it is a bug"
+says  skills/work-on/worker.md "An extra that scores 8 or more is fixed in this change, test first when it is a bug"
 says  skills/work-on/worker.md "One that scores under 8 is dropped: you bring it to no one"
 for f in references/session-cliffs.md agents/adjudicator.md skills/work-on/foreman.md skills/github-issues/SKILL.md skills/linear-issues/SKILL.md README.md docs/explainer.template.html docs/explainer.html docs/images/review.svg; do
   never "$f" "8 or more"
@@ -1185,7 +1186,7 @@ else
   pass=$((pass + 1))
 fi
 # Scenario 8: the docs and option text match the code.
-says  skills/work-on/worker.md "Done is four things"
+says  skills/work-on/worker.md "Done is five things"
 never skills/work-on/worker.md "Done is three things"
 never .claude-plugin/plugin.json "Subagents run on Haiku unless"
 says  .claude-plugin/plugin.json "\"title\": \"Ask for a reason before a helper runs on the biggest model\""
@@ -1419,7 +1420,7 @@ says  references/dispatch-brief.md 'until then it is on, on a new install too'
 never references/session-cliffs.md 'the person sends back, as step 4 says, and none of the others'
 says  references/session-cliffs.md 'While the trial is on, you fix only the architecture findings the person sends back'
 # Round 1, fix F2: the waiting and the relay are pinned.
-says  references/session-cliffs.md 'who brings it to the user; the PR waits for that answer'
+says  references/session-cliffs.md 'who brings it to the user; your commits wait for that answer before they land'
 says  references/session-cliffs.md 'So does its Architecture trial section, while the trial period is on'
 says  skills/work-on/foreman.md 'A PR with one of those unanswered is not queued'
 # Round 1, fix F3: the README says the fix list rule holds once the trial is off.
@@ -1442,7 +1443,7 @@ says  references/session-cliffs.md 'whenever that section lists a finding, whate
 never references/session-cliffs.md 'the trial period is on, as the brief'"'"'s `Architecture trial:` line says'
 # Re-verify round 1, fix C1: the trial-off half and step 4 are pinned.
 says  references/session-cliffs.md 'once it is off, the section reads "None, the trial is off" and the adjudicator'"'"'s Fix list holds them like any other finding, fixed as step 4 says'
-says  references/session-cliffs.md 'Fix each finding on the adjudicator'"'"'s fix list in this PR, test first'
+says  references/session-cliffs.md 'Fix each finding on the adjudicator'"'"'s fix list in this change, test first'
 # Re-verify round 1, fix C3: the adjudicator follows a build finding's path before keeping it.
 says  agents/adjudicator.md 'One that says a build would behave wrongly holds when the architecture doc names that build and you follow the path the finding gives to the wrong result in that build'
 # MAST-36: /setup brings an existing project in line with its architecture doc,
@@ -1580,5 +1581,46 @@ says  "$RD" 'When one holds a path, the doc has moved or gone: that is the first
 never "$RD" 'with a verdict and a why on each entry'
 says  "$RD" 'a verdict on each entry, and a why only on a divergence'
 says  "$RD" 'says only "conforms" with no word of how,'
+# INFRA-260: a worker lands its verified commits on the landing branch, with no
+# pull request and no merge queue, and closes its issue with the change's record
+# as a comment.
+# Scenario 4: no step of Opening a PR opens a pull request or waits on a queue.
+OPR="$(tr '\n' ' ' <"$ROOT/references/session-cliffs.md" | tr -s ' ' | sed -E 's/.*\*\*Opening a PR\.\*\*//; s/\*\*Updating main\.\*\*.*//')"
+for phrase in "open one PR" "open a PR" "open a pull request" "opens a pull request" "Push and open" "merge queue" "queue the PR" "once it merges" "PR body" "the PR waits" "in this PR"; do
+  if grep -qiF -- "$phrase" <<<"$OPR"; then
+    fail=$((fail + 1)); printf 'FAIL Opening a PR still says: %s\n' "$phrase"
+  else
+    pass=$((pass + 1))
+  fi
+done
+# Scenario 1: the commits land on the landing branch, and nothing else moves.
+says  references/session-cliffs.md "Land your commits on the landing branch, \`landing\`, with no pull request"
+says  references/session-cliffs.md "git push origin HEAD:landing"
+says  references/session-cliffs.md "git rebase origin/landing"
+says  references/session-cliffs.md "Never force-push \`landing\`"
+says  references/session-cliffs.md "your push creates it"
+says  references/session-cliffs.md "Never commit or push to main"
+says  references/session-cliffs.md "main moves forward only from \`landing\`"
+never references/session-cliffs.md "main changes only by merging the reviewed PR"
+never references/session-cliffs.md "let main change only by merging the reviewed PR"
+# Scenario 2: the rebase comes before the pre-push check, whose receipt is for
+# the tree that is pushed, and a refused push means a fresh check.
+says  references/session-cliffs.md "before you run the check, since its receipt is for the tree you push"
+says  references/session-cliffs.md "run the check again on the new commit, and push again"
+# Scenario 3: the steps are the plugin's own, so every repository lands this way.
+says  references/session-cliffs.md "Every change reaches main through the landing branch"
+# Scenario 5: the change's record is a comment on the issue as it closes.
+says  references/session-cliffs.md "Close the issue with the change's record as its comment"
+says  references/session-cliffs.md "what you did not prove, the extras you fixed with their scores, the agent-run count"
+says  references/session-cliffs.md "save_comment"
+says  references/session-cliffs.md "gh issue close"
+says  skills/work-on/worker.md "the commits are on \`landing\`"
+says  skills/work-on/worker.md "the issue is closed with the change's record"
+never skills/work-on/worker.md "the PR is open. Then you stop"
+never skills/work-on/worker.md "ready to queue your PR"
+never skills/work-on/worker.md "The PR body says \`Fixes KOR-12\`"
+never skills/work-on/worker.md "Once the PR is open, set the Status to In Review"
+never skills/linear-issues/SKILL.md "sets In Review once the PR is open"
+never skills/github-issues/SKILL.md "body closes the issue on merge"
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]

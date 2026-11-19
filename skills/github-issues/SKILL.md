@@ -170,13 +170,13 @@ the table above.
   lives in. The skill makes the worktree, reads the issue and its project
   README, makes a branch linked to the issue (`<user>/<n>-short-title`, with
   `gh issue develop`), and sets the Status to In Progress.
-- **One checkout per issue**, deleted when the pull request merges.
+- **One checkout per issue**, deleted once its commits reach main.
 - **One issue per session.** A session works one issue and nothing else, which
   is about the quality of its answers.
 - **Status.** Nothing moves an issue's Status on its own when a branch is made
-  or pushed; `/work-on` sets In Progress. `Fixes #<n>` in the pull request
-  body closes the issue on merge. When a PR has merged and its `Fixes` line
-  did not close the issue, close it and set the Status to Done, and say so.
+  or pushed; `/work-on` sets In Progress. Once the worker's commits are on
+  the landing branch, it closes the issue with the change's record as its
+  comment and sets the Status to Done, as step 10 of **Opening a PR** says.
 - **`refs #<n>`** when a change touches an issue without finishing it.
 - **"Close it" means closed as completed** when the issue's work shipped.
   Closed as not planned is only for work that will not be done, and only when

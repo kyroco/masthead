@@ -70,9 +70,10 @@ To undo an edit of your own, reverse it with an Edit call, or copy the file
 to the scratchpad first and restore from the copy. Commit first, so
 HEAD is where your work is.
 
-**Opening a PR.** Every change reaches main through one reviewed PR, in this
-order. The steps live here and nowhere else; a repo supplies only its own facts
-(its pre-push check, its changelog format) in its
+**Opening a PR.** Every change reaches main through the landing branch, in
+this order, with no pull request: the lead keeps its old name so a repository's
+own version still replaces it. The steps live here and nowhere else; a repo
+supplies only its own facts (its pre-push check, its changelog format) in its
 `CLAUDE.md` and `docs/conventions/`.
 
 1. Build on a branch and commit. A bug gets its test first: the failing
@@ -115,15 +116,15 @@ order. The steps live here and nowhere else; a repo supplies only its own facts
    `project_fact.py --architecture-trial`), and nothing else: not your
    claims, not your did-not-prove list, not your view of any finding. It reads the code along
    each verifier's path, decides whether the finding holds, and places it:
-   fix in this PR, or an extra, as "Decide where it goes" in
+   fix in this change, or an extra, as "Decide where it goes" in
    `agents/adjudicator.md` says, for an architecture finding too. That placement is final for
    you and the foreman. What it throws out is gone: it is not logged or filed. Score and
    settle each of its extras as the worker's "What done is" says
    (`skills/work-on/worker.md`); one you fix is fixed as step 4 says. Its For
    the foreman section (a security finding it could not
    settle, or an ADR line and a mockup that disagree) goes to the foreman
-   unedited (to the user when there is none), who brings it to the user; the
-   PR waits for that answer. So does its Architecture trial section, while
+   unedited (to the user when there is none), who brings it to the user; your
+   commits wait for that answer before they land. So does its Architecture trial section, while
    the trial period is on: whenever that section lists a finding, whatever
    your brief's `Architecture trial:` line said, since the adjudicator reads
    a missing or misspelled line as on (`references/dispatch-brief.md` has
@@ -132,7 +133,7 @@ order. The steps live here and nowhere else; a repo supplies only its own facts
    says; once it is off, the section reads "None, the trial is off" and the
    adjudicator's Fix list holds them like any other finding, fixed as step
    4 says.
-4. Fix each finding on the adjudicator's fix list in this PR, test first,
+4. Fix each finding on the adjudicator's fix list in this change, test first,
    in two commits of its own: a test that reproduces it and fails, then the
    fix. When no test can reproduce it (instruction text, a fault only a
    deployed system shows), fix it in one commit and say why in the
@@ -179,7 +180,13 @@ order. The steps live here and nowhere else; a repo supplies only its own facts
    fix list and fixed, brought to the user, or dropped.
 7. Add the changelog entry when the repo keeps one, or its label for internal
    work.
-8. Commit, then run the repo's pre-push check on that last commit: the script
+8. Commit, then bring your branch up to date with the landing branch before
+   you run the check, since its receipt is for the tree you push:
+   `git fetch origin`, then `git rebase origin/landing`. When origin has no
+   `landing` yet, rebase onto `origin/main` instead; your push creates it
+   in step 9. When the rebase stops on a conflict, keep both sides' intent,
+   finish it, and put each conflict you settled on your did-not-prove list.
+   Then run the repo's pre-push check on that last commit: the script
    its settings name as `PROJECT_PUSH_CHECK` (`settings.local.json` over
    `settings.json`, as `hooks/project_fact.py` reads them), or its own
    test command when it names none, in one command with nothing sourced. Run
@@ -189,29 +196,41 @@ order. The steps live here and nowhere else; a repo supplies only its own facts
    names a commit that is no longer the last one. Read
    the output, not the exit code. When it cannot reach its test stack, do what
    it prints, and stop and report only when that fails too. `hard-gate.sh`
-   refuses the push and the PR until the check's receipt matches the commit;
+   refuses the push until the check's receipt matches the commit;
    it reads the receipt before its slower checks, so a refusal comes back in
    seconds. This run settles each claim the verdict lists as not proven here
    for want of a database. One it does not cover, and every claim that
    needed a private copy, goes on your did-not-prove list.
-9. Push and open one PR to main. Its body gives the unproven list, the
-   extras fixed in it with their scores, the agent-run count (the rows added to
-   `<state>/dispatches.tsv` for this issue whose outcome is not refused;
-   `<state>` is the folder `project_fact.py --state-path` prints, the one
-   the dispatch record writes to), and
-   `Fixes #<issue>`, or `Fixes <key>`, such as `Fixes KOR-12`, when the
-   issue lives in Linear. Never
-   commit or push to main: main changes only by merging the reviewed PR once
-   its checks are green.
-10. Once it merges, clean up what your own work created, from the main
-    checkout: bring down the test stack and any tunnels as the repo's
-    procedures say, delete the branch's code index
+9. Land your commits on the landing branch, `landing`, with no pull request:
+   `git push origin HEAD:landing`. Each commit message
+   is a short summary that names the issue (`#<issue>`, or its key, such as
+   `KOR-12`). When the push is refused because `landing` moved (another
+   worker landed first), fetch, rebase onto `origin/landing` again, run the
+   check again on the new commit, and push again. Never force-push
+   `landing`. Never commit or push to main: main moves forward only from
+   `landing`, after one run of the repo's Gate passes on the batch, and the
+   foreman does that, not you.
+10. Close the issue with the change's record as its comment, in plain words:
+    the commits you landed, what you did not prove, the extras you fixed with
+    their scores, the agent-run count (the rows added to
+    `<state>/dispatches.tsv` for this issue whose outcome is not refused;
+    `<state>` is the folder `project_fact.py --state-path` prints, the one
+    the dispatch record writes to), and each check the repo lacks. A commit
+    message closes nothing, so you close it yourself. In Linear: post the
+    record with `save_comment`, then set the issue to Done with
+    `save_issue`. On GitHub: `gh issue close <n> --comment "<record>"`, then
+    set the project Status to Done with `set-status.sh`. If a batch later
+    drops your commit, the issue is opened again and the commit comes back
+    to you.
+11. Once the batch has moved main past your commits, clean up what your own
+    work created, from the main checkout: bring down the test stack and any
+    tunnels as the repo's procedures say, delete the branch's code index
     (`korium-cli delete <branch>`), `git worktree remove` the worktree (never
     forced; report what blocks it), delete the branch locally, and name the
-    remote branch for the user to delete. The irreversible-action gate
-    refuses a session that deletes a remote branch, so the user makes that
-    call.
+    remote branch for the user to delete when you pushed one. The
+    irreversible-action gate refuses a session that deletes a remote branch,
+    so the user makes that call.
 
-**Updating main.** Never commit or push directly to main. Build on a branch,
-open a PR, and let main change only by merging the reviewed PR once its checks
-are green.
+**Updating main.** Never commit or push directly to main. Build on a branch
+and land it on `landing` as **Opening a PR** says; main moves forward only from
+`landing`, when one run of the repo's Gate passes on the batch.
