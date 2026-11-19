@@ -307,8 +307,16 @@ with tempfile.TemporaryDirectory() as top:
     check("S4 the README itself shows the steps with a placeholder for the repository",
           "--repo OWNER/REPO" in read(README))
     check("S4 setup shows the steps from batch.py", "batch.py steps" in read(SKILL))
-    check("S4 setup asks for the yes before writing anything for the batch run",
-          re.search(r"batch run.*\?\"", read(SKILL)) is not None)
+    # Read only the batch run section, words joined across line ends, so an older question elsewhere cannot pass it (arch-3).
+    def asks_before_writing(skill):
+        part = " ".join(skill.split("### Then the batch run", 1)[-1].split("## 10.", 1)[0].split())
+        question = part.find('"Shall Masthead put its batch run into this repository?')
+        return question >= 0 and question < part.find("batch.py write")
+    check("S4 setup asks the batch run question before writing anything for the batch run",
+          asks_before_writing(read(SKILL)))
+    without = read(SKILL).replace("Shall\nMasthead put its batch run into this repository?", "Shall we go on?")
+    check("arch-3 the question check fails when the batch run question is gone",
+          without != read(SKILL) and not asks_before_writing(without))
 
 # ---- Scenario 5: the App key is kept from every workflow but the move ---------
 with tempfile.TemporaryDirectory() as top:
