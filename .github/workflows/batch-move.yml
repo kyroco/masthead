@@ -30,6 +30,10 @@ on:
 jobs:
   move:
     runs-on: ubuntu-latest
+    # The App key lives in this environment, which only `landing` may use, and
+    # GitHub hands its secrets only to a job that names it: this one, not the
+    # repository's Gate, which the starter calls with `secrets: inherit` (INFRA-272).
+    environment: masthead-batch
     permissions:
       contents: read
     steps:
