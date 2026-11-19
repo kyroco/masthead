@@ -8,6 +8,7 @@ workflow uses it) or by `workflow_dispatch` (started by hand or by `gh`).
 
     gate.py look  [--root DIR]            what setup should say, as JSON; writes nothing
     gate.py store WORKFLOW [--root DIR]   write .claude/gate.json, after the person's yes
+    gate.py starter [--root DIR]          print the batch run's starter file for the stored Gate (INFRA-270)
 
 A workflow named Gate is the Gate; failing that, a workflow that runs on a
 pull request or the merge queue, or a reusable workflow one of those runs.
@@ -182,6 +183,112 @@ def look(top):
     return {"status": "choose", "choices": [answer(f) for f in startable]}
 
 
+STARTER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "batch-starter.yml")
+# The scopes `read-all` covers, for merging it with a job that asks for one write.
+SCOPES = ("actions", "attestations", "checks", "contents", "deployments", "discussions", "issues",
+          "packages", "pages", "pull-requests", "security-events", "statuses")
+LEVELS = {"none": 0, "read": 1, "write": 2}
+# A Gate job that names no permissions takes its caller's: give it GitHub's
+# restricted default, so a grant that names other scopes does not take its checkout away.
+UNDECLARED = {"contents": "read", "packages": "read"}
+
+
+def children(lines, i):
+    """The indices of the lines nested under line i."""
+    indent = len(lines[i]) - len(lines[i].lstrip())
+    found = []
+    for j in range(i + 1, len(lines)):
+        if not lines[j].strip():
+            continue
+        if len(lines[j]) - len(lines[j].lstrip()) <= indent:
+            break
+        found.append(j)
+    return found
+
+
+def keys(lines, idx):
+    """The (index, key, rest) of each key at the first level of the nested lines `idx`."""
+    if not idx:
+        return []
+    depth = min(len(lines[j]) - len(lines[j].lstrip()) for j in idx)
+    found = []
+    for j in idx:
+        line = lines[j]
+        if len(line) - len(line.lstrip()) == depth and ":" in line:
+            key, rest = line.strip().split(":", 1)
+            found.append((j, unquote(key), rest.strip()))
+    return found
+
+
+def permission(lines, i, rest):
+    """A `permissions:` value: "read-all", "write-all", or {scope: level}."""
+    if rest.startswith("{"):
+        pairs = [p.split(":", 1) for p in rest.strip().strip("{}").split(",") if ":" in p]
+        return {unquote(k): unquote(v) for k, v in pairs}
+    if rest:
+        return unquote(rest)
+    return {key: unquote(value) for _, key, value in keys(lines, children(lines, i))}
+
+
+def asked_permissions(text):
+    """What each job of a workflow asks of the token: one entry per job, its own or the workflow's."""
+    lines = [strip_comment(l) for l in text.lstrip("﻿").splitlines()]
+    top, jobs = None, None
+    for i, line in enumerate(lines):
+        m = re.match(r"^(permissions|jobs)\s*:\s*(.*)$", line)
+        if m and m.group(1) == "permissions":
+            top = permission(lines, i, m.group(2).strip())
+        elif m:
+            jobs = i
+    asks = []
+    if jobs is not None:
+        for j, _, _ in keys(lines, children(lines, jobs)):
+            own = [permission(lines, k, rest) for k, key, rest in keys(lines, children(lines, j)) if key == "permissions"]
+            asks.append(own[0] if own else top)
+    if not asks:
+        asks.append(top)
+    return [UNDECLARED if ask is None else ask for ask in asks]
+
+
+def grant(text):
+    """The permissions the starter's Gate job grants: the strongest level each Gate job asks for.
+
+    A called workflow may ask for no more than its caller job grants, or GitHub
+    refuses the whole run before any job starts (arch-1). Written as one line.
+    """
+    asks = asked_permissions(text)
+    if "write-all" in asks:
+        return "write-all"
+    merged = {}
+    for ask in asks:
+        if ask == "read-all":
+            ask = {scope: "read" for scope in SCOPES}
+        if not isinstance(ask, dict):
+            continue
+        for scope, level in ask.items():
+            if LEVELS.get(level, 0) > LEVELS.get(merged.get(scope, "none"), 0):
+                merged[scope] = level
+    if not merged:
+        return "{}"
+    return "{ " + ", ".join("{}: {}".format(s, merged[s]) for s in sorted(merged)) + " }"
+
+
+def starter(top):
+    """The batch run's starter file for this repository, from its stored Gate, or (None, why)."""
+    stored = project_fact.gate(top)
+    if not stored:
+        return None, "No Gate is stored in .claude/gate.json, so there is no batch run to start. " + OLD_WAY
+    if "workflow_call" not in stored["starts"]:
+        return None, "{} cannot be started with workflow_call, which is how the batch run starts it. {}".format(
+            stored["workflow"], OLD_WAY)
+    text = project_fact.read_repo_file(top, stored["workflow"], limit=1024 * 1024)
+    if text is None:
+        return None, "{} is not a plain file in this repository. {}".format(stored["workflow"], OLD_WAY)
+    with open(STARTER, encoding="utf-8") as handle:
+        template = handle.read()
+    return template.replace("__GATE_PERMISSIONS__", grant(text)).replace("__GATE__", stored["workflow"]), None
+
+
 def store(top, workflow):
     flows = {f["workflow"]: f for f in workflows(top)}
     flow = flows.get(workflow)
@@ -232,8 +339,15 @@ def main(argv):
             return 1
         print(json.dumps(record, indent=2))
         return 0
+    if argv == ["starter"]:
+        text, error = starter(top)
+        if error:
+            print(error, file=sys.stderr)
+            return 1
+        sys.stdout.write(text)
+        return 0
     print(__doc__.strip().splitlines()[0], file=sys.stderr)
-    print("usage: gate.py look | gate.py store WORKFLOW  [--root DIR]", file=sys.stderr)
+    print("usage: gate.py look | gate.py store WORKFLOW | gate.py starter  [--root DIR]", file=sys.stderr)
     return 2
 
 

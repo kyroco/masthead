@@ -1,7 +1,8 @@
 # Masthead batch run: one Gate run per batch of commits landed on `landing`,
 # and main moves to the batch only when that run is green.
 # Written by Masthead's setup; the batch run itself lives in kyroco/masthead
-# (references/batch-run.md there). __GATE__ is the Gate stored in .claude/gate.json.
+# (references/batch-run.md there). `gate.py starter` fills in the Gate stored in
+# .claude/gate.json and the token permissions that Gate asks for.
 name: Masthead batch
 
 on:
@@ -19,6 +20,8 @@ jobs:
     uses: kyroco/masthead/.github/workflows/batch-plan.yml@main
   gate:
     needs: plan
+    # What the Gate's jobs ask of the token; a called workflow may ask no more than this.
+    permissions: __GATE_PERMISSIONS__
     uses: ./__GATE__
     secrets: inherit
   move:
