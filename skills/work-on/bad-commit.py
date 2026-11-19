@@ -184,23 +184,22 @@ def subject(sha):
 
 
 def issue_of(sha, root):
-    """The issue a commit belongs to, from its message: the Linear key or GitHub number it names."""
-    text = message(sha)
-    lines = text.splitlines()
-    # A "Fixes KEY" or "refs KEY" line names the issue outright; then the subject, then the rest.
+    """The issue a commit belongs to, from its message: the Linear key or GitHub number it names.
+
+    A "Fixes KEY" or "refs KEY" line names the issue outright; then the subject, then the rest.
+    Within a line the last key wins: a subject names its own issue at the end, "(INFRA-422)",
+    and may name another one earlier ("Undo part of INFRA-421 ...")."""
+    lines = message(sha).splitlines()
     ordered = [l for l in lines if re.match(r"\s*(fixes|closes|resolves|refs)\b", l, re.I)] + lines
     if project_fact.tracker(root) == "linear":
         team = project_fact.linear_team(root)
         pattern = re.compile(r"\b{}-\d+\b".format(re.escape(team)) if team else r"\b[A-Z][A-Z0-9]{1,9}-\d+\b")
-        for line in ordered:
-            m = pattern.search(line)
-            if m:
-                return m.group(0)
-        return NO_ISSUE
+    else:
+        pattern = re.compile(r"(?<![\w/])#\d+\b")
     for line in ordered:
-        m = re.search(r"(?<![\w/])#(\d+)\b", line)
-        if m:
-            return "#" + m.group(1)
+        found = pattern.findall(line)
+        if found:
+            return found[-1]
     return NO_ISSUE
 
 

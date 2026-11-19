@@ -94,7 +94,9 @@ trailers, so their names do not change without it:
 | `Masthead-Bring-Back` | `revert-this-commit-and-fix-in-one-push` | one |
 
 The issue is read from the commit's message: a `Fixes <key>` or `refs <key>`
-line first, then the subject, then the rest. In a Linear repository it is a
+line first, then the subject, then the rest. Within a line the last key wins,
+since a subject names its own issue at its end, as in "Undo part of INFRA-421
+so the tests fail (INFRA-422)". In a Linear repository it is a
 key of the team setup stored (`LINEAR_TEAM_KEY`).
 
 ## Bringing it back
