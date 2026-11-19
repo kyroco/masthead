@@ -277,10 +277,16 @@ batch run can move it would never move again.
    person to run them in their own terminal: no session may set a secret.
    Wait until they say they are done.
 4. Land the starter. Commit `.github/workflows/masthead-batch.yml` with
-   `.claude/gate.json` and push them to `landing` (`git push origin
-   HEAD:landing`), with no pull request. GitHub runs the starter only from a
-   commit on that branch, and that first batch is the first proof it works.
-   This push is the switch: `project_fact.py --ships` prints `batch` only
+   `.claude/gate.json`. The commit changes a file under `.github/`, so it
+   needs the person's OK like any change to the checks: ask which issue holds
+   this setup, ask them to say OK in a comment on it, with the reason (it
+   turns on the batch run), and add the line `CI-change-OK: <link to that
+   comment>` to the commit's message; `hard-gate.sh` refuses the push
+   without it. When the repository names a push check, run it on that
+   commit. Then push to `landing` (`git push origin HEAD:landing`), with no
+   pull request, as the batch way's steps 8 and 9 of **Opening a PR** say.
+   GitHub runs the starter only from a commit on that branch, and that first
+   batch is the first proof it works. This push is the switch: `project_fact.py --ships` prints `batch` only
    once both files are committed on `origin/landing`, and until then every
    session ships the pull request way (**Opening a PR** in
    `references/session-cliffs.md`).

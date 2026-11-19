@@ -1718,6 +1718,11 @@ says  README.md "the foreman queues it to be merged"
 never README.md "fixes in the same pull request"
 says  README.md "One issue is one pull request, or one landing with the batch run"
 says  README.md "which says \`batch\` only once setup's two batch files are committed on \`landing\`"
+# INFRA-276 round 1, s2-judge-1 and arch-1: setup's switch push carries the CI-change OK and the push check.
+says  skills/setup/SKILL.md "The commit changes a file under \`.github/\`, so it needs the person's OK like any change to the checks"
+says  skills/setup/SKILL.md "add the line \`CI-change-OK: <link to that comment>\` to the commit's message; \`hard-gate.sh\` refuses the push without it"
+says  skills/setup/SKILL.md "When the repository names a push check, run it on that commit"
+says  skills/setup/SKILL.md "as the batch way's steps 8 and 9 of **Opening a PR** say"
 says  README.md "a green batch moves main"
 # F2: the README and the gate catalog name the new refusal.
 says  README.md "a command line that changes the commit before it pushes"
