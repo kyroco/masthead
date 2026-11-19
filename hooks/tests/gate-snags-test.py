@@ -220,6 +220,34 @@ check("S2 the fixed Gate's called workflow and helper were read",
       out and set(out.get("read", [])) == {".github/workflows/gate.yml", ".github/workflows/gate-plan.yml",
                                            ".github/workflows/retry.yml"}, out)
 
+# A test of the run's name is told about the run's name, not a job's (S2-2),
+# even when the Gate also has a job keyed gate.
+retry_line = [s for s in each if s["workflow"] == ".github/workflows/retry.yml" and s["line"] == 8]
+check("S2 a run-name test is told the run is named Masthead batch",
+      retry_line and "Masthead batch" in retry_line[0]["misses"] and "gate / " not in retry_line[0]["misses"],
+      retry_line)
+
+# A helper fixed only halfway (its list names Masthead batch, its test still
+# only Gate) is still pointed at (arch-1, round 2).
+half = RETRY.replace("workflows: [Gate]", "workflows: [Gate, Masthead batch]")
+root = repo({".claude/gate.json": STORED, ".github/workflows/gate.yml": AFTER,
+             ".github/workflows/gate-plan.yml": PLAN_AFTER, ".github/workflows/retry.yml": half})
+code, out, err = snags(root)
+check("S2 a half-fixed helper's name test is still pointed at",
+      out and [(s["workflow"], s["line"], s["kind"]) for s in out.get("snags", [])]
+      == [(".github/workflows/retry.yml", 8, "check")], out or err)
+
+# A run-name test fixed across a folded if: is clear.
+folded = RETRY.replace("workflows: [Gate]", "workflows: [Gate, Masthead batch]").replace(
+    "    if: github.event.workflow_run.name == 'Gate'\n",
+    "    if: >-\n      github.event.workflow_run.name == 'Gate'\n"
+    "      || github.event.workflow_run.name == 'Masthead batch'\n")
+root = repo({".claude/gate.json": STORED, ".github/workflows/gate.yml": AFTER,
+             ".github/workflows/gate-plan.yml": PLAN_AFTER, ".github/workflows/retry.yml": folded})
+code, out, err = snags(root)
+check("S2 a run-name test fixed across a folded if is clear",
+      out and out.get("status") == "clear", out or err)
+
 # Every way to write the workflow_dispatch trigger is a trigger, not a test (FIX-2),
 # and a job's own quoted name is not a check lookup (FIX-3).
 for label, on in (("an empty map", "on:\n  pull_request:\n  workflow_dispatch: {}\n  workflow_call:\n"),
