@@ -1705,5 +1705,10 @@ never "$FM" "Left for INFRA-263"
 # Scenario 5: the later commit's worker owns the fix and keeps both issues in sync.
 says  "$FM" "to read the earlier issue and every comment on it first, and to comment"
 says  references/bad-commit.md "batch-issues.py returned"
+# Round 1, s2-judge-1: hand back each dropped commit, not each issue once.
+never "$FM" "For each issue it names, one you have not handed back already in this run"
+says  "$FM" "For each dropped commit it lists, one whose drop you have not handed back already"
+# Round 1, s4-judge-1: a sent-back issue its commit's closing words closed is reopened.
+says  "$FM" "reopen it"
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]

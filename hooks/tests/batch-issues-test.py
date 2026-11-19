@@ -325,6 +325,123 @@ check("s4 the GitHub issue the green batch carried counts as merged, the dropped
 check("s4 s1 on GitHub too, the foreman's script only reads runs", only_reads(calls), calls)
 r.done()
 
+# ---- Round 1 fixes ---------------------------------------------------------------
+
+# s2-1 (arch-1): the worker brings its commit back after the green run and before the foreman
+# reads it. The run carried the commit and its revert, not the fix: the issue is still sent back.
+r = Repo()
+r.land({"a": "1\n"}, "Add a (INFRA-11)")
+r.land({"breaks": "x\n"}, "Add the part that breaks the tests (INFRA-12)")
+red = r.batch_run(green=False)
+r.search(red)
+revert = r.records()[0]
+green = r.batch_run(green=True)
+git(r.work, "revert", "--no-edit", revert)
+os.remove(os.path.join(r.work, "breaks"))
+r.write("b", "fixed\n")
+git(r.work, "add", "-A")
+git(r.work, "commit", "--quiet", "-m", "Fix the part that broke the tests (INFRA-12)")
+git(r.work, "push", "--quiet", "origin", "landing")
+out, _ = r.foreman("merged", green, "--since", r.base)
+check("s2-1 an issue brought back after the run it is read from is still sent back in that run",
+      merged_line(out.stdout) == ["INFRA-11"] and "Sent back, not merged, leave open: INFRA-12" in out.stdout,
+      out.stdout)
+r.done()
+
+# s3-1: a commit dropped only because it builds on the bad one comes back as a lone revert of its
+# record. That revert is its issue's work, so the green run carrying it lists the issue as merged.
+r = Repo()
+r.land({"lib": "one\ntwo\nthree\n"}, "Add lib (INFRA-10)")
+base = r.landing()
+git(r.remote, "update-ref", "refs/heads/main", base)
+r.land({"breaks": "x\n", "lib": "one\ntwo by 12\nthree\n"}, "Change lib and break the tests (INFRA-12)")
+r.land({"lib": "one\ntwo by 13\nthree\n"}, "Change lib again (INFRA-13)")
+red = r.batch_run(green=False)
+out = r.search(red)
+recs = r.records()
+check("s3-1 setup: the search drops the bad commit and the one that builds on it", len(recs) == 2,
+      out.stdout + out.stderr)
+r.batch_run(green=True)
+by_issue = {}
+for sha in recs:
+    body = git(r.work, "log", "-1", "--format=%B", sha)
+    by_issue[re.search(r"^Masthead-Issue: (.*)$", body, re.M).group(1)] = sha
+git(r.work, "revert", "--no-edit", by_issue["INFRA-12"])
+os.remove(os.path.join(r.work, "breaks"))
+git(r.work, "add", "-A")
+git(r.work, "commit", "--quiet", "-m", "Fix the tests (INFRA-12)")
+git(r.work, "push", "--quiet", "origin", "landing")
+r.batch_run(green=True)
+git(r.work, "revert", "--no-edit", by_issue["INFRA-13"])
+git(r.work, "push", "--quiet", "origin", "landing")
+back = r.batch_run(green=True)
+out, _ = r.foreman("merged", back)
+check("s3-1 an issue whose only commit in the batch is the revert of its record counts as merged",
+      merged_line(out.stdout) == ["INFRA-13"], out.stdout)
+r.done()
+
+# arch-2: an issue whose own work is a revert of an ordinary commit counts as merged.
+r = Repo()
+old = r.land({"a": "1\n"}, "Add a (INFRA-50)")
+r.batch_run(green=True)
+mark = r.landing()
+git(r.work, "revert", "--no-edit", old)
+git(r.work, "commit", "--quiet", "--amend", "-m", "Take a out again (INFRA-51)\n\nThis reverts commit {}.".format(old))
+git(r.work, "push", "--quiet", "origin", "landing")
+green = r.batch_run(green=True)
+out, _ = r.foreman("merged", green, "--since", mark)
+check("arch-2 an issue whose own work is a revert of an ordinary commit counts as merged",
+      merged_line(out.stdout) == ["INFRA-51"], out.stdout)
+r.done()
+
+
+def record_commit(repo, dropped, issue):
+    """A drop record as bad-commit.py writes it, for a dropped commit whose message names no issue."""
+    repo.write("rec-" + dropped[:7], "x\n")
+    git(repo.work, "add", "-A")
+    git(repo.work, "commit", "--quiet", "-m", "Drop {} from landing\n\nMasthead-Dropped: {}\nMasthead-Issue: {}\n"
+        "Masthead-Failed-Check: Tests\nMasthead-Red-Run: https://example/runs/1\nMasthead-Batch: {}\n"
+        "Masthead-Bring-Back: revert-this-commit-and-fix-in-one-push\n".format(dropped[:9], dropped, issue, dropped))
+    git(repo.work, "push", "--quiet", "origin", "landing")
+    return git(repo.work, "rev-parse", "HEAD")
+
+
+# arch-3: a dropped commit whose message names no issue. When it brings an earlier drop back, it
+# is that issue's; otherwise it goes to the person, never to a worker of an issue called "none found".
+r = Repo()
+r.land({"breaks": "x\n"}, "Break the tests (INFRA-60)")
+red = r.batch_run(green=False)
+r.search(red)
+first = r.records()[0]
+git(r.work, "revert", "--no-edit", first)
+git(r.work, "push", "--quiet", "origin", "landing")
+bring_back = git(r.work, "rev-parse", "HEAD")
+record_commit(r, bring_back, "none found")
+loose = r.land({"z": "z\n"}, "Tidy something")
+record_commit(r, loose, "none found")
+out, _ = r.foreman("returned")
+check("arch-3 a dropped bring-back that names no issue goes back to the issue it brought back",
+      "INFRA-60 goes back to its worker: {}".format(bring_back[:9]) in out.stdout, out.stdout)
+check("arch-3 no message goes to an issue called none found", "none found goes back" not in out.stdout
+      and "Do not set none found Done" not in out.stdout, out.stdout)
+check("arch-3 a dropped commit with no issue goes to the person, named",
+      "{} names no issue: tell the person".format(loose[:9]) in out.stdout, out.stdout)
+r.done()
+
+# s4-judge-1: a dropped commit's closing words ("Fixes #32", "Fixes INFRA-12") can close its issue
+# when it reaches main with its revert. The sent-back line tells the foreman to reopen it.
+for linear, key, msg in ((False, "#72", "Break the tests\n\nFixes #72"),
+                         (True, "INFRA-72", "Break the tests\n\nFixes INFRA-72")):
+    r = Repo(linear=linear)
+    r.land({"breaks": "x\n"}, msg)
+    red = r.batch_run(green=False)
+    r.search(red)
+    green = r.batch_run(green=True)
+    out, _ = r.foreman("merged", green, "--since", r.base)
+    check("s4-judge-1 a sent-back issue closed by its commit's closing words is to be reopened ({})".format(key),
+          "If its commit's closing words closed {} or set it Done, reopen it".format(key) in out.stdout, out.stdout)
+    r.done()
+
 # ---- Usage ---------------------------------------------------------------------
 
 r = Repo()
