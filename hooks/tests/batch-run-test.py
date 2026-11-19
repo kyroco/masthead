@@ -31,6 +31,12 @@ MOVE = os.path.join(PLUGIN, ".github", "workflows", "batch-move.yml")
 STARTER = os.path.join(PLUGIN, "skills", "setup", "batch-starter.yml")
 GATE = ".github/workflows/gate.yml"
 
+# The plan step reads .claude/gate.json with jq, as GitHub's runners have it.
+# Without it this suite cannot run that step: skip, as run-tests.sh expects (arch-2).
+if not shutil.which("jq"):
+    print("skipped: jq is not installed, and the batch plan step reads .claude/gate.json with it")
+    sys.exit(77)
+
 passed = 0
 failed = 0
 
