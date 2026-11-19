@@ -1,7 +1,10 @@
 # Masthead's batch run, first part: check the stored Gate before a batch starts (INFRA-270).
 #
-# A repository's starter file (skills/setup/batch-starter.yml) calls this on
-# every push to `landing`, before it runs the repository's own Gate. It reads
+# A repository's starter file (skills/setup/batch-starter.yml) calls this when
+# the person says go (skills/work-on/batch-go.py starts the starter on
+# `landing`; a push starts nothing, INFRA-285), before it runs the repository's
+# own Gate. It stops a run that no go started, and one whose `landing` moved
+# after the go checked the pile, so the Gate tests the pile the go named. It reads
 # `.claude/gate.json`, the answer Masthead's setup stored after the person's
 # yes (references/gate-fact.md), at the batch's own commit, and the starter
 # file that called it, to check the starter's Gate job runs that Gate and no
@@ -15,6 +18,22 @@ name: Masthead batch plan
 
 on:
   workflow_call:
+    inputs:
+      sha:
+        description: Landing's last commit when the go was given (batch-go.py).
+        required: false
+        type: string
+        default: ""
+      pile:
+        description: What the go was for, a milestone or a set of issues.
+        required: false
+        type: string
+        default: ""
+      issues:
+        description: The issues on the pile.
+        required: false
+        type: string
+        default: ""
     outputs:
       sha:
         description: The batch's last commit, which the Gate tests and main moves to when it is green.
@@ -41,6 +60,9 @@ jobs:
         env:
           # In a called workflow this is the caller's: the starter file, at the batch's commit.
           STARTER_REF: ${{ github.workflow_ref }}
+          GO_SHA: ${{ inputs.sha }}
+          GO_PILE: ${{ inputs.pile }}
+          GO_ISSUES: ${{ inputs.issues }}
         run: |
           set -u
           file=.claude/gate.json
@@ -52,6 +74,16 @@ jobs:
           }
           if [ "${GITHUB_REF:-}" != "refs/heads/landing" ]; then
             stop "The batch run tests only the landing branch, and this run is on ${GITHUB_REF:-no branch}. It does not start, and main does not move."
+          fi
+          # Only a go starts a batch (INFRA-285). An older starter still starts on every push to landing.
+          if [ "${GITHUB_EVENT_NAME:-}" != "workflow_dispatch" ]; then
+            stop "A batch run starts only when the person says go, and this run started on a ${GITHUB_EVENT_NAME:-unknown} event, so it does not start and main does not move. This starter file is older than that: run /masthead:setup to write it again."
+          fi
+          if [ -z "${GO_SHA:-}" ]; then
+            stop "This run names no commit for the go, so it does not start and main does not move. Start it with batch-go.py, which checks the pile first."
+          fi
+          if [ "$GO_SHA" != "${GITHUB_SHA:-}" ]; then
+            stop "Landing moved after the go: the go checked $GO_SHA, and landing is now at ${GITHUB_SHA:-nothing}. The run does not start and main does not move. Say go again so the new commits are checked too."
           fi
           if [ -L "$file" ] || [ ! -f "$file" ]; then
             stop "No Gate is stored in .claude/gate.json, so the batch run does not start and main does not move. $oldway"
@@ -77,4 +109,4 @@ jobs:
             stop "The starter file runs ${runs:-no workflow of this repository} as the Gate, but the Gate stored in .claude/gate.json is $workflow. The batch run runs only the stored Gate, so it does not start and main does not move. Run /masthead:setup to write the starter file again."
           fi
           echo "sha=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
-          printf 'Batch %s: the Gate is %s, as stored in .claude/gate.json.\n' "$GITHUB_SHA" "$workflow" | tee -a "${GITHUB_STEP_SUMMARY:-/dev/null}"
+          printf 'Batch %s, the go for %s (%s): the Gate is %s, as stored in .claude/gate.json.\n' "$GITHUB_SHA" "${GO_PILE:-no pile named}" "${GO_ISSUES:-no issues named}" "$workflow" | tee -a "${GITHUB_STEP_SUMMARY:-/dev/null}"

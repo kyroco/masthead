@@ -260,7 +260,8 @@ with tempfile.TemporaryDirectory() as top:
 with tempfile.TemporaryDirectory() as top:
     work = repo_with_gate(top)
     text = starter_text(work)
-    check("S3 the starter runs on a push to landing", re.search(r"(?m)^on:\n  push:\n    branches: \[landing\]$", text), text)
+    check("S3 the starter runs only when the person says go, never on a push (INFRA-285)",
+          re.search(r"(?m)^on:\n  workflow_dispatch:\n", text) and "push:" not in text, text)
     check("S3 the starter calls the batch plan kept in kyroco/masthead",
           "    uses: kyroco/masthead/.github/workflows/batch-plan.yml@main\n" in text, text)
     check("S3 the starter calls the batch move kept in kyroco/masthead",

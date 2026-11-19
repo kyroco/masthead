@@ -1,16 +1,30 @@
 # Masthead batch run: one Gate run per batch of commits landed on `landing`,
-# and main moves to the batch only when that run is green.
+# and main moves to the batch only when that run is green. A push to landing
+# starts nothing: the run starts only when the person says go, for a milestone
+# or a set of issues, through skills/work-on/batch-go.py in kyroco/masthead.
 # Written by Masthead's setup; the batch run itself lives in kyroco/masthead
 # (references/batch-run.md there). `gate.py starter` fills in the Gate stored in
 # .claude/gate.json and the token permissions that Gate asks for.
 name: Masthead batch
 
 on:
-  push:
-    branches: [landing]
+  workflow_dispatch:
+    inputs:
+      pile:
+        description: What the go was for, a milestone or a set of issues.
+        required: true
+        type: string
+      issues:
+        description: The issues on the pile.
+        required: true
+        type: string
+      sha:
+        description: Landing's last commit when the go was given; the run stops if landing moved since.
+        required: true
+        type: string
 
-# One batch at a time. A push while a batch runs waits; a newer push replaces
-# the one waiting, so the next run tests everything landed meanwhile, together.
+# One batch at a time. A go while a batch runs waits; a newer go replaces the
+# one waiting.
 concurrency:
   group: masthead-batch
   cancel-in-progress: false
@@ -18,6 +32,10 @@ concurrency:
 jobs:
   plan:
     uses: kyroco/masthead/.github/workflows/batch-plan.yml@main
+    with:
+      sha: ${{ inputs.sha }}
+      pile: ${{ inputs.pile }}
+      issues: ${{ inputs.issues }}
   gate:
     needs: plan
     # What the Gate's jobs ask of the token; a called workflow may ask no more than this.

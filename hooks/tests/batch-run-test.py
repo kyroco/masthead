@@ -13,6 +13,9 @@ Scenario 3: a red Gate (or a cancelled or skipped one) leaves main where it was.
 Scenario 4: the batch run runs the Gate stored in .claude/gate.json and never
 works it out; with none stored it does not start and says so.
 
+INFRA-285: the starter starts on a go only, never on a push or a schedule, and
+the plan stops a run that no go started or whose landing moved after the go.
+
 Run from anywhere: python3 hooks/tests/batch-run-test.py
 """
 import json
@@ -197,8 +200,16 @@ with tempfile.TemporaryDirectory() as top:
     check("S3 a sha that is not a full commit id is refused", code != 0 and repo.main() == stray, out)
 
 # ---- Scenario 1: one run per batch, carrying everything landed meanwhile ------
-check("S1 the starter starts on a push to landing only",
-      re.search(r"^on:\n  push:\n    branches: \[landing\]\n", starter, re.M) is not None, starter)
+on_block = re.search(r"^on:\n((?:  .*\n|\n)*?)(?=^\S)", starter, re.M)
+on_block = on_block.group(1) if on_block else ""
+check("INFRA-285 S1/S4 the starter starts on a go (workflow_dispatch) and on nothing else: no push, no schedule",
+      re.findall(r"^  (\w+):", on_block, re.M) == ["workflow_dispatch"], on_block)
+check("INFRA-285 S1 nothing in the starter starts it on a push to landing",
+      "push:" not in starter and "schedule:" not in starter and "branches:" not in starter, starter)
+check("INFRA-285 the go names its pile, its issues and landing's commit, and the starter hands them to the plan",
+      all(re.search(r"^      {}:\n        description: .+\n        required: true\n        type: string\n".format(k),
+                    on_block, re.M) for k in ("pile", "issues", "sha"))
+      and all("{0}: ${{{{ inputs.{0} }}}}".format(k) in starter for k in ("sha", "pile", "issues")), starter)
 check("S1 the starter keeps one batch at a time in one fixed group",
       re.search(r"^concurrency:\n  group: masthead-batch\n  cancel-in-progress: false\n", starter, re.M) is not None,
       starter)
@@ -226,7 +237,7 @@ SHA = "a" * 40
 STARTER_FILE = ".github/workflows/masthead-batch.yml"
 
 
-def plan(stored, ref="refs/heads/landing", link=False, runs=None):
+def plan(stored, ref="refs/heads/landing", link=False, runs=None, event="workflow_dispatch", go_sha=SHA):
     """Run the plan step in a checkout holding `stored` as gate.json and the starter
     as setup writes it, its Gate job running `runs` (the stored Gate by default)."""
     runs = GATE if runs is None else runs
@@ -247,7 +258,8 @@ def plan(stored, ref="refs/heads/landing", link=False, runs=None):
         with open(os.path.join(checkout, STARTER_FILE), "w", encoding="utf-8") as handle:
             handle.write(starter.replace("uses: ./__GATE__", "uses: ./" + runs))
         return run_script(PLAN_SCRIPT, checkout, {
-            "GITHUB_REF": ref, "GITHUB_SHA": SHA,
+            "GITHUB_REF": ref, "GITHUB_SHA": SHA, "GITHUB_EVENT_NAME": event, "GO_SHA": go_sha,
+            "GO_PILE": "milestone Batch on go", "GO_ISSUES": "INFRA-285 INFRA-286",
             "GITHUB_REPOSITORY": "acme/shop", "STARTER_REF": "acme/shop/" + STARTER_FILE + "@" + ref})
 
 
@@ -255,6 +267,24 @@ code, out, summary, output = plan({"workflow": GATE, "starts": ["workflow_call",
 check("S4 a stored Gate the starter runs lets the batch start", code == 0, out)
 check("S4 the plan names the batch's commit for the Gate and the move", output.strip() == "sha=" + SHA, output)
 check("S4 the plan says which stored Gate runs", GATE in summary and "as stored in .claude/gate.json" in summary, summary)
+check("INFRA-285 S2 the plan says which go the batch is for, and its issues",
+      "milestone Batch on go" in summary and "INFRA-285 INFRA-286" in summary, summary)
+
+STORED = {"workflow": GATE, "starts": ["workflow_call", "workflow_dispatch"]}
+code, out, summary, output = plan(STORED, event="push")
+check("INFRA-285 S1 a run an older starter starts on a push to landing stops at the plan, and the Gate never runs",
+      code != 0 and output.strip() == "" and "starts only when the person says go" in out
+      and "run /masthead:setup to write it again" in out, out)
+for event in ("schedule", "pull_request", "merge_group", ""):
+    code, out, _, output = plan(STORED, event=event)
+    check("INFRA-285 S4 a run started by '{}' and not a go stops at the plan".format(event or "no event"),
+          code != 0 and output.strip() == "", out)
+code, out, _, output = plan(STORED, go_sha="")
+check("INFRA-285 a go that names no commit does not start", code != 0 and output.strip() == "" and "names no commit" in out, out)
+code, out, summary, output = plan(STORED, go_sha="b" * 40)
+check("INFRA-285 S2/S3 landing that moved after the go checked the pile stops the run, so the Gate tests only the "
+      "checked pile", code != 0 and output.strip() == "" and "Landing moved after the go" in out
+      and "b" * 40 in out and SHA in out, out)
 
 NONE = "No Gate is stored in .claude/gate.json, so the batch run does not start and main does not move."
 code, out, summary, output = plan(None)
@@ -292,9 +322,12 @@ plan_text, move_text = read(PLAN), read(MOVE)
 check("the starter calls batch-plan.yml and batch-move.yml in kyroco/masthead",
       "uses: kyroco/masthead/.github/workflows/batch-plan.yml@" in starter
       and "uses: kyroco/masthead/.github/workflows/batch-move.yml@" in starter)
-check("batch-plan.yml can be called and takes no input, so nothing in the starter has to agree with the Gate job",
-      "workflow_call:" in plan_text and "inputs:" not in plan_text
-      and re.search(r"^  plan:\n    uses: [^\n]+\n  gate:\n", starter, re.M) is not None)
+check("batch-plan.yml can be called with the go's three inputs, none required, so an older starter reaches the plan "
+      "and is told why it stops",
+      "workflow_call:" in plan_text
+      and all(re.search(r"^      {}:\n        description: .+\n        required: false\n".format(k), plan_text, re.M)
+              for k in ("sha", "pile", "issues"))
+      and re.search(r"^  plan:\n    uses: [^\n]+\n    with:\n(      \w+: [^\n]+\n){3}  gate:\n", starter, re.M) is not None)
 check("batch-move.yml can be called, with the inputs and secrets the starter passes",
       all(re.search(r"^      {}:\n".format(re.escape(k)), move_text, re.M)
           for k in ("sha", "gate-result", "BATCH_APP_ID", "BATCH_APP_PRIVATE_KEY")))

@@ -5,9 +5,10 @@ repository that opted in, workers land verified commits on `landing` with no
 pull request. A repository opted in when `project_fact.py --ships` prints
 `batch`: its stored Gate and this starter file are both committed on
 `origin/landing` (INFRA-276). Every other repository ships the pull request
-way and has no batch run. One run of the
-repository's own Gate tests everything landed since the last run, together,
-and main moves to that batch's last commit only when the run is green.
+way and has no batch run. Commits pile up on `landing`, and a push starts
+nothing. When the person says go, one run of the repository's own Gate tests
+the whole pile, together, and main moves to the pile's last commit only when
+the run is green.
 Robert, November 18, 2026, agreeing to "One Gate run tests each batch. Green
 moves main forward.": "I agree with 1 and 2".
 
@@ -15,8 +16,9 @@ moves main forward.": "I agree with 1 and 2".
 
 | Part | Where it lives | What it does |
 |---|---|---|
-| The starter file | the repository's `.github/workflows/`, written by setup (INFRA-272) from `skills/setup/batch-starter.yml` | Starts on each push to `landing`, keeps one batch running at a time, and runs the three jobs below |
-| `plan` | `kyroco/masthead/.github/workflows/batch-plan.yml` | Reads `.claude/gate.json` at the batch's commit and stops when no Gate is stored or the starter runs another one |
+| The go | `skills/work-on/batch-go.py`, run by the foreman when the person says go | Checks the pile on `landing` belongs to the issues the go names, then starts the starter file on `landing`, once |
+| The starter file | the repository's `.github/workflows/`, written by setup (INFRA-272) from `skills/setup/batch-starter.yml` | Starts only on a go (`workflow_dispatch`), never on a push, keeps one batch running at a time, and runs the three jobs below |
+| `plan` | `kyroco/masthead/.github/workflows/batch-plan.yml` | Stops a run no go started, or whose `landing` moved after the go; reads `.claude/gate.json` at the batch's commit and stops when no Gate is stored or the starter runs another one |
 | `gate` | the repository's own Gate, the workflow `.claude/gate.json` names | Tests the batch's last commit, started with `workflow_call` |
 | `move` | `kyroco/masthead/.github/workflows/batch-move.yml` | When the Gate passed, moves main forward to exactly that commit, as the batch App |
 
@@ -24,13 +26,45 @@ GitHub runs only workflow files that live in the repository, so the
 repository holds the small starter file and Masthead holds the rest. The
 starter calls Masthead's two workflows at `@main`.
 
+## The go
+
+Robert, November 19, 2026: "Isn't the whole point of this change is to keep
+throwing things on the landing until I say: go to main?" A batch is a
+milestone ("batch means milestone"), or, where there is no milestone, the
+issues the person names ("and when no milestone exists, then it is a set of
+issues I say: go on to make a push"), and the run starts when the person says
+so ("I can say go when I want."). The starter has no push and no schedule
+trigger, so the pile costs no GitHub minutes until the go.
+
+When the person says go, the foreman reads the milestone's issues from the
+tracker, or takes the ones the person named, and runs, from a checkout:
+
+    python3 ${CLAUDE_PLUGIN_ROOT}/skills/work-on/batch-go.py --milestone "<name>" <issue> ...
+    python3 ${CLAUDE_PLUGIN_ROOT}/skills/work-on/batch-go.py <issue> ...
+
+It reads main and `landing` from GitHub and finds each commit's issue in its
+message, as `bad-commit.py` does: a `Fixes` or `refs` line first, then the
+subject, and the last key on that line. Every commit on `landing` past main
+must belong to a named issue, since the run tests `landing`'s last commit and
+a green run moves main to all of it. A commit of any other issue, or of none,
+stops the go: it names each such commit with its issue, and nothing starts.
+Otherwise it starts the starter on `landing` with three inputs: `pile` (what
+the go was for), `issues` (the named issues found on the pile) and `sha`
+(`landing`'s last commit). `--check` checks and starts nothing.
+
+The run's event is `workflow_dispatch`, its ref `refs/heads/landing`, and its
+`github.sha` the last commit of `landing` when the go reached GitHub. `plan`
+stops the run when its event is anything but `workflow_dispatch` (an older
+starter, written before INFRA-285, still starts on every push: setup writes
+it again), and when that commit is not the `sha` the go checked: `landing`
+moved in between, and the person says go again so the new commits are
+checked too.
+
 ## One run per batch
 
-The starter's `concurrency` group lets one batch run at a time. A push while
-a batch runs waits; a newer push replaces the one waiting (GitHub's
-concurrency rule, `cancel-in-progress: false`). So when a run ends, the one
-that starts next tests the newest commit on `landing`, which carries every
-commit landed while the last run was going.
+The starter's `concurrency` group lets one batch run at a time. A go while a
+batch runs waits; a newer go replaces the one waiting (GitHub's concurrency
+rule, `cancel-in-progress: false`).
 
 ## Green, red, and no Gate
 
@@ -105,18 +139,20 @@ three ways (INFRA-283). Any Gate that routes by event meets the same three.
 
 | What the Gate reads | In a batch run | What breaks | Kyroco's fix |
 |---|---|---|---|
-| `github.event_name`, `github.workflow_ref` | `push`, and the ref of `masthead-batch.yml@refs/heads/landing`, because the starter calls the Gate as a job | A test keyed on `workflow_dispatch` (its runner picker, its plan checks) is false | Match a batch run on all three: event `push`, `github.ref` `refs/heads/landing`, and `github.workflow_ref` ending in `masthead-batch.yml@refs/heads/landing` |
-| `github.event.before` | The commit before the last push only | A diff from there misses every commit landed earlier in the batch | Diff a batch run against main, as a run started by hand does |
+| `github.event_name`, `github.workflow_ref` | `workflow_dispatch`, and the ref of `masthead-batch.yml@refs/heads/landing`, because the starter calls the Gate as a job | A test keyed on `workflow_dispatch` alone is true, but one on `github.workflow_ref` naming the Gate is false; a batch arm keyed on `push` is never true | Match a batch run on all three: event `workflow_dispatch`, `github.ref` `refs/heads/landing`, and `github.workflow_ref` ending in `masthead-batch.yml@refs/heads/landing` |
+| `github.event.before` | Empty: a go is not a push | A diff from there sees nothing of the batch | Diff a batch run against main, as a run started by hand does |
 | The check's and the run's names | Each check is `gate / <job>`, the starter's job `gate` then the Gate's own job name (Kyroco's verdict job is `gate`, so its check is `gate / gate`); the run is `Masthead batch`, not `Gate` | A script looking for the check by the job's name alone, or a `workflow_run` helper listening to "Gate", sees nothing | Match both names: `workflows: [Gate, Masthead batch]`, and both `gate` and `gate / gate` |
 
-The batch arms of Kyroco's plan-check test, part of the `if:` in its
-`gate.yml` (the whole test adds two more conditions):
+Kyroco's first batch run started on a push, before INFRA-285. The batch arms
+of its plan-check test, part of the `if:` in its `gate.yml` (the whole test
+adds two more conditions), match a batch run started by a go once the last
+arm tests `workflow_dispatch`, not `push`:
 
 ```yaml
 if: >-
   github.event_name == 'pull_request'
   || (github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main')
-  || (github.event_name == 'push' && github.ref == 'refs/heads/landing'
+  || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/landing'
   && endsWith(github.workflow_ref, '/.github/workflows/masthead-batch.yml@refs/heads/landing'))
 ```
 
@@ -125,9 +161,11 @@ the three, in the stored Gate, every workflow it calls with `uses: ./...`,
 and every `workflow_run` helper that names it, and says what a batch run
 would miss there. A line that only declares a trigger is never pointed at, and
 a line with its own fix within four lines counts as fixed: a batch arm naming
-`masthead-batch.yml` beside a `workflow_dispatch` test or `github.event.before`,
+`masthead-batch.yml` beside a `github.workflow_ref` test or `github.event.before`,
 a test for `== 'Masthead batch'` beside a test of the run's name, or
-`gate / <job>` beside a lookup of that job's check. A `workflows:` list that
+`gate / <job>` beside a lookup of that job's check. A test for a `push` beside
+`refs/heads/landing` or `masthead-batch` is a batch arm from before INFRA-285
+and is pointed at: it is never true now. A `workflows:` list that
 names Masthead batch fixes the list, not a name test below it. It reads workflow files only: a script the Gate
 runs (Kyroco's runner picker was one) needs the same search by hand. Setup
 runs it before the starter lands, so the first batch is not where these show.

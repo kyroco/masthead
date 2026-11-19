@@ -18,6 +18,10 @@ are not pointed at.
 Scenario 3: references/batch-run.md and the README write the three things
 down, step by step, with Kyroco's match as the example.
 
+INFRA-285: a batch run now starts on a go, as a workflow_dispatch run on
+landing. A test for workflow_dispatch is true for it, a test of
+github.workflow_ref is not, and the push arm INFRA-283 advised is never true.
+
 Run from anywhere: python3 hooks/tests/gate-snags-test.py
 """
 import json
@@ -90,7 +94,7 @@ jobs:
           BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: git diff --name-only "$BASE...HEAD"
   plan-checks:
-    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'pull_request' || endsWith(github.workflow_ref, '/gate.yml@refs/heads/main')
     uses: ./.github/workflows/gate-plan.yml
   gate:
     needs: [changes]
@@ -141,7 +145,7 @@ jobs:
     if: >-
       github.event_name == 'pull_request'
       || (github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main')
-      || (github.event_name == 'push' && github.ref == 'refs/heads/landing'
+      || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/landing'
       && endsWith(github.workflow_ref, '/.github/workflows/masthead-batch.yml@refs/heads/landing'))
     runs-on: ubuntu-latest
     steps:
@@ -181,10 +185,10 @@ check("S2 snags answers JSON and exits 0", code == 0 and out is not None, err)
 out = out or {}
 found = {(s["workflow"], s["line"], s["kind"]) for s in out.get("snags", [])}
 check("S2 status says there are snags", out.get("status") == "snags", out)
-check("S2 points at the dispatch test in the Gate",
+check("INFRA-285 points at a test of github.workflow_ref in the Gate",
       (".github/workflows/gate.yml", 15, "event") in found, found)
-check("S2 points at the dispatch test in a workflow the Gate calls",
-      (".github/workflows/gate-plan.yml", 6, "event") in found, found)
+check("INFRA-285 does not point at a test for workflow_dispatch: a batch run is a workflow_dispatch run now",
+      (".github/workflows/gate-plan.yml", 6, "event") not in found, found)
 check("S2 points at github.event.before", (".github/workflows/gate.yml", 12, "base") in found, found)
 check("S2 points at a check named gate", (".github/workflows/gate-plan.yml", 8, "check") in found, found)
 check("S2 points at a workflow_run helper listening only to Gate",
@@ -291,18 +295,38 @@ check("S2 a lookup of the Gate's job test is pointed at",
       [(s["workflow"], s["line"]) for s in checks] == [(".github/workflows/notify.yml", 8)], out or err)
 check("S2 its message names the check gate / test", checks and "gate / test" in checks[0]["misses"], checks)
 
-# A dispatch test with no batch arm nearby is still pointed at, even when the
+# The push arm INFRA-283 advised is never true once a batch starts on a go (INFRA-285):
+# a Gate that still has it is pointed at that line, and told what to put there.
+PUSH_ARM = AFTER.replace("github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/landing'",
+                         "github.event_name == 'push' && github.ref == 'refs/heads/landing'")
+root = repo({".claude/gate.json": STORED, ".github/workflows/gate.yml": PUSH_ARM})
+code, out, err = snags(root)
+pushes = [s for s in (out or {}).get("snags", []) if s["kind"] == "push"]
+check("INFRA-285 the old push arm for a batch run is pointed at, and only that line",
+      [(s["line"], s["kind"]) for s in (out or {}).get("snags", [])] == [(18, "push")], out or err)
+check("INFRA-285 its message says a batch run starts on a go and gives the workflow_dispatch arm",
+      pushes and "says go" in pushes[0]["misses"]
+      and "github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/landing'" in pushes[0]["misses"],
+      pushes)
+plain_push = "name: Gate\non:\n  push:\n    branches: [main]\n  workflow_call:\njobs:\n  deploy:\n" \
+             "    if: github.event_name == 'push'\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo ok\n"
+root = repo({".claude/gate.json": STORED, ".github/workflows/gate.yml": plain_push})
+code, out, err = snags(root)
+check("INFRA-285 a push test with no landing or starter beside it is not a batch arm and is clear",
+      out and out.get("status") == "clear", out or err)
+
+# A workflow_ref test with no batch arm nearby is still pointed at, even when the
 # file names masthead-batch.yml somewhere else.
 far = AFTER.replace("    runs-on: ubuntu-latest\n    steps:\n      - run: echo plan\n",
                     "    runs-on: ubuntu-latest\n    steps:\n      - run: echo plan\n"
                     "  picker:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo one\n"
                     "      - run: echo two\n      - run: echo three\n      - run: echo four\n"
-                    "      - if: github.event_name == 'workflow_dispatch'\n        run: echo pick\n")
+                    "      - if: endsWith(github.workflow_ref, '/gate.yml@refs/heads/main')\n        run: echo pick\n")
 root = repo({".claude/gate.json": STORED, ".github/workflows/gate.yml": far})
 code, out, err = snags(root)
 found = {(s["line"], s["kind"]) for s in (out or {}).get("snags", [])}
-check("S2 a far-off dispatch test is still pointed at", (30, "event") in found, out or err)
-check("S2 the fixed dispatch test beside the batch arm is not", (17, "event") not in found, found)
+check("S2 a far-off workflow_ref test is still pointed at", (30, "event") in found, out or err)
+check("S2 the workflow_ref test inside the batch arm is not", (19, "event") not in found, found)
 
 # No Gate stored: nothing to read, and it says so.
 root = repo({".github/workflows/gate.yml": BEFORE})
@@ -325,7 +349,7 @@ skill = flat(SKILL)
 batch_part = skill.split("### Then the batch run, only with a Gate stored", 1)[-1].split("## 10.", 1)[0]
 before_push = batch_part.split("Land the starter", 1)[0]
 check("S1 setup runs gate.py snags before the starter lands", "gate.py snags" in before_push, before_push[-800:])
-for words in ("workflow_dispatch", "event `push`", "ref `refs/heads/landing`",
+for words in ("workflow_dispatch", "event `workflow_dispatch`", "ref `refs/heads/landing`",
               "masthead-batch.yml@refs/heads/landing", "github.event.before", "gate / <job>", "Masthead batch"):
     check("S1 setup names " + words + " before the first batch", words in before_push)
 check("S1 setup does not tell every repository its check is gate / gate",
@@ -342,6 +366,13 @@ for name, text in (("references/batch-run.md", doc), ("README batch section", re
                   "gate.py snags", "Kyroco"):
         check("S3 {} says {}".format(name, words), words in text)
 check("S3 the README does not say every Gate's job is named gate", "and so is your Gate's job" not in readme_part)
+OLD_ARM = "github.event_name == 'push' && github.ref == 'refs/heads/landing'"
+NEW_ARM = "github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/landing'"
+for name, text in (("references/batch-run.md", doc), ("README batch section", readme_part), ("setup", before_push)):
+    check("INFRA-285 {} no longer gives the push arm as the match for a batch run".format(name),
+          OLD_ARM not in text, text[:300])
+for name, text in (("references/batch-run.md", doc), ("README batch section", readme_part)):
+    check("INFRA-285 {} gives the workflow_dispatch arm".format(name), NEW_ARM in text)
 check("S3 the batch doc calls Kyroco's test an excerpt, not the whole test", "as it reads now" not in doc)
 check("S3 the README gives the Gate steps as numbered steps",
       "Make your Gate ready for a batch run" in readme_part and " 1. " in readme_part.split(

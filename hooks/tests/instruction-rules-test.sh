@@ -1741,7 +1741,7 @@ says  references/session-cliffs.md "By hand is the person's choice, never inferr
 says  skills/work-on/worker.md "a foreman's prompt that says to land by hand on \`landing\` puts you on the batch way whatever it prints"
 says  skills/work-on/foreman.md "The batch way by hand: when the person tells you to land by hand on \`landing\` before the repository has the batch run, run the batch way anyway"
 says  skills/work-on/foreman.md "Never choose it yourself: without the person's word, a repository whose \`--ships\` prints \`pull-request\` ships the pull request way"
-part_says "foreman.md, the batch way," "$FB" "Until Masthead runs the batch itself, start the Gate run by hand on \`landing\`"
+part_says "foreman.md, the batch way," "$FB" "where the person told you to land by hand, start the Gate run by hand on \`landing\` on the go instead"
 # INFRA-276 round 1, s2-judge-1 and arch-1: setup's switch push carries the CI-change OK and the push check.
 says  skills/setup/SKILL.md "The commit changes a file under \`.github/\`, so it needs the person's OK like any change to the checks"
 says  skills/setup/SKILL.md "add the line \`CI-change-OK: <link to that comment>\` to the commit's message; \`hard-gate.sh\` refuses the push without it"

@@ -237,8 +237,9 @@ line: the batch run is already in place, the stored Gate cannot be started
 the way the batch run starts it, or the repository is on a personal account,
 which the App steps do not cover. Only when `"offer"` is true ask: "Shall
 Masthead put its batch run into this repository? Work then lands on a branch
-named `landing`, one Gate run tests each batch, and main moves only when that
-run is green. Main gets locked, so after this nobody, not you, a session or a
+named `landing` and piles up there with no run; when you say go, for a
+milestone or a set of issues, one Gate run tests the pile, and main moves only
+when that run is green. Main gets locked, so after this nobody, not you, a session or a
 pull request merge, can push main directly; only the batch run moves it. Say
 no and this repository keeps shipping the way it does today."
 On no, write nothing and say the one line "Masthead will not use a batch run
@@ -279,15 +280,17 @@ batch run can move it would never move again.
 4. Ready the Gate, before the first batch. A Gate that routes by event can
    miss a batch run in three ways, all found on Kyroco's first batch run
    (November 19, 2026). Say each to the person in plain words:
-   - The event. Under the starter the Gate runs as a called workflow on a
-     push to `landing`, not as a `workflow_dispatch` run, and
-     `github.workflow_ref` names `masthead-batch.yml`, not the Gate. A test
-     keyed on `workflow_dispatch` (a runner picker, a plan check) is false
-     for a batch run. Kyroco's match for a batch run: event `push`, ref
-     `refs/heads/landing`, and `github.workflow_ref` ending in
-     `masthead-batch.yml@refs/heads/landing`.
-   - The diff base. `github.event.before` is only the push before this one,
-     not the whole batch. Diff a batch run against main.
+   - The event. Under the starter the Gate runs as a called workflow of a
+     `workflow_dispatch` run on `landing`, started when the person says go,
+     never on a push, and `github.workflow_ref` names `masthead-batch.yml`,
+     not the Gate. A test keyed on `workflow_dispatch` alone is true for a
+     batch run; one keyed on `github.workflow_ref` (a runner picker, a plan
+     check) is false. The match for a batch run: event `workflow_dispatch`,
+     ref `refs/heads/landing`, and `github.workflow_ref` ending in
+     `masthead-batch.yml@refs/heads/landing`. A batch arm keyed on the event
+     `push`, as Kyroco's first was, is never true now.
+   - The diff base. A go is not a push, so `github.event.before` is empty.
+     Diff a batch run against main.
    - The names. The starter calls the Gate from its job named `gate`, so each
      of the Gate's checks is named `gate / <job>`, the Gate's own job name
      after `gate / ` (Kyroco's verdict job is named `gate`, so its check is
@@ -312,8 +315,9 @@ batch run can move it would never move again.
    without it. When the repository names a push check, run it on that
    commit. Then push to `landing` (`git push origin HEAD:landing`), with no
    pull request, as the batch way's steps 8 and 9 of **Opening a PR** say.
-   GitHub runs the starter only from a commit on that branch, and that first
-   batch is the first proof it works. This push is the switch: `project_fact.py --ships` prints `batch` only
+   The push starts no run: GitHub runs the starter only from a commit on that
+   branch, and only when the person says go (`skills/work-on/batch-go.py`,
+   `references/batch-run.md`). That first go is the first proof it works. This push is the switch: `project_fact.py --ships` prints `batch` only
    once both files are committed on `origin/landing`, and until then every
    session ships the pull request way (**Opening a PR** in
    `references/session-cliffs.md`).

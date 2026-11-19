@@ -310,8 +310,12 @@ repository, unless it is already there, the Gate cannot be started the way
 the batch run starts it, or the repository is on a personal account, which
 the App steps below do not cover. Say no and nothing changes: the repository
 ships the way it does today. Say yes and work lands on a branch named
-`landing`, one Gate run tests each batch, and main moves to the batch only
-when that run is green. On one more yes, setup then writes a small starter
+`landing` and piles up there: a push to `landing` starts nothing. When you
+say go, for a milestone, or for a set of issues you name where there is no
+milestone, the foreman starts one Gate run on the pile, then and there, and
+main moves to the pile only when that run is green. The foreman refuses a go
+while `landing` holds commits of an issue the go does not name, and says
+which. On one more yes, setup then writes a small starter
 file, `.github/workflows/masthead-batch.yml`, which calls the batch run kept
 in this repository; makes the `landing` branch from main if it is missing;
 and makes an environment named `masthead-batch` that only `landing` may use,
@@ -422,8 +426,9 @@ file is on `landing`, tell setup, and it locks main.
 
 Do this before the first batch, so the first batch is not where you find out.
 In a batch run your Gate's code is the same, but GitHub tells it different
-things: the starter calls it as a job on a push to `landing`. Kyroco's first
-batch run went green only after its Gate changed in the three ways below.
+things: the starter calls it as a job of a run started on `landing` when you
+say go. Kyroco's first batch run went green only after its Gate changed in the
+three ways below (that run started on a push; a batch run now starts on a go).
 Setup runs `gate.py snags` and shows you each line of your Gate that needs
 one of them; you can run it yourself the same way:
 
@@ -435,26 +440,29 @@ It reads the Gate stored in `.claude/gate.json`, each workflow the Gate runs
 with `uses: ./...`, and each `workflow_run` workflow that names it. It does
 not read scripts. Masthead changes none of these files: they are yours.
 
-1. Find every test for `workflow_dispatch` in your Gate and in the scripts it
-   runs, such as a step that picks which machine runs a job, or one that
-   decides whether plan checks run. A batch run is not a `workflow_dispatch`
-   run: its event is `push`, its ref is `refs/heads/landing`, and
-   `github.workflow_ref` names `masthead-batch.yml`, not your Gate.
+1. Find every test of `github.workflow_ref` in your Gate and in the scripts
+   it runs, such as a step that picks which machine runs a job, or one that
+   decides whether plan checks run. A batch run is a `workflow_dispatch` run,
+   so a test for `workflow_dispatch` alone is true for it, but
+   `github.workflow_ref` names `masthead-batch.yml`, not your Gate. Its
+   event is `workflow_dispatch` and its ref is `refs/heads/landing`.
 2. Beside each one, add a test that matches a batch run on all three of
-   those. Kyroco's reads:
+   those:
 
    ```yaml
-   || (github.event_name == 'push' && github.ref == 'refs/heads/landing'
+   || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/landing'
    && endsWith(github.workflow_ref, '/.github/workflows/masthead-batch.yml@refs/heads/landing'))
    ```
 
    In a shell script, Kyroco passes the three in as `GATE_EVENT_NAME`,
    `GATE_REF` and `GATE_WORKFLOW_REF` and checks that the workflow ref ends in
-   `/.github/workflows/masthead-batch.yml@refs/heads/landing`.
-3. Find every use of `github.event.before`. In a batch run it is only the
-   commit before the last push, so a diff from it misses every other commit in
-   the batch. For a batch run, diff against main instead, the way a run you
-   start by hand does.
+   `/.github/workflows/masthead-batch.yml@refs/heads/landing`. A Gate that
+   matched a batch run on the event `push`, as Kyroco's did, must change that
+   test to `workflow_dispatch`: a batch run never starts on a push now.
+3. Find every use of `github.event.before`. A batch run starts on a go, not a
+   push, so it is empty, and a diff from it sees nothing of the batch. For a
+   batch run, diff against main instead, the way a run you start by hand
+   does.
 4. Find every place that looks up one of your Gate's checks by name. In a
    batch run each check is named `gate / <job>`: the starter's job is named
    `gate`, and your Gate's own job name follows it. Kyroco's verdict job is

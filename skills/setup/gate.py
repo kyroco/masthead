@@ -311,16 +311,20 @@ def starter(top):
 
 # What a batch run looks like from inside the Gate (INFRA-283, Korium 601448c5):
 # Kyroco's first batch run showed three things a Gate that routes by event misses.
+# Since INFRA-285 a batch run starts on a go, as a workflow_dispatch run on
+# landing, never on a push, so a batch arm keyed on a push is never true.
 # Each rule reads what a line does (a test, a lookup of a name), never a line that
 # only declares a trigger or names a job, and a line with the fix beside it is
 # taken as fixed, the way its message says to fix it.
-BATCH_MATCH = ("github.event_name == 'push' && github.ref == 'refs/heads/landing' && "
+BATCH_MATCH = ("github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/landing' && "
                "endsWith(github.workflow_ref, '/.github/workflows/masthead-batch.yml@refs/heads/landing')")
 MISSES = {
-    "event": ("A batch run is not a workflow_dispatch run: the Gate is called by masthead-batch.yml on a push "
-              "to landing, so this test is false for a batch run. Add a batch arm beside it: " + BATCH_MATCH + "."),
-    "base": ("github.event.before is only the push before this one, so a batch of several commits is diffed "
-             "against its own middle. Diff a batch run against main instead, as a run started by hand does."),
+    "event": ("In a batch run github.workflow_ref names masthead-batch.yml, the starter that calls the Gate, not "
+              "the Gate, so this test is false for a batch run. Add a batch arm beside it: " + BATCH_MATCH + "."),
+    "push": ("A batch run no longer starts on a push to landing: it starts when the person says go, as a "
+             "workflow_dispatch run on landing, so this arm is never true. Replace it with: " + BATCH_MATCH + "."),
+    "base": ("A batch run starts on a go, not a push, so github.event.before is empty and a diff from it does not "
+             "see the batch. Diff a batch run against main instead, as a run started by hand does."),
     "job": ("Under the starter this check is named \"gate / {name}\": the starter's job gate calls the Gate's "
             "job {name}. A lookup of \"{name}\" alone does not see a batch run. Match both names."),
     "run": ("A batch run is named \"Masthead batch\", not \"{name}\", so a test for that name does not see a "
@@ -328,7 +332,10 @@ MISSES = {
     "helper": ("A batch run is named \"Masthead batch\", not by the Gate's own name, so this workflow_run helper "
                "never starts after a batch. List \"Masthead batch\" beside the Gate's name."),
 }
-SNAG_EVENT = re.compile(r"workflow_dispatch")
+SNAG_EVENT = re.compile(r"\bgithub\.workflow_ref\b")
+# A test for a push: the batch arm INFRA-283 advised, when it sits by a test for landing or the starter.
+SNAG_PUSH = re.compile(r"""event_name\s*==\s*['"]push['"]""")
+PUSH_ARM = ("refs/heads/landing", "masthead-batch")
 SNAG_BASE = re.compile(r"github\.event\.before\b")
 # A lookup of a check or run by name: check_name=test, check-name: test, context: test, .name == "test".
 SNAG_LOOKUP = re.compile(r"""\b(?:check_name|check-name|context)\s*[=:]\s*['"]?([^\s&"'),]+)|\bname\s*==\s*(['"])(.*?)\2""",
@@ -428,6 +435,8 @@ def snags(top):
             hits = []
             if SNAG_EVENT.search(line) and not fixed("event"):
                 hits.append(("event", MISSES["event"]))
+            if SNAG_PUSH.search(line) and any(word in near for word in PUSH_ARM):
+                hits.append(("push", MISSES["push"]))
             if SNAG_BASE.search(line) and not fixed("base"):
                 hits.append(("base", MISSES["base"]))
             # A name lookup is fixed only by a lookup of the batch's own name for it

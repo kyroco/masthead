@@ -294,9 +294,22 @@ from memory) and start the next issue in a new one.
 
 Main moves forward only from `landing`, by one run of the repo's Gate on the
 batch, never by a worker and never by you. You queue nothing and open nothing
-on GitHub: no pull request, no merge queue, no merge. Until Masthead runs the
-batch itself, start the Gate run by hand on `landing` once the batch is in,
-and move main to `landing` only when it is green.
+on GitHub: no pull request, no merge queue, no merge. Landed work piles up on
+`landing`, and a push starts no run. The run starts only when the person says
+go: for a milestone, or, where no milestone exists, for the issues they name
+(Robert, November 19, 2026: "batch means milestone", "and when no milestone
+exists, then it is a set of issues I say: go on to make a push", "I can say go
+when I want."). Never start one on your own. On a go, read the milestone's
+issues from the tracker, or take the ones named, and start the run at once:
+
+    python3 ${CLAUDE_PLUGIN_ROOT}/skills/work-on/batch-go.py --milestone "<name>" <issue> ...
+    python3 ${CLAUDE_PLUGIN_ROOT}/skills/work-on/batch-go.py <issue> ...
+
+It starts nothing while `landing` holds a commit of an issue the go does not
+name, and names each one: show the person its lines and ask whether to name
+those issues too. In a repository without the batch run, where the person
+told you to land by hand, start the Gate run by hand on `landing` on the go
+instead, and move main to `landing` only when it is green.
 
 When a batch run ends, read it, from a checkout of the repository:
 
