@@ -315,6 +315,36 @@ code, out, err = snags(root)
 check("INFRA-285 a push test with no landing or starter beside it is not a batch arm and is clear",
       out and out.get("status") == "clear", out or err)
 
+# s1-C2: a workflow of the repository that runs on every push runs on each push to landing too,
+# costing minutes outside the batch run. Snags points at each one; one kept off landing is clear.
+def landing_runs(on):
+    text = "name: Tests\n" + on + "jobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo ok\n"
+    root = repo({".claude/gate.json": STORED, ".github/workflows/gate.yml": AFTER, ".github/workflows/tests.yml": text,
+                 ".github/workflows/masthead-batch.yml": "name: Masthead batch\non:\n  workflow_dispatch:\njobs: {}\n"})
+    code, out, err = snags(root)
+    return [(s["workflow"], s["line"]) for s in (out or {}).get("snags", []) if s["kind"] == "landing-push"], out or err
+
+
+for label, on, line in (("on: push", "on: push\n", 2),
+                        ("a flow list with push", "on: [push, pull_request]\n", 2),
+                        ("a push block with no filter", "on:\n  push:\n  pull_request:\n", 3),
+                        ("a push to every branch", "on:\n  push:\n    branches: ['**']\n", 3),
+                        ("a push that names landing", "on:\n  push:\n    branches: [main, landing]\n", 3),
+                        ("a push that ignores only main", "on:\n  push:\n    branches-ignore:\n      - main\n", 3)):
+    found, out = landing_runs(on)
+    check("s1-C2 a workflow that runs on a push to landing is pointed at ({})".format(label),
+          found == [(".github/workflows/tests.yml", line)], out)
+for label, on in (("main only", "on:\n  push:\n    branches: [main]\n"),
+                  ("landing ignored", "on:\n  push:\n    branches-ignore: [landing]\n"),
+                  ("tags only", "on:\n  push:\n    tags: ['v*']\n"),
+                  ("no push", "on:\n  pull_request:\n")):
+    found, out = landing_runs(on)
+    check("s1-C2 a workflow that does not run on a push to landing is clear ({})".format(label), found == [], out)
+found, out = landing_runs("on: push\n")
+lp = [s for s in out.get("snags", []) if s["kind"] == "landing-push"] if isinstance(out, dict) else []
+check("s1-C2 the snag says each landed change runs it and how to keep it off landing",
+      lp and "every push to landing" in lp[0]["misses"] and "branches-ignore: [landing]" in lp[0]["misses"], lp)
+
 # A workflow_ref test with no batch arm nearby is still pointed at, even when the
 # file names masthead-batch.yml somewhere else.
 far = AFTER.replace("    runs-on: ubuntu-latest\n    steps:\n      - run: echo plan\n",
@@ -373,6 +403,10 @@ for name, text in (("references/batch-run.md", doc), ("README batch section", re
           OLD_ARM not in text, text[:300])
 for name, text in (("references/batch-run.md", doc), ("README batch section", readme_part)):
     check("INFRA-285 {} gives the workflow_dispatch arm".format(name), NEW_ARM in text)
+check("s1-C2 the README does not say a push to landing starts nothing at all",
+      "a push to `landing` starts nothing" not in readme_part and "starts no batch run" in readme_part, readme_part[:600])
+check("s1-C2 setup says the starter must reach main before the first go",
+      "must be on main" in flat(SKILL), "")
 check("S3 the batch doc calls Kyroco's test an excerpt, not the whole test", "as it reads now" not in doc)
 check("S3 the README gives the Gate steps as numbered steps",
       "Make your Gate ready for a batch run" in readme_part and " 1. " in readme_part.split(

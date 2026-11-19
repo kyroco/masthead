@@ -38,6 +38,24 @@ STARTER_TEMPLATE = os.path.join(PLUGIN, "skills", "setup", "batch-starter.yml")
 GATE = ".github/workflows/gate.yml"
 STARTER = ".github/workflows/masthead-batch.yml"
 
+OLD_STARTER = """name: Masthead batch
+on:
+  push:
+    branches: [landing]
+concurrency:
+  group: masthead-batch
+  cancel-in-progress: false
+jobs:
+  plan:
+    uses: kyroco/masthead/.github/workflows/batch-plan.yml@main
+  gate:
+    needs: plan
+    permissions: { contents: read }
+    uses: ./.github/workflows/gate.yml
+    secrets: inherit
+"""
+
+
 if not shutil.which("jq"):
     print("skipped: jq is not installed, and the batch plan step reads .claude/gate.json with it")
     sys.exit(77)
@@ -102,7 +120,7 @@ def run_step(script, cwd, env):
 class Repo:
     """A bare remote opted in to the batch run, a checkout of it, and a gh that logs each call."""
 
-    def __init__(self, top, linear=True, opted_in=True):
+    def __init__(self, top, linear=True, opted_in=True, starter=None, gh_fails=""):
         self.top = top
         self.remote = os.path.join(top, "remote.git")
         self.work = os.path.join(top, "work")
@@ -114,7 +132,9 @@ class Repo:
         self.write(".claude/settings.json", json.dumps({"env": env}))
         self.write(GATE, "name: Gate\non: [workflow_call, workflow_dispatch]\njobs:\n  gate:\n    runs-on: ubuntu-latest\n")
         self.write(".claude/gate.json", json.dumps({"workflow": GATE, "starts": ["workflow_call", "workflow_dispatch"]}))
-        if opted_in:
+        if starter is not None:
+            self.write(STARTER, starter)
+        elif opted_in:
             self.write(STARTER, read(STARTER_TEMPLATE).replace("__GATE_PERMISSIONS__", "{ contents: read }")
                        .replace("__GATE__", GATE))
         git(self.work, "add", "-A")
@@ -127,7 +147,9 @@ class Repo:
         shim = os.path.join(bin_dir, "gh")
         with open(shim, "w") as handle:
             handle.write("#!/usr/bin/env python3\nimport json, sys\n"
-                         "with open({!r}, 'a') as h:\n    h.write(json.dumps(sys.argv[1:]) + '\\n')\n".format(self.log))
+                         "with open({!r}, 'a') as h:\n    h.write(json.dumps(sys.argv[1:]) + '\\n')\n"
+                         "fail = {!r}\n"
+                         "if fail:\n    sys.stderr.write(fail + '\\n')\n    sys.exit(1)\n".format(self.log, gh_fails))
         os.chmod(shim, 0o755)
         self.path = bin_dir + os.pathsep + os.environ.get("PATH", "")
 
@@ -318,6 +340,63 @@ with tempfile.TemporaryDirectory() as top:
     code, out = repo.go("INFRA-285")
     check("main holding a commit landing lacks starts nothing", code != 0 and repo.calls() == []
           and "Main holds a commit landing does not" in out, out)
+
+# ---- Round 1 fixes ----------------------------------------------------------------
+# s3-C1: a repository set up before INFRA-285 still holds the starter that runs on every push. GitHub
+# would refuse a go to it, so the go stops first and says to write the starter again.
+with tempfile.TemporaryDirectory() as top:
+    repo = Repo(top, starter=OLD_STARTER)
+    repo.land("Add the go script (INFRA-285)")
+    code, out = repo.go("INFRA-285")
+    check("s3-C1 a go in a repository whose starter still runs on every push starts nothing",
+          code != 0 and repo.calls() == [], out)
+    check("s3-C1 it says the starter is the older one and to write it again with /masthead:setup",
+          "runs on every push to landing" in out and "/masthead:setup" in out, out)
+
+# The go reaches GitHub, which refuses it, as it does when the starter is not on the default branch yet.
+with tempfile.TemporaryDirectory() as top:
+    repo = Repo(top, gh_fails="HTTP 404: Not Found (https://api.github.com/repos/acme/shop/actions/workflows/masthead-batch.yml/dispatches)")
+    repo.land("Add the go script (INFRA-285)")
+    code, out = repo.go("INFRA-285")
+    check("s3-C1 a go GitHub refuses says so, with GitHub's words",
+          code != 0 and "GitHub did not start the batch run" in out and "HTTP 404" in out, out)
+    check("s3-C1 it says the starter must be on main before GitHub will start it by hand",
+          "must be on main" in out, out)
+
+# s3-J1: a commit naming another team's issue is named by that issue, not as naming none.
+with tempfile.TemporaryDirectory() as top:
+    repo = Repo(top)
+    repo.land("Add the go script (INFRA-285)")
+    other = repo.land("Fix the sign-in copy (ENG-5)")
+    code, out = repo.go("INFRA-285")
+    check("s3-J1 a commit of another team's issue stops the go and is named by its issue",
+          code != 0 and repo.calls() == [] and "{} Fix the sign-in copy (ENG-5) (ENG-5)".format(other[:9]) in out, out)
+    check("s3-J1 the refusal says to name that issue too", "say go again with ENG-5 named too" in out, out)
+    code, out = repo.go("INFRA-285", "ENG-5")
+    check("s3-J1 naming it too lets the go start", code == 0 and len(dispatches(repo.calls())) == 1, out)
+
+# arch-1: after a red batch, the search's drop record and a worker's `git revert` of it bring a
+# commit back. The record is the search's commit, no issue's work, and the revert of it belongs to
+# the record's issue, the way batch-issues.py reads them, though git's message names no issue.
+with tempfile.TemporaryDirectory() as top:
+    repo = Repo(top)
+    repo.land("Add the go script (INFRA-301)")
+    bad = repo.land("Add the hotfix pile (INFRA-303)")
+    git(repo.work, "revert", "--no-edit", "--no-commit", bad)
+    git(repo.work, "commit", "-q", "-m", "Drop {} from landing: it turned the batch red\n\n"
+        "Masthead-Dropped: {}\nMasthead-Issue: INFRA-303\nMasthead-Failed-Check: gate / Tests\n".format(bad[:9], bad))
+    record = git(repo.work, "rev-parse", "HEAD")
+    git(repo.work, "push", "-q", "origin", "HEAD:refs/heads/landing")
+    git(repo.work, "revert", "--no-edit", record)
+    back = git(repo.work, "rev-parse", "HEAD")
+    git(repo.work, "push", "-q", "origin", "HEAD:refs/heads/landing")
+    code, out = repo.go("INFRA-301", "INFRA-303")
+    check("arch-1 a drop record and the worker's revert of it belong to the dropped commit's issue, so the go starts",
+          code == 0 and len(dispatches(repo.calls())) == 1, out)
+    code, out = repo.go("INFRA-301")
+    check("arch-1 without that issue named, the brought-back commit is named by the record's issue",
+          code != 0 and "{} ".format(back[:9]) in out and "(INFRA-303)" in out
+          and "names no issue" not in out, out)
 
 print("{} passed, {} failed".format(passed, failed))
 sys.exit(1 if failed else 0)

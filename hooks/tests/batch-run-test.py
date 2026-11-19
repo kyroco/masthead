@@ -317,6 +317,15 @@ check("S4 a starter that runs a second workflow of its own beside the stored Gat
 code, out, _, output = plan({"workflow": GATE, "starts": ["workflow_call"]}, ref="refs/heads/feature")
 check("S4 a batch run off landing does not start", code != 0 and output.strip() == "", out)
 
+# s1-C1: a starter written before INFRA-285 still starts on every push and calls the plan at @main.
+# The plan job itself is skipped unless a go started the run, so GitHub gives it no runner and bills
+# no minutes; the Gate and the move need it, so they are skipped too.
+plan_job = read(PLAN).split("\njobs:\n  plan:\n", 1)[-1]
+check("s1-C1 the plan job runs only on a go: a push from an older starter gets no runner and uses no minutes",
+      re.match(r"    if: github\.event_name == 'workflow_dispatch'\n", plan_job) is not None, plan_job[:200])
+check("s1-C1 the Gate and the move wait on the plan, so they are skipped with it",
+      re.search(r"^  gate:\n    needs: plan\n", starter, re.M) and re.search(r"^    needs: \[plan, gate\]$", starter, re.M))
+
 # ---- The starter calls this repository's workflows as they are written -------
 plan_text, move_text = read(PLAN), read(MOVE)
 check("the starter calls batch-plan.yml and batch-move.yml in kyroco/masthead",
