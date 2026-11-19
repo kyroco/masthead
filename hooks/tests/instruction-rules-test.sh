@@ -1617,8 +1617,22 @@ for phrase in "open one PR" "open a PR" "open a pull request" "opens a pull requ
 done
 # INFRA-276 scenario 1: the pull request way keeps Masthead 0.3.1's steps 9 and 10 word for word.
 OPP="$(part "$CL" "In the pull request way (\`--ships\` printed \`pull-request\`):" "In the batch way (\`--ships\` printed \`batch\`):")"
-OLD9="$(git -C "$ROOT" show 30b4d47:references/session-cliffs.md 2>/dev/null | tr '\n' ' ' | tr -s ' ' | sed -E 's/.*(9\. Push and open one PR to main\.)/\1/; s/ \*\*Updating main\.\*\*.*//')"
-if [ -n "$OLD9" ]; then
+# The 0.3.1 text is read from its commit. A shallow checkout, as CI's is, lacks that
+# commit, so fetch it alone; when it still cannot be read, the check fails rather
+# than being skipped (round 1, arch-3).
+OLD_REF=30b4d4735a847a869cf2a961176bc470cb6a6ca5
+if ! git -C "$ROOT" cat-file -e "$OLD_REF^{commit}" 2>/dev/null; then
+  git -C "$ROOT" fetch -q --no-tags --depth=1 origin "$OLD_REF" 2>/dev/null
+fi
+old_text() {
+  if ! git -C "$ROOT" cat-file -e "$OLD_REF^{commit}" 2>/dev/null; then
+    fail=$((fail + 1)); printf 'FAIL Masthead 0.3.1 (%s) cannot be read, so %s cannot be compared with it word for word\n' "$OLD_REF" "$1"
+    return 1
+  fi
+}
+OLD9="$(git -C "$ROOT" show "$OLD_REF":references/session-cliffs.md 2>/dev/null | tr '\n' ' ' | tr -s ' ' | sed -E 's/.*(9\. Push and open one PR to main\.)/\1/; s/ \*\*Updating main\.\*\*.*//')"
+if old_text "the pull request way's steps 9 and 10"; then
+  part_says "Opening a PR at 0.3.1" "$OLD9" "9. Push and open one PR to main."
   part_says "Opening a PR, the pull request way," "$OPP" "$OLD9"
 fi
 part_says "Opening a PR, the pull request way," "$OPP" "9. Push and open one PR to main."
@@ -1688,8 +1702,9 @@ for phrase in "Queue the PR when all of these hold" "enqueuePullRequest" "close 
   part_never "foreman.md, the batch way," "$FB" "$phrase"
   part_says "foreman.md, the pull request way," "$FP" "$phrase"
 done
-OLDQ="$(git -C "$ROOT" show 30b4d47:skills/work-on/foreman.md 2>/dev/null | tr '\n' ' ' | tr -s ' ' | sed -E 's/.*(Queue the PR when all of these hold)/\1/; s/ ## End the run.*//')"
-if [ -n "$OLDQ" ]; then
+OLDQ="$(git -C "$ROOT" show "$OLD_REF":skills/work-on/foreman.md 2>/dev/null | tr '\n' ' ' | tr -s ' ' | sed -E 's/.*(Queue the PR when all of these hold)/\1/; s/ ## End the run.*//')"
+if old_text "the foreman's queue section"; then
+  part_says "foreman.md at 0.3.1" "$OLDQ" "Queue the PR when all of these hold"
   part_says "foreman.md, the pull request way," "$FP" "$OLDQ"
 fi
 says  "$F" "\`python3 \${CLAUDE_PLUGIN_ROOT}/hooks/project_fact.py --ships\`"
