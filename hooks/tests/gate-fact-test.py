@@ -285,6 +285,33 @@ os.makedirs(os.path.join(root, ".github"))
 os.symlink(os.path.join(outside, "wf"), os.path.join(root, ".github", "workflows"))
 expect("sec2 symlinked workflows folder not read", look(root).get("status"), "none")
 
+# V2-S1-1: a byte order mark before `name: Gate` still names the Gate.
+root = repo()
+write(root, ".github/workflows/ci.yml", "\ufeffname: Gate\non: [workflow_dispatch]\njobs: {}\n")
+got = look(root)
+expect("s1 byte order mark before name", (got.get("status"), got.get("workflow")), ("found", ".github/workflows/ci.yml"))
+
+# SEC-R1-1: a workflow file of blank lines does not stall working the Gate out.
+root = repo()
+write(root, ".github/workflows/gate.yml", GATE_YML)
+write(root, ".github/workflows/blank.yml", "\n" * 100000 + " \n" * 100000)
+try:
+    r = subprocess.run([sys.executable, GATE, "look", "--root", root], capture_output=True,
+                       text=True, env=env_for(), timeout=10)
+    expect("secr1 blank lines do not stall look", (r.returncode, json.loads(r.stdout).get("status")), (0, "found"))
+except subprocess.TimeoutExpired:
+    expect("secr1 blank lines do not stall look", "timed out", (0, "found"))
+
+# SEC-R1-C2-obs: a deeply nested gate.json is nothing stored, not a crash.
+root = repo()
+write(root, ".github/workflows/gate.yml", GATE_YML)
+write(root, ".claude/gate.json", "[" * 60000)
+r = subprocess.run([sys.executable, FACT, "--gate"], capture_output=True, text=True, cwd=root, env=env_for())
+expect("secr1 nested gate.json reader", (r.returncode, r.stdout.strip(), "Traceback" in r.stderr), (1, "", False))
+r = subprocess.run([sys.executable, GATE, "look", "--root", root], capture_output=True, text=True, env=env_for())
+expect("secr1 nested gate.json look", (r.returncode, "Traceback" in r.stderr,
+                                       json.loads(r.stdout).get("status") if r.returncode == 0 else None), (0, False, "found"))
+
 # The trigger reader handles each form GitHub documents.
 for label, text, want in (
         ("string", "on: workflow_dispatch\n", {"workflow_dispatch"}),
