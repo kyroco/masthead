@@ -1,0 +1,91 @@
+# Masthead's batch run, last part: move main to a green batch (INFRA-270).
+#
+# A repository's starter file (skills/setup/batch-starter.yml) calls this only
+# after its Gate passed on the batch's last commit. It moves main to exactly
+# that commit, forward only, as the GitHub App the main ruleset lets through
+# (Robert, November 19, 2026: "app route confirmed"; proven in INFRA-256). It
+# never moves main when the Gate did not pass, when the commit is not on
+# `landing`, or when main holds a commit the batch does not.
+#
+# references/batch-run.md says how the parts fit.
+name: Masthead batch move
+
+on:
+  workflow_call:
+    inputs:
+      sha:
+        description: The batch's last commit, from the batch plan; the commit the Gate tested.
+        required: true
+        type: string
+      gate-result:
+        description: How the Gate job ended (needs.gate.result). Main moves only on success.
+        required: true
+        type: string
+    secrets:
+      BATCH_APP_ID:
+        required: true
+      BATCH_APP_PRIVATE_KEY:
+        required: true
+
+jobs:
+  move:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Get a token from the batch App
+        id: app
+        if: inputs.gate-result == 'success'
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.BATCH_APP_ID }}
+          private-key: ${{ secrets.BATCH_APP_PRIVATE_KEY }}
+      - uses: actions/checkout@v5
+        if: inputs.gate-result == 'success'
+        with:
+          ref: ${{ inputs.sha }}
+          token: ${{ steps.app.outputs.token }}
+          fetch-depth: 0
+          filter: blob:none
+          sparse-checkout: .claude
+      - name: Move main to the batch
+        id: move
+        env:
+          SHA: ${{ inputs.sha }}
+          GATE_RESULT: ${{ inputs.gate-result }}
+        run: |
+          set -u
+          stop() {
+            echo "::error::$1"
+            printf '%s\n' "$1" >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
+            exit 1
+          }
+          if [ "$GATE_RESULT" != "success" ]; then
+            stop "The Gate ended '$GATE_RESULT' on $SHA, so main does not move."
+          fi
+          if [ "${GITHUB_REF:-}" != "refs/heads/landing" ]; then
+            stop "The batch run moves main only from the landing branch, and this run is on ${GITHUB_REF:-no branch}. Main does not move."
+          fi
+          case "$SHA" in
+            *[!0-9a-f]* | "") stop "'$SHA' is not a full commit id, so main does not move." ;;
+          esac
+          [ "${#SHA}" -eq 40 ] || stop "'$SHA' is not a full commit id, so main does not move."
+          git fetch --quiet --no-tags origin +refs/heads/main:refs/remotes/origin/main +refs/heads/landing:refs/remotes/origin/landing ||
+            stop "Could not read main and landing from GitHub, so main does not move."
+          main="$(git rev-parse --verify --quiet 'refs/remotes/origin/main^{commit}')" || stop "This repository has no main branch, so main does not move."
+          git cat-file -e "$SHA^{commit}" 2>/dev/null || stop "Commit $SHA is not in this repository, so main does not move."
+          git merge-base --is-ancestor "$SHA" refs/remotes/origin/landing ||
+            stop "Commit $SHA is no longer on landing, so main does not move."
+          if [ "$main" = "$SHA" ]; then
+            printf 'Main is already at %s; nothing to move.\n' "$SHA" | tee -a "${GITHUB_STEP_SUMMARY:-/dev/null}"
+            exit 0
+          fi
+          git merge-base --is-ancestor "$main" "$SHA" ||
+            stop "Main ($main) holds a commit that batch $SHA does not, so moving it would drop work. Main does not move."
+          {
+            printf 'Main moves from %s to %s, carrying:\n\n' "$main" "$SHA"
+            git log --format='- %h %s (%an)' "$main..$SHA"
+          } | tee -a "${GITHUB_STEP_SUMMARY:-/dev/null}"
+          # A plain push, never forced: git refuses it unless main is still behind the batch.
+          git push --quiet origin "$SHA:refs/heads/main" || stop "GitHub refused the move of main to $SHA, so main has not moved."
+          printf 'Main is now at %s.\n' "$SHA" | tee -a "${GITHUB_STEP_SUMMARY:-/dev/null}"

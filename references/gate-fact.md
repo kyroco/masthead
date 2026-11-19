@@ -33,7 +33,8 @@ after a yes. No repository writes it by hand.
   to start it.
 - In a workflow on GitHub, where Masthead is not installed:
   `jq -r .workflow .claude/gate.json`. Check `starts` holds the way you mean
-  to start it.
+  to start it. The batch run starts it with `workflow_call`
+  (`references/batch-run.md`).
 
 ## When nothing is stored
 

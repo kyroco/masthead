@@ -1,0 +1,68 @@
+# Masthead's batch run, first part: check the stored Gate before a batch starts (INFRA-270).
+#
+# A repository's starter file (skills/setup/batch-starter.yml) calls this on
+# every push to `landing`, before it runs the repository's own Gate. It reads
+# `.claude/gate.json`, the answer Masthead's setup stored after the person's
+# yes (references/gate-fact.md), at the batch's own commit. It never works the
+# Gate out: with no answer stored, or one the starter file does not run, it
+# stops here, so the Gate and the move of main never start.
+#
+# Its output `sha` is the batch's last commit, the one the Gate tests and the
+# one main moves to. references/batch-run.md says how the parts fit.
+name: Masthead batch plan
+
+on:
+  workflow_call:
+    inputs:
+      gate:
+        description: The Gate workflow the starter file runs, as .claude/gate.json names it (.github/workflows/<file>.yml).
+        required: true
+        type: string
+    outputs:
+      sha:
+        description: The batch's last commit, which the Gate tests and main moves to when it is green.
+        value: ${{ jobs.plan.outputs.sha }}
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      sha: ${{ steps.plan.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+          sparse-checkout: .claude
+      - name: Read the stored Gate
+        id: plan
+        env:
+          GATE_INPUT: ${{ inputs.gate }}
+        run: |
+          set -u
+          file=.claude/gate.json
+          oldway="Run /masthead:setup to store one; until then this repository ships the way it did before the batch run."
+          stop() {
+            echo "::error::$1"
+            printf '%s\n' "$1" >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
+            exit 1
+          }
+          if [ "${GITHUB_REF:-}" != "refs/heads/landing" ]; then
+            stop "The batch run tests only the landing branch, and this run is on ${GITHUB_REF:-no branch}. It does not start, and main does not move."
+          fi
+          if [ -L "$file" ] || [ ! -f "$file" ]; then
+            stop "No Gate is stored in .claude/gate.json, so the batch run does not start and main does not move. $oldway"
+          fi
+          workflow="$(jq -er '.workflow | strings' "$file" 2>/dev/null)" ||
+            stop ".claude/gate.json names no Gate workflow, so the batch run does not start and main does not move. $oldway"
+          if ! jq -e '.starts | arrays | index("workflow_call") != null' "$file" >/dev/null 2>&1; then
+            stop "The stored Gate, $workflow, cannot be started with workflow_call, which is how the batch run starts it. The batch run does not start, and main does not move."
+          fi
+          if [ "$workflow" != "$GATE_INPUT" ]; then
+            stop "The starter file runs $GATE_INPUT as the Gate, but the Gate stored in .claude/gate.json is $workflow. The batch run runs only the stored Gate, so it does not start and main does not move. Run /masthead:setup to write the starter file again."
+          fi
+          echo "sha=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+          printf 'Batch %s: the Gate is %s, as stored in .claude/gate.json.\n' "$GITHUB_SHA" "$workflow" | tee -a "${GITHUB_STEP_SUMMARY:-/dev/null}"

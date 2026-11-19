@@ -1,0 +1,34 @@
+# Masthead batch run: one Gate run per batch of commits landed on `landing`,
+# and main moves to the batch only when that run is green.
+# Written by Masthead's setup; the batch run itself lives in kyroco/masthead
+# (references/batch-run.md there). __GATE__ is the Gate stored in .claude/gate.json.
+name: Masthead batch
+
+on:
+  push:
+    branches: [landing]
+
+# One batch at a time. A push while a batch runs waits; a newer push replaces
+# the one waiting, so the next run tests everything landed meanwhile, together.
+concurrency:
+  group: masthead-batch
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    uses: kyroco/masthead/.github/workflows/batch-plan.yml@main
+    with:
+      gate: __GATE__
+  gate:
+    needs: plan
+    uses: ./__GATE__
+    secrets: inherit
+  move:
+    needs: [plan, gate]
+    uses: kyroco/masthead/.github/workflows/batch-move.yml@main
+    with:
+      sha: ${{ needs.plan.outputs.sha }}
+      gate-result: ${{ needs.gate.result }}
+    secrets:
+      BATCH_APP_ID: ${{ secrets.BATCH_APP_ID }}
+      BATCH_APP_PRIVATE_KEY: ${{ secrets.BATCH_APP_PRIVATE_KEY }}
