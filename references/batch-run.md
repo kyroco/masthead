@@ -132,6 +132,11 @@ landing's last commit:
 | A run whose Gate passed and whose move failed | Runs that run's failed jobs again, only the move, so main moves with no Gate run. Only when every job that failed or was cancelled is a move job, so a failed Gate job is never run again on its own and then moved |
 | A run whose Gate went red | Starts nothing: nothing new has landed. The search for the bad change (`bad-commit.py <run>`) is the next step |
 | Nothing, or runs that proved nothing (the plan stopped, or the run was cancelled) | Starts a run |
+| GitHub does not answer about its runs | Starts nothing and says to go again: a new run could test a commit that already passed |
+
+A Gate job GitHub skips by its own `if:` in a batch run (one keyed on a pull
+request or on main) does not stop a Gate from counting as passed, as long as
+one of its jobs ran and passed.
 
 Inside a run, the plan's second step compares the batch's files with main's.
 When nothing differs, or only paths main's own `.claude/gate.json` names as

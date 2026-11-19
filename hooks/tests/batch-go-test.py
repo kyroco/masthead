@@ -906,7 +906,7 @@ with tempfile.TemporaryDirectory() as top:
     repo.answer({"run list": {"fail": "HTTP 502"}})
     code, out = repo.go("INFRA-285")
     check("s1-J1 a go whose run list fails starts nothing, so it cannot test a proved commit again",
-          code != 0 and dispatches(repo.calls()) == [] and "HTTP 502" in out and "say go again" in out, out)
+          code != 0 and dispatches(repo.calls()) == [] and "HTTP 502" in out and "say go again" in out.lower(), out)
 with tempfile.TemporaryDirectory() as top:
     repo = Repo(top)
     head = repo.land("Add the go script (INFRA-285)")
@@ -988,7 +988,8 @@ with tempfile.TemporaryDirectory() as top:
     check("INFRA-287 S4 the go does not call a mixed pile only documents", "only documents" not in out, out)
     where, code, out = repo.run_batch(dispatches(repo.calls())[0])
     check("INFRA-287 S4 a pile with one change that is not a document runs the Gate",
-          repo.last_plan == {"test": "true", "proof": "gate"} and "so the Gate runs" in out, repo.last_plan)
+          repo.last_plan == {"test": "true", "proof": "gate"} and "changes more than documents" in out
+          and "The Gate runs on" in out, (repo.last_plan, out))
 
 for label, name, content in (
         ("the checks themselves", ".github/workflows/other.yml", "on: push\n"),

@@ -35,9 +35,12 @@ for landing's last commit:
   the same commit again;
 - one whose Gate passed and whose move failed: it runs that run's failed jobs
   again, which are only the move, so main moves with no Gate run. It does this
-  only when every job that failed or was cancelled is a move job;
+  only when every job that failed or was cancelled is a move job, and a Gate
+  job GitHub skipped by its own `if:` still leaves the Gate passed;
 - one whose Gate went red: nothing starts, since nothing new has landed; the
-  search for the bad change (bad-commit.py) is the next step.
+  search for the bad change (bad-commit.py) is the next step;
+- GitHub not answering about its runs: nothing starts, since a new run could
+  test a commit that already passed.
 
 A pile that changes only documents since main still starts a run, but the run's
 plan skips the Gate and the move checks that again (batch-plan.yml).
@@ -344,9 +347,11 @@ def verdict(jobs):
         return None
     if any(c in RED for c in gate_jobs):
         return "red"
+    # A Gate job GitHub skips by its own `if:` in a batch run (one keyed on a pull request, or on main)
+    # leaves the Gate passed, as `needs.gate.result` reads it; at least one Gate job must have run (s1-1).
     others = [c for part, ends in by_part.items() if part != "move" for c in ends]
-    if gate_jobs and all(c == "success" for c in gate_jobs) and not any(c in NOT_PASSED for c in others) \
-            and any(c in NOT_PASSED for c in move):
+    if "success" in gate_jobs and all(c in ("success", "skipped") for c in gate_jobs) \
+            and not any(c in NOT_PASSED for c in others) and any(c in NOT_PASSED for c in move):
         return "moved-not"
     return None
 
@@ -354,11 +359,11 @@ def verdict(jobs):
 def earlier(head):
     """Stop, or rerun only a move, when GitHub already holds a batch run for `head`. Returns True when it
     started the move again, False when a new run should start."""
+    # GitHub not answering starts nothing: a new run could test a commit that already passed (s1-J1).
     runs, error = runs_for(head)
     if runs is None:
-        print("GitHub did not list the earlier batch runs ({}), so the go cannot tell whether {} was tested "
-              "before; it starts a run.".format(error, head[:9]))
-        return False
+        raise Stop("GitHub did not list the earlier batch runs ({}), so the go cannot tell whether {} was tested "
+                   "already, and nothing starts. Say go again in a minute.".format(error, head[:9]))
     for run in runs:
         if run.get("status") != "completed":
             raise Stop("Batch run {} is already testing landing at {} ({}). A second go would test the same commit "
@@ -367,7 +372,9 @@ def earlier(head):
     for run in runs:
         found, error = gh_json("run", "view", str(run.get("databaseId")), "--json", "jobs")
         if error or not isinstance(found, dict):
-            continue
+            raise Stop("GitHub did not show batch run {} of {} ({}), so the go cannot tell whether that run "
+                       "already tested it, and nothing starts. Say go again in a minute.".format(
+                           run.get("databaseId"), head[:9], error or "no jobs in its answer"))
         said = verdict(found.get("jobs"))
         if said == "red":
             raise Stop("Batch run {} already tested landing at {}, and its Gate went red. Nothing has landed since, "

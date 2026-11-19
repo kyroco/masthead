@@ -140,12 +140,16 @@ jobs:
           GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $(printf 'x-access-token:%s' "${TOKEN:-}" | base64 | tr -d '\n')"
           export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0="http.https://github.com/.extraheader" GIT_CONFIG_VALUE_0
           # documents-only: begin. These lines are the same in batch-plan.yml and batch-move.yml.
-          # documents_only BASE HEAD prints why and returns 0 when HEAD's files differ from BASE's only in
-          # the paths BASE's own .claude/gate.json names as documents, or not at all; it returns 1 otherwise.
+          # documents_only BASE HEAD returns 0 when HEAD's files differ from BASE's only in the paths
+          # BASE's own .claude/gate.json names as documents, or not at all, and 1 otherwise; either way it
+          # prints why, so a no never reads as more than it knows (s4-J1).
           # A pattern's * stands for any run of characters, a / included, and ? for one, as setup stored it.
           documents_only() {
             changed="$(mktemp)"
-            git diff --no-renames --name-only -z "$1" "$2" -- > "$changed" || return 1
+            if ! git diff --no-renames --name-only -z "$1" "$2" -- > "$changed"; then
+              echo "Git could not compare the batch with main, so it cannot tell what the batch changes."
+              return 1
+            fi
             if [ ! -s "$changed" ]; then
               echo "The batch's files are the same as main's: nothing in it is new."
               return 0
@@ -153,16 +157,26 @@ jobs:
             patterns="$(git show "$1:.claude/gate.json" 2>/dev/null | jq -r '.documents
               | if type == "array" and length > 0 and all(.[]; type == "string" and length <= 200
                   and test("^[A-Za-z0-9._*?+@-][A-Za-z0-9._*?/+@-]*$") and test("[A-Za-z0-9]"))
-                then .[] else empty end' 2>/dev/null)" || return 1
-            [ -n "$patterns" ] || return 1
+                then .[] else empty end' 2>/dev/null)" || patterns=""
+            if [ -z "$patterns" ]; then
+              echo "Main's .claude/gate.json names no document paths that can be read, so no change counts as a document."
+              return 1
+            fi
             count=0
             while IFS= read -r -d '' path; do
-              case "$path" in .github/* | .claude/gate.json) return 1 ;; esac
               hit=""
-              while IFS= read -r pattern; do
-                case "$path" in $pattern) hit=1; break ;; esac
-              done <<< "$patterns"
-              [ -n "$hit" ] || return 1
+              case "$path" in
+                .github/* | .claude/gate.json) ;;
+                *)
+                  while IFS= read -r pattern; do
+                    case "$path" in $pattern) hit=1; break ;; esac
+                  done <<< "$patterns"
+                  ;;
+              esac
+              if [ -z "$hit" ]; then
+                echo "The batch changes $path, which is not a document by main's .claude/gate.json, so it changes more than documents."
+                return 1
+              fi
               count=$((count + 1))
             done < "$changed"
             echo "The batch changes only documents since main ($count file(s)), as main's .claude/gate.json names them."
@@ -171,13 +185,14 @@ jobs:
           # documents-only: end.
           test=true
           proof=gate
-          if git fetch --quiet --no-tags --depth=1 origin +refs/heads/main:refs/remotes/origin/main 2>/dev/null &&
-            why="$(documents_only refs/remotes/origin/main "$GITHUB_SHA")"; then
+          if ! git fetch --quiet --no-tags --depth=1 origin +refs/heads/main:refs/remotes/origin/main 2>/dev/null; then
+            say "The plan could not read main from GitHub, so it cannot tell whether the batch changes only documents. The Gate runs on $GITHUB_SHA."
+          elif why="$(documents_only refs/remotes/origin/main "$GITHUB_SHA")"; then
             test=false
             proof=documents
             say "$why So the Gate does not run, and main moves to $GITHUB_SHA once the move checks this again."
           else
-            say "The batch changes more than documents since main, so the Gate runs on $GITHUB_SHA."
+            say "$why The Gate runs on $GITHUB_SHA."
           fi
           echo "test=$test" >> "$GITHUB_OUTPUT"
           echo "proof=$proof" >> "$GITHUB_OUTPUT"

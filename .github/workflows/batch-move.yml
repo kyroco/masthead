@@ -77,12 +77,16 @@ jobs:
             exit 1
           }
           # documents-only: begin. These lines are the same in batch-plan.yml and batch-move.yml.
-          # documents_only BASE HEAD prints why and returns 0 when HEAD's files differ from BASE's only in
-          # the paths BASE's own .claude/gate.json names as documents, or not at all; it returns 1 otherwise.
+          # documents_only BASE HEAD returns 0 when HEAD's files differ from BASE's only in the paths
+          # BASE's own .claude/gate.json names as documents, or not at all, and 1 otherwise; either way it
+          # prints why, so a no never reads as more than it knows (s4-J1).
           # A pattern's * stands for any run of characters, a / included, and ? for one, as setup stored it.
           documents_only() {
             changed="$(mktemp)"
-            git diff --no-renames --name-only -z "$1" "$2" -- > "$changed" || return 1
+            if ! git diff --no-renames --name-only -z "$1" "$2" -- > "$changed"; then
+              echo "Git could not compare the batch with main, so it cannot tell what the batch changes."
+              return 1
+            fi
             if [ ! -s "$changed" ]; then
               echo "The batch's files are the same as main's: nothing in it is new."
               return 0
@@ -90,16 +94,26 @@ jobs:
             patterns="$(git show "$1:.claude/gate.json" 2>/dev/null | jq -r '.documents
               | if type == "array" and length > 0 and all(.[]; type == "string" and length <= 200
                   and test("^[A-Za-z0-9._*?+@-][A-Za-z0-9._*?/+@-]*$") and test("[A-Za-z0-9]"))
-                then .[] else empty end' 2>/dev/null)" || return 1
-            [ -n "$patterns" ] || return 1
+                then .[] else empty end' 2>/dev/null)" || patterns=""
+            if [ -z "$patterns" ]; then
+              echo "Main's .claude/gate.json names no document paths that can be read, so no change counts as a document."
+              return 1
+            fi
             count=0
             while IFS= read -r -d '' path; do
-              case "$path" in .github/* | .claude/gate.json) return 1 ;; esac
               hit=""
-              while IFS= read -r pattern; do
-                case "$path" in $pattern) hit=1; break ;; esac
-              done <<< "$patterns"
-              [ -n "$hit" ] || return 1
+              case "$path" in
+                .github/* | .claude/gate.json) ;;
+                *)
+                  while IFS= read -r pattern; do
+                    case "$path" in $pattern) hit=1; break ;; esac
+                  done <<< "$patterns"
+                  ;;
+              esac
+              if [ -z "$hit" ]; then
+                echo "The batch changes $path, which is not a document by main's .claude/gate.json, so it changes more than documents."
+                return 1
+              fi
               count=$((count + 1))
             done < "$changed"
             echo "The batch changes only documents since main ($count file(s)), as main's .claude/gate.json names them."
@@ -139,7 +153,7 @@ jobs:
             stop "Main moved to $main while this batch ran, and holds work batch $SHA was not tested with (most often the other pile, landing or hotfix, reached main first), so moving it would drop work. Main does not move. Nothing in this batch is to blame: give the same go again. It brings main in with one merge and tests the two together, or, when it cannot make or push that merge on its own, it stops and says to merge by hand first."
           if [ -n "$documents" ]; then
             why="$(documents_only "$main" "$SHA")" ||
-              stop "The Gate did not run on $SHA, and the batch changes more than documents since main ($main), so main does not move."
+              stop "The Gate did not run on $SHA, and main ($main) does not move: $why"
             printf '%s No Gate run was needed.\n' "$why" | tee -a "${GITHUB_STEP_SUMMARY:-/dev/null}"
           fi
           {
