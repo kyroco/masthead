@@ -1280,7 +1280,7 @@ echo more >> "$d/README.md"
 run_gate "$d" "git commit -qam 'Docs' && git push origin HEAD:landing"
 ok "$STATUS" "0" "a docs edit committed in the same line as the push goes through"
 run_gate "$d" "git merge side && git push origin HEAD:landing"
-ok "$STATUS" "2" "a merge in the same line as the push is refused, since what it brings is not known yet"
+ok "$STATUS" "0" "a merge in the same line as the push goes through when no unsent commit touches the CI checks"
 # F2: --all, --branches and --mirror.
 d="$(ci_repo ci-push-all)"
 ( cd "$d" && git checkout -qb side && echo 'jobs: {}' >> .github/workflows/gate.yml && git commit -qam "Add a lane" \
@@ -1324,6 +1324,39 @@ d="$(ci_repo ci-ok-indented)"
     && git commit -qam "Add a lane (INFRA-1)" -m "  $OKLINE" ) >/dev/null 2>&1
 run_gate "$d" "git push origin HEAD:landing"
 ok "$STATUS" "0" "the OK line copied with its indent still counts"
+
+echo "40c. INFRA-274 round 2: a push the check cannot read in full reads every branch"
+# F1: a source written through the shell, and a glob.
+d="$(ci_repo ci-shell-source)"
+( cd "$d" && echo 'jobs: {}' >> .github/workflows/gate.yml && git commit -qam "Add a lane" ) >/dev/null 2>&1
+run_gate "$d" 'git push -u origin "$(git branch --show-current)"'
+ok "$STATUS" "2" "a branch named through the shell is read, and its CI commit refused"
+run_gate "$d" 'B=$(git branch --show-current); git push -u origin "$B"'
+ok "$STATUS" "2" "a branch named through a variable is read, and its CI commit refused"
+run_gate "$d" "git push origin 'refs/heads/*:refs/heads/*'"
+ok "$STATUS" "2" "a glob refspec is read, and the CI commit refused"
+# F2: the matching refspec.
+run_gate "$d" "git push origin :"
+ok "$STATUS" "2" "git push origin : is read, and the CI commit refused"
+# F3: an amend in the same line can drop the OK line.
+d="$(ci_repo ci-amend)"
+( cd "$d" && echo 'jobs: {}' >> .github/workflows/gate.yml && git commit -qam "Add a lane" -m "$OKLINE" ) >/dev/null 2>&1
+run_gate "$d" "git commit --amend -m 'Add a lane' && git push -f origin HEAD:landing"
+ok "$STATUS" "2" "an amend in the same line as the push of a CI commit is refused"
+contains "$ERR" "on its own, then push" "it says to run the amend on its own first"
+run_gate "$d" "git push origin HEAD:landing"
+ok "$STATUS" "0" "the same OK'd commit pushed on its own goes through"
+# F4: a rebase that brings in another branch's CI commit.
+d="$(ci_repo ci-rebase-side)"
+( cd "$d" && git checkout -qb side && echo 'jobs: {}' >> .github/workflows/gate.yml && git commit -qam "Add a lane" \
+    && git checkout -q - ) >/dev/null 2>&1
+run_gate "$d" "git rebase side && git push origin HEAD:landing"
+ok "$STATUS" "2" "a rebase onto a branch holding an unsent CI commit, then a push, is refused"
+# F5: the sentence for a command that moves HEAD.
+run_gate "$d" "git checkout side && git push origin HEAD:landing"
+ok "$STATUS" "2" "a checkout of a branch holding an unsent CI commit, then a push, is refused"
+contains "$ERR" "can change which commits are pushed" "it says why: the command can change what is pushed after the check reads it"
+contains "$ERR" "Run 'git checkout' on its own, then push" "it says what to do next"
 
 echo ""
 echo "passed $pass, failed $fail"
