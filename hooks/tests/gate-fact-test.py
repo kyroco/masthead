@@ -312,6 +312,22 @@ r = subprocess.run([sys.executable, GATE, "look", "--root", root], capture_outpu
 expect("secr1 nested gate.json look", (r.returncode, "Traceback" in r.stderr,
                                        json.loads(r.stdout).get("status") if r.returncode == 0 else None), (0, False, "found"))
 
+# V3-S1-1: a reusable workflow is still found in files with Windows line ends.
+root = repo()
+write(root, ".github/workflows/ci.yml",
+      "name: CI\r\non:\r\n  pull_request:\r\njobs:\r\n  checks:\r\n    uses: ./.github/workflows/checks.yml\r\n")
+write(root, ".github/workflows/checks.yml", "name: Checks\r\non:\r\n  workflow_call:\r\njobs: {}\r\n")
+got = look(root)
+expect("s1 reusable workflow, CRLF", (got.get("status"), got.get("workflow")), ("found", ".github/workflows/checks.yml"))
+
+# V3-S1-J1: a comment after the uses path does not hide the call.
+root = repo()
+write(root, ".github/workflows/ci.yml",
+      "name: CI\non:\n  pull_request:\njobs:\n  checks:\n    uses: ./.github/workflows/checks.yml  # the checks\n")
+write(root, ".github/workflows/checks.yml", "name: Checks\non:\n  workflow_call:\njobs: {}\n")
+got = look(root)
+expect("s1 reusable workflow, comment", (got.get("status"), got.get("workflow")), ("found", ".github/workflows/checks.yml"))
+
 # The trigger reader handles each form GitHub documents.
 for label, text, want in (
         ("string", "on: workflow_dispatch\n", {"workflow_dispatch"}),
