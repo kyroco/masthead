@@ -192,8 +192,11 @@ class Repo:
         env.update({"PATH": self.bin + os.pathsep + env.get("PATH", ""), "FAKE_GH_STATE": self.state,
                     "FAKE_GH_REMOTE": self.remote, "MASTHEAD_SEARCH_POLL_SECONDS": "0",
                     "MASTHEAD_SEARCH_FIND_TRIES": "2", "CLAUDE_PROJECT_DIR": self.work,
-                    # As on CI's ubuntu-latest: no global git config, so no identity outside the work clone (arch-4).
-                    "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1"})
+                    # As on CI's ubuntu-latest: no global git config. Commits the fake gh makes in the bare
+                    # remote take their identity from here, as batch-run-test.py's do (arch-4).
+                    "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1",
+                    "GIT_AUTHOR_NAME": "Worker", "GIT_AUTHOR_EMAIL": "w@example.com",
+                    "GIT_COMMITTER_NAME": "Worker", "GIT_COMMITTER_EMAIL": "w@example.com"})
         return run([sys.executable, SEARCH, run_id], self.work, env)
 
     def landing(self):
