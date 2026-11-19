@@ -199,6 +199,22 @@ with tempfile.TemporaryDirectory() as top:
     code, out, _, _ = repo.move("main")
     check("S3 a sha that is not a full commit id is refused", code != 0 and repo.main() == stray, out)
 
+# INFRA-286: a hotfix's own pile, on the branch hotfix, moves main from there, and only with a commit on hotfix.
+with tempfile.TemporaryDirectory() as top:
+    repo = Repo(top)
+    (pile,) = repo.land("pile.txt")
+    git(repo.work, "switch", "-q", "-c", "hot", repo.base)
+    hot = commit(repo.work, "hot.txt")
+    git(repo.work, "push", "-q", "origin", "HEAD:refs/heads/hotfix")
+    code, out, _, _ = repo.move(pile, ref="refs/heads/hotfix")
+    check("INFRA-286 a run on hotfix refuses a commit that is not on hotfix", code != 0 and repo.main() == repo.base
+          and "no longer on hotfix" in out, out)
+    code, out, _, _ = repo.move(hot, ref="refs/heads/hotfix")
+    check("INFRA-286 a green run on hotfix moves main to the hotfix alone",
+          code == 0 and repo.main() == hot and git(repo.origin, "rev-list", repo.base + "..main").split() == [hot], out)
+    check("INFRA-286 the milestone pile on landing is left where it was",
+          git(repo.origin, "rev-parse", "refs/heads/landing") == pile)
+
 # ---- Scenario 1: one run per batch, carrying everything landed meanwhile ------
 on_block = re.search(r"^on:\n((?:  .*\n|\n)*?)(?=^\S)", starter, re.M)
 on_block = on_block.group(1) if on_block else ""
@@ -210,9 +226,9 @@ check("INFRA-285 the go names its pile, its issues and landing's commit, and the
       all(re.search(r"^      {}:\n        description: .+\n        required: true\n        type: string\n".format(k),
                     on_block, re.M) for k in ("pile", "issues", "sha"))
       and all("{0}: ${{{{ inputs.{0} }}}}".format(k) in starter for k in ("sha", "pile", "issues")), starter)
-check("S1 the starter keeps one batch at a time in one fixed group",
-      re.search(r"^concurrency:\n  group: masthead-batch\n  cancel-in-progress: false\n", starter, re.M) is not None,
-      starter)
+check("S1 the starter keeps one batch at a time on each pile, in one group per branch (INFRA-286)",
+      re.search(r"^concurrency:\n  group: masthead-batch-\$\{\{ github.ref_name \}\}\n  cancel-in-progress: false\n",
+                starter, re.M) is not None, starter)
 check("S1 the starter runs the Gate once per run, after the plan",
       starter.count("uses: ./__GATE__") == 1 and re.search(r"^  gate:\n    needs: plan\n", starter, re.M) is not None,
       starter)
@@ -283,7 +299,7 @@ code, out, _, output = plan(STORED, go_sha="")
 check("INFRA-285 a go that names no commit does not start", code != 0 and output.strip() == "" and "names no commit" in out, out)
 code, out, summary, output = plan(STORED, go_sha="b" * 40)
 check("INFRA-285 S2/S3 landing that moved after the go checked the pile stops the run, so the Gate tests only the "
-      "checked pile", code != 0 and output.strip() == "" and "Landing moved after the go" in out
+      "checked pile", code != 0 and output.strip() == "" and "The landing branch moved after the go" in out
       and "b" * 40 in out and SHA in out, out)
 
 NONE = "No Gate is stored in .claude/gate.json, so the batch run does not start and main does not move."
@@ -316,6 +332,14 @@ check("S4 a starter that runs a second workflow of its own beside the stored Gat
       code != 0 and output.strip() == "" and "runs only the stored Gate" in out, out)
 code, out, _, output = plan({"workflow": GATE, "starts": ["workflow_call"]}, ref="refs/heads/feature")
 check("S4 a batch run off landing does not start", code != 0 and output.strip() == "", out)
+check("INFRA-286 a run off both piles says it tests only landing and hotfix",
+      "only the landing and hotfix branches" in out, out)
+code, out, _, output = plan({"workflow": GATE, "starts": ["workflow_call"]}, ref="refs/heads/hotfix")
+check("INFRA-286 a hotfix's own run on hotfix passes the plan, and the Gate tests its commit",
+      code == 0 and output.strip() == "sha=" + SHA, out)
+code, out, _, output = plan({"workflow": GATE, "starts": ["workflow_call"]}, ref="refs/heads/hotfix", go_sha="b" * 40)
+check("INFRA-286 a hotfix pile that moved after its go stops the run",
+      code != 0 and output.strip() == "" and "The hotfix branch moved after the go" in out, out)
 
 # s1-C1: a starter written before INFRA-285 still starts on every push and calls the plan at @main.
 # The plan job must fail there, not be skipped: GitHub documents that a job whose need failed is

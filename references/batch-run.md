@@ -8,7 +8,8 @@ pull request. A repository opted in when `project_fact.py --ships` prints
 way and has no batch run. Commits pile up on `landing`, and a push starts
 nothing. When the person says go, one run of the repository's own Gate tests
 the whole pile, together, and main moves to the pile's last commit only when
-the run is green.
+the run is green. A hotfix has a pile of its own, `hotfix`, whose run starts
+as soon as it lands (see The hotfix pile).
 Robert, November 18, 2026, agreeing to "One Gate run tests each batch. Green
 moves main forward.": "I agree with 1 and 2".
 
@@ -16,11 +17,11 @@ moves main forward.": "I agree with 1 and 2".
 
 | Part | Where it lives | What it does |
 |---|---|---|
-| The go | `skills/work-on/batch-go.py`, run by the foreman when the person says go | Checks the pile on `landing` belongs to the issues the go names, then starts the starter file on `landing`, once |
-| The starter file | the repository's `.github/workflows/`, written by setup (INFRA-272) from `skills/setup/batch-starter.yml` | Starts only on a go (`workflow_dispatch`), never on a push, keeps one batch running at a time, and runs the three jobs below |
-| `plan` | `kyroco/masthead/.github/workflows/batch-plan.yml` | Stops a run no go started, or whose `landing` moved after the go; reads `.claude/gate.json` at the batch's commit and stops when no Gate is stored or the starter runs another one |
+| The go | `skills/work-on/batch-go.py`, run by the foreman when the person says go, or with `--hotfix` as soon as a hotfix lands | Checks the pile on `landing` (or `hotfix`) belongs to the issues the go names, brings main in with one merge when main holds work the pile does not, then starts the starter file on that branch, once |
+| The starter file | the repository's `.github/workflows/`, written by setup (INFRA-272) from `skills/setup/batch-starter.yml` | Starts only on a go (`workflow_dispatch`), never on a push, keeps one batch running at a time on each pile, and runs the three jobs below |
+| `plan` | `kyroco/masthead/.github/workflows/batch-plan.yml` | Stops a run on any branch but `landing` and `hotfix`, a run no go started, or one whose pile moved after the go; reads `.claude/gate.json` at the batch's commit and stops when no Gate is stored or the starter runs another one |
 | `gate` | the repository's own Gate, the workflow `.claude/gate.json` names | Tests the batch's last commit, started with `workflow_call` |
-| `move` | `kyroco/masthead/.github/workflows/batch-move.yml` | When the Gate passed, moves main forward to exactly that commit, as the batch App |
+| `move` | `kyroco/masthead/.github/workflows/batch-move.yml` | When the Gate passed, moves main forward to exactly that commit, as the batch App, when it is still on the run's own pile |
 
 GitHub runs only workflow files that live in the repository, so the
 repository holds the small starter file and Masthead holds the rest. The
@@ -66,9 +67,52 @@ checked too.
 
 ## One run per batch
 
-The starter's `concurrency` group lets one batch run at a time. A go while a
-batch runs waits; a newer go replaces the one waiting (GitHub's concurrency
-rule, `cancel-in-progress: false`).
+The starter's `concurrency` group lets one batch run at a time on each pile.
+A go while a batch runs waits; a newer go replaces the one waiting (GitHub's
+concurrency rule, `cancel-in-progress: false`). The group is named for the
+branch (`masthead-batch-${{ github.ref_name }}`), so a hotfix never waits
+behind a milestone's run, and a milestone's go never replaces a hotfix's
+waiting run.
+
+## The hotfix pile
+
+An urgent fix does not wait for the milestone's go. Robert, November 19,
+2026: "fine, figure out a way to make its own pile. On a hot fix, we land and
+push that fix to main." A hotfix has its own pile, the branch `hotfix` (INFRA-286):
+
+1. The person says the issue is a hotfix, and the foreman tells its worker to
+   land on `hotfix`. The worker rebases onto what
+   `batch-go.py --hotfix --base` prints (`origin/main`, or `origin/hotfix`
+   while another hotfix waits there) and lands with
+   `git push origin HEAD:hotfix`. Nothing lands on `landing`, and a push to
+   `hotfix` starts nothing.
+2. As soon as the landing is accepted, the foreman starts the hotfix's own
+   run, with no wait for a go:
+   `batch-go.py --hotfix <issue> ...`. It checks the `hotfix` pile as a go
+   checks `landing`, and starts the starter on `hotfix`. A green run moves
+   main to the hotfix's last commit, so main gains the hotfix and nothing of
+   the milestone pile. A red one leaves main alone; the hotfix's worker fixes
+   it on top on `hotfix`, and the foreman starts the hotfix's run again.
+3. `landing` is not touched. Main now holds the hotfix and `landing` does
+   not, so the next go on `landing` first makes one merge of main into it,
+   with no checkout, and pushes it plainly, never forced. The run tests that
+   merge, the milestone pile with the hotfix, and a green run moves main to
+   both. The pile check passes over a merge whose other parents are all on
+   main: it carries no issue of its own. When the push of the merge loses the
+   race with a worker landing at the same moment, the go reads the new pile,
+   checks it again and makes the merge on it, up to three tries.
+
+The go stops, and pushes nothing, when main and the pile change the same
+lines (it names the files; a worker merges `origin/main` into the pile by
+hand and lands the merge), or when the merge leaves a file under `.github/`
+or `scripts/ci/` unlike both sides, which INFRA-274's push check refuses
+without the person's OK. A change to the CI checks on one side only is
+already OKed there and passes.
+
+A hotfix's run has event `workflow_dispatch`, ref `refs/heads/hotfix`, and a
+`github.workflow_ref` ending `/.github/workflows/masthead-batch.yml@refs/heads/hotfix`.
+A Gate arm that matches a batch run on `refs/heads/landing` alone does not
+match it, and treats it as a run started by hand on a branch.
 
 ## Green, red, and no Gate
 
@@ -102,7 +146,7 @@ Setup's part (INFRA-272), each after the person's yes, through
 `skills/setup/batch.py`: the starter file as `python3 skills/setup/gate.py
 starter` prints it, written to `.github/workflows/masthead-batch.yml`; the
 `landing` branch, made from main through GitHub's API when missing; an
-environment named `masthead-batch` that only `landing` may use, holding the
+environment named `masthead-batch` that only `landing` and `hotfix` may use, holding the
 App's id and key as the secrets `BATCH_APP_ID` and `BATCH_APP_PRIVATE_KEY`,
 which a person stores; and, last, the lock on main, a ruleset refusing every
 update, force push and delete of main whose only bypass is the batch App.

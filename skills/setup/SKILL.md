@@ -267,7 +267,8 @@ batch run can move it would never move again.
 2. Say what the next three change, and ask one question, "Shall I make
    these?": the starter file `.github/workflows/masthead-batch.yml`, the
    `landing` branch (made from main through GitHub's API, only when missing),
-   and the `masthead-batch` environment that only `landing` may use. On yes,
+   and the `masthead-batch` environment that only `landing` and `hotfix` (a
+   hotfix's own pile) may use. On yes,
    run `batch.py write`, `batch.py landing` and `batch.py environment`. A
    repository that deletes a branch when its pull request merges loses
    `landing` if anyone merges a pull request from it; the batch run never

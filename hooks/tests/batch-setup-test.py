@@ -128,7 +128,8 @@ def ready_for_lock(gh, work, **leave_out):
     state["refs"]["landing"] = MAIN_SHA
     secrets = [s for s in ("BATCH_APP_ID", "BATCH_APP_PRIVATE_KEY") if s not in leave_out.get("secrets", ())]
     state["environments"]["masthead-batch"] = {"custom": True, "protected": False, "secrets": secrets,
-                                               "policies": [{"id": 1, "name": "landing", "type": "branch"}]}
+                                               "policies": [{"id": 1, "name": "landing", "type": "branch"},
+                                                            {"id": 2, "name": "hotfix", "type": "branch"}]}
     if not leave_out.get("starter"):
         state.setdefault("files", {}).setdefault("landing", {})[STARTER_PATH] = leave_out.get("starter_text") or starter_text(work)
     gh.save(state)
@@ -333,19 +334,42 @@ with tempfile.TemporaryDirectory() as top:
     env = gh.state()["environments"].get("masthead-batch", {})
     check("S5 environment makes masthead-batch open to chosen branches only",
           run.returncode == 0 and env.get("custom") is True and env.get("protected") is False, run.stdout + run.stderr)
-    check("S5 the only branch that may use it is landing, and any wider rule is removed",
-          [(p["name"], p["type"]) for p in env.get("policies", [])] == [("landing", "branch")], env)
+    check("S5 the only branches that may use it are landing and hotfix, and any wider rule is removed (INFRA-286)",
+          sorted((p["name"], p["type"]) for p in env.get("policies", [])) == [("hotfix", "branch"), ("landing", "branch")],
+          env)
 
 with tempfile.TemporaryDirectory() as top:
     gh = GitHub(top)
     work = repo_with_gate(top)
     batch(gh, work, "environment")
     env = gh.state()["environments"].get("masthead-batch", {})
-    check("S5 a new environment gets exactly the landing rule",
-          [(p["name"], p["type"]) for p in env.get("policies", [])] == [("landing", "branch")], env)
+    check("S5 a new environment gets exactly the landing and hotfix rules (INFRA-286)",
+          sorted((p["name"], p["type"]) for p in env.get("policies", [])) == [("hotfix", "branch"), ("landing", "branch")],
+          env)
     batch(gh, work, "environment")
     check("S5 running it again adds nothing",
-          len(gh.state()["environments"].get("masthead-batch", {}).get("policies", [])) == 1, gh.state())
+          len(gh.state()["environments"].get("masthead-batch", {}).get("policies", [])) == 2, gh.state())
+
+# INFRA-286: an environment set up before the hotfix pile is open to landing alone, so a hotfix's run
+# could not read the App key and main would never move. check says so, and environment adds the rule.
+with tempfile.TemporaryDirectory() as top:
+    gh = GitHub(top, refs={"main": MAIN_SHA, "landing": MAIN_SHA})
+    work = repo_with_gate(top)
+    ready_for_lock(gh, work)
+    state = gh.state()
+    state["environments"]["masthead-batch"]["policies"] = [{"id": 1, "name": "landing", "type": "branch"}]
+    gh.save(state)
+    p = parts(batch(gh, work, "check"))
+    env_part = p.get("environment", {})
+    check("INFRA-286 check fails an environment open to landing alone, and says a hotfix's run could not move main",
+          env_part.get("ok") is False and "hotfix's run could not move main" in env_part.get("say", ""), env_part)
+    batch(gh, work, "environment")
+    env = gh.state()["environments"]["masthead-batch"]
+    check("INFRA-286 environment adds the hotfix rule and keeps the landing rule it found",
+          sorted((x["name"], x["type"]) for x in env["policies"]) == [("hotfix", "branch"), ("landing", "branch")]
+          and any(x["id"] == 1 for x in env["policies"]), env)
+    p = parts(batch(gh, work, "check"))
+    check("INFRA-286 check then passes the environment", p.get("environment", {}).get("ok") is True, p)
 
 move = read(MOVE)
 move_job = move.split("\n  move:\n", 1)[-1]
@@ -362,7 +386,8 @@ with tempfile.TemporaryDirectory() as top:
 
 # check: the key in the environment and nowhere else.
 READY = {"masthead-batch": {"custom": True, "protected": False, "secrets": ["BATCH_APP_ID", "BATCH_APP_PRIVATE_KEY"],
-                            "policies": [{"id": 1, "name": "landing", "type": "branch"}]}}
+                            "policies": [{"id": 1, "name": "landing", "type": "branch"},
+                                         {"id": 2, "name": "hotfix", "type": "branch"}]}}
 with tempfile.TemporaryDirectory() as top:
     gh = GitHub(top, environments=READY, refs={"main": MAIN_SHA, "landing": MAIN_SHA})
     work = repo_with_gate(top)

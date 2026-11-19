@@ -311,6 +311,26 @@ those issues too. In a repository without the batch run, where the person
 told you to land by hand, start the Gate run by hand on `landing` on the go
 instead, and move main to `landing` only when it is green.
 
+A hotfix has its own pile, the branch `hotfix`, and does not wait for a go
+(Robert, November 19, 2026: "fine, figure out a way to make its own pile. On
+a hot fix, we land and push that fix to main."). An issue is a hotfix only
+when the person calls it one. Tell its worker in its prompt that the issue is
+a hotfix and lands on `hotfix`, not on `landing` (**Opening a PR**, step 9).
+Accept its landing as any other, on `origin/hotfix`, and start its run at
+once:
+
+    python3 ${CLAUDE_PLUGIN_ROOT}/skills/work-on/batch-go.py --hotfix <issue> ...
+
+A green run moves main to the hotfix alone, and `landing` is left as it is.
+The next go on `landing` brings main, with the hotfix, into the pile with one
+merge before its run starts, so a green run moves main to both. When that go
+stops because main and the pile change the same lines, or because the merge
+changes a CI file in a way neither side did, a worker merges `origin/main`
+into `landing` by hand (with the person's OK line for a CI file) and lands
+the merge; then start the go again. A red hotfix run goes back to the
+hotfix's worker to fix on top on `hotfix`, then start its run again: the
+search for a red batch's bad change reads `landing` only.
+
 When a batch run ends, read it, from a checkout of the repository:
 
     python3 ${CLAUDE_PLUGIN_ROOT}/skills/work-on/batch-issues.py merged <run id>

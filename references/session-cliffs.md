@@ -254,7 +254,13 @@ In the batch way (`--ships` printed `batch`):
    check again on the new commit, and push again. Never force-push
    `landing`. Never commit or push to main: main moves forward only from
    `landing`, after one run of the repo's Gate passes on the batch, and the
-   foreman does that, not you.
+   foreman does that, not you. When your foreman's prompt says the issue is
+   a hotfix, it has its own pile, `hotfix`, and nothing of it lands on
+   `landing`: in step 8, rebase onto the branch
+   `python3 ${CLAUDE_PLUGIN_ROOT}/skills/work-on/batch-go.py --hotfix --base`
+   prints in place of `origin/landing`, and land with
+   `git push origin HEAD:hotfix`, never forced. The foreman starts the
+   hotfix's own run once your landing is accepted.
 10. Post the change's record on the issue as a comment as soon as your
     commits land, in plain words: the commits you landed, what you did not prove, the extras you fixed with
     their scores, the agent-run count (the rows added to

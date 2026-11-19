@@ -319,7 +319,9 @@ while `landing` holds commits of an issue the go does not name, and says
 which. On one more yes, setup then writes a small starter
 file, `.github/workflows/masthead-batch.yml`, which calls the batch run kept
 in this repository; makes the `landing` branch from main if it is missing;
-and makes an environment named `masthead-batch` that only `landing` may use,
+and makes an environment named `masthead-batch` that only `landing` and
+`hotfix` (a hotfix's own pile, whose run moves main without waiting for a go)
+may use,
 to hold the App's two secrets. Once you have stored the secrets and the
 starter file is on `landing`, setup locks main, on a yes of its own, with a
 ruleset whose only bypass is your batch App, so no person, session or pull

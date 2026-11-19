@@ -5,7 +5,7 @@ Run by /masthead:setup, each part only after the person's yes:
 
     batch.py write        write the starter file, .github/workflows/masthead-batch.yml
     batch.py landing      make the landing branch from main, when it is missing
-    batch.py environment  make the masthead-batch environment, open to `landing` only
+    batch.py environment  make the masthead-batch environment, open to `landing` and `hotfix` only
     batch.py lock --app-id N   lock main: only the batch App may update, force-push or delete it;
                                refused until landing holds the starter and the environment both secrets
     batch.py check [--app-id N]   say, as JSON, which parts are in place and whether to offer the batch run; changes nothing
@@ -16,9 +16,10 @@ Every command takes [--root DIR] (the repository's checkout) and
 
 The App key lives as two secrets of the masthead-batch environment. GitHub
 hands an environment's secrets only to a job that names the environment, and
-the environment lets only `landing` use it, so the move job of the batch run
-is the one workflow that can read the key: not the repository's own Gate, not
-a workflow on any other branch (scenario 5, SEC-270-2). A person stores the
+the environment lets only `landing` and `hotfix` (a hotfix's own pile,
+INFRA-286) use it, so the move job of the batch run is the one workflow that
+can read the key: not the repository's own Gate, not a workflow on any other
+branch (scenario 5, SEC-270-2). A person stores the
 two secrets; no session may (`gh secret set` is refused by Masthead's gates).
 
 The batch run itself lives in kyroco/masthead (references/batch-run.md).
@@ -39,6 +40,8 @@ README = os.path.join(PLUGIN, "README.md")
 STARTER_PATH = project_fact.STARTER_FILE  # project_fact.ships() reads the same file (INFRA-276)
 ENVIRONMENT = "masthead-batch"
 LANDING = "landing"
+# The branches whose batch run may move main: the milestone pile and a hotfix's own pile (INFRA-286).
+PILES = (LANDING, "hotfix")
 MAIN = "refs/heads/main"
 RULESET = "Masthead batch: only the batch run moves main"
 SECRETS = ("BATCH_APP_ID", "BATCH_APP_PRIVATE_KEY")
@@ -138,25 +141,30 @@ def policies(repo):
     return (found or {}).get("branch_policies", [])
 
 
-def is_landing_rule(policy):
-    return policy.get("name") == LANDING and policy.get("type", "branch") == "branch"
+def pile_rule(policy):
+    """The pile a rule opens the environment to, or None when it opens it to anything else."""
+    if policy.get("type", "branch") == "branch" and policy.get("name") in PILES:
+        return policy.get("name")
+    return None
 
 
 def environment(repo):
     gh_api("-X", "PUT", "repos/{}/environments/{}".format(repo, ENVIRONMENT),
            body={"deployment_branch_policy": {"protected_branches": False, "custom_branch_policies": True}})
-    have = False
+    have = set()
     for policy in policies(repo):
-        if is_landing_rule(policy) and not have:
-            have = True
+        pile = pile_rule(policy)
+        if pile and pile not in have:
+            have.add(pile)
             continue
         # Any other rule lets another branch or a tag read the App key.
         gh_api("-X", "DELETE", "repos/{}/environments/{}/deployment-branch-policies/{}".format(
             repo, ENVIRONMENT, policy["id"]))
-    if not have:
-        gh_api("-X", "POST", "repos/{}/environments/{}/deployment-branch-policies".format(repo, ENVIRONMENT),
-               body={"name": LANDING, "type": "branch"})
-    return "The {} environment is open to the landing branch only.".format(ENVIRONMENT)
+    for pile in PILES:
+        if pile not in have:
+            gh_api("-X", "POST", "repos/{}/environments/{}/deployment-branch-policies".format(repo, ENVIRONMENT),
+                   body={"name": pile, "type": "branch"})
+    return "The {} environment is open to the landing and hotfix branches only.".format(ENVIRONMENT)
 
 
 def app_bypass(app_id):
@@ -285,11 +293,18 @@ def check(top, repo, app_id):
         policy = env.get("deployment_branch_policy") or {}
         rules = ask("environment", lambda: policies(repo), "") if policy.get("custom_branch_policies") else []
         if rules is not None:
-            only = policy.get("custom_branch_policies") and not policy.get("protected_branches") and \
-                len(rules) == 1 and is_landing_rule(rules[0])
-            part("environment", only, "Only the landing branch may use the {} environment.".format(ENVIRONMENT) if only
-                 else "Branches other than landing may use the {} environment, so they could read the App key. "
-                      "Run batch.py environment.".format(ENVIRONMENT))
+            custom = policy.get("custom_branch_policies") and not policy.get("protected_branches")
+            opened = [pile_rule(r) for r in rules]
+            only = bool(custom and None not in opened and sorted(opened) == sorted(PILES))
+            if only:
+                say = "Only the landing and hotfix branches may use the {} environment.".format(ENVIRONMENT)
+            elif custom and None not in opened and set(opened) < set(PILES):
+                say = ("Only {} may use the {} environment, so a hotfix's run could not move main. Run batch.py "
+                       "environment.".format(" and ".join(sorted(set(opened))) or "no branch", ENVIRONMENT))
+            else:
+                say = ("Branches other than landing and hotfix may use the {} environment, so they could read the "
+                       "App key. Run batch.py environment.".format(ENVIRONMENT))
+            part("environment", only, say)
 
     if env is None:
         part("key in the environment", False, "There is no {} environment to hold the App's secrets.".format(ENVIRONMENT))

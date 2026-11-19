@@ -159,13 +159,23 @@ class Repo:
         with open(full, "w") as handle:
             handle.write(text)
 
-    def land(self, message, name=None):
+    def land(self, message, name=None, branch="landing", onto=None, text=None):
+        """A worker's landing: start from the newest pile (or `onto`), commit, push to the pile's branch."""
+        git(self.work, "fetch", "-q", "origin")
+        git(self.work, "switch", "-q", "--detach", onto or "origin/" + branch)
         name = name or re.sub(r"\W+", "-", message)[:40] + ".txt"
-        self.write(name, message + "\n")
+        self.write(name, (text if text is not None else message) + "\n")
         git(self.work, "add", "-A")
         git(self.work, "commit", "-q", "-m", message)
-        git(self.work, "push", "-q", "origin", "HEAD:refs/heads/landing")
+        git(self.work, "push", "-q", "origin", "HEAD:refs/heads/" + branch)
         return git(self.work, "rev-parse", "HEAD")
+
+    def land_hotfix(self, message, name=None, text=None):
+        """A hotfix worker: rebase onto what `--hotfix --base` prints, then push to hotfix (INFRA-286)."""
+        code, out = self.go("--hotfix", "--base")
+        if code != 0:
+            raise SystemExit("--hotfix --base failed: " + out)
+        return self.land(message, name=name, branch="hotfix", onto=out.splitlines()[0], text=text)
 
     def go(self, *args):
         env = dict(ENV, PATH=self.path, CLAUDE_PROJECT_DIR=self.work)
@@ -184,17 +194,18 @@ class Repo:
         return dict(call[i + 1].split("=", 1) for i, arg in enumerate(call) if arg == "-f")
 
     def run_batch(self, call, gate_result="success"):
-        """What GitHub runs for this dispatch: the plan at landing's head as it is now, then the move."""
+        """What GitHub runs for this dispatch: the plan at the pile's head as it is now, then the move."""
         job = os.path.join(self.top, "job")
         if os.path.exists(job):
             shutil.rmtree(job)
         os.makedirs(job)
         checkout = os.path.join(job, "checkout")
         git(job, "clone", "-q", self.remote, checkout)
-        head = self.ref("landing")
+        branch = call[call.index("--ref") + 1]
+        head = self.ref(branch)
         git(checkout, "checkout", "-q", head)
         inputs = self.inputs(call)
-        ref = "refs/heads/" + call[call.index("--ref") + 1]
+        ref = "refs/heads/" + branch
         code, out, summary, output = run_step(step_script(PLAN, "plan"), checkout, {
             "GITHUB_REF": ref, "GITHUB_SHA": head, "GITHUB_EVENT_NAME": "workflow_dispatch",
             "GITHUB_REPOSITORY": "acme/shop", "STARTER_REF": "acme/shop/" + STARTER + "@" + ref,
@@ -306,7 +317,7 @@ with tempfile.TemporaryDirectory() as top:
     late = repo.land("Start the next milestone (INFRA-310)")
     where, code, out = repo.run_batch(dispatches(repo.calls())[0])
     check("a commit landed after the go stops the run at the plan, and main does not move",
-          where == "plan" and code != 0 and "Landing moved after the go" in out and repo.ref("main") == repo.base, out)
+          where == "plan" and code != 0 and "The landing branch moved after the go" in out and repo.ref("main") == repo.base, out)
 
 # ---- Nothing to go with ------------------------------------------------------------
 with tempfile.TemporaryDirectory() as top:
@@ -329,17 +340,6 @@ with tempfile.TemporaryDirectory() as top:
     check("a repository with no batch run starts nothing and says so",
           code != 0 and repo.calls() == [] and "has no batch run" in out, out)
 
-with tempfile.TemporaryDirectory() as top:
-    repo = Repo(top)
-    repo.land("Add the go script (INFRA-285)")
-    git(repo.work, "switch", "-q", "-c", "side", repo.base)
-    repo.write("hot.txt", "hot\n")
-    git(repo.work, "add", "-A")
-    git(repo.work, "commit", "-q", "-m", "Hot fix (INFRA-290)")
-    git(repo.work, "push", "-q", "origin", "HEAD:refs/heads/main")
-    code, out = repo.go("INFRA-285")
-    check("main holding a commit landing lacks starts nothing", code != 0 and repo.calls() == []
-          and "Main holds a commit landing does not" in out, out)
 
 # ---- Round 1 fixes ----------------------------------------------------------------
 # s3-C1: a repository set up before INFRA-285 still holds the starter that runs on every push. GitHub
@@ -409,6 +409,225 @@ with tempfile.TemporaryDirectory() as top:
     code, out = repo.go("INFRA-285")
     check("s3-J1 a lower-case key of the go's own issue on a refs line belongs to it, and the go starts",
           code == 0 and "Traceback" not in out and len(dispatches(repo.calls())) == 1, out)
+
+# ==== INFRA-286: a hotfix has its own pile that lands and goes straight to main ====================
+# Robert, November 19, 2026: "fine, figure out a way to make its own pile. On a hot fix, we land and push
+# that fix to main."
+
+def parents(repo, sha):
+    return git(repo.remote, "rev-list", "--parents", "-n", "1", sha).split()[1:]
+
+
+def on(repo, ancestor, sha):
+    return subprocess.run(["git", "merge-base", "--is-ancestor", ancestor, sha], cwd=repo.remote,
+                          env=ENV).returncode == 0
+
+
+def shown(repo, sha, path):
+    r = subprocess.run(["git", "show", "{}:{}".format(sha, path)], cwd=repo.remote, env=ENV,
+                       capture_output=True, text=True)
+    return r.stdout if r.returncode == 0 else None
+
+
+# ---- Scenario 1: a hotfix lands apart from the milestone pile -------------------------------------
+with tempfile.TemporaryDirectory() as top:
+    repo = Repo(top)
+    a = repo.land("Add the go script (INFRA-285)")
+    b = repo.land("Follow up on the go script (INFRA-285)")
+    code, out = repo.go("--hotfix", "--base")
+    check("286-S1 with no hotfix waiting, a hotfix worker is told to build on main",
+          code == 0 and out.splitlines()[0] == "origin/main" and "git push origin HEAD:hotfix" in out, out)
+    hot = repo.land_hotfix("Stop the sign-in page crashing (INFRA-290)")
+    check("286-S1 the hotfix lands on its own branch, hotfix", repo.ref("hotfix") == hot, repo.ref("hotfix"))
+    check("286-S1 the hotfix pile is main plus the hotfix, with nothing of the milestone pile",
+          parents(repo, hot) == [repo.base] and not on(repo, a, hot), parents(repo, hot))
+    check("286-S1 the milestone pile on landing is untouched", repo.ref("landing") == b, repo.ref("landing"))
+    check("286-S1 landing a hotfix starts nothing by itself", repo.calls() == [], repo.calls())
+    code, out = repo.go("--hotfix", "--base")
+    check("286-S1 while a hotfix waits on hotfix, the next hotfix worker is told to build on it",
+          code == 0 and out.splitlines()[0] == "origin/hotfix", out)
+    code, out = repo.go("--base")
+    check("286-S1 a milestone worker is still told to build on landing", code == 0 and
+          out.splitlines()[0] == "origin/landing", out)
+
+    # ---- Scenario 2: the hotfix's own run is green, and main moves with only the hotfix in it ---------
+    code, out = repo.go("--hotfix", "INFRA-290")
+    runs = dispatches(repo.calls())
+    call = runs[0] if runs else ["workflow", "run", "", "--ref", "hotfix"]
+    inputs = repo.inputs(call)
+    check("286-S2 the hotfix's go starts exactly one run", code == 0 and len(runs) == 1, out)
+    check("286-S2 the run is the starter on hotfix, not on landing",
+          call[2:5] == ["masthead-batch.yml", "--ref", "hotfix"], call)
+    check("286-S2 the run tests the hotfix's last commit and says it is a hotfix",
+          inputs.get("sha") == hot and inputs.get("pile") == "hotfix INFRA-290" and inputs.get("issues") == "INFRA-290",
+          inputs)
+    where, code, out = repo.run_batch(call)
+    check("286-S2 the plan and the move accept a run on hotfix, and a green run moves main",
+          where == "move" and code == 0, out)
+    check("286-S2 main moves to the hotfix", repo.ref("main") == hot, repo.ref("main"))
+    check("286-S2 main holds only the hotfix past where it was, nothing of the milestone pile",
+          git(repo.remote, "rev-list", "{}..main".format(repo.base)).split() == [hot]
+          and not on(repo, a, repo.ref("main")), out)
+    code, out = repo.go("--hotfix", "--base")
+    check("286-S2 once the hotfix is on main, the next hotfix builds on main again",
+          code == 0 and out.splitlines()[0] == "origin/main", out)
+
+    # ---- Scenario 3: the milestone pile is untouched, and a later go includes the hotfix -------------
+    check("286-S3 after the hotfix moved main, landing is exactly the milestone pile it was",
+          repo.ref("landing") == b and not on(repo, hot, b), repo.ref("landing"))
+    code, out = repo.go("--check", "--milestone", "Batch on go", "INFRA-285")
+    check("286-S3 --check says a go would bring main in first, and pushes and starts nothing",
+          code == 0 and "a go first brings main into landing" in out and repo.ref("landing") == b
+          and len(dispatches(repo.calls())) == 1, out)
+    code, out = repo.go("--milestone", "Batch on go", "INFRA-285")
+    runs = dispatches(repo.calls())
+    head = repo.ref("landing")
+    check("286-S3 a later go for the milestone starts, though the hotfix's issue is not one it names",
+          code == 0 and len(runs) == 2, out)
+    check("286-S3 the go brings main into landing with one merge on top of the untouched pile",
+          parents(repo, head) == [b, hot] and "brought main into landing" in out, (parents(repo, head), out))
+    check("286-S3 the merge names the hotfix's issue",
+          git(repo.remote, "log", "-1", "--format=%s", head) == "Bring main into landing for the go (INFRA-290)",
+          git(repo.remote, "log", "-1", "--format=%s", head))
+    check("286-S3 the merge holds the pile and the hotfix",
+          shown(repo, head, "Stop-the-sign-in-page-crashing-INFRA-290.txt") is not None
+          and shown(repo, head, "Add-the-go-script-INFRA-285-.txt") is not None, head)
+    check("286-S3 the run tests the merge, the pile with the hotfix", repo.inputs(runs[-1]).get("sha") == head
+          and repo.inputs(runs[-1]).get("issues") == "INFRA-285", runs[-1])
+    check("286-S3 the go lists the merge as bringing main in", "{} Bring main into landing for the go (INFRA-290) "
+          "(brings main in)".format(head[:9]) in out, out)
+    where, code, out = repo.run_batch(runs[-1])
+    check("286-S3 a green run moves main to the pile and the hotfix together",
+          where == "move" and code == 0 and repo.ref("main") == head and on(repo, hot, head) and on(repo, b, head), out)
+
+# A later go with no new hotfix makes no merge: landing already holds main.
+with tempfile.TemporaryDirectory() as top:
+    repo = Repo(top)
+    a = repo.land("Add the go script (INFRA-285)")
+    code, out = repo.go("INFRA-285")
+    check("286 a go on a pile that holds main makes no merge", code == 0 and repo.ref("landing") == a
+          and "brought main" not in out, out)
+
+# The hotfix pile is checked like any pile: a commit of another issue on it stops the hotfix's go.
+with tempfile.TemporaryDirectory() as top:
+    repo = Repo(top)
+    hot = repo.land_hotfix("Stop the sign-in page crashing (INFRA-290)")
+    other = repo.land("Start the next milestone (INFRA-310)", branch="hotfix")
+    code, out = repo.go("--hotfix", "INFRA-290")
+    check("286 a hotfix pile holding another issue's commit starts nothing and names it",
+          code != 0 and repo.calls() == [] and "{} Start the next milestone (INFRA-310) (INFRA-310)".format(other[:9]) in out
+          and "Hotfix holds 1 commit outside hotfix INFRA-290" in out, out)
+
+with tempfile.TemporaryDirectory() as top:
+    repo = Repo(top)
+    code, out = repo.go("--hotfix", "INFRA-290")
+    check("286 a hotfix go with no hotfix branch on GitHub starts nothing and says to land it first",
+          code != 0 and repo.calls() == [] and "GitHub has no hotfix branch" in out, out)
+    code, out = repo.go("--hotfix", "--milestone", "Batch on go", "INFRA-290")
+    check("286 a hotfix is not part of a milestone", code != 0 and repo.calls() == [] and "not part of a milestone" in out,
+          out)
+
+# A hotfix that touches the same lines as the pile: the go stops, pushes nothing, starts nothing.
+with tempfile.TemporaryDirectory() as top:
+    repo = Repo(top)
+    b = repo.land("Change the greeting (INFRA-285)", name="greeting.txt", text="hello from the milestone")
+    hot = repo.land_hotfix("Fix the greeting (INFRA-290)", name="greeting.txt", text="hello from the hotfix")
+    code, out = repo.go("--hotfix", "INFRA-290")
+    repo.run_batch(dispatches(repo.calls())[0])
+    code, out = repo.go("INFRA-285")
+    check("286-S3 a pile and a hotfix changing the same lines stop the go and name the file",
+          code != 0 and "change the same lines" in out and "greeting.txt" in out, out)
+    check("286-S3 that stop pushes nothing to landing and starts no run",
+          repo.ref("landing") == b and len(dispatches(repo.calls())) == 1, repo.calls())
+
+# INFRA-274's push check on the merge: a hotfix's CI change alone needs no new OK, since the merge leaves
+# the file as main has it. Both sides changing one CI file leaves the merge's file unlike either side, and
+# the push check refuses that without an OK, so the go stops.
+with tempfile.TemporaryDirectory() as top:
+    repo = Repo(top)
+    repo.write(".github/workflows/lint.yml", "\n".join("line {}".format(n) for n in range(1, 21)) + "\n")
+    git(repo.work, "add", "-A")
+    git(repo.work, "commit", "-q", "-m", "Add lint")
+    git(repo.work, "push", "-q", "origin", "HEAD:refs/heads/main", "HEAD:refs/heads/landing")
+    repo.base = repo.ref("main")
+    lint = "\n".join("line {}".format(n) for n in range(1, 21))
+    repo.land("Change the pile (INFRA-285)")
+    repo.land_hotfix("Fix lint (INFRA-290)\n\nCI-change-OK: https://linear.app/x/issue/INFRA-290/x#comment-1",
+                     name=".github/workflows/lint.yml", text=lint.replace("line 1\n", "line one\n", 1))
+    repo.go("--hotfix", "INFRA-290")
+    repo.run_batch(dispatches(repo.calls())[-1])
+    code, out = repo.go("INFRA-285")
+    check("286 a hotfix's CI change alone passes the push check on the merge, and the go starts",
+          code == 0 and len(dispatches(repo.calls())) == 2, out)
+with tempfile.TemporaryDirectory() as top:
+    repo = Repo(top)
+    lint = "\n".join("line {}".format(n) for n in range(1, 21))
+    repo.write(".github/workflows/lint.yml", lint + "\n")
+    git(repo.work, "add", "-A")
+    git(repo.work, "commit", "-q", "-m", "Add lint")
+    git(repo.work, "push", "-q", "origin", "HEAD:refs/heads/main", "HEAD:refs/heads/landing")
+    repo.base = repo.ref("main")
+    before = repo.land("Tune lint (INFRA-285)\n\nCI-change-OK: https://linear.app/x/issue/INFRA-285/x#comment-2",
+                       name=".github/workflows/lint.yml", text=lint.replace("line 20", "line twenty"))
+    repo.land_hotfix("Fix lint (INFRA-290)\n\nCI-change-OK: https://linear.app/x/issue/INFRA-290/x#comment-1",
+                     name=".github/workflows/lint.yml", text=lint.replace("line 1\n", "line one\n", 1))
+    repo.go("--hotfix", "INFRA-290")
+    repo.run_batch(dispatches(repo.calls())[-1])
+    code, out = repo.go("INFRA-285")
+    check("286 a merge whose CI file differs from both sides stops the go at the push check",
+          code != 0 and "push check refuses" in out and ".github/workflows/lint.yml" in out, out)
+    check("286 that stop pushes nothing and starts nothing", repo.ref("landing") == before
+          and len(dispatches(repo.calls())) == 1, out)
+
+# The merge's push loses the race with a worker landing at the same moment: the go checks the new pile and
+# makes the merge again on it, never forcing. GitHub is stood in for by a hook on the remote that lands a
+# commit on landing just before the go's push is applied, once.
+# git keeps a push's objects apart until its hooks pass and forbids a hook to move a ref, so the hook's
+# own landing runs outside that, as another push would.
+RACE_HOOK = """#!/bin/sh
+[ -f "{marker}" ] && exit 0
+touch "{marker}"
+unset GIT_QUARANTINE_PATH GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES
+old=$(git rev-parse refs/heads/landing)
+new=$(git commit-tree "$old^{{tree}}" -p "$old" -m "{message}")
+git update-ref refs/heads/landing "$new" "$old"
+"""
+
+
+def racing(repo, message):
+    hook = os.path.join(repo.remote, "hooks", "pre-receive")
+    with open(hook, "w") as handle:
+        handle.write(RACE_HOOK.format(marker=os.path.join(repo.top, "raced"), message=message))
+    os.chmod(hook, 0o755)
+
+
+with tempfile.TemporaryDirectory() as top:
+    repo = Repo(top)
+    b = repo.land("Add the go script (INFRA-285)")
+    hot = repo.land_hotfix("Stop the sign-in page crashing (INFRA-290)")
+    repo.go("--hotfix", "INFRA-290")
+    repo.run_batch(dispatches(repo.calls())[-1])
+    racing(repo, "Follow up on the go script (INFRA-285)")
+    code, out = repo.go("INFRA-285")
+    head = repo.ref("landing")
+    racer = parents(repo, head)[0] if parents(repo, head) else ""
+    check("286 a merge push that loses the race is made again on the new pile, and the go starts",
+          code == 0 and "moved while the go pushed its merge" in out and len(dispatches(repo.calls())) == 2, out)
+    check("286 the merge sits on the worker's commit that won the race, so nothing was forced over it",
+          racer != b and parents(repo, racer) == [b] and parents(repo, head) == [racer, hot], (head, racer))
+    check("286 the run tests the new merge", repo.inputs(dispatches(repo.calls())[-1]).get("sha") == head, out)
+
+with tempfile.TemporaryDirectory() as top:
+    repo = Repo(top)
+    b = repo.land("Add the go script (INFRA-285)")
+    repo.land_hotfix("Stop the sign-in page crashing (INFRA-290)")
+    repo.go("--hotfix", "INFRA-290")
+    repo.run_batch(dispatches(repo.calls())[-1])
+    racing(repo, "Start the next milestone (INFRA-310)")
+    code, out = repo.go("INFRA-285")
+    check("286 when the commit that won the race belongs to another issue, the go checks it and stops",
+          code != 0 and "Start the next milestone (INFRA-310) (INFRA-310)" in out
+          and len(dispatches(repo.calls())) == 1, out)
 
 print("{} passed, {} failed".format(passed, failed))
 sys.exit(1 if failed else 0)
