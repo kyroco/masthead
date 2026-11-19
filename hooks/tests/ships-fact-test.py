@@ -192,6 +192,19 @@ base, work = repo(landing=linked)
 made.append(base)
 expect("s4 gate is a symlink", ships(work), (0, "pull-request"))
 
+# Round 1, arch-2: the Gate's workflow is checked by the same rule gate() uses, a plain
+# file at any size. A Gate workflow between 64 KiB and 1 MiB, which setup stores and
+# locks main to, is still the batch way.
+big = dict(OPTED_IN)
+big[".github/workflows/gate.yml"] = GATE_YML + "# padding\n" * 10000  # about 100 KiB
+base, work = repo(landing=big)
+made.append(base)
+expect("arch-2 a Gate workflow over 64 KiB", ships(work), (0, "batch"))
+big[".github/workflows/gate.yml"] = GATE_YML + "# padding\n" * 90000  # about 900 KiB
+base, work = repo(landing=big)
+made.append(base)
+expect("arch-2 a Gate workflow near 1 MiB", ships(work), (0, "batch"))
+
 # Outside a git repository: the pull request way, never an error.
 plain = os.path.realpath(tempfile.mkdtemp(prefix="ships-plain-"))
 made.append(plain)
