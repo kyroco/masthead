@@ -918,6 +918,32 @@ with tempfile.TemporaryDirectory() as top:
     check("s1-J1 a go that cannot read an earlier run of the same commit starts nothing and says so",
           code != 0 and dispatches(repo.calls()) == [] and "4242" in out and "HTTP 503" in out, out)
 
+# J1: a second go seconds after the first, before GitHub lists the run the first one started, starts
+# nothing; once the window has passed and GitHub still lists nothing, a go starts a run.
+with tempfile.TemporaryDirectory() as top:
+    repo = Repo(top)
+    head = repo.land("Add the go script (INFRA-285)")
+    code, out = repo.go("INFRA-285")
+    check("J1 the first go starts one run", code == 0 and len(dispatches(repo.calls())) == 1, out)
+    code, out = repo.go("INFRA-285")
+    check("J1 a second go moments later, before GitHub lists the run, starts nothing",
+          code != 0 and len(dispatches(repo.calls())) == 1 and "moments ago" in out, out)
+    marker = os.path.join(git(repo.work, "rev-parse", "--path-format=absolute", "--git-common-dir"),
+                          "masthead-batch-go.json")
+    check("J1 the go remembers, in the repository's own git folder, which commit it started a run for",
+          os.path.exists(marker), marker)
+    said = json.load(open(marker)) if os.path.exists(marker) else {"sha": head, "at": 0}
+    said["at"] -= 3600
+    with open(marker, "w") as handle:
+        json.dump(said, handle)
+    code, out = repo.go("INFRA-285")
+    check("J1 a go long after, with GitHub still listing nothing, starts a run",
+          code == 0 and len(dispatches(repo.calls())) == 2, out)
+    newer = repo.land("Follow up on the go script (INFRA-285)")
+    code, out = repo.go("INFRA-285")
+    check("J1 a go for a newer commit is not held by the go before it",
+          code == 0 and len(dispatches(repo.calls())) == 3, out)
+
 # s1-1: a Gate job GitHub skips in a batch run (one keyed on a pull request or on main) does not make a
 # Gate that passed count as unproven: only the move runs again.
 with tempfile.TemporaryDirectory() as top:
@@ -1007,6 +1033,16 @@ for label, name, content in (
         where, code, out = repo.run_batch(dispatches(repo.calls())[0])
         check("INFRA-287 S4 a pile that changes {} runs the Gate".format(label),
               repo.last_plan.get("test") == "true", repo.last_plan)
+
+# V1: a change to the checks that a stored pattern names is refused for being a check, and says so.
+with tempfile.TemporaryDirectory() as top:
+    repo = Repo(top, documents=["*.md"])
+    repo.land("Change the PR template (INFRA-287)", name=".github/pull_request_template.md")
+    code, out = repo.go("INFRA-287")
+    where, code, out = repo.run_batch(dispatches(repo.calls())[0])
+    check("V1 a .github/ file a stored pattern names runs the Gate, and the plan says checks always do",
+          repo.last_plan.get("test") == "true" and "always runs the Gate" in out
+          and "not a document by main's" not in out, out)
 
 # A pile cannot widen its own list: the plan reads main's.
 with tempfile.TemporaryDirectory() as top:
