@@ -80,8 +80,7 @@ always git.
 Done is five things: every scenario in the issue has a test that passes, if
 your work involves UI then every UI element related to this issue is
 functional, the repo's pre-push check passes, the commits are on `landing`,
-and the issue is closed with the change's record as its comment. Then you
-stop.
+and the change's record is a comment on the issue. Then you stop.
 
 Reviews will always find more than the scenarios ask for, and so will you:
 each such thing is an extra. Score each one from 1 to 10 the way the person
@@ -125,8 +124,9 @@ worktree:
 It prints the same steps the hook injects: your repository's own version when
 its `.claude/references/session-cliffs.md` has that lead, otherwise the
 plugin's. Its step 8 says when to run the pre-push check.
-Its steps 9 and 10 land the commits on `landing` and close the issue with
-the change's record as its comment, which takes the place of a pull request.
+Its steps 9 and 10 land the commits on `landing` and put the change's
+record on the issue as a comment, which takes the place of a pull request.
+The issue closes later, when a green batch moves main.
 
 ## 7. Report
 
@@ -188,15 +188,16 @@ shown for KOR-12:
 - **Step 4.** A split follows the `linear-issues` skill, and the issue goes
   back to `Todo` with `save_issue`.
 - **Step 6.** Each commit message names `KOR-12`. A commit message moves
-  nothing in Linear, so step 10 of **Opening a PR** closes the issue: post the
-  change's record with `save_comment`, then set `Done` with `save_issue`.
+  nothing in Linear, so step 10 of **Opening a PR** has you post the change's
+  record with `save_comment`, then set `In Review` with `save_issue` when the
+  team has that status.
 - **A question.** When nothing answers it, set the issue's status to
   `Needs Human` with `save_issue` before you ask, whether you ask the person
   or your foreman. When the answer comes back, put the answer on the issue as
   a comment in the words it came in, and set the status back to
   `In Progress`.
-- **After the merge.** Check the issue's status still reads Done, and set it
-  with `save_issue` if not. A parent with no open sub-issue left is set to
+- **After the merge.** Check the issue's status reads Done once the batch
+  moved main, and set it with `save_issue` if not. A parent with no open sub-issue left is set to
   Done the same way.
 
 On a repository whose issues live on GitHub, none of this section applies.

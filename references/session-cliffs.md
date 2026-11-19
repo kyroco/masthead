@@ -210,18 +210,22 @@ supplies only its own facts (its pre-push check, its changelog format) in its
    `landing`. Never commit or push to main: main moves forward only from
    `landing`, after one run of the repo's Gate passes on the batch, and the
    foreman does that, not you.
-10. Close the issue with the change's record as its comment, in plain words:
-    the commits you landed, what you did not prove, the extras you fixed with
+10. Post the change's record on the issue as a comment as soon as your
+    commits land, in plain words: the commits you landed, what you did not prove, the extras you fixed with
     their scores, the agent-run count (the rows added to
     `<state>/dispatches.tsv` for this issue whose outcome is not refused;
     `<state>` is the folder `project_fact.py --state-path` prints, the one
-    the dispatch record writes to), and each check the repo lacks. A commit
-    message closes nothing, so you close it yourself. In Linear: post the
-    record with `save_comment`, then set the issue to Done with
-    `save_issue`. On GitHub: `gh issue close <n> --comment "<record>"`, then
-    set the project Status to Done with `set-status.sh`. If a batch later
-    drops your commit, the issue is opened again and the commit comes back
-    to you.
+    the dispatch record writes to), and each check the repo lacks. In
+    Linear: post it with `save_comment`, then move the issue with
+    `save_issue` to the status named In Review, when `list_issue_statuses`
+    shows the team has one; with none, leave it In Progress. On GitHub:
+    `gh issue comment <n> --body "<record>"`, then set the project Status to
+    In Review with `set-status.sh`. Never set Done and never close the issue
+    yourself: your commit is not proven until a batch passes, so the
+    foreman closes it and sets Done once a green batch moves main past your
+    commits. With no foreman, you do that yourself, only after the batch
+    moved main. A commit message closes nothing. If a batch drops your
+    commit, it comes back to you.
 11. Once the batch has moved main past your commits, clean up what your own
     work created, from the main checkout: bring down the test stack and any
     tunnels as the repo's procedures say, delete the branch's code index

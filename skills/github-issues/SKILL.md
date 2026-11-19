@@ -175,8 +175,9 @@ the table above.
   is about the quality of its answers.
 - **Status.** Nothing moves an issue's Status on its own when a branch is made
   or pushed; `/work-on` sets In Progress. Once the worker's commits are on
-  the landing branch, it closes the issue with the change's record as its
-  comment and sets the Status to Done, as step 10 of **Opening a PR** says.
+  the landing branch, it posts the change's record as a comment and sets In
+  Review, as step 10 of **Opening a PR** says. The issue closes, and its
+  Status reads Done, once a green batch moves main.
 - **`refs #<n>`** when a change touches an issue without finishing it.
 - **"Close it" means closed as completed** when the issue's work shipped.
   Closed as not planned is only for work that will not be done, and only when

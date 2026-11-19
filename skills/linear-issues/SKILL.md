@@ -134,9 +134,9 @@ the merge queue through GitHub, as the `github-issues` skill says.
 - **One checkout per issue**, deleted once its commits reach main, and **one
   issue per session**.
 - **Status.** `/work-on` sets In Progress. Once the worker's commits are on
-  the landing branch, it posts the change's record as a comment and sets
-  Done, as step 10 of **Opening a PR** says: a commit message moves nothing
-  in Linear.
+  the landing branch, it posts the change's record as a comment and sets In
+  Review, as step 10 of **Opening a PR** says: a commit message moves nothing
+  in Linear. Done waits until a green batch moves main.
 - **`refs <key>`** when a change touches an issue without finishing it.
 - **"Close it" means Done** when the issue's work shipped. Canceled is only
   for work that will not be done, and only when the user says so in those
