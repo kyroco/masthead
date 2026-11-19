@@ -104,7 +104,7 @@ push that fix to main." A hotfix has its own pile, the branch `hotfix` (INFRA-28
 
 The go stops, and pushes nothing, when git cannot put main and the pile
 together on its own: they change the same lines of a file, or one deletes or
-renames a file the other changes (it names the files; a worker merges
+renames a file the other changes (it gives git's own line for each conflict; a worker merges
 `origin/main` into the pile by hand and lands the merge). It stops too when
 the merge leaves a file under `.github/`
 or `scripts/ci/` unlike both sides, which INFRA-274's push check refuses

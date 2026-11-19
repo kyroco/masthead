@@ -337,8 +337,9 @@ runs. Its Gate then passes on code that lacks what main now holds, and its
 move stops, saying main moved while the batch ran and nothing in it is to
 blame. Run the same go again at once, the person's go still standing:
 `--hotfix` for a hotfix, the same milestone or issues for `landing`. It
-brings main in with one merge and tests the two together. Hand nothing back
-to a worker for it.
+brings main in with one merge and tests the two together. When that go stops
+because git cannot put the two together on its own, a worker merges by hand
+as above; otherwise hand nothing back to a worker for it.
 
 When a batch run ends, read it, from a checkout of the repository:
 

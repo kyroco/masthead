@@ -234,15 +234,16 @@ def base(branch):
 def merge_main_into(branch, head, pattern):
     """One merge of main into the pile's head, made with no checkout (INFRA-286). Stops on a
     conflict, and on a change to the CI checks the push check would refuse (INFRA-274)."""
-    r = git("merge-tree", "--write-tree", "--name-only", "--no-messages", head, tracking(MAIN), check=False)
+    r = git("merge-tree", "--write-tree", "--messages", head, tracking(MAIN), check=False)
     if r.returncode == 1:
-        files = [l for l in r.stdout.splitlines()[1:] if l.strip()]
-        # git stops on any conflict: the same lines changed on both sides, or a file one side deletes or
-        # renames and the other changes (s3-2).
-        raise Stop("Main and {0} cannot be put together on their own: they change the same lines of a file, or one "
-                   "deletes or renames a file the other changes. So the go cannot bring main into {0}, and nothing "
-                   "starts. A worker merges origin/main into {0} by hand and lands the merge, then say go again. "
-                   "The files: {1}".format(branch, ", ".join(files) or "not named by git"))
+        # git stops on any kind of conflict, so the stop gives git's own line for each one rather than
+        # guess the kind, and lists no file name of its own: git's working names are in neither branch
+        # (s3-2, msg-go).
+        said = [l.strip() for l in r.stdout.splitlines() if l.startswith("CONFLICT")]
+        raise Stop("Main and {0} cannot be put together on their own, for example where both change the same "
+                   "lines, or one deletes or renames a file the other changes. So the go cannot bring main into {0}, "
+                   "and nothing starts. A worker merges origin/main into {0} by hand and lands the merge, then say go "
+                   "again. git said:\n{1}".format(branch, "\n".join("  " + l for l in said) or "  nothing more"))
     if r.returncode != 0:
         raise Stop("git could not merge main into {}: {}".format(branch, (r.stderr or r.stdout).strip()))
     tree = r.stdout.split()[0]
