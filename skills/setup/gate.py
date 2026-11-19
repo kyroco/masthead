@@ -105,6 +105,10 @@ def workflow_name(text):
 def workflows(top):
     """Each workflow file: its repo-relative path, name and triggers."""
     folder = os.path.join(top, ".github", "workflows")
+    # A symlinked .github or workflows folder is not the repository's own, so nothing in it counts.
+    for part in (os.path.join(top, ".github"), folder):
+        if os.path.islink(part) or not os.path.isdir(part):
+            return []
     try:
         leaves = sorted(os.listdir(folder))
     except OSError:
@@ -114,10 +118,8 @@ def workflows(top):
         rel = ".github/workflows/" + leaf
         if not project_fact.GATE_PATH.fullmatch(rel):
             continue
-        try:
-            with open(os.path.join(folder, leaf), encoding="utf-8") as handle:
-                text = handle.read()
-        except (OSError, UnicodeDecodeError):
+        text = project_fact.read_repo_file(top, rel, limit=1024 * 1024)
+        if text is None:
             continue
         found.append({"workflow": rel, "name": workflow_name(text), "triggers": triggers(text)})
     return found
@@ -162,11 +164,23 @@ def store(top, workflow):
     record = answer(flow)
     if not record["starts"]:
         return None, "{} cannot be started on its own, so nothing was stored. {}".format(workflow, OLD_WAY)
+    # Never write through a symlink a cloned repository committed (SEC-1): the
+    # .claude folder must be a real folder, and gate.json a plain file or absent.
+    folder = os.path.join(top, ".claude")
+    if os.path.islink(folder) or (os.path.lexists(folder) and not os.path.isdir(folder)):
+        return None, ".claude is not a plain folder in this repository, so nothing was stored. " + OLD_WAY
+    os.makedirs(folder, exist_ok=True)
     path = os.path.join(top, project_fact.GATE_FILE)
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w", encoding="utf-8") as handle:
-        json.dump({"workflow": record["workflow"], "starts": record["starts"]}, handle, indent=2)
-        handle.write("\n")
+    refused = "{} is not a plain file, so nothing was stored. {}".format(project_fact.GATE_FILE, OLD_WAY)
+    if os.path.lexists(path) and not project_fact.repo_file(top, project_fact.GATE_FILE):
+        return None, refused
+    body = json.dumps({"workflow": record["workflow"], "starts": record["starts"]}, indent=2) + "\n"
+    try:
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_NOFOLLOW", 0), 0o644)
+    except OSError:
+        return None, refused
+    with os.fdopen(fd, "w", encoding="utf-8") as handle:
+        handle.write(body)
     return record, None
 
 

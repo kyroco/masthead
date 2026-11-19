@@ -365,6 +365,59 @@ def architecture_trial(root=None):
 GATE_FILE = os.path.join(".claude", "gate.json")
 GATE_STARTS = ("workflow_call", "workflow_dispatch")
 GATE_PATH = re.compile(r"\.github/workflows/[A-Za-z0-9._-]+\.ya?ml")
+REPO_FILE_LIMIT = 64 * 1024
+
+
+def repo_file(top, relative):
+    """The full path of `relative` under `top` when it is a regular file reached
+    through no symlink at any step, else None. A cloned repository can commit
+    symlinks, so a file it supplies is only read or written when it really lives
+    in the checkout (INFRA-268, SEC-1 to SEC-3)."""
+    path = top
+    parts = [p for p in relative.replace(os.sep, "/").split("/") if p]
+    if not parts or any(p in (".", "..") for p in parts):
+        return None
+    try:
+        for i, part in enumerate(parts):
+            path = os.path.join(path, part)
+            info = os.lstat(path)
+            if stat.S_ISLNK(info.st_mode):
+                return None
+            last = i == len(parts) - 1
+            if not last and not stat.S_ISDIR(info.st_mode):
+                return None
+            if last and not stat.S_ISREG(info.st_mode):
+                return None
+    except OSError:
+        return None
+    return path
+
+
+def read_repo_file(top, relative, limit=REPO_FILE_LIMIT):
+    """The text of a file the repository supplies, or None when it is not a
+    plain file in the checkout, is larger than `limit`, or is not UTF-8."""
+    path = repo_file(top, relative)
+    if not path:
+        return None
+    try:
+        fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0))
+    except OSError:
+        return None
+    try:
+        info = os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode) or info.st_size > limit:
+            return None
+        data = os.read(fd, limit + 1)
+    except OSError:
+        return None
+    finally:
+        os.close(fd)
+    if len(data) > limit:
+        return None
+    try:
+        return data.decode("utf-8")
+    except UnicodeDecodeError:
+        return None
 
 
 def gate(root=None):
@@ -373,17 +426,20 @@ def gate(root=None):
     Read from .claude/gate.json at the top of the checkout `root` is in, a file
     the repository commits so the batch run on GitHub reads the same answer
     (references/gate-fact.md). Returns {"workflow": path, "starts": [...]} only
-    when the path is a workflow file that exists and at least one way to start
-    it is named; anything else is None, and the repository ships the old way.
+    when the path is a workflow file in the checkout and at least one way to
+    start it is named; anything else is None, and the repository ships the old
+    way. Never works the Gate out: with nothing stored, nothing is returned.
     """
     root = root or project_root()
     if not trusted(root):
         return None
     top = checkout_top(root)
+    text = read_repo_file(top, GATE_FILE)
+    if text is None:
+        return None
     try:
-        with open(os.path.join(top, GATE_FILE), encoding="utf-8") as handle:
-            data = json.load(handle)
-    except Exception:
+        data = json.loads(text)
+    except ValueError:
         return None
     if not isinstance(data, dict):
         return None
@@ -394,7 +450,7 @@ def gate(root=None):
     if not isinstance(starts, list):
         return None
     starts = sorted({s for s in starts if s in GATE_STARTS})
-    if not starts or not os.path.isfile(os.path.join(top, workflow)):
+    if not starts or not repo_file(top, workflow):
         return None
     return {"workflow": workflow, "starts": starts}
 
