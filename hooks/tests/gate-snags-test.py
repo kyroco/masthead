@@ -147,6 +147,8 @@ jobs:
       || (github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main')
       || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/landing'
       && endsWith(github.workflow_ref, '/.github/workflows/masthead-batch.yml@refs/heads/landing'))
+      || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/hotfix'
+      && endsWith(github.workflow_ref, '/.github/workflows/masthead-batch.yml@refs/heads/hotfix'))
     runs-on: ubuntu-latest
     steps:
       - run: echo plan
@@ -154,6 +156,10 @@ jobs:
     needs: [plan-checks]
     uses: ./.github/workflows/gate-plan.yml
 """
+# The batch arm as INFRA-283 and INFRA-285 advised it, before a hotfix had its own pile (INFRA-286).
+LANDING_ONLY = AFTER.replace(
+    "      || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/hotfix'\n"
+    "      && endsWith(github.workflow_ref, '/.github/workflows/masthead-batch.yml@refs/heads/hotfix'))\n", "")
 
 # The helper fixed, not deleted: it lists both names and its test matches both (arch-1).
 RETRY_AFTER = RETRY.replace("workflows: [Gate]", "workflows: [Gate, Masthead batch]").replace(
@@ -308,6 +314,30 @@ check("INFRA-285 its message says a batch run starts on a go and gives the workf
       pushes and "says go" in pushes[0]["misses"]
       and "github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/landing'" in pushes[0]["misses"],
       pushes)
+def gate_module():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("gate_under_test", GATE)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+# INFRA-286 arch-2: a hotfix's run is on refs/heads/hotfix, so a batch arm that matches landing alone misses
+# it. Snags points at that arm, and the arm it advises matches both piles.
+root = repo({".claude/gate.json": STORED, ".github/workflows/gate.yml": LANDING_ONLY,
+             ".github/workflows/gate-plan.yml": PLAN_AFTER, ".github/workflows/retry.yml": RETRY_AFTER})
+code, out, err = snags(root)
+hot = [s for s in (out or {}).get("snags", []) if s["kind"] == "hotfix"]
+check("286 arch-2 a batch arm that matches landing alone is pointed at, and only that arm",
+      [(s["workflow"], s["line"]) for s in (out or {}).get("snags", [])] == [(".github/workflows/gate.yml", 19)]
+      and len(hot) == 1, out or err)
+check("286 arch-2 its message says a hotfix's run is on refs/heads/hotfix and gives the arm for it",
+      hot and "refs/heads/hotfix" in hot[0]["misses"]
+      and "masthead-batch.yml@refs/heads/hotfix" in hot[0]["misses"], hot)
+check("286 arch-2 the arm snags advises for a test of github.workflow_ref matches a hotfix's run too",
+      "masthead-batch.yml@refs/heads/hotfix" in gate_module().MISSES["event"]
+      and "masthead-batch.yml@refs/heads/landing" in gate_module().MISSES["event"])
+
 plain_push = "name: Gate\non:\n  push:\n    branches: [main]\n  workflow_call:\njobs:\n  deploy:\n" \
              "    if: github.event_name == 'push'\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo ok\n"
 root = repo({".claude/gate.json": STORED, ".github/workflows/gate.yml": plain_push})
@@ -361,7 +391,7 @@ far = AFTER.replace("    runs-on: ubuntu-latest\n    steps:\n      - run: echo p
 root = repo({".claude/gate.json": STORED, ".github/workflows/gate.yml": far})
 code, out, err = snags(root)
 found = {(s["line"], s["kind"]) for s in (out or {}).get("snags", [])}
-check("S2 a far-off workflow_ref test is still pointed at", (30, "event") in found, out or err)
+check("S2 a far-off workflow_ref test is still pointed at", (32, "event") in found, out or err)
 check("S2 the workflow_ref test inside the batch arm is not", (19, "event") not in found, found)
 
 # No Gate stored: nothing to read, and it says so.

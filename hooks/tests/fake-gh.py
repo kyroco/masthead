@@ -114,8 +114,9 @@ def main(argv):
                         "workflow": workflow, "event": "workflow_dispatch", "jobs": jobs,
                         "conclusion": conclusion(jobs)}
     elif argv[:2] == ["run", "list"]:
-        workflow, branch = argv[argv.index("--workflow") + 1], argv[argv.index("--branch") + 1]
-        out = [r for r in runs.values() if r.get("workflow") == workflow and r.get("headBranch") == branch]
+        workflow = argv[argv.index("--workflow") + 1]
+        branch = argv[argv.index("--branch") + 1] if "--branch" in argv else None
+        out = [r for r in runs.values() if r.get("workflow") == workflow and branch in (None, r.get("headBranch"))]
     elif argv[:2] == ["run", "rerun"]:
         run = runs[argv[2]]
         run["attempt"] = run.get("attempt", 1) + 1

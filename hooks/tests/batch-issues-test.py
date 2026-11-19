@@ -145,9 +145,10 @@ class Repo:
     def landing(self):
         return git(self.remote, "rev-parse", "refs/heads/landing")
 
-    def batch_run(self, green):
-        """Record a batch run on landing's tip, as the starter's run shows it. Green moves main there."""
-        sha = self.landing()
+    def batch_run(self, green, branch="landing"):
+        """Record a batch run on the pile's tip (landing, or hotfix for a hotfix's own pile), as the
+        starter's run shows it. Green moves main there."""
+        sha = git(self.remote, "rev-parse", "refs/heads/" + branch)
         run_id = str(self.next_run)
         self.next_run += 1
         if green:
@@ -163,7 +164,7 @@ class Repo:
         state = self.load()
         state["runs"][run_id] = {"databaseId": int(run_id), "status": "completed",
                                  "conclusion": "success" if green else "failure", "headSha": sha,
-                                 "headBranch": "landing", "attempt": 1, "workflow": "Masthead batch",
+                                 "headBranch": branch, "attempt": 1, "workflow": "Masthead batch",
                                  "workflowName": "Masthead batch", "event": "push",
                                  "url": "https://github.com/example/repo/actions/runs/" + run_id, "jobs": jobs}
         self.save(state)
@@ -291,6 +292,37 @@ green = r.batch_run(green=True)
 out, _ = r.foreman("merged", green, "--since", mark)
 check("arch-2 an issue whose own work is a revert of an ordinary commit counts as merged",
       merged_line(out.stdout) == ["INFRA-51"], out.stdout)
+r.done()
+
+# ---- INFRA-286 arch-1: a hotfix's own run is read like any batch run ----------------
+# After a green hotfix run, the foreman reads it to close the hotfix's issue. A later milestone batch that
+# brought main in with one merge carries only its own issues: the hotfix was merged by its own run.
+r = Repo()
+r.land({"a": "1\n"}, "Add a (INFRA-11)")
+r.batch_run(green=True)
+git(r.work, "fetch", "--quiet", "origin")
+git(r.work, "switch", "--quiet", "--detach", "origin/main")
+r.write("hot", "fixed\n")
+git(r.work, "add", "-A")
+git(r.work, "commit", "--quiet", "-m", "Stop the sign-in page crashing (INFRA-290)")
+git(r.work, "push", "--quiet", "origin", "HEAD:refs/heads/hotfix")
+hot = git(r.work, "rev-parse", "HEAD")
+hot_run = r.batch_run(green=True, branch="hotfix")
+out, calls = r.foreman("merged", hot_run)
+check("286 arch-1 a green hotfix run is read, not refused as off landing", out.returncode == 0, out.stdout + out.stderr)
+check("286 arch-1 it lists the hotfix's issue as merged, and only that", merged_line(out.stdout) == ["INFRA-290"],
+      out.stdout)
+check("286 arch-1 reading a hotfix run only reads", only_reads(calls), calls)
+git(r.work, "switch", "--quiet", "landing")
+r.land({"c": "3\n"}, "Add c (INFRA-13)")
+pile = r.landing()
+tree = git(r.work, "merge-tree", "--write-tree", pile, hot).split()[0]
+merge = git(r.work, "commit-tree", tree, "-p", pile, "-p", hot, "-m", "Bring main into landing for the go (INFRA-290)")
+git(r.work, "push", "--quiet", "origin", merge + ":refs/heads/landing")
+later = r.batch_run(green=True)
+out, _ = r.foreman("merged", later)
+check("286 arch-1 the later milestone batch lists only its own issue, not the hotfix again",
+      merged_line(out.stdout) == ["INFRA-13"], out.stdout)
 r.done()
 
 # ---- Usage ---------------------------------------------------------------------

@@ -629,5 +629,83 @@ with tempfile.TemporaryDirectory() as top:
           code != 0 and "Start the next milestone (INFRA-310) (INFRA-310)" in out
           and len(dispatches(repo.calls())) == 1, out)
 
+# ---- Round 1 fixes of INFRA-286 -----------------------------------------------------------------
+# s2-J1: a milestone run and a hotfix run each have their own queue, so both can pass their Gate while
+# the other moves main. The one whose move comes second must not read as a red batch: nothing in it is to
+# blame. Its move says so and says to give the same go again, and that go brings main in and moves main.
+with tempfile.TemporaryDirectory() as top:
+    repo = Repo(top)
+    pile_tip = repo.land("Add the go script (INFRA-285)")
+    repo.go("--milestone", "Batch on go", "INFRA-285")
+    milestone = dispatches(repo.calls())[-1]
+    hot = repo.land_hotfix("Stop the sign-in page crashing (INFRA-290)")
+    repo.go("--hotfix", "INFRA-290")
+    hotfix = dispatches(repo.calls())[-1]
+    where, code, out = repo.run_batch(hotfix)
+    check("s2-J1 setup: the hotfix's run moves main first", code == 0 and repo.ref("main") == hot, out)
+    where, code, out = repo.run_batch(milestone)
+    check("s2-J1 the milestone run whose Gate passed after main moved does not move main",
+          where == "move" and code != 0 and repo.ref("main") == hot, out)
+    check("s2-J1 its move says main moved while the batch ran and nothing in the batch is to blame",
+          "while this batch ran" in out and "Nothing in this batch is to blame" in out, out)
+    check("s2-J1 its move says to give the same go again, which brings main in",
+          "give the same go again" in out and "brings main in" in out, out)
+    code, out = repo.go("--milestone", "Batch on go", "INFRA-285")
+    where, code, out = repo.run_batch(dispatches(repo.calls())[-1])
+    check("s2-J1 the same go given again moves main to the pile and the hotfix together",
+          code == 0 and on(repo, hot, repo.ref("main")) and on(repo, pile_tip, repo.ref("main")), out)
+
+# s3-1: --check promises a merge only when the go could make it. Same lines changed on both sides, or a
+# CI file left unlike both sides, stop --check the way they stop the go.
+with tempfile.TemporaryDirectory() as top:
+    repo = Repo(top)
+    b = repo.land("Change the greeting (INFRA-285)", name="greeting.txt", text="hello from the milestone")
+    repo.land_hotfix("Fix the greeting (INFRA-290)", name="greeting.txt", text="hello from the hotfix")
+    repo.go("--hotfix", "INFRA-290")
+    repo.run_batch(dispatches(repo.calls())[0])
+    code, out = repo.go("--check", "INFRA-285")
+    check("s3-1 --check on a pile main cannot be merged into does not promise a merge",
+          code != 0 and "a go first brings main into landing" not in out and "greeting.txt" in out, out)
+    check("s3-1 that --check pushes and starts nothing", repo.ref("landing") == b and len(dispatches(repo.calls())) == 1,
+          out)
+with tempfile.TemporaryDirectory() as top:
+    repo = Repo(top)
+    lint = "\n".join("line {}".format(n) for n in range(1, 21))
+    repo.write(".github/workflows/lint.yml", lint + "\n")
+    git(repo.work, "add", "-A")
+    git(repo.work, "commit", "-q", "-m", "Add lint")
+    git(repo.work, "push", "-q", "origin", "HEAD:refs/heads/main", "HEAD:refs/heads/landing")
+    repo.land("Tune lint (INFRA-285)\n\nCI-change-OK: https://linear.app/x/issue/INFRA-285/x#comment-2",
+              name=".github/workflows/lint.yml", text=lint.replace("line 20", "line twenty"))
+    repo.land_hotfix("Fix lint (INFRA-290)\n\nCI-change-OK: https://linear.app/x/issue/INFRA-290/x#comment-1",
+                     name=".github/workflows/lint.yml", text=lint.replace("line 1\n", "line one\n", 1))
+    repo.go("--hotfix", "INFRA-290")
+    repo.run_batch(dispatches(repo.calls())[-1])
+    code, out = repo.go("--check", "INFRA-285")
+    check("s3-1 --check on a merge the push check would refuse says so, and promises nothing",
+          code != 0 and "push check refuses" in out and "a go first brings main into landing" not in out, out)
+
+# s3-2: a hotfix that deletes a file the pile changes stops the go, and the stop says what really happened.
+with tempfile.TemporaryDirectory() as top:
+    repo = Repo(top)
+    repo.write("notes.txt", "one\ntwo\nthree\n")
+    git(repo.work, "add", "-A")
+    git(repo.work, "commit", "-q", "-m", "Add notes")
+    git(repo.work, "push", "-q", "origin", "HEAD:refs/heads/main", "HEAD:refs/heads/landing")
+    repo.land("Change the notes (INFRA-285)", name="notes.txt", text="one\nTWO\nthree")
+    code, base_out = repo.go("--hotfix", "--base")
+    git(repo.work, "fetch", "-q", "origin")
+    git(repo.work, "switch", "-q", "--detach", base_out.splitlines()[0])
+    git(repo.work, "rm", "-q", "notes.txt")
+    git(repo.work, "commit", "-q", "-m", "Remove the notes (INFRA-290)")
+    git(repo.work, "push", "-q", "origin", "HEAD:refs/heads/hotfix")
+    repo.go("--hotfix", "INFRA-290")
+    repo.run_batch(dispatches(repo.calls())[-1])
+    code, out = repo.go("INFRA-285")
+    check("s3-2 a file deleted on one side and changed on the other stops the go and names the file",
+          code != 0 and "notes.txt" in out, out)
+    check("s3-2 the stop names deleting a file as a cause, not only the same lines changed",
+          "deletes or renames a file the other changes" in out, out)
+
 print("{} passed, {} failed".format(passed, failed))
 sys.exit(1 if failed else 0)
