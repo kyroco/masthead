@@ -462,10 +462,10 @@ bad = r.land({"breaks": "x\n"}, "Break it (INFRA-406)")
 before = r.red_batch()
 first = r.search()
 second = r.search()
-check("s1 searching the same red batch twice names the same change both times and pushes nothing",
+check("s1 searching the same red batch twice names it once, says so the second time, and pushes nothing",
       first.returncode == 0 and second.returncode == 0 and r.landing() == before and
-      record(first.stdout).get("Masthead-Bad-Change") == [bad] == record(second.stdout).get("Masthead-Bad-Change"),
-      second.stdout + second.stderr)
+      record(first.stdout).get("Masthead-Bad-Change") == [bad] and "already named" in second.stdout and
+      block(second.stdout) == ("", ""), second.stdout + second.stderr)
 r.done()
 
 # A commit whose message names no issue: the record goes to the person, not to a worker.
@@ -477,6 +477,78 @@ out = r.search()
 check("a bad change that names no issue goes to the person with its record, and no worker block is printed",
       out.returncode == 0 and "names no issue: tell the person" in out.stdout and block(out.stdout) == ("", "") and
       record(out.stdout).get("Masthead-Bad-Change") == [bad], out.stdout + out.stderr)
+r.done()
+
+# ---- V-S2-1: a named change fixed on top, then a new break -----------------------
+# Main has not moved, so the next red batch still holds the first bad change with its
+# fix on top. The search names the new break, not the change already fixed.
+
+# The commits are bad, a, fix, new: halving tests bad + a first, which is red, so a
+# search that trusts red prefixes to only grow names the change already fixed.
+r = Repo()
+first_bad = r.land({"breaks": "x\n"}, "Break it (INFRA-501)")
+r.land({"a": "1\n"}, "Add a (INFRA-500)")
+r.red_batch()
+out = r.search()
+check("v-s2-1 setup: the first search names the first bad change",
+      record(out.stdout).get("Masthead-Bad-Change") == [first_bad], out.stdout + out.stderr)
+os.remove(os.path.join(r.work, "breaks"))
+fix = r.land({"b": "fixed\n"}, "Fix the break on top (INFRA-501)")
+new_bad = r.land({"half-a": "a\n", "half-b": "b\n"}, "Break it another way (INFRA-503)")
+before = r.red_batch()
+state = r.load()
+state["calls"] = []
+r.save(state)
+out = r.search()
+rec = record(out.stdout)
+check("v-s2-1 the next red batch names the new break, not the change already fixed on top",
+      out.returncode == 0 and rec.get("Masthead-Bad-Change") == [new_bad] and rec.get("Masthead-Issue") == ["INFRA-503"],
+      out.stdout + out.stderr)
+check("v-s2-1 the block goes to the new break's issue only",
+      "post on INFRA-503 " in block(out.stdout)[0] and "INFRA-501 as a comment" not in out.stdout, out.stdout)
+check("v-s2-1 the new break fails alone after the fix, so it names no commit it fails with",
+      "Masthead-Fails-With" not in rec, rec)
+check("v-s2-1 still nothing is pushed", r.landing() == before)
+r.done()
+
+# A fix on top that does not fix it: the change is named again, and its worker is told so.
+r = Repo()
+r.land({"a": "1\n"}, "Add a (INFRA-510)")
+first_bad = r.land({"breaks": "x\n"}, "Break it (INFRA-511)")
+r.red_batch()
+r.search()
+tried = r.land({"b": "not fixed\n"}, "Try to fix the break (INFRA-511)")
+r.land({"c": "3\n"}, "Add c (INFRA-512)")
+r.red_batch()
+out = r.search()
+rec = record(out.stdout)
+check("v-s2-1 a fix on top that is still red: the same change is named again",
+      out.returncode == 0 and rec.get("Masthead-Bad-Change") == [first_bad], out.stdout + out.stderr)
+check("v-s2-1 and its worker is told the fix it landed is still red",
+      "Your fix on top, {}".format(tried[:9]) in block(out.stdout)[1] and "still red" in block(out.stdout)[1],
+      out.stdout)
+r.done()
+
+# ---- V-S2-J1: a named change whose fix has not landed is not searched again ------
+# The batch run queued behind the red one holds the same change and goes red too.
+
+r = Repo()
+r.land({"a": "1\n"}, "Add a (INFRA-520)")
+bad = r.land({"breaks": "x\n"}, "Break it (INFRA-521)")
+r.red_batch()
+first = r.search()
+r.land({"d": "4\n"}, "Add d (INFRA-522)")
+before = r.red_batch()
+state = r.load()
+state["calls"] = []
+r.save(state)
+out = r.search()
+check("v-s2-j1 a red batch holding a named change with no fix on top starts no Gate run",
+      out.returncode == 0 and r.dispatches() == [], (r.dispatches(), out.stdout + out.stderr))
+check("v-s2-j1 it says the change is already named and handed back, and prints no block to send again",
+      "already named" in out.stdout and bad[:9] in out.stdout and "INFRA-521" in out.stdout and
+      block(out.stdout) == ("", ""), out.stdout)
+check("v-s2-j1 still nothing is pushed", r.landing() == before)
 r.done()
 
 # ---- V-S3-1, V-S3-2: the batch run's own plan and move jobs ---------------------
