@@ -476,9 +476,9 @@ def builds_on_message(later, dropped, run, batch, root):
     body = [
         "Drop {} from landing: it builds on {}, which turned batch {} red".format(later[:9], dropped[:9], batch[:9]),
         "",
-        "Dropped with {} ({}): {} ({}) changes the same lines, so {} could not come off landing".format(
+        "Dropped with {} ({}): {} ({}) changes lines {} changed, or lines next to them, so".format(
             dropped[:9], issue_of(dropped, root), subject(later), issue_of(later, root), dropped[:9]),
-        "without it. It failed no check of its own.",
+        "{} could not come off landing without it. It failed no check of its own.".format(dropped[:9]),
         "",
         "To bring it back, its worker waits until {} is back with its fix, then reverts this".format(dropped[:9]),
         "commit, fixes what no longer fits, and pushes both to landing at once.",
@@ -501,10 +501,23 @@ def revert_tree(head, sha):
     return r.stdout.split()[0] if r.returncode == 0 else None
 
 
+def reverts_apply(tip, order):
+    """Whether reverting `order`, one after another, applies cleanly on `tip`."""
+    head = tip
+    for sha in order:
+        tree = revert_tree(head, sha)
+        if not tree:
+            return False
+        head = git("commit-tree", tree, "-p", head, "-m", "Masthead search: check").stdout.strip()
+    return True
+
+
 def take_off(main, dropped, tip):
     """The commits to take off landing, newest first, ending with `dropped`: alone when its revert
-    applies on `tip`, else with each later commit that changes a file it or one of those changes.
-    Records, and commits already dropped, are never taken off. None when even that does not apply."""
+    applies on `tip`, else with only the later commits whose change is in the way. Those are found
+    from the later commits that change a file it, or one of them, changes: each is left on landing
+    when the rest still come off cleanly without it. Records, and commits already dropped, are never
+    taken off. None when even all of them do not come off cleanly."""
     if revert_tree(tip, dropped):
         return [dropped]
     done = drops(main, tip)
@@ -517,14 +530,13 @@ def take_off(main, dropped, tip):
         if files & paths:
             builds.append(sha)
             paths |= files
-    order = list(reversed(builds)) + [dropped]
-    head = tip
-    for sha in order:
-        tree = revert_tree(head, sha)
-        if not tree:
-            return None
-        head = git("commit-tree", tree, "-p", head, "-m", "check").stdout.strip()
-    return order
+    if not reverts_apply(tip, list(reversed(builds)) + [dropped]):
+        return None
+    for sha in list(builds):
+        rest = [b for b in builds if b != sha]
+        if reverts_apply(tip, list(reversed(rest)) + [dropped]):
+            builds = rest
+    return list(reversed(builds)) + [dropped]
 
 
 def drop(main, dropped, message_for, tries=5):

@@ -31,7 +31,7 @@ that Gate with `gh workflow run`, so the stored Gate must list
 | No commit fails alone, but some fail together | Drops the latest-landed of them, and names each commit it fails with. Robert, November 19, 2026: "(and we send back the latest one) it is its job to figure out what needs to be fixed and fix it" |
 | No Gate run the search starts goes red, and a run of the whole batch again is green | Drops nothing, and says the red did not happen again |
 | A commit of the batch was already dropped by a revert pushed after the red run started (the batch run queued behind a red one, or the same run searched twice) | Drops nothing more and starts no Gate run: the batch run on that revert is the one to search |
-| Later commits change the same files as the bad commit, so its change cannot come off alone | Drops it together with those later commits, each with its own record saying what it builds on |
+| Later commits change the bad commit's lines, so its change cannot come off alone | Drops it together with only the later commits in the way, each with its own record saying what it builds on |
 | The batch run's own plan or move job could not start or fetch the code | Reruns the run's failed jobs and drops nothing |
 | The plan job stopped the batch run, the Gate passed and the move of main failed, or the run is not on landing | Drops nothing, and says why |
 
@@ -77,9 +77,11 @@ in landing's history. That push starts the next batch run, which tests the
 rest of the batch again.
 
 When commits landed after the bad one change the same files, its revert may
-not apply on its own. The search then also takes off each later commit that
-changes a file the bad commit, or one of those later commits, changes: one
-revert each, newest first, all in the same push. Each of those records names
+not apply on its own. The search then also takes off the later commits whose
+change is in the way: it starts from the later commits that change a file the
+bad commit, or one of them, changes, and leaves each one on landing when the
+rest still come off cleanly without it. One revert each, newest first, all in
+the same push. Each of those records names
 the bad commit in `Masthead-Builds-On` and no failed check, since it failed
 none of its own. Commits already dropped, and their reverts, are never taken
 off this way.
@@ -101,7 +103,7 @@ trailers, so their names do not change without it:
 | `Masthead-Issue` | its issue: the Linear key or `#<number>` its message names, or `none found` | one |
 | `Masthead-Failed-Check` | the name of a Gate job that failed with it | one or more; none on a record with `Masthead-Builds-On` |
 | `Masthead-Fails-With` | `<full commit id> <issue>`, for each commit it fails only together with | none when it fails alone |
-| `Masthead-Builds-On` | `<full commit id> <issue>` of the bad commit, when this commit came off only because it changes the same files | none, or one |
+| `Masthead-Builds-On` | `<full commit id> <issue>` of the bad commit, when this commit came off only because its change was in the way of taking the bad one off | none, or one |
 | `Masthead-Red-Run` | the link to the Gate run that showed it red | one |
 | `Masthead-Batch` | the full id of the red batch's last commit | one |
 | `Masthead-Bring-Back` | `revert-this-commit-and-fix-in-one-push` | one |
