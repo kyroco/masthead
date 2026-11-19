@@ -153,7 +153,8 @@ class Repo:
             handle.write("#!/usr/bin/env python3\nimport json, sys\n"
                          "with open({!r}, 'a') as h:\n    h.write(json.dumps(sys.argv[1:]) + '\\n')\n"
                          "fail = {!r}\n"
-                         "if fail:\n    sys.stderr.write(fail + '\\n')\n    sys.exit(1)\n"
+                         "if fail and sys.argv[1:3] == ['workflow', 'run']:\n"
+                         "    sys.stderr.write(fail + '\\n')\n    sys.exit(1)\n"
                          # INFRA-287: what GitHub answers a read, set per case with repo.answer().
                          "import os\nanswers = {{}}\n"
                          "if os.path.exists({!r}):\n    answers = json.load(open({!r}))\n"
@@ -212,7 +213,7 @@ class Repo:
     def inputs(self, call):
         return dict(call[i + 1].split("=", 1) for i, arg in enumerate(call) if arg == "-f")
 
-    def run_batch(self, call, gate_result="success"):
+    def run_batch(self, call, gate_result="success", main_unreadable=False):
         """What GitHub runs for this dispatch: the plan at the pile's head as it is now, then the move."""
         job = os.path.join(self.top, "job")
         if os.path.exists(job):
@@ -220,6 +221,9 @@ class Repo:
         os.makedirs(job)
         checkout = os.path.join(job, "checkout")
         git(job, "clone", "-q", self.remote, checkout)
+        if main_unreadable:
+            # The proof step's fetch of main fails, as it would if GitHub refused it.
+            git(checkout, "remote", "set-url", "origin", os.path.join(self.top, "gone.git"))
         branch = call[call.index("--ref") + 1]
         head = self.ref(branch)
         git(checkout, "checkout", "-q", head)
@@ -894,14 +898,44 @@ with tempfile.TemporaryDirectory() as top:
     check("INFRA-287 S1 a run of an older commit does not stop a go for a new one",
           code == 0 and len(dispatches(repo.calls())) == 1, out)
 
-# GitHub not listing its runs does not stop the go; it says it cannot tell.
+# s1-J1: GitHub not answering about its earlier runs starts nothing: a new run could test a commit
+# that already passed. The go says why and to say go again.
 with tempfile.TemporaryDirectory() as top:
     repo = Repo(top)
     repo.land("Add the go script (INFRA-285)")
     repo.answer({"run list": {"fail": "HTTP 502"}})
     code, out = repo.go("INFRA-285")
-    check("INFRA-287 S1 a go whose run list fails still starts one run and says it could not tell",
-          code == 0 and len(dispatches(repo.calls())) == 1 and "cannot tell whether" in out, out)
+    check("s1-J1 a go whose run list fails starts nothing, so it cannot test a proved commit again",
+          code != 0 and dispatches(repo.calls()) == [] and "HTTP 502" in out and "say go again" in out, out)
+with tempfile.TemporaryDirectory() as top:
+    repo = Repo(top)
+    head = repo.land("Add the go script (INFRA-285)")
+    earlier_run(repo, head, GREEN_GATE + [job("move / move", "failure")])
+    answers = json.loads(read(repo.answers_path))
+    answers["run view 4242"] = {"fail": "HTTP 503"}
+    repo.answer(answers)
+    code, out = repo.go("INFRA-285")
+    check("s1-J1 a go that cannot read an earlier run of the same commit starts nothing and says so",
+          code != 0 and dispatches(repo.calls()) == [] and "4242" in out and "HTTP 503" in out, out)
+
+# s1-1: a Gate job GitHub skips in a batch run (one keyed on a pull request or on main) does not make a
+# Gate that passed count as unproven: only the move runs again.
+with tempfile.TemporaryDirectory() as top:
+    repo = Repo(top)
+    head = repo.land("Add the go script (INFRA-285)")
+    earlier_run(repo, head, GREEN_GATE + [job("gate / publish", "skipped"), job("move / move", "failure")])
+    code, out = repo.go("INFRA-285")
+    calls = repo.calls()
+    check("s1-1 a passed Gate with a job it skipped, and a failed move, runs only the move again",
+          code == 0 and dispatches(calls) == [] and ["run", "rerun", "4242", "--failed"] in calls, (out, calls))
+with tempfile.TemporaryDirectory() as top:
+    repo = Repo(top)
+    head = repo.land("Add the go script (INFRA-285)")
+    earlier_run(repo, head, [job("plan / plan", "success"), job("gate / publish", "skipped"),
+                             job("move / move", "failure")])
+    code, out = repo.go("INFRA-285")
+    check("s1-1 a Gate whose every job was skipped proved nothing: the move is not run again",
+          not any(c[:2] == ["run", "rerun"] for c in repo.calls()), repo.calls())
 
 # GitHub refusing to run the move again: nothing starts, so the Gate is not run again either.
 with tempfile.TemporaryDirectory() as top:
@@ -995,6 +1029,27 @@ with tempfile.TemporaryDirectory() as top:
     where, code, out = repo.run_batch(dispatches(repo.calls())[0])
     check("INFRA-287 S4 with no document paths stored a pile of docs runs the Gate",
           repo.last_plan.get("test") == "true", repo.last_plan)
+    # s4-J1: the plan says why it could not tell, never that the pile holds more than documents.
+    check("s4-J1 with no document paths stored the plan says main names none, not that the pile holds code",
+          "names no document paths" in out and "changes more than documents" not in out, out)
+
+# s4-J1: a fetch of main that fails runs the Gate and says main could not be read.
+with tempfile.TemporaryDirectory() as top:
+    repo = Repo(top, documents=DOCS)
+    repo.land("Explain the go (INFRA-287)", name="docs/go.md")
+    code, out = repo.go("INFRA-287")
+    where, code, out = repo.run_batch(dispatches(repo.calls())[0], main_unreadable=True)
+    check("s4-J1 a plan that cannot read main runs the Gate and says it could not read main",
+          repo.last_plan.get("test") == "true" and "could not read main" in out
+          and "changes more than documents" not in out, out)
+
+# s4-J1: a pile with code names a path that is not a document.
+with tempfile.TemporaryDirectory() as top:
+    repo = Repo(top, documents=DOCS)
+    repo.land("Change the code (INFRA-287)", name="lib/go.py")
+    code, out = repo.go("INFRA-287")
+    where, code, out = repo.run_batch(dispatches(repo.calls())[0])
+    check("s4-J1 a pile with code says which path is not a document", "lib/go.py" in out, out)
 
 # An older starter, without the skip: the go says so.
 with tempfile.TemporaryDirectory() as top:
