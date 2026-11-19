@@ -25,7 +25,8 @@ Quietly gather these, with commands that read and change nothing:
   `PROJECT_STATE_DIR`, `ADR_DIR`, `ISSUE_TRACKER`, `LINEAR_TEAM_KEY` or
   `ARCHITECTURE_DOC`. If
   Masthead was set up before, say so and
-  offer to change answers rather than starting over. When it was set up
+  offer to change answers rather than starting over. Step 9, the Gate, runs
+  on every run all the same, as it says. When it was set up
   before and no `ARCHITECTURE_DOC` is recorded, offer the architecture doc on
   its own: go straight to step 8, then steps 9 to 11, and ask none of the other
   questions unless the person asks to change an answer. The fact goes to the
@@ -202,7 +203,9 @@ Masthead's batch run tests everything landed since the last run with one
 Gate run, and its search for a bad commit starts the Gate on the commits it
 picks. Both read how the Gate is run from `.claude/gate.json`, which only this
 step writes, and only after a yes. The batch run is an option: without it the
-repository ships the way it does today. Use what `gate.py look` printed:
+repository ships the way it does today. Ask this step on every run of `/masthead:setup`, a first one or not, whatever
+else is recorded: a repository set up before Masthead knew the Gate has
+never been asked. Use what `gate.py look` printed:
 
 - `stored`: say "This repository's Gate is `<workflow>`, stored before." and
   ask nothing, unless the person asks to change it; then run
@@ -213,10 +216,13 @@ repository ships the way it does today. Use what `gate.py look` printed:
   `python3 ${CLAUDE_PLUGIN_ROOT}/skills/setup/gate.py store <workflow>`.
 - `choose`: list the choices and ask "Which of these is this repository's
   Gate, or none?" The one they name is the yes; store it the same way.
-- `none`, a no, or `store` refusing: write nothing and say the one line
-  `look` gave (or `store` printed): "Masthead could not work out how this
+- `none`, or `store` refusing: write nothing and say the one line `look`
+  gave (or `store` printed): "Masthead could not work out how this
   repository's Gate is run, so it keeps shipping the way it does today." Add
   why in one more line when `look` gave a reason.
+- A no to `found`, or "none" to `choose`: write nothing and say the one
+  line "Masthead will not use a batch run here, so this repository keeps
+  shipping the way it does today."
 
 Once stored, say to commit `.claude/gate.json`: the batch run reads it on
 GitHub, where only committed files exist. Changing a workflow to make it
