@@ -258,7 +258,7 @@ def check(top, repo, app_id):
             gone = [s for s in SECRETS if s not in names]
             part("key in the environment", not gone,
                  "The {} environment holds {}.".format(ENVIRONMENT, " and ".join(SECRETS)) if not gone else
-                 "The {} environment lacks {}. The person stores it; batch.py steps gives the command.".format(
+                 "The {} environment lacks {}. The person stores them; batch.py steps gives the commands.".format(
                      ENVIRONMENT, " and ".join(gone)))
 
     repo_names = ask("key nowhere else", lambda: gh_api("repos/{}/actions/secrets?per_page=100".format(repo)), "")
