@@ -35,7 +35,8 @@ commit landed while the last run was going.
   batch's last commit, the one the Gate tested.
 - Red, cancelled or skipped: `move` does not run, and if it is ever made to
   run it refuses anything but a Gate that passed. Main stays where it was.
-  Finding the commit that turned the batch red is INFRA-262.
+  The foreman then runs the search for the commit that turned the batch red,
+  which drops it from landing and says whose it is (`references/bad-commit.md`).
 - No Gate stored: `plan` stops with "No Gate is stored in .claude/gate.json,
   so the batch run does not start and main does not move." The Gate and the
   move never start. Robert, November 19, 2026: "yes that's the right
