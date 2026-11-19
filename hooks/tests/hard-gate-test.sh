@@ -1182,6 +1182,92 @@ run_gate "$TMP/pushcheck-side"
 ok "$STATUS" "2" "a clean worktree with no origin/main is still refused when its branch lacks the push check"
 contains "$ERR" "not in this checkout" "and it says the script is not in this checkout"
 
+echo "40. INFRA-274: a change to the CI checks needs the person's OK before it is pushed"
+# Robert, November 19, 2026: "any time we add a lane to CI I want to know why" and
+# "I want it caught before it hits github". His OK is his words in a comment on the
+# issue, and the commit carries a line pointing to that comment. These repos name
+# no push check, as a repository other than Kyroco may not (scenario 4).
+OKLINE="CI-change-OK: https://linear.app/kyroco/issue/INFRA-274/x#comment-40b88778"
+ci_repo() {
+  d="$(newrepo "$1")"
+  ( cd "$d" && mkdir -p .github/workflows scripts/ci && echo 'on: push' > .github/workflows/gate.yml \
+      && echo 'echo ci' > scripts/ci/run.sh && echo base > README.md && git add -A && git commit -qm base \
+      && git update-ref refs/remotes/origin/main HEAD && git update-ref refs/remotes/origin/landing HEAD ) >/dev/null 2>&1
+  printf '%s' "$d"
+}
+d="$(ci_repo ci-workflow)"
+( cd "$d" && echo 'jobs: {}' >> .github/workflows/gate.yml && git commit -qam "Add a lane (INFRA-1)" ) >/dev/null 2>&1
+run_gate "$d" "git push origin HEAD:landing"
+ok "$STATUS" "2" "a commit that changes a workflow, with no OK, is refused"
+contains "$ERR" ".github/workflows/gate.yml" "the refusal names the file"
+contains "$ERR" "OK" "the refusal says the person's OK is needed"
+contains "$ERR" "CI-change-OK:" "the refusal says which line records the OK"
+run_gate "$d" "git push -u origin HEAD"
+ok "$STATUS" "2" "the same commit pushed to any branch is refused too"
+
+d="$(ci_repo ci-script)"
+( cd "$d" && echo 'echo more' >> scripts/ci/run.sh && git commit -qam "Change a CI script (INFRA-1)" ) >/dev/null 2>&1
+run_gate "$d" "git push origin HEAD:landing"
+ok "$STATUS" "2" "a commit that changes scripts/ci/, with no OK, is refused"
+contains "$ERR" "scripts/ci/run.sh" "the refusal names that file"
+
+d="$(ci_repo ci-ok)"
+( cd "$d" && echo 'jobs: {}' >> .github/workflows/gate.yml \
+    && git commit -qam "Add a lane (INFRA-1)" -m "$OKLINE" ) >/dev/null 2>&1
+run_gate "$d" "git push origin HEAD:landing"
+ok "$STATUS" "0" "the same commit with a line pointing to the OK comment goes through"
+
+d="$(ci_repo ci-ok-not-a-comment)"
+( cd "$d" && echo 'jobs: {}' >> .github/workflows/gate.yml \
+    && git commit -qam "Add a lane (INFRA-1)" -m "CI-change-OK: https://linear.app/kyroco/issue/INFRA-274/x" ) >/dev/null 2>&1
+run_gate "$d" "git push origin HEAD:landing"
+ok "$STATUS" "2" "a line that points to the issue, not to a comment on it, is refused"
+contains "$ERR" "comment" "it says the line must point to the comment"
+
+d="$(ci_repo ci-ok-github)"
+( cd "$d" && echo 'jobs: {}' >> .github/workflows/gate.yml \
+    && git commit -qam "Add a lane (#12)" -m "CI-change-OK: https://github.com/o/r/issues/12#issuecomment-123" ) >/dev/null 2>&1
+run_gate "$d" "git push origin HEAD:landing"
+ok "$STATUS" "0" "a line pointing to a GitHub issue comment goes through"
+
+d="$(ci_repo ci-other)"
+( cd "$d" && echo more >> README.md && mkdir -p docs/.github && echo x > docs/.github/note.md \
+    && git add -A && git commit -qm "Change the docs (INFRA-1)" ) >/dev/null 2>&1
+run_gate "$d" "git push origin HEAD:landing"
+ok "$STATUS" "0" "a commit that touches neither path goes through"
+if grep -q "CI-change-OK" <<<"$ERR"; then ok "said" "silent" "and the check says nothing"; else ok "silent" "silent" "and the check says nothing"; fi
+
+d="$(ci_repo ci-each)"
+( cd "$d" && echo 'jobs: {}' >> .github/workflows/gate.yml && git commit -qam "Add a lane (INFRA-1)" \
+    && echo 'echo more' >> scripts/ci/run.sh && git commit -qam "Change a CI script (INFRA-1)" -m "$OKLINE" ) >/dev/null 2>&1
+run_gate "$d" "git push origin HEAD:landing"
+ok "$STATUS" "2" "each commit needs its own OK: a later commit's line does not cover an earlier one"
+contains "$ERR" ".github/workflows/gate.yml" "the refusal names the earlier commit's file"
+
+d="$(ci_repo ci-already-sent)"
+( cd "$d" && echo 'jobs: {}' >> .github/workflows/gate.yml && git commit -qam "Add a lane (INFRA-1)" \
+    && git update-ref refs/remotes/origin/landing HEAD && echo more >> README.md && git commit -qam "Docs (INFRA-2)" ) >/dev/null 2>&1
+run_gate "$d" "git push origin HEAD:landing"
+ok "$STATUS" "0" "a CI commit origin already has is not this push's business"
+
+d="$(ci_repo ci-moved-out)"
+( cd "$d" && git mv .github/workflows/gate.yml gate.yml && git commit -qm "Move the workflow out (INFRA-1)" ) >/dev/null 2>&1
+run_gate "$d" "git push origin HEAD:landing"
+ok "$STATUS" "2" "moving a workflow out of .github/ is a change to it"
+
+d="$(ci_repo ci-deleted)"
+( cd "$d" && git rm -q scripts/ci/run.sh && git commit -qm "Drop a CI script (INFRA-1)" ) >/dev/null 2>&1
+run_gate "$d" "git push origin HEAD:landing"
+ok "$STATUS" "2" "deleting a CI script is a change to it"
+
+d="$(ci_repo ci-other-branch)"
+( cd "$d" && git checkout -qb side && echo 'jobs: {}' >> .github/workflows/gate.yml && git commit -qam "Add a lane (INFRA-1)" \
+    && git checkout -q - ) >/dev/null 2>&1
+run_gate "$d" "git push origin side:landing"
+ok "$STATUS" "2" "pushing another branch's CI commit is refused the same way"
+run_gate "$d" "git push origin --delete side"
+ok "$STATUS" "0" "deleting a remote branch sends no commit, so it goes through"
+
 echo ""
 echo "passed $pass, failed $fail"
 [ "$fail" -eq 0 ] || exit 1
