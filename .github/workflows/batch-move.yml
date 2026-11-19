@@ -8,6 +8,11 @@
 # pile's branch (`landing`, or `hotfix` for a hotfix's own pile, INFRA-286), or
 # when main holds a commit the batch does not.
 #
+# The one move without a Gate run (INFRA-287): the plan found the batch changes
+# only documents since main, or nothing, and skipped the Gate. The move then
+# checks that again itself, with main's own list of document paths, before it
+# moves main.
+#
 # references/batch-run.md says how the parts fit.
 name: Masthead batch move
 
@@ -19,9 +24,14 @@ on:
         required: true
         type: string
       gate-result:
-        description: How the Gate job ended (needs.gate.result). Main moves only on success.
+        description: How the Gate job ended (needs.gate.result). Main moves on success, or on skipped with proof documents.
         required: true
         type: string
+      proof:
+        description: The plan's proof output; "documents" when it skipped the Gate because the batch changes only documents.
+        required: false
+        type: string
+        default: ""
     secrets:
       BATCH_APP_ID:
         required: true
@@ -40,13 +50,13 @@ jobs:
     steps:
       - name: Get a token from the batch App
         id: app
-        if: inputs.gate-result == 'success'
+        if: inputs.gate-result == 'success' || (inputs.gate-result == 'skipped' && inputs.proof == 'documents')
         uses: actions/create-github-app-token@v2
         with:
           app-id: ${{ secrets.BATCH_APP_ID }}
           private-key: ${{ secrets.BATCH_APP_PRIVATE_KEY }}
       - uses: actions/checkout@v5
-        if: inputs.gate-result == 'success'
+        if: inputs.gate-result == 'success' || (inputs.gate-result == 'skipped' && inputs.proof == 'documents')
         with:
           ref: ${{ inputs.sha }}
           token: ${{ steps.app.outputs.token }}
@@ -58,6 +68,7 @@ jobs:
         env:
           SHA: ${{ inputs.sha }}
           GATE_RESULT: ${{ inputs.gate-result }}
+          PROOF: ${{ inputs.proof }}
         run: |
           set -u
           stop() {
@@ -65,7 +76,42 @@ jobs:
             printf '%s\n' "$1" >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
             exit 1
           }
-          if [ "$GATE_RESULT" != "success" ]; then
+          # documents-only: begin. These lines are the same in batch-plan.yml and batch-move.yml.
+          # documents_only BASE HEAD prints why and returns 0 when HEAD's files differ from BASE's only in
+          # the paths BASE's own .claude/gate.json names as documents, or not at all; it returns 1 otherwise.
+          # A pattern's * stands for any run of characters, a / included, and ? for one, as setup stored it.
+          documents_only() {
+            changed="$(mktemp)"
+            git diff --no-renames --name-only -z "$1" "$2" -- > "$changed" || return 1
+            if [ ! -s "$changed" ]; then
+              echo "The batch's files are the same as main's: nothing in it is new."
+              return 0
+            fi
+            patterns="$(git show "$1:.claude/gate.json" 2>/dev/null | jq -r '.documents
+              | if type == "array" and length > 0 and all(.[]; type == "string" and length <= 200
+                  and test("^[A-Za-z0-9._*?+@-][A-Za-z0-9._*?/+@-]*$") and test("[A-Za-z0-9]"))
+                then .[] else empty end' 2>/dev/null)" || return 1
+            [ -n "$patterns" ] || return 1
+            count=0
+            while IFS= read -r -d '' path; do
+              case "$path" in .github/* | .claude/gate.json) return 1 ;; esac
+              hit=""
+              while IFS= read -r pattern; do
+                case "$path" in $pattern) hit=1; break ;; esac
+              done <<< "$patterns"
+              [ -n "$hit" ] || return 1
+              count=$((count + 1))
+            done < "$changed"
+            echo "The batch changes only documents since main ($count file(s)), as main's .claude/gate.json names them."
+            return 0
+          }
+          # documents-only: end.
+          # The Gate passed, or the plan skipped it because the batch changes only documents (INFRA-287),
+          # which is checked again below, against main as this step reads it, before main moves.
+          documents=""
+          if [ "$GATE_RESULT" = "skipped" ] && [ "${PROOF:-}" = "documents" ]; then
+            documents=1
+          elif [ "$GATE_RESULT" != "success" ]; then
             stop "The Gate ended '$GATE_RESULT' on $SHA, so main does not move."
           fi
           # The milestone pile on landing, or a hotfix's own pile on hotfix (INFRA-286).
@@ -91,6 +137,11 @@ jobs:
           # The Gate passed on code that lacks what main now holds: it is retested, never blamed (s2-J1).
           git merge-base --is-ancestor "$main" "$SHA" ||
             stop "Main moved to $main while this batch ran, and holds work batch $SHA was not tested with (most often the other pile, landing or hotfix, reached main first), so moving it would drop work. Main does not move. Nothing in this batch is to blame: give the same go again. It brings main in with one merge and tests the two together, or, when it cannot make or push that merge on its own, it stops and says to merge by hand first."
+          if [ -n "$documents" ]; then
+            why="$(documents_only "$main" "$SHA")" ||
+              stop "The Gate did not run on $SHA, and the batch changes more than documents since main ($main), so main does not move."
+            printf '%s No Gate run was needed.\n' "$why" | tee -a "${GITHUB_STEP_SUMMARY:-/dev/null}"
+          fi
           {
             printf 'Main moves from %s to %s, carrying:\n\n' "$main" "$SHA"
             git log --format='- %h %s (%an)' "$main..$SHA"

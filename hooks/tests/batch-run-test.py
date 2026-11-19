@@ -137,13 +137,23 @@ class Repo:
     def main(self):
         return git(self.origin, "rev-parse", "refs/heads/main")
 
-    def move(self, sha, gate_result="success", ref="refs/heads/landing"):
+    def move(self, sha, gate_result="success", ref="refs/heads/landing", proof=""):
         if os.path.exists(os.path.dirname(self.job)):
             shutil.rmtree(os.path.dirname(self.job))
         os.makedirs(os.path.dirname(self.job))
         git(os.path.dirname(self.job), "clone", "-q", self.origin, self.job)
         return run_script(step_script(MOVE, "move"), self.job,
-                          {"SHA": sha, "GATE_RESULT": gate_result, "GITHUB_REF": ref})
+                          {"SHA": sha, "GATE_RESULT": gate_result, "GITHUB_REF": ref, "PROOF": proof})
+
+    def put(self, name, text):
+        full = os.path.join(self.work, name)
+        os.makedirs(os.path.dirname(full), exist_ok=True)
+        with open(full, "w", encoding="utf-8") as handle:
+            handle.write(text)
+        git(self.work, "add", "-A")
+        git(self.work, "commit", "-q", "-m", "Put " + name)
+        git(self.work, "push", "-q", "origin", "HEAD:refs/heads/landing")
+        return git(self.work, "rev-parse", "HEAD")
 
 
 # ---- Scenario 2: green moves main to the batch's last commit ----------------
@@ -176,8 +186,17 @@ starter = read(STARTER)
 move_job = starter.split("\n  move:\n", 1)[-1]
 check("S3 the starter's move job waits on the Gate job",
       re.search(r"^    needs: \[plan, gate\]$", move_job, re.M) is not None, move_job)
-check("S3 the starter's move job has no condition that runs it after a red Gate",
-      re.search(r"^    if:", move_job, re.M) is None and "always()" not in starter, move_job)
+# INFRA-287: the move also runs after a Gate the plan skipped for documents, so its condition names
+# exactly the two ends it accepts, and none that runs it after a red Gate.
+MOVE_IF = ("    if: ${{ !cancelled() && needs.plan.result == 'success' && (needs.gate.result == 'success' || "
+           "(needs.gate.result == 'skipped' && needs.plan.outputs.test == 'false')) }}")
+check("S3 the starter's move job runs only after a Gate that passed or one the plan skipped for documents",
+      re.findall(r"^    if:.*$", move_job, re.M) == [MOVE_IF] and "always()" not in starter, move_job)
+check("INFRA-287 S4 the starter's Gate job is skipped only when the plan says false, so it runs by default",
+      "  gate:\n    needs: plan\n    # No Gate run when the batch changes only documents since main, or nothing (the "
+      "plan says so).\n    if: needs.plan.outputs.test != 'false'\n" in starter, starter)
+check("INFRA-287 the starter hands the plan's proof to the move", "      proof: ${{ needs.plan.outputs.proof }}\n" in move_job,
+      move_job)
 check("S3 the starter passes the Gate job's own result to the move",
       "gate-result: ${{ needs.gate.result }}" in move_job, move_job)
 
@@ -493,6 +512,97 @@ with tempfile.TemporaryDirectory() as top:
     run = gate_cli(top, "starter")
     check("arch-1 with no Gate stored there is no starter to write, and setup is told why",
           run.returncode == 1 and run.stdout == "" and "No Gate is stored" in run.stderr, run.stdout + run.stderr)
+
+# ---- INFRA-287: the move after a Gate the plan skipped for documents ------------
+DOC_GATE = json.dumps({"workflow": GATE, "starts": ["workflow_call"], "documents": ["docs/*", "README.md"]})
+with tempfile.TemporaryDirectory() as top:
+    repo = Repo(top)
+    repo.put(".claude/gate.json", DOC_GATE)
+    git(repo.work, "push", "-q", "origin", "HEAD:refs/heads/main")
+    start = repo.main()
+    repo.put("docs/how.md", "how\n")
+    head = repo.put("README.md", "read me\n")
+    code, out, summary, _ = repo.move(head, gate_result="skipped", proof="documents")
+    check("INFRA-287 S2 a pile of only documents moves main with the Gate skipped",
+          code == 0 and repo.main() == head and "No Gate run was needed" in summary, out)
+    code_head = repo.put("lib/app.py", "code\n")
+    code, out, _, _ = repo.move(code_head, gate_result="skipped", proof="documents")
+    check("INFRA-287 S4 the move checks again: a skipped Gate on a pile with code never moves main",
+          code != 0 and repo.main() == head and "changes more than documents" in out, out)
+    code, out, _, _ = repo.move(code_head, gate_result="failure", proof="documents")
+    check("INFRA-287 S4 a red Gate never moves main, whatever the proof says", code != 0 and repo.main() == head, out)
+    code, out, _, _ = repo.move(code_head, gate_result="skipped", proof="")
+    check("INFRA-287 a skipped Gate with no proof never moves main", code != 0 and repo.main() == head, out)
+    code, out, _, _ = repo.move(code_head, gate_result="skipped", proof="gate")
+    check("INFRA-287 a skipped Gate with the proof gate never moves main", code != 0 and repo.main() == head, out)
+    ci = repo.put(".github/workflows/other.yml", "on: push\n")
+    code, out, _, _ = repo.move(ci, gate_result="skipped", proof="documents")
+    check("INFRA-287 S4 a change to the checks is never a document", code != 0 and repo.main() == head, out)
+
+# Main's own list decides, not the pile's.
+with tempfile.TemporaryDirectory() as top:
+    repo = Repo(top)
+    repo.put(".claude/gate.json", DOC_GATE)
+    git(repo.work, "push", "-q", "origin", "HEAD:refs/heads/main")
+    repo.put(".claude/gate.json", json.dumps({"workflow": GATE, "starts": ["workflow_call"], "documents": ["lib/*"]}))
+    head = repo.put("lib/app.py", "code\n")
+    code, out, _, _ = repo.move(head, gate_result="skipped", proof="documents")
+    check("INFRA-287 S4 a pile that calls its own code a document still never moves main without a Gate",
+          code != 0 and repo.main() != head, out)
+
+# Both workflows hold the same matcher, and it reads a pattern as setup's Python does.
+blocks = []
+for path in (PLAN, MOVE):
+    text = read(path)
+    m = re.search(r"\n( *# documents-only: begin\..*?# documents-only: end\.\n)", text, re.S)
+    blocks.append(m.group(1) if m else None)
+check("INFRA-287 batch-plan.yml and batch-move.yml hold the same document matcher, line for line",
+      blocks[0] is not None and blocks[0] == blocks[1], blocks)
+sys.path.insert(0, os.path.join(PLUGIN, "hooks"))
+import project_fact  # noqa: E402
+check("INFRA-287 the workflows test a pattern with the same rule as setup",
+      blocks[0] is not None and project_fact.DOCUMENT_PATTERN in blocks[0], project_fact.DOCUMENT_PATTERN)
+PATTERNS = ["docs/*", "README.md", "*.md", "guide/??.txt", "a+b@c-d_e.txt"]
+PATHS = ["docs/a.md", "docs/deep/b.png", "docsx/a.md", "README.md", "readme.md", "x/README.md", "lib/a.py",
+         "lib/notes.md", "guide/ab.txt", "guide/abc.txt", "guide/a/.txt", "a+b@c-d_e.txt", ".github/x.md",
+         ".claude/gate.json", "with space.md", "new\nline.md"]
+with tempfile.TemporaryDirectory() as top:
+    repo = Repo(top)
+    repo.put(".claude/gate.json", json.dumps({"workflow": GATE, "starts": ["workflow_call"], "documents": PATTERNS}))
+    base = git(repo.work, "rev-parse", "HEAD")
+    script = blocks[0] + 'documents_only "$BASE" "$HEAD_SHA"\n'
+    agree = []
+    for path in PATHS:
+        git(repo.work, "switch", "-q", "--detach", base)
+        full = os.path.join(repo.work, path)
+        os.makedirs(os.path.dirname(full), exist_ok=True)
+        with open(full, "w") as handle:
+            handle.write("x\n")
+        git(repo.work, "add", "-A")
+        git(repo.work, "commit", "-q", "-m", "one path")
+        head = git(repo.work, "rev-parse", "HEAD")
+        code, out, _, _ = run_script(script, repo.work, {"BASE": base, "HEAD_SHA": head})
+        expect = project_fact.is_document(path, PATTERNS)
+        agree.append((path, code == 0, expect))
+        git(repo.work, "reset", "-q", "--hard", base)
+    check("INFRA-287 the shell matcher and setup's Python agree on every path",
+          all(shell == py for _, shell, py in agree), [a for a in agree if a[1] != a[2]])
+    check("INFRA-287 the cases cover both answers", {py for _, _, py in agree} == {True, False}, agree)
+
+# Bad lists are never read as documents, in the shell and in Python alike.
+for label, documents in (("a pattern with a bracket", ["docs/[a]*"]), ("a pattern of only wildcards", ["*"]),
+                         ("a pattern from the root", ["/docs/*"]), ("a pattern that is not text", [7]),
+                         ("a list that is not a list", "docs/*"), ("an empty list", [])):
+    with tempfile.TemporaryDirectory() as top:
+        repo = Repo(top)
+        base = repo.put(".claude/gate.json", json.dumps({"workflow": GATE, "starts": ["workflow_call"],
+                                                         "documents": documents}))
+        head = repo.put("docs/a.md", "x\n")
+        code, out, _, _ = run_script(blocks[0] + 'documents_only "$BASE" "$HEAD_SHA"\n', repo.work,
+                                     {"BASE": base, "HEAD_SHA": head})
+        stored = project_fact.document_patterns(json.dumps({"documents": documents}))
+        check("INFRA-287 {} makes nothing a document, in the shell and in Python".format(label),
+              code != 0 and not stored, (out, stored))
 
 # ---- arch-2: without jq the suite skips, as run-tests.sh expects --------------
 if not os.environ.get("BATCH_RUN_NO_JQ_CHILD"):

@@ -40,16 +40,21 @@ jobs:
       issues: ${{ inputs.issues }}
   gate:
     needs: plan
+    # No Gate run when the batch changes only documents since main, or nothing (the plan says so).
+    if: needs.plan.outputs.test != 'false'
     # What the Gate's jobs ask of the token; a called workflow may ask no more than this.
     permissions: __GATE_PERMISSIONS__
     uses: ./__GATE__
     secrets: inherit
   move:
     needs: [plan, gate]
+    # After a Gate that passed, or a Gate the plan skipped for documents; never after a red one.
+    if: ${{ !cancelled() && needs.plan.result == 'success' && (needs.gate.result == 'success' || (needs.gate.result == 'skipped' && needs.plan.outputs.test == 'false')) }}
     uses: kyroco/masthead/.github/workflows/batch-move.yml@main
     with:
       sha: ${{ needs.plan.outputs.sha }}
       gate-result: ${{ needs.gate.result }}
+      proof: ${{ needs.plan.outputs.proof }}
     secrets:
       BATCH_APP_ID: ${{ secrets.BATCH_APP_ID }}
       BATCH_APP_PRIVATE_KEY: ${{ secrets.BATCH_APP_PRIVATE_KEY }}

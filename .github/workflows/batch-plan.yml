@@ -13,7 +13,11 @@
 # and the move of main never start.
 #
 # Its output `sha` is the batch's last commit, the one the Gate tests and the
-# one main moves to. references/batch-run.md says how the parts fit.
+# one main moves to. Its output `test` is false, and `proof` is `documents`,
+# when that commit differs from main only in the paths main's own
+# .claude/gate.json names as documents, or not at all: then the Gate does not
+# run and the move checks the same thing again before it moves main (INFRA-287).
+# references/batch-run.md says how the parts fit.
 name: Masthead batch plan
 
 on:
@@ -38,6 +42,12 @@ on:
       sha:
         description: The batch's last commit, which the Gate tests and main moves to when it is green.
         value: ${{ jobs.plan.outputs.sha }}
+      test:
+        description: "\"false\" when the batch changes only documents since main, or nothing, so the Gate does not run; \"true\" otherwise."
+        value: ${{ jobs.plan.outputs.test }}
+      proof:
+        description: "What lets main move: \"gate\", a Gate run that passed, or \"documents\", which the move checks again."
+        value: ${{ jobs.plan.outputs.proof }}
 
 jobs:
   plan:
@@ -46,11 +56,15 @@ jobs:
       contents: read
     outputs:
       sha: ${{ steps.plan.outputs.sha }}
+      test: ${{ steps.proof.outputs.test }}
+      proof: ${{ steps.proof.outputs.proof }}
     steps:
       - uses: actions/checkout@v5
         with:
           ref: ${{ github.sha }}
           fetch-depth: 1
+          # Commits and folders only, so the proof step can read main's without the whole of it.
+          filter: blob:none
           persist-credentials: false
           sparse-checkout: |
             .claude
@@ -112,3 +126,58 @@ jobs:
           fi
           echo "sha=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
           printf 'Batch %s, the go for %s (%s): the Gate is %s, as stored in .claude/gate.json.\n' "$GITHUB_SHA" "${GO_PILE:-no pile named}" "${GO_ISSUES:-no issues named}" "$workflow" | tee -a "${GITHUB_STEP_SUMMARY:-/dev/null}"
+      # INFRA-287. Robert, November 19, 2026: "Why do we run ANYTHING for a document commit? Why?"
+      # Main is code a Gate run already passed, so a batch that adds nothing to it but documents needs
+      # no Gate run. Anything this step cannot read runs the Gate, as before.
+      - name: Decide whether the Gate runs
+        id: proof
+        env:
+          TOKEN: ${{ github.token }}
+        run: |
+          set -u
+          say() { printf '%s\n' "$1" | tee -a "${GITHUB_STEP_SUMMARY:-/dev/null}"; }
+          # Read main from GitHub with this run's own read token, for this step's git calls only.
+          GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $(printf 'x-access-token:%s' "${TOKEN:-}" | base64 | tr -d '\n')"
+          export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0="http.https://github.com/.extraheader" GIT_CONFIG_VALUE_0
+          # documents-only: begin. These lines are the same in batch-plan.yml and batch-move.yml.
+          # documents_only BASE HEAD prints why and returns 0 when HEAD's files differ from BASE's only in
+          # the paths BASE's own .claude/gate.json names as documents, or not at all; it returns 1 otherwise.
+          # A pattern's * stands for any run of characters, a / included, and ? for one, as setup stored it.
+          documents_only() {
+            changed="$(mktemp)"
+            git diff --no-renames --name-only -z "$1" "$2" -- > "$changed" || return 1
+            if [ ! -s "$changed" ]; then
+              echo "The batch's files are the same as main's: nothing in it is new."
+              return 0
+            fi
+            patterns="$(git show "$1:.claude/gate.json" 2>/dev/null | jq -r '.documents
+              | if type == "array" and length > 0 and all(.[]; type == "string" and length <= 200
+                  and test("^[A-Za-z0-9._*?+@-][A-Za-z0-9._*?/+@-]*$") and test("[A-Za-z0-9]"))
+                then .[] else empty end' 2>/dev/null)" || return 1
+            [ -n "$patterns" ] || return 1
+            count=0
+            while IFS= read -r -d '' path; do
+              case "$path" in .github/* | .claude/gate.json) return 1 ;; esac
+              hit=""
+              while IFS= read -r pattern; do
+                case "$path" in $pattern) hit=1; break ;; esac
+              done <<< "$patterns"
+              [ -n "$hit" ] || return 1
+              count=$((count + 1))
+            done < "$changed"
+            echo "The batch changes only documents since main ($count file(s)), as main's .claude/gate.json names them."
+            return 0
+          }
+          # documents-only: end.
+          test=true
+          proof=gate
+          if git fetch --quiet --no-tags --depth=1 origin +refs/heads/main:refs/remotes/origin/main 2>/dev/null &&
+            why="$(documents_only refs/remotes/origin/main "$GITHUB_SHA")"; then
+            test=false
+            proof=documents
+            say "$why So the Gate does not run, and main moves to $GITHUB_SHA once the move checks this again."
+          else
+            say "The batch changes more than documents since main, so the Gate runs on $GITHUB_SHA."
+          fi
+          echo "test=$test" >> "$GITHUB_OUTPUT"
+          echo "proof=$proof" >> "$GITHUB_OUTPUT"
