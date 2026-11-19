@@ -211,7 +211,8 @@ if len(sys.argv) > 3 and sys.argv[3] == "revs":
                 out.append("HEAD")
                 continue
             sub, rest = git_sub(words)
-            if sub in MOVERS:
+            # A branch moved or copied (-f, -m, -c and their capitals) changes what a push of it sends.
+            if sub in MOVERS or (sub == "branch" and any(a in ("-f", "--force", "-m", "-M", "-c", "-C") for a in rest)):
                 moved = moved or sub
                 continue
             if sub != "push" or any(a in ("--delete", "-d") for a in rest):

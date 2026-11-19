@@ -18,11 +18,14 @@ or scripts/ci/ needs its own line. A merge counts only the files it leaves diffe
 from every parent, so bringing in a change that is already on origin asks for
 nothing.
 
-A line "moves SUB" says a git command (a commit, rebase, checkout and the like) runs
-ahead of the push, so the commits, and their messages, can change after this reads
-them. Then every local branch, HEAD and the files not committed yet are read, and
-the line is refused when any of them touches a CI file, OK line or not, with the
-advice to run that command on its own first. Otherwise it adds nothing.
+A line "moves SUB" says a git command that makes or moves a commit runs ahead of the
+push, so the commits, and their messages, can change after this reads them. A merge,
+cherry-pick, revert, reset, am, checkout, switch or branch repoint can bring in a CI
+change from a commit origin already holds, so that line is refused, with the advice
+to run that command on its own first. For a commit, rebase or pull, whose new commits
+come only from local ones, every local branch, HEAD and the files not committed yet
+are read, and the line is refused when any of them touches a CI file, OK line or
+not. Otherwise it adds nothing.
 
 Exit 0 when all is well, 1 with the reason on stdout when not.
 
@@ -38,6 +41,9 @@ import sys
 PATHS = (".github/", "scripts/ci/")
 MANY = {"--branches", "--all", "--tags"}
 WIDE = ["HEAD", "--branches"]
+# The commands ahead of a push whose new commits come only from local ones: a commit is made from the files
+# not committed yet, and a rebase or pull replays local commits onto origin's. Every other one is refused.
+KEEPS = {"commit", "rebase", "pull"}
 OK_LINE = re.compile(r"^[ \t]*CI-change-OK:[ \t]*(\S+)[ \t]*$", re.M)
 # A link to one comment: Linear's #comment-<id>, GitHub's #issuecomment-<n>.
 COMMENT_LINK = re.compile(r"^https?://\S+#(comment-[0-9A-Za-z-]+|issuecomment-[0-9]+)$")
@@ -92,8 +98,16 @@ def main(lines):
     for line in lines:
         if line and not line.startswith("moves "):
             revs.extend([line] if resolvable(line) else WIDE)
+    if moved and moved not in KEEPS:
+        # A merge, cherry-pick, revert, reset, checkout or branch repoint can bring in a CI change from a
+        # commit origin already holds, which nothing here can read before it is made.
+        print(f"this command runs 'git {moved}' before it pushes, and that can change which commits are pushed, or their"
+              " messages, after this check reads them, so a change to the CI checks (files under .github/ or scripts/ci/)"
+              " could go out without the person's OK.")
+        print(f"Run 'git {moved}' on its own, then push, so this check reads the commits as they will go.")
+        return 1
     if moved:
-        against = ["HEAD"] if resolvable("HEAD") else ["--cached"]  # no commit yet: what is staged
+        against =["HEAD"] if resolvable("HEAD") else ["--cached"]  # no commit yet: what is staged
         pending = ci(names("diff", "--name-only", "--no-renames", "-z", *against)
                      + names("ls-files", "--others", "--exclude-standard", "-z"))
         found = [describe(c, files) for c, files in unsent_ci_commits(revs + WIDE)]
