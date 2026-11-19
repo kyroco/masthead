@@ -297,5 +297,90 @@ for path in (PLAN, MOVE):
         check("{} step {} puts no expression inside its shell".format(os.path.basename(path), step_id),
               "${{" not in step_script(path, step_id))
 
+# ---- arch-1: the starter grants the Gate the token permissions it asks for -----
+# A called workflow may ask for no more than its caller job grants, or GitHub
+# refuses the whole run before any job starts. Setup fills the Gate job's grant
+# from the stored Gate's own permissions (gate.py starter).
+sys.path.insert(0, os.path.join(PLUGIN, "skills", "setup"))
+import gate as gate_py  # noqa: E402
+
+KYROCO_LIKE = """name: Gate
+on:
+  pull_request:
+  workflow_call:
+permissions:
+  contents: read
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+    steps: []
+  tests:
+    runs-on: ubuntu-latest
+    steps: []
+  drop-build:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: read
+    steps: []
+"""
+CLOUD = """name: Gate
+on: [workflow_call]
+jobs:
+  deploy-check:
+    runs-on: ubuntu-latest
+    permissions: { id-token: write, checks: write }
+    steps: []
+  lint:
+    runs-on: ubuntu-latest
+    steps: []
+"""
+WRITE_ALL = "name: Gate\non: [workflow_call]\npermissions: write-all\njobs:\n  a:\n    runs-on: x\n    steps: []\n"
+
+
+def rendered(gate_text):
+    with tempfile.TemporaryDirectory() as top:
+        os.makedirs(os.path.join(top, ".github", "workflows"))
+        with open(os.path.join(top, GATE), "w", encoding="utf-8") as handle:
+            handle.write(gate_text)
+        os.makedirs(os.path.join(top, ".claude"))
+        with open(os.path.join(top, ".claude", "gate.json"), "w", encoding="utf-8") as handle:
+            json.dump({"workflow": GATE, "starts": ["workflow_call"]}, handle)
+        try:
+            return gate_py.starter(top)
+        except Exception as error:  # the check below reports it
+            return "error: {!r}".format(error)
+
+
+def gate_job(text):
+    return text.split("\n  gate:\n", 1)[-1].split("\n  move:\n", 1)[0]
+
+
+text = rendered(KYROCO_LIKE)
+check("arch-1 the rendered starter runs the stored Gate", "    uses: ./" + GATE + "\n" in gate_job(text), text)
+check("arch-1 the Gate job grants every permission a Gate job asks for, the strongest level of each",
+      "    permissions: { actions: write, contents: read, pull-requests: read }\n" in gate_job(text), text)
+check("arch-1 the rendered starter keeps no placeholder", "__" not in text, text)
+text = rendered(CLOUD)
+check("arch-1 a Gate job asking for id-token and checks write gets them, and a job that asks for nothing keeps contents read",
+      "    permissions: { checks: write, contents: read, id-token: write, packages: read }\n" in gate_job(text), text)
+check("arch-1 a Gate asking for write-all is granted write-all",
+      "    permissions: write-all\n" in gate_job(rendered(WRITE_ALL)), rendered(WRITE_ALL))
+check("arch-1 with no Gate stored there is no starter to write", gate_py.starter(tempfile.gettempdir()) is None
+      if hasattr(gate_py, "starter") else False)
+
+# ---- arch-2: without jq the suite skips, as run-tests.sh expects --------------
+if not os.environ.get("BATCH_RUN_NO_JQ_CHILD"):
+    with tempfile.TemporaryDirectory() as empty:
+        child = subprocess.run([sys.executable, os.path.abspath(__file__)], capture_output=True, text=True,
+                               env={"PATH": empty, "BATCH_RUN_NO_JQ_CHILD": "1", "HOME": empty})
+        last = (child.stdout + child.stderr).strip().splitlines()[-1:] or [""]
+        check("arch-2 with no jq on the path the suite exits 77 and says why",
+              child.returncode == 77 and "jq" in last[0], child.stdout + child.stderr)
+
 print("{} passed, {} failed".format(passed, failed))
 sys.exit(1 if failed else 0)
