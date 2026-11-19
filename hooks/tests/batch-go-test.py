@@ -410,28 +410,5 @@ with tempfile.TemporaryDirectory() as top:
     check("s3-J1 a lower-case key of the go's own issue on a refs line belongs to it, and the go starts",
           code == 0 and "Traceback" not in out and len(dispatches(repo.calls())) == 1, out)
 
-# arch-1: after a red batch, the search's drop record and a worker's `git revert` of it bring a
-# commit back. The record is the search's commit, no issue's work, and the revert of it belongs to
-# the record's issue, the way batch-issues.py reads them, though git's message names no issue.
-with tempfile.TemporaryDirectory() as top:
-    repo = Repo(top)
-    repo.land("Add the go script (INFRA-301)")
-    bad = repo.land("Add the hotfix pile (INFRA-303)")
-    git(repo.work, "revert", "--no-edit", "--no-commit", bad)
-    git(repo.work, "commit", "-q", "-m", "Drop {} from landing: it turned the batch red\n\n"
-        "Masthead-Dropped: {}\nMasthead-Issue: INFRA-303\nMasthead-Failed-Check: gate / Tests\n".format(bad[:9], bad))
-    record = git(repo.work, "rev-parse", "HEAD")
-    git(repo.work, "push", "-q", "origin", "HEAD:refs/heads/landing")
-    git(repo.work, "revert", "--no-edit", record)
-    back = git(repo.work, "rev-parse", "HEAD")
-    git(repo.work, "push", "-q", "origin", "HEAD:refs/heads/landing")
-    code, out = repo.go("INFRA-301", "INFRA-303")
-    check("arch-1 a drop record and the worker's revert of it belong to the dropped commit's issue, so the go starts",
-          code == 0 and len(dispatches(repo.calls())) == 1, out)
-    code, out = repo.go("INFRA-301")
-    check("arch-1 without that issue named, the brought-back commit is named by the record's issue",
-          code != 0 and "{} ".format(back[:9]) in out and "(INFRA-303)" in out
-          and "names no issue" not in out, out)
-
 print("{} passed, {} failed".format(passed, failed))
 sys.exit(1 if failed else 0)

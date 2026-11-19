@@ -47,10 +47,7 @@ def _load(name, path):
     return module
 
 
-# Drop records and the commits that bring a dropped commit back are read the way batch-issues.py
-# reads them, so the two cannot disagree on whose such a commit is (arch-1). The starter's triggers
-# are read the way setup reads every workflow's.
-batch_issues = _load("batch_issues", os.path.join(HERE, "batch-issues.py"))
+# The starter's triggers are read the way setup reads every workflow's.
 gate = _load("gate", os.path.join(PLUGIN, "skills", "setup", "gate.py"))
 
 REMOTE = "origin"
@@ -135,13 +132,9 @@ def owner(body, pattern):
     return m.group(1) if m else None
 
 
-def pile(pattern, head):
-    """[(sha, subject, issue)] for each commit on landing past main, oldest first.
-
-    A drop record a red batch left (references/bad-commit.md) belongs to the issue of the commit it
-    dropped, and so does a commit that reverts it to bring that commit back, whatever its message
-    names: the rule batch-issues.py reads them by."""
-    by_revert = {r["revert"]: r for r in batch_issues.records(head)}
+def pile(pattern):
+    """[(sha, subject, issue)] for each commit on landing past main, oldest first. A red batch puts
+    nothing on landing (INFRA-288: its bad change is fixed on top), so every commit is a worker's."""
     out = git("log", "--reverse", "--format=%H%x1f%s%x1f%B%x1e",
               "refs/remotes/{0}/{1}..refs/remotes/{0}/{2}".format(REMOTE, MAIN, LANDING)).stdout
     found = []
@@ -149,13 +142,7 @@ def pile(pattern, head):
         if "\x1f" not in entry:
             continue
         sha, subject, body = entry.split("\x1f", 2)
-        sha = sha.strip()
-        record = by_revert.get(sha) or batch_issues.brings_back(body, by_revert)
-        if record:
-            issue = record["issue"] if record["issue"] != batch_issues.bc.NO_ISSUE else None
-        else:
-            issue = owner(body, pattern)
-        found.append((sha, subject.strip(), issue))
+        found.append((sha.strip(), subject.strip(), owner(body, pattern)))
     return found
 
 
@@ -210,7 +197,7 @@ def go(argv):
         raise Stop("Main holds a commit landing does not, so a green run could not move main to landing. "
                    "Nothing starts.")
 
-    commits = pile(key_pattern(keys, project_fact.linear_team(top)), head)
+    commits = pile(key_pattern(keys, project_fact.linear_team(top)))
     if not commits:
         raise Stop("Landing holds nothing main does not, so there is nothing to test and nothing starts.")
     strays = [(sha, subject, issue) for sha, subject, issue in commits if issue not in keys]
