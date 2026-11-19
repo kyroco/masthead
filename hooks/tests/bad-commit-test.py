@@ -452,6 +452,34 @@ check("s1 s4 the failing commit's own record still names it, its issue and the f
 check("s1 a commit that does not build on it stays on landing", "other" in files, files)
 r.done()
 
+# R1-V1: a later commit that shares the bad commit's file but none of its lines stays on landing.
+LINES = ["line {}".format(n) for n in range(1, 41)]
+
+
+def lib_with(**changed):
+    lines = list(LINES)
+    for number, text in changed.items():
+        lines[int(number[1:]) - 1] = text
+    return "\n".join(lines) + "\n"
+
+
+r = Repo()
+r.land({"lib": lib_with()}, "Add lib (INFRA-501)")
+bad = r.land({"lib": lib_with(n2="two broken"), "breaks": "x\n"}, "Break lib (INFRA-502)")
+r.red_batch()
+in_way = r.land({"lib": lib_with(n2="two again")}, "Change line two again (INFRA-503)")
+far = r.land({"lib": lib_with(n2="two again", n38="thirty-eight")}, "Change line 38 (INFRA-504)")
+r.land({"other": "o\n"}, "Add other (INFRA-505)")
+out = r.search()
+lib = git(r.remote, "show", "refs/heads/landing:lib").splitlines()
+dropped = [r.trailers(sha).get("Masthead-Dropped", [""])[0] for sha in r.records()]
+check("r1-v1 only the later commit in the way comes off with the bad one",
+      out.returncode == 0 and sorted(dropped) == sorted([bad, in_way]), (out.stdout + out.stderr, dropped))
+check("r1-v1 a later commit sharing only the file keeps its change on landing",
+      far not in dropped and lib[37] == "thirty-eight" and lib[1] == "line 2" and
+      "breaks" not in r.files_on_landing(), lib)
+r.done()
+
 # V-S1-1: a later red batch still holds a commit an earlier search dropped, with its
 # revert. The search blames the commit that fails now, not the one already dropped.
 r = Repo()
