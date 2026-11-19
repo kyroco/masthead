@@ -120,18 +120,22 @@ def run_step(script, cwd, env):
 class Repo:
     """A bare remote opted in to the batch run, a checkout of it, and a gh that logs each call."""
 
-    def __init__(self, top, linear=True, opted_in=True, starter=None, gh_fails=""):
+    def __init__(self, top, linear=True, opted_in=True, starter=None, gh_fails="", documents=None):
         self.top = top
         self.remote = os.path.join(top, "remote.git")
         self.work = os.path.join(top, "work")
         self.log = os.path.join(top, "gh-calls.jsonl")
+        self.answers_path = os.path.join(top, "gh-answers.json")
         git(top, "init", "-q", "--bare", "-b", "main", self.remote)
         git(top, "clone", "-q", self.remote, self.work)
         git(self.work, "switch", "-q", "-c", "main")
         env = {"ISSUE_TRACKER": "linear", "LINEAR_TEAM_KEY": "INFRA"} if linear else {}
         self.write(".claude/settings.json", json.dumps({"env": env}))
         self.write(GATE, "name: Gate\non: [workflow_call, workflow_dispatch]\njobs:\n  gate:\n    runs-on: ubuntu-latest\n")
-        self.write(".claude/gate.json", json.dumps({"workflow": GATE, "starts": ["workflow_call", "workflow_dispatch"]}))
+        stored = {"workflow": GATE, "starts": ["workflow_call", "workflow_dispatch"]}
+        if documents is not None:
+            stored["documents"] = documents
+        self.write(".claude/gate.json", json.dumps(stored))
         if starter is not None:
             self.write(STARTER, starter)
         elif opted_in:
@@ -149,7 +153,16 @@ class Repo:
             handle.write("#!/usr/bin/env python3\nimport json, sys\n"
                          "with open({!r}, 'a') as h:\n    h.write(json.dumps(sys.argv[1:]) + '\\n')\n"
                          "fail = {!r}\n"
-                         "if fail:\n    sys.stderr.write(fail + '\\n')\n    sys.exit(1)\n".format(self.log, gh_fails))
+                         "if fail:\n    sys.stderr.write(fail + '\\n')\n    sys.exit(1)\n"
+                         # INFRA-287: what GitHub answers a read, set per case with repo.answer().
+                         "import os\nanswers = {{}}\n"
+                         "if os.path.exists({!r}):\n    answers = json.load(open({!r}))\n"
+                         "key = ' '.join(sys.argv[1:3] + sys.argv[3:4] * (sys.argv[1:3] == ['run', 'view']))\n"
+                         "said = answers.get(key)\n"
+                         "if isinstance(said, dict) and 'fail' in said:\n"
+                         "    sys.stderr.write(said['fail'] + '\\n')\n    sys.exit(1)\n"
+                         "if said is not None:\n    sys.stdout.write(json.dumps(said))\n".format(
+                             self.log, gh_fails, self.answers_path, self.answers_path))
         os.chmod(shim, 0o755)
         self.path = bin_dir + os.pathsep + os.environ.get("PATH", "")
 
@@ -183,6 +196,11 @@ class Repo:
         r = subprocess.run([sys.executable, GO, *args], cwd=self.work, env=env, capture_output=True, text=True)
         return r.returncode, r.stdout + r.stderr
 
+    def answer(self, answers):
+        """What the stand-in gh prints: {"run list": [...], "run view <id>": {...}, "run rerun": {"fail": "..."}}."""
+        with open(self.answers_path, "w") as handle:
+            json.dump(answers, handle)
+
     def calls(self):
         if not os.path.exists(self.log):
             return []
@@ -214,9 +232,18 @@ class Repo:
         if code != 0:
             return "plan", code, out
         sha = output.strip().split("=", 1)[1]
+        # INFRA-287: the plan's second step says whether the Gate runs; when it does not, the Gate
+        # job is skipped and the move is told so, as the starter wires it.
+        _, said, _, proof_output = run_step(step_script(PLAN, "proof"), checkout,
+                                            {"GITHUB_SHA": head, "TOKEN": "unused"})
+        outputs = dict(line.split("=", 1) for line in proof_output.split() if "=" in line)
+        self.last_plan = outputs
+        if outputs.get("test") == "false":
+            gate_result = "skipped"
         code, out, _, _ = run_step(step_script(MOVE, "move"), checkout,
-                                   {"SHA": sha, "GATE_RESULT": gate_result, "GITHUB_REF": ref})
-        return "move", code, out + summary
+                                   {"SHA": sha, "GATE_RESULT": gate_result, "GITHUB_REF": ref,
+                                    "PROOF": outputs.get("proof", "")})
+        return "move", code, said + out + summary
 
 
 def dispatches(calls):
@@ -240,7 +267,8 @@ with tempfile.TemporaryDirectory() as top:
     code, out = repo.go("--milestone", "Batch on go", "INFRA-285", "INFRA-286", "INFRA-287")
     runs = dispatches(repo.calls())
     check("S2 a go for a milestone whose issues are the whole pile exits 0", code == 0, out)
-    check("S2/S4 the go starts exactly one run, then and there", len(runs) == 1 and len(repo.calls()) == 1, repo.calls())
+    check("S2/S4 the go starts exactly one run, then and there, after only reading GitHub's earlier runs",
+          len(runs) == 1 and [c[:2] for c in repo.calls()] == [["run", "list"], ["workflow", "run"]], repo.calls())
     call = runs[0] if runs else ["workflow", "run"]
     inputs = repo.inputs(call)
     check("S2 the run is the starter on landing", call[2:5] == ["masthead-batch.yml", "--ref", "landing"], call)
@@ -785,6 +813,200 @@ else:
             "PATH": os.path.dirname(GERMAN_GIT) + os.pathsep + repo.path, "LC_ALL": "de_DE.UTF-8", "LANGUAGE": "de"})
         check("r2-J2 with git speaking German, the stop still gives git's line for the conflict",
               code != 0 and "nothing more" not in out and "greeting.txt" in out.split("git said:")[-1], out)
+# ==== INFRA-287: never test the same code twice, and no Gate for a pile of only documents ====
+# Robert, November 19, 2026: "then fix it so that if there is nothing new, DON'T FUCKING TEST AGAIN!"
+# and "Why do we run ANYTHING for a document commit? Why?"
+
+
+def job(name, conclusion):
+    return {"name": name, "conclusion": conclusion}
+
+
+def earlier_run(repo, head, jobs, run_id=4242, status="completed"):
+    repo.answer({"run list": [{"databaseId": run_id, "headSha": head, "status": status,
+                               "conclusion": "failure", "createdAt": "2026-11-19T21:00:00Z"},
+                              {"databaseId": 1, "headSha": "f" * 40, "status": "in_progress",
+                               "conclusion": "", "createdAt": "2026-11-19T22:00:00Z"}],
+                 "run view {}".format(run_id): {"jobs": jobs}})
+
+
+GREEN_GATE = [job("plan / plan", "success"), job("gate / tests", "success"), job("gate / gate", "success")]
+
+# S1: a commit a batch run already proved is not tested again: its Gate passed and only the move failed,
+# so the go runs the move again and starts no Gate run.
+with tempfile.TemporaryDirectory() as top:
+    repo = Repo(top)
+    head = repo.land("Add the go script (INFRA-285)")
+    earlier_run(repo, head, GREEN_GATE + [job("move / move", "failure")])
+    code, out = repo.go("INFRA-285")
+    calls = repo.calls()
+    check("INFRA-287 S1 a commit whose Gate passed and whose move failed starts no new run",
+          code == 0 and dispatches(calls) == [], calls)
+    check("INFRA-287 S1 it runs only that run's failed jobs again, the move",
+          ["run", "rerun", "4242", "--failed"] in calls, calls)
+    check("INFRA-287 S1 it says the Gate does not run again", "with no Gate run" in out, out)
+
+# The foreman's guard: the move is run again only when every job that failed or was cancelled is a move job.
+for label, jobs in (
+        ("a Gate job failed", [job("plan / plan", "success"), job("gate / tests", "failure"), job("move / move", "skipped")]),
+        ("a Gate job was cancelled", [job("plan / plan", "success"), job("gate / tests", "cancelled"),
+                                      job("gate / gate", "success"), job("move / move", "failure")]),
+        ("a Gate job timed out beside a failed move", [job("plan / plan", "success"), job("gate / tests", "timed_out"),
+                                                       job("move / move", "failure")]),
+        ("the plan stopped", [job("plan / plan", "failure"), job("gate", "skipped"), job("move", "skipped")]),
+        ("no Gate job ran", [job("plan / plan", "success"), job("gate", "skipped"), job("move / move", "failure")])):
+    with tempfile.TemporaryDirectory() as top:
+        repo = Repo(top)
+        head = repo.land("Add the go script (INFRA-285)")
+        earlier_run(repo, head, jobs)
+        code, out = repo.go("INFRA-285")
+        calls = repo.calls()
+        check("INFRA-287 S1 when {} the go never runs failed jobs again".format(label),
+              not any(c[:2] == ["run", "rerun"] for c in calls), calls)
+
+# A Gate that went red on the same commit, with nothing new landed: nothing starts.
+with tempfile.TemporaryDirectory() as top:
+    repo = Repo(top)
+    head = repo.land("Add the go script (INFRA-285)")
+    earlier_run(repo, head, [job("plan / plan", "success"), job("gate / tests", "failure"), job("move", "skipped")])
+    code, out = repo.go("INFRA-285")
+    check("INFRA-287 S1 a commit a run already tested red starts nothing, since nothing is new",
+          code != 0 and dispatches(repo.calls()) == [] and "a second run would test the same commit again" in out, out)
+    check("INFRA-287 S1 the refusal points at the search for the bad change", "bad-commit.py 4242" in out, out)
+
+# A run of the same commit still running or waiting: a second go starts nothing.
+for status in ("in_progress", "queued", "waiting"):
+    with tempfile.TemporaryDirectory() as top:
+        repo = Repo(top)
+        head = repo.land("Add the go script (INFRA-285)")
+        earlier_run(repo, head, GREEN_GATE, status=status)
+        code, out = repo.go("INFRA-285")
+        check("INFRA-287 S1 a go while a run of the same commit is {} starts nothing".format(status),
+              code != 0 and dispatches(repo.calls()) == [] and "already testing" in out, out)
+
+# A run of an older commit says nothing about the new one: the go starts a run.
+with tempfile.TemporaryDirectory() as top:
+    repo = Repo(top)
+    old = repo.land("Add the go script (INFRA-285)")
+    head = repo.land("Follow up on the go script (INFRA-285)")
+    earlier_run(repo, old, [job("plan / plan", "success"), job("gate / tests", "failure"), job("move", "skipped")])
+    code, out = repo.go("INFRA-285")
+    check("INFRA-287 S1 a run of an older commit does not stop a go for a new one",
+          code == 0 and len(dispatches(repo.calls())) == 1, out)
+
+# GitHub not listing its runs does not stop the go; it says it cannot tell.
+with tempfile.TemporaryDirectory() as top:
+    repo = Repo(top)
+    repo.land("Add the go script (INFRA-285)")
+    repo.answer({"run list": {"fail": "HTTP 502"}})
+    code, out = repo.go("INFRA-285")
+    check("INFRA-287 S1 a go whose run list fails still starts one run and says it could not tell",
+          code == 0 and len(dispatches(repo.calls())) == 1 and "cannot tell whether" in out, out)
+
+# GitHub refusing to run the move again: nothing starts, so the Gate is not run again either.
+with tempfile.TemporaryDirectory() as top:
+    repo = Repo(top)
+    head = repo.land("Add the go script (INFRA-285)")
+    earlier_run(repo, head, GREEN_GATE + [job("move / move", "failure")])
+    answers = json.loads(read(repo.answers_path))
+    answers["run rerun"] = {"fail": "HTTP 403: run is older than 30 days"}
+    repo.answer(answers)
+    code, out = repo.go("INFRA-285")
+    check("INFRA-287 S1 a move GitHub will not run again starts no new Gate run, and says why",
+          code != 0 and dispatches(repo.calls()) == [] and "HTTP 403" in out, out)
+
+# A repeat on the same tree: commits that put the files back as main has them carry nothing new,
+# so the run moves main with no Gate run.
+with tempfile.TemporaryDirectory() as top:
+    repo = Repo(top)
+    repo.land("Try a change (INFRA-285)", name="try.txt")
+    git(repo.work, "rm", "-q", "try.txt")
+    git(repo.work, "commit", "-q", "-m", "Take the change back (INFRA-285)")
+    git(repo.work, "push", "-q", "origin", "HEAD:refs/heads/landing")
+    head = git(repo.work, "rev-parse", "HEAD")
+    code, out = repo.go("INFRA-285")
+    where, code, out = repo.run_batch(dispatches(repo.calls())[0])
+    check("INFRA-287 S1 a pile whose files are the same as main's runs no Gate",
+          repo.last_plan.get("test") == "false" and "nothing in it is new" in out, out)
+    check("INFRA-287 S1 and its move takes main there", where == "move" and code == 0 and repo.ref("main") == head, out)
+
+# ---- S2: a pile of only documents moves main with no Gate run --------------------------
+DOCS = ["docs/*", "README.md"]
+with tempfile.TemporaryDirectory() as top:
+    repo = Repo(top, documents=DOCS)
+    repo.land("Explain the go (INFRA-287)", name="docs/go.md")
+    head = repo.land("Say what's new (INFRA-287)", name="README.md")
+    code, out = repo.go("INFRA-287")
+    check("INFRA-287 S2 the go says the pile is only documents and moves main with no Gate run",
+          code == 0 and "changes only documents since main" in out and "with no Gate run" in out, out)
+    where, code, out = repo.run_batch(dispatches(repo.calls())[0], gate_result="never ran")
+    check("INFRA-287 S2 the plan says the Gate does not run", repo.last_plan == {"test": "false", "proof": "documents"},
+          repo.last_plan)
+    check("INFRA-287 S2 the move takes main to the pile with no Gate run",
+          where == "move" and code == 0 and repo.ref("main") == head and "No Gate run was needed" in out, out)
+
+# ---- S4: any change that is not a document runs the Gate -------------------------------
+with tempfile.TemporaryDirectory() as top:
+    repo = Repo(top, documents=DOCS)
+    repo.land("Explain the go (INFRA-287)", name="docs/go.md")
+    repo.land("Change the code (INFRA-287)", name="lib/go.py")
+    code, out = repo.go("INFRA-287")
+    check("INFRA-287 S4 the go does not call a mixed pile only documents", "only documents" not in out, out)
+    where, code, out = repo.run_batch(dispatches(repo.calls())[0])
+    check("INFRA-287 S4 a pile with one change that is not a document runs the Gate",
+          repo.last_plan == {"test": "true", "proof": "gate"} and "so the Gate runs" in out, repo.last_plan)
+
+for label, name, content in (
+        ("the checks themselves", ".github/workflows/other.yml", "on: push\n"),
+        ("the stored list itself", ".claude/gate.json",
+         json.dumps({"workflow": GATE, "starts": ["workflow_call"], "documents": ["*.py", "docs/*"]})),
+        ("a document folder's twin", "docsx/go.md", "x\n")):
+    with tempfile.TemporaryDirectory() as top:
+        repo = Repo(top, documents=DOCS + [".github/*", ".claude/*"])
+        repo.land("Explain the go (INFRA-287)", name="docs/go.md")
+        repo.write(name, content)
+        git(repo.work, "add", "-A")
+        git(repo.work, "commit", "-q", "-m", "Change {} (INFRA-287)".format(name))
+        git(repo.work, "push", "-q", "origin", "HEAD:refs/heads/landing")
+        code, out = repo.go("INFRA-287")
+        where, code, out = repo.run_batch(dispatches(repo.calls())[0])
+        check("INFRA-287 S4 a pile that changes {} runs the Gate".format(label),
+              repo.last_plan.get("test") == "true", repo.last_plan)
+
+# A pile cannot widen its own list: the plan reads main's.
+with tempfile.TemporaryDirectory() as top:
+    repo = Repo(top, documents=DOCS)
+    repo.write(".claude/gate.json", json.dumps({"workflow": GATE, "starts": ["workflow_call"], "documents": ["*"]}))
+    git(repo.work, "add", "-A")
+    git(repo.work, "commit", "-q", "-m", "Call everything a document (INFRA-287)")
+    git(repo.work, "push", "-q", "origin", "HEAD:refs/heads/landing")
+    head = repo.land("Change the code (INFRA-287)", name="lib/go.py")
+    # Main takes the widened list another way (here, by hand): the code commit still runs the Gate.
+    code, out = repo.go("INFRA-287")
+    where, code, out = repo.run_batch(dispatches(repo.calls())[0])
+    check("INFRA-287 S4 a pile that widens the document list in its own gate.json still runs the Gate",
+          repo.last_plan.get("test") == "true", repo.last_plan)
+
+# With no document paths stored, only a pile of nothing new skips the Gate.
+with tempfile.TemporaryDirectory() as top:
+    repo = Repo(top)
+    repo.land("Explain the go (INFRA-287)", name="docs/go.md")
+    code, out = repo.go("INFRA-287")
+    where, code, out = repo.run_batch(dispatches(repo.calls())[0])
+    check("INFRA-287 S4 with no document paths stored a pile of docs runs the Gate",
+          repo.last_plan.get("test") == "true", repo.last_plan)
+
+# An older starter, without the skip: the go says so.
+with tempfile.TemporaryDirectory() as top:
+    old = read(STARTER_TEMPLATE).replace("__GATE_PERMISSIONS__", "{ contents: read }").replace("__GATE__", GATE)
+    old = re.sub(r"\n    # No Gate run when.*\n    if: needs\.plan\.outputs\.test != 'false'", "", old)
+    old = re.sub(r"\n    # After a Gate that passed.*\n    if: .*", "", old).replace(
+        "\n      proof: ${{ needs.plan.outputs.proof }}", "")
+    repo = Repo(top, starter=old, documents=DOCS)
+    repo.land("Explain the go (INFRA-287)", name="docs/go.md")
+    code, out = repo.go("INFRA-287")
+    check("INFRA-287 S2 an older starter that runs the Gate for documents is named, with how to write it again",
+          code == 0 and "starter on landing is older and runs the Gate anyway" in out and "/masthead:setup" in out, out)
 
 print("{} passed, {} failed".format(passed, failed))
 sys.exit(1 if failed else 0)

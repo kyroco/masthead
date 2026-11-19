@@ -317,7 +317,11 @@ keep it off `landing`. When you say go, for a milestone, or for a set of issues 
 milestone, the foreman starts one Gate run on the pile, then and there, and
 main moves to the pile only when that run is green. The foreman refuses a go
 while `landing` holds commits of an issue the go does not name, and says
-which. On one more yes, setup then writes a small starter
+which. Nothing is tested twice: a go for a commit already being tested, or
+already tested red, starts nothing, and one whose Gate passed but whose move
+failed runs only the move again. Setup asks you once which paths hold only
+documents; a pile that changes only those moves main with no Gate run, and
+setup names any workflow that would test again when main moves. On one more yes, setup then writes a small starter
 file, `.github/workflows/masthead-batch.yml`, which calls the batch run kept
 in this repository; makes the `landing` branch from main if it is missing;
 and makes an environment named `masthead-batch` that only `landing` and

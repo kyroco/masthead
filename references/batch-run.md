@@ -17,11 +17,11 @@ moves main forward.": "I agree with 1 and 2".
 
 | Part | Where it lives | What it does |
 |---|---|---|
-| The go | `skills/work-on/batch-go.py`, run by the foreman when the person says go, or with `--hotfix` as soon as a hotfix lands | Checks the pile on `landing` (or `hotfix`) belongs to the issues the go names, brings main in with one merge when main holds work the pile does not, then starts the starter file on that branch, once |
+| The go | `skills/work-on/batch-go.py`, run by the foreman when the person says go, or with `--hotfix` as soon as a hotfix lands | Checks the pile on `landing` (or `hotfix`) belongs to the issues the go names, brings main in with one merge when main holds work the pile does not, then starts the starter file on that branch, once, unless a run already tested or is testing that commit (INFRA-287) |
 | The starter file | the repository's `.github/workflows/`, written by setup (INFRA-272) from `skills/setup/batch-starter.yml` | Starts only on a go (`workflow_dispatch`), never on a push, keeps one batch running at a time on each pile, and runs the three jobs below |
 | `plan` | `kyroco/masthead/.github/workflows/batch-plan.yml` | Stops a run on any branch but `landing` and `hotfix`, a run no go started, or one whose pile moved after the go; reads `.claude/gate.json` at the batch's commit and stops when no Gate is stored or the starter runs another one |
-| `gate` | the repository's own Gate, the workflow `.claude/gate.json` names | Tests the batch's last commit, started with `workflow_call` |
-| `move` | `kyroco/masthead/.github/workflows/batch-move.yml` | When the Gate passed, moves main forward to exactly that commit, as the batch App, when it is still on the run's own pile |
+| `gate` | the repository's own Gate, the workflow `.claude/gate.json` names | Tests the batch's last commit, started with `workflow_call`; skipped when the plan finds the batch changes only documents, or nothing (INFRA-287) |
+| `move` | `kyroco/masthead/.github/workflows/batch-move.yml` | When the Gate passed, or was skipped for documents and the move finds that true again, moves main forward to exactly that commit, as the batch App, when it is still on the run's own pile |
 
 GitHub runs only workflow files that live in the repository, so the
 repository holds the small starter file and Masthead holds the rest. The
@@ -117,13 +117,50 @@ A Gate arm that matches a batch run on `refs/heads/landing` alone does not
 match it, and treats it as a run started by hand on a branch; `gate.py snags`
 points at such an arm (see What the Gate sees in a batch run).
 
+## Never the same code twice (INFRA-287)
+
+Robert, November 19, 2026: "then fix it so that if there is nothing new,
+DON'T FUCKING TEST AGAIN!" and "Why do we run ANYTHING for a document commit?
+Why?"
+
+Before `batch-go.py` starts a run, it reads the batch runs GitHub holds for
+landing's last commit:
+
+| What GitHub holds for that commit | What the go does |
+|---|---|
+| A run still running or waiting | Starts nothing: a second run would test the same commit again |
+| A run whose Gate passed and whose move failed | Runs that run's failed jobs again, only the move, so main moves with no Gate run. Only when every job that failed or was cancelled is a move job, so a failed Gate job is never run again on its own and then moved |
+| A run whose Gate went red | Starts nothing: nothing new has landed. The search for the bad change (`bad-commit.py <run>`) is the next step |
+| Nothing, or runs that proved nothing (the plan stopped, or the run was cancelled) | Starts a run |
+
+Inside a run, the plan's second step compares the batch's files with main's.
+When nothing differs, or only paths main's own `.claude/gate.json` names as
+documents (`references/gate-fact.md`), its output `test` is `false`: the
+starter skips the Gate job and the move still runs, told `proof: documents`.
+The move checks the same thing again, against main as it reads it, before it
+moves main, and refuses when the batch changes anything else. The list is read
+from main, never from the pile, so a pile cannot widen its own exemption, and
+a change under `.github/` or to `.claude/gate.json` always runs the Gate.
+Anything the plan cannot read (main, the list) runs the Gate, as before.
+
+A starter written before INFRA-287 has no skip: its Gate runs on every go.
+`batch-go.py` says so when the pile is only documents, and setup writes the
+starter again (`batch.py write`).
+
+The move pushes main, and a workflow of the repository that runs on a push to
+main runs again there, on the commit the batch run just proved. Setup names
+each such workflow (`gate.py snags`, kind `main-push`); keeping one that only
+tests off main is the repository's change to `.github/`.
+
 ## Green, red, and no Gate
 
 - Green: `move` checks the commit is still on `landing` and main is behind it,
   then pushes it to main with a plain push, never forced. Main ends on the
   batch's last commit, the one the Gate tested.
-- Red, cancelled or skipped: `move` does not run, and if it is ever made to
-  run it refuses anything but a Gate that passed. Main stays where it was.
+- Red, cancelled, or skipped for any reason but documents: `move` does not
+  run, and if it is ever made to run it refuses anything but a Gate that
+  passed, or one skipped with `proof: documents` that it finds true again.
+  Main stays where it was.
   The foreman then runs the search for the change that turned the batch red,
   which names it and says whose it is, and takes nothing off landing; its
   worker fixes it on top (`references/bad-commit.md`).

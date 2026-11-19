@@ -307,7 +307,11 @@ issues from the tracker, or take the ones named, and start the run at once:
 
 It starts nothing while `landing` holds a commit of an issue the go does not
 name, and names each one: show the person its lines and ask whether to name
-those issues too. In a repository without the batch run, where the person
+those issues too. It never has the same commit tested twice (INFRA-287): a run
+already going on that commit starts nothing, a run whose Gate passed there and
+whose move failed gets only its move run again, and a run already red there
+starts nothing and points at the search below. A pile of only documents runs
+no Gate. Say what it printed. In a repository without the batch run, where the person
 told you to land by hand, start the Gate run by hand on `landing` on the go
 instead, and move main to `landing` only when it is green.
 

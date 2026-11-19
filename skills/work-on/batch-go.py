@@ -26,6 +26,22 @@ issue. Then it starts the starter file, `masthead-batch.yml`, on `landing`
 once, with landing's last commit, so the run tests the pile this script
 checked and no other: the run's plan step stops when landing moved in between.
 
+It never has the same commit tested twice (INFRA-287; Robert, November 19,
+2026: "then fix it so that if there is nothing new, DON'T FUCKING TEST
+AGAIN!"). Before it starts a run it reads the batch runs GitHub already holds
+for landing's last commit:
+
+- one still running or waiting: nothing starts, since a second run would test
+  the same commit again;
+- one whose Gate passed and whose move failed: it runs that run's failed jobs
+  again, which are only the move, so main moves with no Gate run. It does this
+  only when every job that failed or was cancelled is a move job;
+- one whose Gate went red: nothing starts, since nothing new has landed; the
+  search for the bad change (bad-commit.py) is the next step.
+
+A pile that changes only documents since main still starts a run, but the run's
+plan skips the Gate and the move checks that again (batch-plan.yml).
+
 `--check` checks the pile and starts nothing.
 
 A hotfix has its own pile, the branch `hotfix` (INFRA-286). Robert, November
@@ -49,6 +65,7 @@ over a merge that brings in only commits main already holds.
 there and `origin/main` otherwise. It starts nothing.
 """
 import importlib.util
+import json
 import os
 import re
 import subprocess
@@ -285,6 +302,98 @@ def check_pile(commits, keys, name, branch):
     raise Stop("\n".join(lines))
 
 
+# ---- Never test the same commit twice (INFRA-287) ------------------------------
+# A job of the starter's run is named for the starter's job first: "plan / plan", "gate / <the Gate's
+# job>", "move / move". What a job ended as, when that end proves nothing passed.
+NOT_PASSED = ("failure", "cancelled", "timed_out", "startup_failure", "action_required", "stale")
+RED = ("failure", "timed_out")
+
+
+def part_of(job):
+    return (job.get("name") or "").split(" / ", 1)[0].strip()
+
+
+def gh_json(*args):
+    r = subprocess.run(["gh", *args], capture_output=True, text=True)
+    if r.returncode != 0:
+        return None, (r.stderr or r.stdout).strip()
+    try:
+        return json.loads(r.stdout or "null"), None
+    except ValueError:
+        return None, "gh {} did not answer with JSON".format(" ".join(args[:2]))
+
+
+def runs_for(head):
+    """The batch runs GitHub holds for `head` on landing, newest first, or (None, why) when it cannot say."""
+    runs, error = gh_json("run", "list", "--workflow", STARTER, "--branch", LANDING, "--event", "workflow_dispatch",
+                          "--json", "databaseId,headSha,status,conclusion,createdAt", "--limit", "50")
+    if error:
+        return None, error
+    runs = [r for r in (runs or []) if isinstance(r, dict) and r.get("headSha") == head]
+    return sorted(runs, key=lambda r: r.get("createdAt") or "", reverse=True), None
+
+
+def verdict(jobs):
+    """What a finished batch run proved about its commit: "moved-not" (the Gate passed and only the move
+    failed), "red" (a Gate job failed), or None (it proved nothing: its plan stopped, or it was cancelled)."""
+    by_part = {}
+    for job in jobs or []:
+        by_part.setdefault(part_of(job), []).append(job.get("conclusion"))
+    plan, gate_jobs, move = by_part.get("plan", []), by_part.get("gate", []), by_part.get("move", [])
+    if not plan or any(c != "success" for c in plan):
+        return None
+    if any(c in RED for c in gate_jobs):
+        return "red"
+    others = [c for part, ends in by_part.items() if part != "move" for c in ends]
+    if gate_jobs and all(c == "success" for c in gate_jobs) and not any(c in NOT_PASSED for c in others) \
+            and any(c in NOT_PASSED for c in move):
+        return "moved-not"
+    return None
+
+
+def earlier(head):
+    """Stop, or rerun only a move, when GitHub already holds a batch run for `head`. Returns True when it
+    started the move again, False when a new run should start."""
+    runs, error = runs_for(head)
+    if runs is None:
+        print("GitHub did not list the earlier batch runs ({}), so the go cannot tell whether {} was tested "
+              "before; it starts a run.".format(error, head[:9]))
+        return False
+    for run in runs:
+        if run.get("status") != "completed":
+            raise Stop("Batch run {} is already testing landing at {} ({}). A second go would test the same commit "
+                       "again, so nothing starts. Watch it: gh run watch {}".format(
+                           run.get("databaseId"), head[:9], run.get("status") or "waiting", run.get("databaseId")))
+    for run in runs:
+        found, error = gh_json("run", "view", str(run.get("databaseId")), "--json", "jobs")
+        if error or not isinstance(found, dict):
+            continue
+        said = verdict(found.get("jobs"))
+        if said == "red":
+            raise Stop("Batch run {} already tested landing at {}, and its Gate went red. Nothing has landed since, "
+                       "so nothing starts: a second run would test the same commit again. Find the change that "
+                       "turned it red: python3 ${{CLAUDE_PLUGIN_ROOT}}/skills/work-on/bad-commit.py {}".format(
+                           run.get("databaseId"), head[:9], run.get("databaseId")))
+        if said == "moved-not":
+            r = subprocess.run(["gh", "run", "rerun", str(run.get("databaseId")), "--failed"],
+                               capture_output=True, text=True)
+            if r.returncode != 0:
+                raise Stop("Batch run {} already passed the Gate on {}, but its move of main failed, and GitHub did "
+                           "not run the move again: {}\nNothing starts, so the Gate does not test the same commit "
+                           "again. Tell the person.".format(run.get("databaseId"), head[:9],
+                                                             (r.stderr or r.stdout).strip()))
+            print("Batch run {} already passed the Gate on {}; only its move of main failed. Its move runs again, "
+                  "with no Gate run: gh run watch {}".format(run.get("databaseId"), head[:9], run.get("databaseId")))
+            return True
+    return False
+
+
+def starter_skips_documents():
+    """Whether the starter on landing skips the Gate for a pile of only documents (INFRA-287)."""
+    text = git("show", "refs/remotes/{}/{}:{}".format(REMOTE, LANDING, project_fact.STARTER_FILE), check=False).stdout
+    return "needs.plan.outputs.test" in text
+
+
 def go(argv):
     milestone, check_only, hotfix, want_base, words = None, False, False, False, []
     i = 0
@@ -373,10 +482,22 @@ def go(argv):
         print("  {} {} ({})".format(sha[:9], subject, "brings main in" if merge else issue))
     if absent:
         print("Nothing on the pile for {}: already on main, or not landed yet.".format(" ".join(absent)))
+    main_ref = "refs/remotes/{}/{}".format(REMOTE, MAIN)
+    only_documents = project_fact.documents_only(top, main_ref, head)
+    if only_documents:
+        if starter_skips_documents():
+            print("The pile changes only documents since main, as main's .claude/gate.json names them, so the run "
+                  "moves main with no Gate run.")
+        else:
+            print("The pile changes only documents since main, but the starter on landing is older and runs the "
+                  "Gate anyway. Run /masthead:setup to write it again (batch.py write), with the person's OK for the "
+                  "change to .github/.")
     if check_only:
         if behind:
             print("Main holds work {} does not; a go first brings main into {} with one merge.".format(branch, branch))
         print("Checked only; nothing started.")
+        return 0
+    if earlier(head):
         return 0
 
     r = subprocess.run(["gh", "workflow", "run", STARTER, "--ref", branch,
