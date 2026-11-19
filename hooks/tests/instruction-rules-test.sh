@@ -1670,5 +1670,10 @@ says  README.md "a green batch moves main"
 # F2: the README and the gate catalog name the new refusal.
 says  README.md "a command line that changes the commit before it pushes"
 says  references/gate-catalog.md "refuses a command line that changes the commit before it pushes"
+# Re-verify round 1, judge-1: the /work-on description and its tool rule tell the landing story.
+never skills/work-on/SKILL.md "from worktree to one PR"
+never skills/work-on/SKILL.md "the merge queue stays on"
+says  skills/work-on/SKILL.md "from worktree to commits landed on the \`landing\` branch, with no pull request"
+says  skills/work-on/SKILL.md "what an issue unblocks stays on \`gh\`"
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
