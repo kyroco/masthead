@@ -511,6 +511,24 @@ contains "$ERR" "local tests have not passed" "it says the local tests have not 
 run_gate "$d" "git fetch origin landing && git rebase origin/landing && git push origin HEAD:landing"
 ok "$STATUS" "2" "a rebase and push in one command line is refused the same way"
 echo 0 > "$d/scripts/code"
+# INFRA-260 round 1, F2: the hook runs once, before the line runs, so a receipt
+# that passes for HEAD now says nothing about the commit a rebase, commit, pull
+# or reset earlier in the same line makes. That line is refused even when the
+# check passes, and the refusal says to run the step on its own first.
+for mover in "git rebase origin/landing" "git -C $d rebase origin/landing" "git pull --rebase origin landing" \
+    "git commit -qam more" "git merge origin/landing" "git cherry-pick abc123" "git reset --hard origin/landing" "git am fix.patch"; do
+  run_gate "$d" "git fetch origin && $mover && git push origin HEAD:landing"
+  ok "$STATUS" "2" "'$mover' before the push in one line is refused though the check passes"
+done
+contains "$ERR" "changes the commit before it pushes" "it says the line changes the commit before the push"
+run_gate "$d" "git fetch origin; git rebase origin/landing; git push origin HEAD:landing"
+ok "$STATUS" "2" "the same with ; between the commands is refused"
+run_gate "$d" "git fetch origin && git push origin HEAD:landing"
+ok "$STATUS" "0" "a fetch before the push moves no commit and goes through"
+run_gate "$d" "git push origin HEAD:landing && git rebase origin/landing"
+ok "$STATUS" "0" "a rebase after the push does not change what was pushed and goes through"
+run_gate "$d" "git log --oneline -3 && git status && git push origin HEAD:landing"
+ok "$STATUS" "0" "reading commands before the push go through"
 
 echo "29. a shell redirect after the push is not read as a branch"
 # Found 2026-11-11: `git push -u origin BRANCH 2>&1 | tail -3` was refused as
