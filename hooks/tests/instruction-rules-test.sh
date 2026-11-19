@@ -843,7 +843,7 @@ never "$F" "**Fix later.**"
 says  "$F" "Set the issue to \`Done\` with \`save_issue\`, then each parent up the chain with no open sub-issue left"
 says  "$F" "list what it blocked from \`get_issue\` with \`includeRelations\` true, its \`relations.blocks\`"
 # Scenario 7: the merge queue stays on GitHub.
-says  "$F" "**Once a green batch moves main.** Set the issue to \`Done\`"
+says  "$F" "**Once a green batch moves main.** For each issue \`merged\` lists, set the issue to \`Done\`"
 # Workers start on the Linear key and the status is set through Linear.
 says  "$F" "\`/work-on KOR-12 dispatched\`"
 says  "$F" "\`--name \"KOR-12-issue\"\`"
@@ -1650,9 +1650,8 @@ never "$F" "Queuing the PR is unchanged"
 says  "$F" "Its first message is a question, a split or its report of the commits it landed"
 says  "$F" "Accept a landing when all of these hold"
 says  "$F" "its slot is free once it answers \"cleaned up\""
-says  "$F" "Once a green batch moves main past an issue's commits"
+says  "$F" "Green, with main at its commit, it lists the issues the batch carried to main"
 says  "$F" "An issue whose blocker is still open waits until a green batch moves main past that blocker's commits"
-says  "$F" "Left for INFRA-263"
 says  skills/work-on/worker.md "when your foreman accepts your landing"
 # arch-3: the tracker skills no longer restate Done as a pull request's.
 for f in skills/github-issues/SKILL.md skills/linear-issues/SKILL.md; do
@@ -1686,5 +1685,25 @@ says  skills/work-on/SKILL.md "what an issue unblocks stays on \`gh\`"
 # accepted; the issue closes later, when a green batch moves main.
 never skills/work-on/SKILL.md "a background session in the terminal) until a green batch moves main"
 says  skills/work-on/SKILL.md "each issue runs in a fresh session of its own (a desktop session in the Claude desktop app, a background session in the terminal) until its landing is accepted, and the issue closes once a green batch moves main"
+# INFRA-263: the foreman queues nothing, and hands a dropped commit back to its worker.
+# Scenario 1: no step of the foreman's queues a pull request, merges one or opens one.
+FM=skills/work-on/foreman.md
+for phrase in "gh pr merge" "gh pr create" "merge queue to" "queue the PR" "queue your PR" "ready to queue" "--auto" "open a pull request"; do
+  never "$FM" "$phrase"
+done
+says  "$FM" "You queue nothing and open nothing on GitHub: no pull request, no merge queue, no merge."
+never skills/work-on/worker.md "ready to queue your PR"
+# Scenario 3: an issue counts as merged when the run that carried it to main is read.
+says  "$FM" "batch-issues.py merged <run id>"
+says  "$FM" "it lists the issues the batch carried to main: each counts as merged"
+# Scenario 2: a dropped commit's issue is never set Done, and its worker gets the message.
+says  "$FM" "batch-issues.py returned"
+says  "$FM" "Never set it Done. Set it back to In Progress"
+says  "$FM" "Send the message, whole and unedited, to a worker on that issue"
+says  "$FM" "set its issue back to \`In Progress\` with \`save_issue\`"
+never "$FM" "Left for INFRA-263"
+# Scenario 5: the later commit's worker owns the fix and keeps both issues in sync.
+says  "$FM" "to read the earlier issue and every comment on it first, and to comment"
+says  references/bad-commit.md "batch-issues.py returned"
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]

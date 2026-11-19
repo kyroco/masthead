@@ -229,12 +229,22 @@ worker's session (its id and worktree come from `claude agents --json`, not
 from memory) and start the next issue in a new one.
 
 Main moves forward only from `landing`, by one run of the repo's Gate on the
-batch, never by a worker. Until Masthead runs that batch itself, start the
-Gate run by hand on `landing` once the batch is in, and move main to
-`landing` only when it is green. Once a green batch moves main past an issue's commits, close the issue (on GitHub,
-`gh issue close <n>`, then set it to Done with `set-status.sh`), then each
-parent up the chain that has no open sub-issue left, set to Done the same way.
-List what it blocked:
+batch, never by a worker and never by you. You queue nothing and open nothing
+on GitHub: no pull request, no merge queue, no merge. Until Masthead runs the
+batch itself, start the Gate run by hand on `landing` once the batch is in,
+and move main to `landing` only when it is green.
+
+When a batch run ends, read it, from a checkout of the repository:
+
+    python3 ${CLAUDE_PLUGIN_ROOT}/skills/work-on/batch-issues.py merged <run id>
+
+Green, with main at its commit, it lists the issues the batch carried to main:
+each counts as merged. Close each one (on GitHub, `gh issue close <n>`, then
+set it to Done with `set-status.sh`), then each parent up the chain that has
+no open sub-issue left, set to Done the same way. An issue it lists as sent
+back is not merged, though its commit sits on main with its revert: leave it
+open and never set it Done. On the first batch it may ask for `--since <the
+commit main was on before this batch>`. List what each closed issue blocked:
 
     gh api repos/{owner}/{repo}/issues/<n>/dependencies/blocking --jq '.[] | "#\(.number) \(.state) \(.title)"'
 
@@ -246,20 +256,42 @@ report it done. Every other GitHub call here goes through the connector when
 it is loaded, as **Which tool makes the call** in the github-issues skill
 says.
 
-When a batch goes red, run the search for the commit that broke it, from a
-checkout of the repository, with the red run's id:
+When a batch goes red, run the search for the commit that broke it, with the
+red run's id:
 
     python3 ${CLAUDE_PLUGIN_ROOT}/skills/work-on/bad-commit.py <run id>
 
 It reruns a batch that went red only because a runner could not start, or
 drops the bad commit from `landing`, with any later commit whose change is in
-the way, and prints a record for each (`references/bad-commit.md`). Otherwise
-it drops nothing and prints why, for example when the Gate passed and only
-the move of main failed, or when the red did not happen again. Left for
-INFRA-263: opening a dropped commit's issue again and handing it back to its
-worker, and reading the batch run's record to know which issues it carried.
-Until then, what the search prints, a record or its reason for dropping
-nothing, goes to the person as it stands.
+the way, and writes a record for each (`references/bad-commit.md`). When it
+drops nothing, what it prints, its reason, goes to the person as it stands,
+for example when the Gate passed and only the move of main failed, or when
+the red did not happen again.
+
+When it dropped a commit, hand it back to its worker:
+
+    python3 ${CLAUDE_PLUGIN_ROOT}/skills/work-on/batch-issues.py returned
+
+It lists every dropped commit not yet back on landing, each with its issue and
+a message for that issue's worker: which check failed, and how to bring the
+commit back. A commit that fails only together with an earlier one goes back
+to the worker of the later one, whose message tells it to own the fix end to
+end, to read the earlier issue and every comment on it first, and to comment
+on both issues once its fix lands. Robert, November 19, 2026: "it is its job
+to figure out what needs to be fixed and fix it, and not say: welp not my
+commit sorry, moving on". For each issue it names, one you have not handed
+back already in this run:
+
+1. Never set it Done. Set it back to In Progress (`set-status.sh`).
+2. Post the message on the issue as a comment, word for word, so any session
+   that reads the issue has it.
+3. Send the message, whole and unedited, to a worker on that issue: its own
+   worker when that session is still alive, otherwise a new one started as
+   **Start a worker** says, with the message added to its prompt. A returned
+   worker may remember nothing; the message carries all it needs.
+
+Its landing is accepted as any other, and the issue closes only once a green
+batch carries it to main and `merged` lists it.
 
 Every report to the person carries the count of issues closed after a green
 batch in the run. A split is not a stop: its sub-issues join the run like any
@@ -308,10 +340,12 @@ skill says. The code, CI and the decision records stay on GitHub. Every section 
   with `save_issue` once no `[NEEDS CLARIFICATION]` line is left.
 - **A worker's report.** A worker's report quotes a line from the project
   description, in place of the project README.
+- **A dropped commit.** Set its issue back to `In Progress` with `save_issue`
+  and post the message with `save_comment`; never `Done`.
 - **Park.** A second failure sets the issue's status to `Needs Human` with
   `save_issue` and adds one comment saying what happened, never a `parked`
   label.
-- **Once a green batch moves main.** Set the issue to `Done` with
+- **Once a green batch moves main.** For each issue `merged` lists, set the issue to `Done` with
   `save_issue`, then each parent up the chain with no open sub-issue left, and list what it blocked from `get_issue` with `includeRelations`
   true, its `relations.blocks`.
 

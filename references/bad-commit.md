@@ -126,4 +126,19 @@ their issues and comments first, and comments on each issue its fix touches.
 Robert, November 19, 2026: "yes the fixing worker should add a comment to both
 issues it was working on to make sure they stay in sync". A commit that came
 off only because it builds on the bad one waits until the bad one is back
-with its fix, then comes back the same way. Handing it back is INFRA-263's.
+with its fix, then comes back the same way.
+
+## Handing it back
+
+The foreman hands each dropped commit back (INFRA-263) with
+
+    python3 ${CLAUDE_PLUGIN_ROOT}/skills/work-on/batch-issues.py returned
+
+which reads these records and lists each commit not yet back, with its issue
+and the message for that issue's worker: the failed check, the commits it
+fails with and what to read first, and the steps above. A record counts as
+back once a later commit on landing reverts its revert ("This reverts commit
+<revert>", as `git revert` writes it) or carries the dropped commit again
+with `git cherry-pick -x`. Until then `batch-issues.py merged <run id>` lists
+its issue as sent back, never as merged, though the commit and its revert both
+reach main.
