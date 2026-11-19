@@ -54,6 +54,13 @@ only after the `gate` job passed in the same run, and that is the decision.
 
 ## What the repository needs
 
-Setup's part (INFRA-272): the starter file with `__GATE__` replaced by the
-stored Gate, the lock on main whose only bypass is the batch App, and the
-App's id and key as the secrets `BATCH_APP_ID` and `BATCH_APP_PRIVATE_KEY`.
+Setup's part (INFRA-272): the starter file as `python3 skills/setup/gate.py
+starter` prints it, the lock on main whose only bypass is the batch App, and
+the App's id and key as the secrets `BATCH_APP_ID` and `BATCH_APP_PRIVATE_KEY`.
+`gate.py starter` fills in the stored Gate and grants the starter's Gate job
+the strongest token permission each of the Gate's jobs asks for: a called
+workflow may ask for no more than its caller job grants, or GitHub refuses
+the whole run before any job starts.
+
+`plan` reads the starter's own `uses: ./...` lines, the workflow GitHub runs
+as the Gate, and stops unless they name the stored Gate and nothing else.
