@@ -1675,5 +1675,9 @@ never skills/work-on/SKILL.md "from worktree to one PR"
 never skills/work-on/SKILL.md "the merge queue stays on"
 says  skills/work-on/SKILL.md "from worktree to commits landed on the \`landing\` branch, with no pull request"
 says  skills/work-on/SKILL.md "what an issue unblocks stays on \`gh\`"
+# Re-verify round 2, judge2-F1: a worker's session lasts until its landing is
+# accepted; the issue closes later, when a green batch moves main.
+never skills/work-on/SKILL.md "a background session in the terminal) until a green batch moves main"
+says  skills/work-on/SKILL.md "each issue runs in a fresh session of its own (a desktop session in the Claude desktop app, a background session in the terminal) until its landing is accepted, and the issue closes once a green batch moves main"
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
