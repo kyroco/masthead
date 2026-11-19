@@ -246,10 +246,17 @@ report it done. Every other GitHub call here goes through the connector when
 it is loaded, as **Which tool makes the call** in the github-issues skill
 says.
 
-Left for INFRA-263: when a batch goes red, finding the commit that broke it,
-dropping it from `landing`, opening its issue again and handing it back to its
-worker; and reading the batch run's record to know which issues it carried.
-Until then, a red batch goes to the person as it stands.
+When a batch goes red, run the search for the commit that broke it, from a
+checkout of the repository, with the red run's id:
+
+    python3 ${CLAUDE_PLUGIN_ROOT}/skills/work-on/bad-commit.py <run id>
+
+It reruns a batch that went red only because a runner could not start, or
+drops the bad commit from `landing` and prints its record
+(`references/bad-commit.md`). Left for INFRA-263: opening the dropped commit's
+issue again and handing it back to its worker, and reading the batch run's
+record to know which issues it carried. Until then, the record the search
+prints goes to the person as it stands.
 
 Every report to the person carries the count of issues closed after a green
 batch in the run. A split is not a stop: its sub-issues join the run like any
