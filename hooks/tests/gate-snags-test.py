@@ -146,10 +146,30 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo plan
+  gate:
+    needs: [plan-checks]
+    uses: ./.github/workflows/gate-plan.yml
 """
 
+# The helper fixed, not deleted: it lists both names and its test matches both (arch-1).
 RETRY_AFTER = RETRY.replace("workflows: [Gate]", "workflows: [Gate, Masthead batch]").replace(
-    "    if: github.event.workflow_run.name == 'Gate'\n", "")
+    "    if: github.event.workflow_run.name == 'Gate'\n",
+    "    if: github.event.workflow_run.name == 'Gate' || github.event.workflow_run.name == 'Masthead batch'\n")
+
+# A called workflow fixed the way the snags say, not deleted (arch-1): the
+# diff base keeps github.event.before only behind a batch arm, and the check
+# lookup matches both names.
+PLAN_AFTER = """name: Plan
+on:
+  workflow_call:
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    env:
+      BASE: ${{ (github.ref == 'refs/heads/landing' && endsWith(github.workflow_ref, '/.github/workflows/masthead-batch.yml@refs/heads/landing')) && 'origin/main' || github.event.before }}
+    steps:
+      - run: gh api "repos/x/y/commits/$SHA/check-runs" --jq '.check_runs[] | select(.name == "gate" or .name == "gate / gate")'
+"""
 
 # ---- Scenario 2: setup points at the lines -----------------------------------
 
@@ -191,10 +211,57 @@ check("S2 the read list names the Gate, what it calls and the helper",
 
 # Lines already fixed the way Kyroco did are not pointed at.
 root = repo({".claude/gate.json": STORED, ".github/workflows/gate.yml": AFTER,
-             ".github/workflows/retry.yml": RETRY_AFTER})
+             ".github/workflows/gate-plan.yml": PLAN_AFTER, ".github/workflows/retry.yml": RETRY_AFTER})
 code, out, err = snags(root)
 check("S2 a Gate fixed the way Kyroco did has no snags",
       code == 0 and out and out.get("status") == "clear" and out.get("snags") == [], out or err)
+
+check("S2 the fixed Gate's called workflow and helper were read",
+      out and set(out.get("read", [])) == {".github/workflows/gate.yml", ".github/workflows/gate-plan.yml",
+                                           ".github/workflows/retry.yml"}, out)
+
+# Every way to write the workflow_dispatch trigger is a trigger, not a test (FIX-2),
+# and a job's own quoted name is not a check lookup (FIX-3).
+for label, on in (("an empty map", "on:\n  pull_request:\n  workflow_dispatch: {}\n  workflow_call:\n"),
+                  ("null", "on:\n  pull_request:\n  workflow_dispatch: null\n  workflow_call:\n"),
+                  ("a flow list", "on: [pull_request, workflow_dispatch, workflow_call]\n"),
+                  ("a flow list on its own line", "on:\n  [pull_request, workflow_dispatch, workflow_call]\n"),
+                  ("a block list", "on:\n  - pull_request\n  - workflow_dispatch\n  - workflow_call\n"),
+                  ("a quoted key", "on:\n  pull_request:\n  'workflow_dispatch':\n    inputs: {}\n  workflow_call:\n")):
+    text = "name: Gate\n" + on + "jobs:\n  verdict:\n    name: 'Gate'\n    runs-on: ubuntu-latest\n    steps:\n      - name: \"gate\"\n        run: echo ok\n"
+    root = repo({".claude/gate.json": STORED, ".github/workflows/gate.yml": text})
+    code, out, err = snags(root)
+    check("S2 a trigger written as {} and quoted job names are clear".format(label),
+          code == 0 and out and out.get("status") == "clear", out or err)
+
+# The batch check is "gate / " and the Gate's own job name, so a lookup of a
+# Gate job named test is pointed at, and its message names "gate / test" (FIX-1).
+TEST_GATE = """name: Checks
+on:
+  workflow_call:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo ok
+"""
+LOOKUP = """name: Notify
+on:
+  workflow_call:
+jobs:
+  tell:
+    runs-on: ubuntu-latest
+    steps:
+      - run: gh api "repos/x/y/commits/$SHA/check-runs?check_name=test"
+"""
+root = repo({".claude/gate.json": STORED, ".github/workflows/gate.yml": TEST_GATE.replace(
+    "      - run: echo ok\n", "      - run: echo ok\n  tell:\n    uses: ./.github/workflows/notify.yml\n"),
+    ".github/workflows/notify.yml": LOOKUP})
+code, out, err = snags(root)
+checks = [s for s in (out or {}).get("snags", []) if s["kind"] == "check"]
+check("S2 a lookup of the Gate's job test is pointed at",
+      [(s["workflow"], s["line"]) for s in checks] == [(".github/workflows/notify.yml", 8)], out or err)
+check("S2 its message names the check gate / test", checks and "gate / test" in checks[0]["misses"], checks)
 
 # A dispatch test with no batch arm nearby is still pointed at, even when the
 # file names masthead-batch.yml somewhere else.
@@ -230,9 +297,11 @@ skill = flat(SKILL)
 batch_part = skill.split("### Then the batch run, only with a Gate stored", 1)[-1].split("## 10.", 1)[0]
 before_push = batch_part.split("Land the starter", 1)[0]
 check("S1 setup runs gate.py snags before the starter lands", "gate.py snags" in before_push, before_push[-800:])
-for words in ("workflow_dispatch", "masthead-batch.yml@refs/heads/landing", "github.event.before",
-              "gate / gate", "Masthead batch"):
+for words in ("workflow_dispatch", "event `push`", "ref `refs/heads/landing`",
+              "masthead-batch.yml@refs/heads/landing", "github.event.before", "gate / <job>", "Masthead batch"):
     check("S1 setup names " + words + " before the first batch", words in before_push)
+check("S1 setup does not tell every repository its check is gate / gate",
+      "The verdict check is named `gate / gate`, not `gate`" not in before_push)
 
 # ---- Scenario 3: the batch doc and the README write it down, step by step ----
 
@@ -241,9 +310,11 @@ readme = flat(README)
 readme_part = readme.split("### The optional batch run", 1)[-1].split("### Install options", 1)[0]
 for name, text in (("references/batch-run.md", doc), ("README batch section", readme_part)):
     for words in ("workflow_dispatch", "github.workflow_ref", "masthead-batch.yml@refs/heads/landing",
-                  "refs/heads/landing", "github.event.before", "gate / gate", "Masthead batch",
+                  "refs/heads/landing", "github.event.before", "gate / <job>", "gate / gate", "Masthead batch",
                   "gate.py snags", "Kyroco"):
         check("S3 {} says {}".format(name, words), words in text)
+check("S3 the README does not say every Gate's job is named gate", "and so is your Gate's job" not in readme_part)
+check("S3 the batch doc calls Kyroco's test an excerpt, not the whole test", "as it reads now" not in doc)
 check("S3 the README gives the Gate steps as numbered steps",
       "Make your Gate ready for a batch run" in readme_part and " 1. " in readme_part.split(
           "Make your Gate ready for a batch run", 1)[-1][:3000], readme_part[:200])
