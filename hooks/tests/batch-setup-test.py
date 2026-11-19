@@ -473,6 +473,16 @@ check("SEC-272-1 setup never offers All repositories", "All repositories" not in
 check("SEC-272-1 setup reuses the organization's App and adds this repository to it",
       "reuse" in skill_batch and "Add this repository to an App you already have" in skill_batch, skill_batch[:600])
 
+# Round 1 re-verify fix: with one shared App, a new key must reach every repository before the old one goes.
+with tempfile.TemporaryDirectory() as top:
+    gh = GitHub(top)
+    steps = " ".join(batch(gh, repo_with_gate(top), "steps").stdout.split())
+    check("R1 the steps never say to delete the old key on its own", "make a new key the same way and delete the old one" not in steps,
+          steps)
+    check("R1 the steps say a new key goes into every repository that uses the App before the old key is deleted",
+          "every repository that uses the App" in steps and "before you delete the old" in steps, steps)
+    check("R1 the reuse steps say what to do without the .pem file", "If no one has the `.pem` file" in steps, steps)
+
 # F4: a repository on a personal account gets no offer, since the App steps are for an organization.
 with tempfile.TemporaryDirectory() as top:
     gh = GitHub(top, owner_type="User")
