@@ -353,11 +353,12 @@ jobs:
 WRITE_ALL = "name: Gate\non: [workflow_call]\npermissions: write-all\njobs:\n  a:\n    runs-on: x\n    steps: []\n"
 
 
-def rendered(gate_text):
+def rendered(gate_text, others=None):
     with tempfile.TemporaryDirectory() as top:
         os.makedirs(os.path.join(top, ".github", "workflows"))
-        with open(os.path.join(top, GATE), "w", encoding="utf-8") as handle:
-            handle.write(gate_text)
+        for rel, body in dict(others or {}, **{GATE: gate_text}).items():
+            with open(os.path.join(top, rel), "w", encoding="utf-8") as handle:
+                handle.write(body)
         os.makedirs(os.path.join(top, ".claude"))
         with open(os.path.join(top, ".claude", "gate.json"), "w", encoding="utf-8") as handle:
             json.dump({"workflow": GATE, "starts": ["workflow_call"]}, handle)
@@ -379,6 +380,43 @@ check("arch-1 a Gate job asking for id-token and checks write gets them, and a j
       "    permissions: { checks: write, contents: read, id-token: write, packages: read }\n" in gate_job(text), text)
 check("arch-1 a Gate asking for write-all is granted write-all",
       "    permissions: write-all\n" in gate_job(rendered(WRITE_ALL)), rendered(WRITE_ALL))
+# A Gate job that hands its checks to a workflow of the same repository and names
+# no permissions passes the grant down; that workflow's jobs ask of it too (arch-1, round 1).
+HANDS_OFF = """name: Gate
+on: [pull_request, workflow_call]
+jobs:
+  checks:
+    uses: ./.github/workflows/checks.yml
+  lint:
+    runs-on: ubuntu-latest
+    steps: []
+"""
+CHECKS = """name: Checks
+on:
+  workflow_call:
+jobs:
+  cloud:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps: []
+  report:
+    uses: "./.github/workflows/report.yml"  # one level further down
+"""
+REPORT = "on: workflow_call\njobs:\n  publish:\n    runs-on: x\n    permissions: { checks: write }\n    steps: []\n"
+LOOP = "on: workflow_call\njobs:\n  again:\n    uses: ./.github/workflows/loop.yml\n"
+text = rendered(HANDS_OFF, {".github/workflows/checks.yml": CHECKS, ".github/workflows/report.yml": REPORT})
+check("arch-1 a Gate job that runs a local workflow is granted what that workflow's jobs ask, at every level",
+      "    permissions: { checks: write, contents: read, id-token: write, packages: read }\n" in gate_job(text), text)
+NAMED = HANDS_OFF.replace("    uses: ./.github/workflows/checks.yml",
+                          "    permissions: { contents: read }\n    uses: ./.github/workflows/checks.yml")
+text = rendered(NAMED, {".github/workflows/checks.yml": CHECKS, ".github/workflows/report.yml": REPORT})
+check("arch-1 a calling job that names its permissions caps what it passes down, so only that is granted",
+      "    permissions: { contents: read, packages: read }\n" in gate_job(text), text)
+text = rendered(HANDS_OFF.replace("checks.yml", "loop.yml"), {".github/workflows/loop.yml": LOOP})
+check("arch-1 a local workflow that calls itself still gives a starter", "    permissions: { contents: read, packages: read }\n"
+      in gate_job(text), text)
 with tempfile.TemporaryDirectory() as top:
     run = gate_cli(top, "starter")
     check("arch-1 with no Gate stored there is no starter to write, and setup is told why",
