@@ -3,9 +3,11 @@
 # A repository's starter file (skills/setup/batch-starter.yml) calls this on
 # every push to `landing`, before it runs the repository's own Gate. It reads
 # `.claude/gate.json`, the answer Masthead's setup stored after the person's
-# yes (references/gate-fact.md), at the batch's own commit. It never works the
-# Gate out: with no answer stored, or one the starter file does not run, it
-# stops here, so the Gate and the move of main never start.
+# yes (references/gate-fact.md), at the batch's own commit, and the starter
+# file that called it, to check the starter's Gate job runs that Gate and no
+# other workflow of the repository. It never works the Gate out: with no
+# answer stored, or one the starter does not run, it stops here, so the Gate
+# and the move of main never start.
 #
 # Its output `sha` is the batch's last commit, the one the Gate tests and the
 # one main moves to. references/batch-run.md says how the parts fit.
@@ -13,11 +15,6 @@ name: Masthead batch plan
 
 on:
   workflow_call:
-    inputs:
-      gate:
-        description: The Gate workflow the starter file runs, as .claude/gate.json names it (.github/workflows/<file>.yml).
-        required: true
-        type: string
     outputs:
       sha:
         description: The batch's last commit, which the Gate tests and main moves to when it is green.
@@ -36,11 +33,14 @@ jobs:
           ref: ${{ github.sha }}
           fetch-depth: 1
           persist-credentials: false
-          sparse-checkout: .claude
+          sparse-checkout: |
+            .claude
+            .github
       - name: Read the stored Gate
         id: plan
         env:
-          GATE_INPUT: ${{ inputs.gate }}
+          # In a called workflow this is the caller's: the starter file, at the batch's commit.
+          STARTER_REF: ${{ github.workflow_ref }}
         run: |
           set -u
           file=.claude/gate.json
@@ -61,8 +61,20 @@ jobs:
           if ! jq -e '.starts | arrays | index("workflow_call") != null' "$file" >/dev/null 2>&1; then
             stop "The stored Gate, $workflow, cannot be started with workflow_call, which is how the batch run starts it. The batch run does not start, and main does not move."
           fi
-          if [ "$workflow" != "$GATE_INPUT" ]; then
-            stop "The starter file runs $GATE_INPUT as the Gate, but the Gate stored in .claude/gate.json is $workflow. The batch run runs only the stored Gate, so it does not start and main does not move. Run /masthead:setup to write the starter file again."
+          # The starter's own `uses: ./...` lines are what GitHub runs as the Gate; read them, not a label.
+          starter="${STARTER_REF:-}"
+          starter="${starter#"${GITHUB_REPOSITORY:-}/"}"
+          starter="${starter%%@*}"
+          case "$starter" in
+            .github/workflows/*) ;;
+            *) stop "The batch run cannot tell which starter file started it ('${STARTER_REF:-}'), so it does not start and main does not move." ;;
+          esac
+          if [ -L "$starter" ] || [ ! -f "$starter" ]; then
+            stop "The starter file $starter is not a plain file at this commit, so the batch run does not start and main does not move."
+          fi
+          runs="$(tr -d '\r' < "$starter" | grep -E '^[[:space:]]*(-[[:space:]]+)?uses[[:space:]]*:[[:space:]]*\./' | sed -E 's/^[^:]*:[[:space:]]*\.\///; s/[[:space:]]+#.*$//; s/[[:space:]]*$//' | paste -sd ' ' -)" || runs=""
+          if [ "$runs" != "$workflow" ]; then
+            stop "The starter file runs ${runs:-no workflow of this repository} as the Gate, but the Gate stored in .claude/gate.json is $workflow. The batch run runs only the stored Gate, so it does not start and main does not move. Run /masthead:setup to write the starter file again."
           fi
           echo "sha=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
           printf 'Batch %s: the Gate is %s, as stored in .claude/gate.json.\n' "$GITHUB_SHA" "$workflow" | tee -a "${GITHUB_STEP_SUMMARY:-/dev/null}"

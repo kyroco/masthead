@@ -220,7 +220,7 @@ SHA = "a" * 40
 STARTER_FILE = ".github/workflows/masthead-batch.yml"
 
 
-def plan(stored, gate_input=GATE, ref="refs/heads/landing", link=False, runs=None):
+def plan(stored, ref="refs/heads/landing", link=False, runs=None):
     """Run the plan step in a checkout holding `stored` as gate.json and the starter
     as setup writes it, its Gate job running `runs` (the stored Gate by default)."""
     runs = GATE if runs is None else runs
@@ -239,9 +239,9 @@ def plan(stored, gate_input=GATE, ref="refs/heads/landing", link=False, runs=Non
         with open(os.path.join(checkout, ".github", "workflows", "gate.yml"), "w") as handle:
             handle.write("name: Gate\non: [pull_request, workflow_call]\n")
         with open(os.path.join(checkout, STARTER_FILE), "w", encoding="utf-8") as handle:
-            handle.write(starter.replace("uses: ./__GATE__", "uses: ./" + runs).replace("__GATE__", gate_input))
+            handle.write(starter.replace("uses: ./__GATE__", "uses: ./" + runs))
         return run_script(PLAN_SCRIPT, checkout, {
-            "GATE_INPUT": gate_input, "GITHUB_REF": ref, "GITHUB_SHA": SHA,
+            "GITHUB_REF": ref, "GITHUB_SHA": SHA,
             "GITHUB_REPOSITORY": "acme/shop", "STARTER_REF": "acme/shop/" + STARTER_FILE + "@" + ref})
 
 
@@ -286,9 +286,9 @@ plan_text, move_text = read(PLAN), read(MOVE)
 check("the starter calls batch-plan.yml and batch-move.yml in kyroco/masthead",
       "uses: kyroco/masthead/.github/workflows/batch-plan.yml@" in starter
       and "uses: kyroco/masthead/.github/workflows/batch-move.yml@" in starter)
-check("batch-plan.yml can be called, with the gate input the starter passes",
-      "workflow_call:" in plan_text and re.search(r"^      gate:\n", plan_text, re.M)
-      and "gate: __GATE__" in starter)
+check("batch-plan.yml can be called and takes no input, so nothing in the starter has to agree with the Gate job",
+      "workflow_call:" in plan_text and "inputs:" not in plan_text
+      and re.search(r"^  plan:\n    uses: [^\n]+\n  gate:\n", starter, re.M) is not None)
 check("batch-move.yml can be called, with the inputs and secrets the starter passes",
       all(re.search(r"^      {}:\n".format(re.escape(k)), move_text, re.M)
           for k in ("sha", "gate-result", "BATCH_APP_ID", "BATCH_APP_PRIVATE_KEY")))
