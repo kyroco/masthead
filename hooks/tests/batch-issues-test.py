@@ -1,23 +1,20 @@
 #!/usr/bin/env python3
-"""Linear issue INFRA-263: the foreman queues nothing, and hands a dropped commit back to its worker.
+"""Linear issues INFRA-263 and INFRA-288: the foreman queues nothing, and a red batch's bad change stays on landing.
 
 Each case builds a throwaway repository (a bare "GitHub" remote and a checkout),
 lands commits on `landing`, turns a batch red, and runs the real
-skills/work-on/bad-commit.py to drop the bad commit, so the records read here
-are the ones the search writes. Then it runs the real
+skills/work-on/bad-commit.py to name the bad change. Then it runs the real
 skills/work-on/batch-issues.py as the foreman would. gh is the stand-in
 hooks/tests/fake-gh.py, which logs every call.
 
-Scenario 1: reading a landing and a batch run queues nothing and opens nothing:
-the script makes no gh call but reading runs.
-Scenario 2: a dropped commit's worker is told which check failed, and its issue
-is listed as sent back, never as merged.
-Scenario 3: a commit that reached main in a green batch counts as merged when
-the foreman reads that run, including one that came back after a drop.
-Scenario 4: a repository whose issues live on GitHub works the same way.
-Scenario 5: a commit dropped because it fails with an earlier one: its worker
-is told to own the fix end to end, read the earlier issue and every comment on
-it first, and comment on both issues once the fix lands.
+INFRA-263 scenario 1: reading a landing and a batch run queues nothing and
+opens nothing: the script makes no gh call but reading runs.
+INFRA-288 scenario 3: a red run counts nothing as merged and main stays where it
+was, until a later run is green with the fix on top.
+INFRA-263 scenario 3: a commit that reached main in a green batch counts as
+merged when the foreman reads that run: the named change and its fix included,
+since nothing was taken off landing (INFRA-288 scenario 1).
+INFRA-263 scenario 4: a repository whose issues live on GitHub works the same way.
 
 Run from anywhere: python3 hooks/tests/batch-issues-test.py
 """
@@ -183,9 +180,7 @@ class Repo:
         return env
 
     def search(self, run_id):
-        out = run([sys.executable, SEARCH, run_id], self.work, self.env())
-        git(self.work, "pull", "--quiet", "--rebase", "origin", "landing")
-        return out
+        return run([sys.executable, SEARCH, run_id], self.work, self.env())
 
     def foreman(self, *args):
         before = len(self.load()["calls"])
@@ -193,8 +188,8 @@ class Repo:
         calls = self.load()["calls"][before:]
         return out, calls
 
-    def records(self):
-        return git(self.remote, "log", "refs/heads/landing", "--format=%H", "--grep=^Masthead-Dropped:").split()
+    def main(self):
+        return git(self.remote, "rev-parse", "refs/heads/main")
 
     def done(self):
         shutil.rmtree(self.tmp, ignore_errors=True)
@@ -210,179 +205,78 @@ def only_reads(calls):
     return all(c[:2] in (["run", "view"], ["run", "list"]) for c in calls)
 
 
-# ---- Scenarios 1, 2 and 3: one bad commit, sent back, then brought back ------
+# ---- A red batch, its change named, then fixed on top ---------------------------
 
 r = Repo()
 a = r.land({"a": "1\n"}, "Add a (INFRA-11)")
 b = r.land({"breaks": "x\n"}, "Add the part that breaks the tests\n\nFixes INFRA-12")
 c = r.land({"c": "3\n"}, "Add c (INFRA-13)")
+red_tip = r.landing()
 red = r.batch_run(green=False)
 out = r.search(red)
-check("setup: the search drops the bad commit", out.returncode == 0 and len(r.records()) == 1, out.stdout + out.stderr)
-revert = r.records()[0]
+check("setup: the search names the bad change", out.returncode == 0 and "Masthead-Bad-Change: " + b in out.stdout,
+      out.stdout + out.stderr)
+check("288 s1 the named change is still on landing, at the same tip", r.landing() == red_tip)
 
 out, calls = r.foreman("merged", red)
-check("s2 a red run counts nothing as merged", out.returncode == 1 and merged_line(out.stdout) is None, out.stdout)
-check("s2 a red run says to run the search and hand back", "bad-commit.py " + red in out.stdout
-      and "batch-issues.py returned" in out.stdout, out.stdout)
-check("s1 reading a red run only reads", only_reads(calls), calls)
+check("288 s3 a red run counts nothing as merged", out.returncode == 1 and merged_line(out.stdout) is None, out.stdout)
+check("288 s3 a red run says main did not move", "main did not move" in out.stdout, out.stdout)
+check("288 s2 a red run says to run the search and hand the named change back to its worker",
+      "bad-commit.py " + red in out.stdout and "hand the change it names back to its worker" in out.stdout, out.stdout)
+check("288 no word of a returned command any more", "batch-issues.py returned" not in out.stdout, out.stdout)
+check("263 s1 reading a red run only reads", only_reads(calls), calls)
+check("288 s3 main has not moved", r.main() == r.base)
 
-out, calls = r.foreman("returned")
-text = out.stdout
-check("s2 returned ends well", out.returncode == 0, text + out.stderr)
-check("s2 the dropped commit's issue goes back to its worker", "INFRA-12 goes back to its worker" in text, text)
-check("s2 the worker is told which check failed", "Failed check: Tests." in text, text)
-check("s2 the foreman is told not to set the issue Done", "Do not set INFRA-12 Done." in text, text)
-check("s2 the message names the dropped commit and the revert that dropped it", b in text and revert in text, text)
-check("s2 the message says how to bring it back in one push",
-      "git revert " + revert in text and "in one push" in text, text)
-check("s2 an issue whose commit was not dropped is not handed back",
-      "INFRA-11 goes back" not in text and "INFRA-13 goes back" not in text, text)
-check("s1 handing back only reads", only_reads(calls) and not calls, calls)
-# INFRA-274's push gate refuses a revert and a push on one command line: every command the message
-# gives is one git command, and none of them pushes.
-commands = re.findall(r"`([^`]*)`", text)
-check("the hand-back's commands keep the revert and the push apart, as the push gate needs",
-      commands and all("push" not in c and c.count("git ") <= 1 for c in commands), commands)
-
-green = r.batch_run(green=True)
-out, calls = r.foreman("merged", green, "--since", r.base)
-check("s3 a green run reached by main ends well", out.returncode == 0, out.stdout + out.stderr)
-check("s3 the issues the green batch carried to main count as merged",
-      merged_line(out.stdout) == ["INFRA-11", "INFRA-13"], out.stdout)
-check("s2 the dropped commit's issue is sent back, never merged, though its commit is on main",
-      "INFRA-12" not in (merged_line(out.stdout) or []) and "Sent back, not merged, leave open: INFRA-12" in out.stdout,
-      out.stdout)
-check("s1 reading a green run only reads, and queues nothing", only_reads(calls), calls)
-
-# The worker brings it back: reverts the revert, fixes on top, one push.
+# The worker fixes it on top of the pile: one more commit on landing, nothing reverted.
 git(r.work, "pull", "--quiet", "--rebase", "origin", "landing")
-git(r.work, "revert", "--no-edit", revert)
 os.remove(os.path.join(r.work, "breaks"))
 r.write("b", "fixed\n")
 git(r.work, "add", "-A")
 git(r.work, "commit", "--quiet", "-m", "Fix the part that broke the tests (INFRA-12)")
 git(r.work, "push", "--quiet", "origin", "landing")
+green = r.batch_run(green=True)
+out, calls = r.foreman("merged", green, "--since", r.base)
+check("263 s3 a green run reached by main ends well", out.returncode == 0, out.stdout + out.stderr)
+check("288 s3 263 s3 the green run with the fix on top carries every issue to main, the named one included",
+      merged_line(out.stdout) == ["INFRA-11", "INFRA-12", "INFRA-13"], out.stdout)
+check("288 nothing is listed as sent back", "Sent back" not in out.stdout, out.stdout)
+check("263 s1 reading a green run only reads, and queues nothing", only_reads(calls), calls)
+
+# The next green run finds where its batch starts from the earlier green run.
+r.land({"d": "4\n"}, "Add d (INFRA-14)")
 again = r.batch_run(green=True)
 out, calls = r.foreman("merged", again)
-check("s3 the next green run finds where its batch starts from the earlier green run", out.returncode == 0,
-      out.stdout + out.stderr)
-check("s3 the issue whose commit came back counts as merged once its batch reaches main",
-      merged_line(out.stdout) == ["INFRA-12"], out.stdout)
-check("s3 an issue already counted in an earlier batch is not counted again",
-      "INFRA-11" not in (merged_line(out.stdout) or []), out.stdout)
-out, _ = r.foreman("returned")
-check("s2 a commit that came back is no longer handed back", "No dropped commit is waiting" in out.stdout, out.stdout)
+check("263 s3 the next green run finds where its batch starts, and counts no issue twice",
+      out.returncode == 0 and merged_line(out.stdout) == ["INFRA-14"], out.stdout + out.stderr)
 
 # A green run main has not reached: nothing is merged yet.
-r.land({"d": "4\n"}, "Add d (INFRA-14)")
+r.land({"e": "5\n"}, "Add e (INFRA-15)")
 pending = r.batch_run(green=True)
 git(r.remote, "update-ref", "refs/heads/main", git(r.remote, "rev-parse", "refs/heads/landing~1"))
 out, calls = r.foreman("merged", pending)
-check("s3 a green run main has not reached counts nothing as merged",
+check("263 s3 a green run main has not reached counts nothing as merged",
       out.returncode == 1 and merged_line(out.stdout) is None and "main has not reached" in out.stdout, out.stdout)
 r.done()
 
-# ---- Scenario 5: commits that fail only together ------------------------------
-
-r = Repo()
-first = r.land({"half-a": "a\n"}, "Add the first half (INFRA-21)")
-r.land({"e": "e\n"}, "Add e (INFRA-23)")
-second = r.land({"half-b": "b\n"}, "Add the second half (INFRA-22)")
-red = r.batch_run(green=False)
-out = r.search(red)
-check("s5 setup: the search drops the latest-landed of the two", out.returncode == 0 and len(r.records()) == 1,
-      out.stdout + out.stderr)
-out, calls = r.foreman("returned")
-text = out.stdout
-check("s5 the later commit's issue goes back, not the earlier one",
-      "INFRA-22 goes back to its worker" in text and "INFRA-21 goes back" not in text, text)
-check("s5 the worker is told which check failed", "Failed check: Tests." in text, text)
-check("s5 the worker is told it fails only with the earlier commit and its issue",
-      "fails only together with {} (INFRA-21)".format(first[:9]) in text, text)
-check("s5 the worker owns the fix end to end, whichever commit the fault sits in",
-      "It is your job to figure out what needs to be fixed and fix it, end to end" in text
-      and "not someone else's commit to hand on" in text, text)
-check("s5 the worker reads the earlier issue and every comment on it first",
-      "Before you change anything, read INFRA-21 and every comment on it" in text, text)
-check("s5 once the fix lands, the worker comments on both issues saying what changed and why",
-      "Once your fix lands, add a comment to INFRA-22 and to INFRA-21 saying what you changed and why" in text, text)
-check("s1 handing back only reads", not calls, calls)
-r.done()
-
-# ---- Scenario 4: a repository whose issues live on GitHub ---------------------
+# ---- INFRA-263 scenario 4: a repository whose issues live on GitHub ---------------
 
 r = Repo(linear=False)
 r.land({"a": "1\n"}, "Add a (#31)")
-r.land({"breaks": "x\n"}, "Add the part that breaks the tests (#32)")
+bad = r.land({"breaks": "x\n"}, "Add the part that breaks the tests (#32)")
 red = r.batch_run(green=False)
 out = r.search(red)
-check("s4 setup: the search drops the bad commit on a GitHub repository", len(r.records()) == 1,
-      out.stdout + out.stderr)
-out, calls = r.foreman("returned")
-check("s4 the dropped commit's GitHub issue goes back to its worker, told the failed check",
-      "#32 goes back to its worker" in out.stdout and "Failed check: Tests." in out.stdout
-      and "Do not set #32 Done." in out.stdout, out.stdout)
+check("263 s4 the search names the bad change's GitHub issue",
+      "Masthead-Issue: #32" in out.stdout and "--- post on #32 as a comment" in out.stdout, out.stdout)
+git(r.work, "pull", "--quiet", "--rebase", "origin", "landing")
+os.remove(os.path.join(r.work, "breaks"))
+git(r.work, "add", "-A")
+git(r.work, "commit", "--quiet", "-m", "Fix the tests (#32)")
+git(r.work, "push", "--quiet", "origin", "landing")
 green = r.batch_run(green=True)
 out, calls = r.foreman("merged", green, "--since", r.base)
-check("s4 the GitHub issue the green batch carried counts as merged, the dropped one is sent back",
-      merged_line(out.stdout) == ["#31"] and "Sent back, not merged, leave open: #32" in out.stdout, out.stdout)
-check("s4 s1 on GitHub too, the foreman's script only reads runs", only_reads(calls), calls)
-r.done()
-
-# ---- Round 1 fixes ---------------------------------------------------------------
-
-# s2-1 (arch-1): the worker brings its commit back after the green run and before the foreman
-# reads it. The run carried the commit and its revert, not the fix: the issue is still sent back.
-r = Repo()
-r.land({"a": "1\n"}, "Add a (INFRA-11)")
-r.land({"breaks": "x\n"}, "Add the part that breaks the tests (INFRA-12)")
-red = r.batch_run(green=False)
-r.search(red)
-revert = r.records()[0]
-green = r.batch_run(green=True)
-git(r.work, "revert", "--no-edit", revert)
-os.remove(os.path.join(r.work, "breaks"))
-r.write("b", "fixed\n")
-git(r.work, "add", "-A")
-git(r.work, "commit", "--quiet", "-m", "Fix the part that broke the tests (INFRA-12)")
-git(r.work, "push", "--quiet", "origin", "landing")
-out, _ = r.foreman("merged", green, "--since", r.base)
-check("s2-1 an issue brought back after the run it is read from is still sent back in that run",
-      merged_line(out.stdout) == ["INFRA-11"] and "Sent back, not merged, leave open: INFRA-12" in out.stdout,
-      out.stdout)
-r.done()
-
-# s3-1: a commit dropped only because it builds on the bad one comes back as a lone revert of its
-# record. That revert is its issue's work, so the green run carrying it lists the issue as merged.
-r = Repo()
-r.land({"lib": "one\ntwo\nthree\n"}, "Add lib (INFRA-10)")
-base = r.landing()
-git(r.remote, "update-ref", "refs/heads/main", base)
-r.land({"breaks": "x\n", "lib": "one\ntwo by 12\nthree\n"}, "Change lib and break the tests (INFRA-12)")
-r.land({"lib": "one\ntwo by 13\nthree\n"}, "Change lib again (INFRA-13)")
-red = r.batch_run(green=False)
-out = r.search(red)
-recs = r.records()
-check("s3-1 setup: the search drops the bad commit and the one that builds on it", len(recs) == 2,
-      out.stdout + out.stderr)
-r.batch_run(green=True)
-by_issue = {}
-for sha in recs:
-    body = git(r.work, "log", "-1", "--format=%B", sha)
-    by_issue[re.search(r"^Masthead-Issue: (.*)$", body, re.M).group(1)] = sha
-git(r.work, "revert", "--no-edit", by_issue["INFRA-12"])
-os.remove(os.path.join(r.work, "breaks"))
-git(r.work, "add", "-A")
-git(r.work, "commit", "--quiet", "-m", "Fix the tests (INFRA-12)")
-git(r.work, "push", "--quiet", "origin", "landing")
-r.batch_run(green=True)
-git(r.work, "revert", "--no-edit", by_issue["INFRA-13"])
-git(r.work, "push", "--quiet", "origin", "landing")
-back = r.batch_run(green=True)
-out, _ = r.foreman("merged", back)
-check("s3-1 an issue whose only commit in the batch is the revert of its record counts as merged",
-      merged_line(out.stdout) == ["INFRA-13"], out.stdout)
+check("263 s4 on GitHub, the green batch with the fix carries both issues to main",
+      merged_line(out.stdout) == ["#31", "#32"], out.stdout)
+check("263 s4 s1 on GitHub too, the foreman's script only reads runs", only_reads(calls), calls)
 r.done()
 
 # arch-2: an issue whose own work is a revert of an ordinary commit counts as merged.
@@ -399,54 +293,6 @@ check("arch-2 an issue whose own work is a revert of an ordinary commit counts a
       merged_line(out.stdout) == ["INFRA-51"], out.stdout)
 r.done()
 
-
-def record_commit(repo, dropped, issue):
-    """A drop record as bad-commit.py writes it, for a dropped commit whose message names no issue."""
-    repo.write("rec-" + dropped[:7], "x\n")
-    git(repo.work, "add", "-A")
-    git(repo.work, "commit", "--quiet", "-m", "Drop {} from landing\n\nMasthead-Dropped: {}\nMasthead-Issue: {}\n"
-        "Masthead-Failed-Check: Tests\nMasthead-Red-Run: https://example/runs/1\nMasthead-Batch: {}\n"
-        "Masthead-Bring-Back: revert-this-commit-and-fix-in-one-push\n".format(dropped[:9], dropped, issue, dropped))
-    git(repo.work, "push", "--quiet", "origin", "landing")
-    return git(repo.work, "rev-parse", "HEAD")
-
-
-# arch-3: a dropped commit whose message names no issue. When it brings an earlier drop back, it
-# is that issue's; otherwise it goes to the person, never to a worker of an issue called "none found".
-r = Repo()
-r.land({"breaks": "x\n"}, "Break the tests (INFRA-60)")
-red = r.batch_run(green=False)
-r.search(red)
-first = r.records()[0]
-git(r.work, "revert", "--no-edit", first)
-git(r.work, "push", "--quiet", "origin", "landing")
-bring_back = git(r.work, "rev-parse", "HEAD")
-record_commit(r, bring_back, "none found")
-loose = r.land({"z": "z\n"}, "Tidy something")
-record_commit(r, loose, "none found")
-out, _ = r.foreman("returned")
-check("arch-3 a dropped bring-back that names no issue goes back to the issue it brought back",
-      "INFRA-60 goes back to its worker: {}".format(bring_back[:9]) in out.stdout, out.stdout)
-check("arch-3 no message goes to an issue called none found", "none found goes back" not in out.stdout
-      and "Do not set none found Done" not in out.stdout, out.stdout)
-check("arch-3 a dropped commit with no issue goes to the person, named",
-      "{} names no issue: tell the person".format(loose[:9]) in out.stdout, out.stdout)
-r.done()
-
-# s4-judge-1: a dropped commit's closing words ("Fixes #32", "Fixes INFRA-12") can close its issue
-# when it reaches main with its revert. The sent-back line tells the foreman to reopen it.
-for linear, key, msg in ((False, "#72", "Break the tests\n\nFixes #72"),
-                         (True, "INFRA-72", "Break the tests\n\nFixes INFRA-72")):
-    r = Repo(linear=linear)
-    r.land({"breaks": "x\n"}, msg)
-    red = r.batch_run(green=False)
-    r.search(red)
-    green = r.batch_run(green=True)
-    out, _ = r.foreman("merged", green, "--since", r.base)
-    check("s4-judge-1 a sent-back issue closed by its commit's closing words is to be reopened ({})".format(key),
-          "If its commit's closing words closed {} or set it Done, reopen it".format(key) in out.stdout, out.stdout)
-    r.done()
-
 # ---- Usage ---------------------------------------------------------------------
 
 r = Repo()
@@ -454,6 +300,9 @@ out, _ = r.foreman("merged")
 check("a call with no run id prints the usage", out.returncode == 2 and "Usage:" in out.stdout, out.stdout)
 out, _ = r.foreman("merged", "notanumber")
 check("a run id that is not a number prints the usage", out.returncode == 2, out.stdout)
+out, _ = r.foreman("returned")
+check("288 returned is gone: nothing is ever dropped, so nothing waits to come back",
+      out.returncode == 2 and "returned" not in out.stdout, out.stdout)
 r.land({"a": "1\n"}, "Add a (INFRA-41)")
 first_green = r.batch_run(green=True)
 out, _ = r.foreman("merged", first_green)

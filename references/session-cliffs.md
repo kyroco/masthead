@@ -269,8 +269,8 @@ In the batch way (`--ships` printed `batch`):
     yourself: your commit is not proven until a batch passes, so the
     foreman closes it and sets Done once a green batch moves main past your
     commits. With no foreman, you do that yourself, only after the batch
-    moved main. A commit message closes nothing. If a batch drops your
-    commit, it comes back to you.
+    moved main. A commit message closes nothing. If a red batch names your
+    commit, it stays on landing and comes back to you to fix on top.
 11. Once the batch has moved main past your commits, clean up what your own
     work created, from the main checkout: bring down the test stack and any
     tunnels as the repo's procedures say, delete the branch's code index

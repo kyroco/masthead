@@ -1774,19 +1774,33 @@ part_never "worker.md, the batch way," "$WB" "ready to queue your PR"
 # Scenario 3: an issue counts as merged when the run that carried it to main is read.
 says  "$FM" "batch-issues.py merged <run id>"
 says  "$FM" "it lists the issues the batch carried to main: each counts as merged"
-# Scenario 2: a dropped commit's issue is never set Done, and its worker gets the message.
-says  "$FM" "batch-issues.py returned"
-says  "$FM" "Never set it Done. Set it back to In Progress"
-says  "$FM" "Send the message, whole and unedited, to a worker on that issue"
+# Scenario 2: a named change's issue is never set Done, and its worker gets the block.
+says  "$FM" "Never set the issue Done. Set it back to In Progress"
+says  "$FM" "Send the block, whole and unedited, to a worker on that issue"
 says  "$FM" "set its issue back to \`In Progress\` with \`save_issue\`"
 never "$FM" "Left for INFRA-263"
 # Scenario 5: the later commit's worker owns the fix and keeps both issues in sync.
-says  "$FM" "to read the earlier issue and every comment on it first, and to comment"
-says  references/bad-commit.md "batch-issues.py returned"
-# Round 1, s2-judge-1: hand back each dropped commit, not each issue once.
-never "$FM" "For each issue it names, one you have not handed back already in this run"
-says  "$FM" "For each dropped commit it lists, one whose drop you have not handed back already"
-# Round 1, s4-judge-1: a sent-back issue its commit's closing words closed is reopened.
-says  "$FM" "reopen it"
+says  "$FM" "worker to own the fix end to end, to read the earlier issue and every comment"
+# INFRA-288: a red batch's bad change is named and stays on landing; its worker fixes it on top.
+# Scenario 1: the search names the change and pushes nothing; nothing is dropped or brought back.
+says  "$FM" "It pushes nothing to landing or main: the"
+says  "$FM" "so why are you asking me?"
+for phrase in "batch-issues.py returned" "drops the bad commit" "dropped commit" "sent back is not merged" "reopen it"; do
+  never "$FM" "$phrase"
+done
+says  references/bad-commit.md "In every case it pushes nothing to landing or main."
+never references/bad-commit.md "batch-issues.py returned"
+never references/bad-commit.md "Masthead-Dropped"
+never references/batch-run.md "drops it from landing"
+# Scenario 2: the record lives on the issue, as a comment the foreman posts.
+says  "$FM" "That comment is the record"
+says  references/bad-commit.md "The comment is the record"
+# Scenario 2: the worker fixes on top of the pile, on the newest landing.
+says  skills/work-on/worker.md "it stays on landing: fix it on top"
+never skills/work-on/worker.md "If a batch drops your commit"
+never references/session-cliffs.md "If a batch drops your commit"
+says  references/session-cliffs.md "it stays on landing and comes back to you to fix on top"
+# Scenario 3: main waits for a later go that runs green.
+says  "$FM" "main does not move until a later go runs green"
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]

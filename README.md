@@ -12,8 +12,9 @@ An optional new way to ship: agents land tested changes on one shared
 `landing` branch, with no pull request per change.
 
 - CI tests everything waiting there in one run. Green moves `main` forward.
-- A red batch: Masthead finds the change that broke it, takes it out, and
-  hands it back to the agent that wrote it to fix. The rest keeps moving.
+- A red batch: Masthead finds the change that broke it and hands it back to
+  the agent that wrote it, which fixes it on top. Nothing is taken out, and
+  `main` waits until a later run is green.
 - The agent's record of what it did goes on the issue, not in a pull request.
 - A change to CI files (`.github/`, `scripts/ci/`) is stopped before it is
   pushed unless you have OKed it on the issue.

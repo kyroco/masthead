@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Find the commit that turned a batch red, drop it from landing, and say whose it is (INFRA-269).
+"""Find the change that turned a batch red and say whose it is (INFRA-269, INFRA-288).
 
 The foreman runs this by hand, from a checkout of the repository, when a batch
 run on `landing` goes red:
@@ -15,20 +15,20 @@ workflow_dispatch among its starts.
 What it does with a red batch (references/bad-commit.md has the whole of it):
 
 - Red only because a runner could not fetch the code or start: it reruns the
-  run's failed jobs and drops nothing.
+  run's failed jobs and names nothing.
 - Otherwise it finds the first commit of the batch after which the Gate is red,
-  then tests that commit alone on main. Red alone: it is the bad commit. Green
+  then tests that commit alone on main. Red alone: it is the bad change. Green
   alone: it fails only together with earlier commits of the batch, and the
   search names each of them. Either way that commit, the latest-landed of those
-  that fail, is dropped (Robert, November 19, 2026: "(and we send back the
+  that fail, is the one named (Robert, November 19, 2026: "(and we send back the
   latest one)").
-- It drops the commit with a revert pushed to landing as a plain push, never a
-  force push, so workers landing at the same moment lose nothing. That push
-  starts the next batch run, which tests the rest again. The revert's message
-  carries the record as git trailers (Masthead-Dropped and the rest), where the
-  foreman reads it: git log origin/landing --grep='^Masthead-Dropped:'.
+- It names the change, its issue and the failed check, and pushes nothing to
+  landing or main: the change stays on the pile and its worker fixes it on top
+  (Robert, November 19, 2026: "so why are you asking me?", INFRA-288). It prints
+  the record and the worker's message as one block, which the foreman posts on
+  the issue as a comment and sends to the worker.
 - When none of its own Gate runs goes red, the red did not happen again: it
-  drops nothing and says so.
+  names nothing and says so.
 """
 import json
 import os
@@ -46,17 +46,16 @@ MAIN = "main"
 REMOTE = "origin"
 SEARCH_PREFIX = "masthead-search/"
 
-# The record's trailer names. INFRA-263 parses them: change them only together with it.
-T_DROPPED = "Masthead-Dropped"
+# The record's field names, one per line of the block the foreman posts on the issue.
+T_BAD = "Masthead-Bad-Change"
 T_ISSUE = "Masthead-Issue"
 T_CHECK = "Masthead-Failed-Check"
 T_WITH = "Masthead-Fails-With"
-T_BUILDS_ON = "Masthead-Builds-On"
 T_RUN = "Masthead-Red-Run"
 T_BATCH = "Masthead-Batch"
-T_BRING_BACK = "Masthead-Bring-Back"
-BRING_BACK = "revert-this-commit-and-fix-in-one-push"
 NO_ISSUE = "none found"
+BLOCK_START = "--- post on {issue} as a comment, word for word, and send it whole to its worker ---"
+BLOCK_END = "--- end ---"
 
 # A failed step with one of these names, or a job with no steps, means the runner
 # never got as far as a check: it could not start, or could not fetch the code.
@@ -71,7 +70,7 @@ START_RERUNS = 2
 
 
 class Stop(Exception):
-    """The search ends here and says why. Nothing is dropped."""
+    """The search ends here and says why. Nothing is named."""
 
 
 def say(line=""):
@@ -233,7 +232,7 @@ def batch_verdict(run, run_id, verdicts):
     if plan_failed:
         if all(could_not_start(j) for j in plan_failed):
             return "start"
-        raise Stop("Run {} stopped in its plan, before the Gate ran, so no commit is to blame. "
+        raise Stop("Run {} stopped in its plan, before the Gate ran, so no change is to blame. "
                    "Read the plan's message in the run.".format(run_id))
     if run.get("conclusion") == "startup_failure":
         return "start"
@@ -244,9 +243,9 @@ def batch_verdict(run, run_id, verdicts):
     if move_failed and all(could_not_start(j) for j in move_failed):
         return "start"
     if move_failed:
-        raise Stop("In run {} the Gate passed and the move of main failed, so no commit is to blame and "
-                   "nothing is dropped. Read the move's message in the run.".format(run_id))
-    raise Stop("Run {} is not red: its Gate did not fail. Nothing is dropped.".format(run_id))
+        raise Stop("In run {} the Gate passed and the move of main failed, so no change is to blame and "
+                   "nothing is named. Read the move's message in the run.".format(run_id))
+    raise Stop("Run {} is not red: its Gate did not fail. Nothing is named.".format(run_id))
 
 
 def failed_checks(jobs, verdicts):
@@ -289,22 +288,6 @@ def issue_of(sha, root):
     return NO_ISSUE
 
 
-DROPPED_LINE = re.compile(r"^{}: ([0-9a-f]{{40}})\s*$".format(T_DROPPED), re.MULTILINE)
-
-
-def drops(base, tip):
-    """{dropped commit: the revert that took it off landing}, for every record between base and tip."""
-    out = git("log", "--format=%H%x1f%B%x1e", "--grep=^{}:".format(T_DROPPED), "{}..{}".format(base, tip)).stdout
-    found = {}
-    for entry in out.split("\x1e"):
-        if "\x1f" not in entry:
-            continue
-        revert, body = entry.split("\x1f", 1)
-        for m in DROPPED_LINE.finditer(body):
-            found.setdefault(m.group(1), revert.strip())
-    return found
-
-
 def apply_on(base, commits):
     """A commit holding `commits` cherry-picked onto `base` in order, or None when one does not apply cleanly."""
     head = base
@@ -323,18 +306,16 @@ def apply_on(base, commits):
 # ---- Running the stored Gate on one commit set -------------------------------
 
 class Search:
-    """The search over a batch's live commits: those not already dropped. `clean` holds the live
-    commits whose own tree is main with exactly the live commits up to them, because every
-    dropped commit before them has its revert before them too; the Gate runs on those directly."""
+    """The search over a batch's commits, oldest first. Landing is linear, so main with the first
+    k of them is the k-th commit itself; the Gate runs on that commit directly."""
 
-    def __init__(self, root, gate_workflow, main, commits, red_run, batch, clean):
+    def __init__(self, root, gate_workflow, main, commits, red_run, batch):
         self.root = root
         self.workflow = os.path.basename(gate_workflow)
         self.verdicts = verdict_names(root, gate_workflow)
         self.main = main
         self.commits = commits
         self.batch = batch
-        self.clean = clean
         self.red_run = red_run
         self.cache = {(): ("green", None)}
         self.cache[tuple(commits)] = ("red", red_run)
@@ -347,7 +328,7 @@ class Search:
         key = tuple(chosen)
         if key in self.cache:
             return self.cache[key]
-        if list(key) == self.commits[:len(key)] and key[-1] in self.clean:
+        if list(key) == self.commits[:len(key)]:
             sha = key[-1]
         else:
             sha = apply_on(self.main, key)
@@ -375,7 +356,7 @@ class Search:
             while classify(run, self.verdicts) == "start":
                 if reruns >= START_RERUNS:
                     raise Stop("The Gate run {} on {} could not start or fetch the code {} times, so the search "
-                               "cannot tell if it is red. Nothing is dropped.".format(
+                               "cannot tell if it is red. Nothing is named.".format(
                                    run.get("url", run_id), self.label(key), reruns + 1))
                 reruns += 1
                 attempt = (run.get("attempt") or 1) + 1
@@ -400,7 +381,7 @@ class Search:
                 if run.get("headSha") == sha:
                     return run["databaseId"]
             time.sleep(POLL)
-        raise Stop("GitHub did not show the Gate run started on {}, so the search stops. Nothing is dropped.".format(
+        raise Stop("GitHub did not show the Gate run started on {}, so the search stops. Nothing is named.".format(
             branch))
 
     # The search itself.
@@ -417,7 +398,7 @@ class Search:
         return hi
 
     def find(self):
-        """The commit to drop, the earlier commits it fails with, and the run that showed it red."""
+        """The bad change, the earlier commits it fails with, and the run that showed it red."""
         k = self.first_red_prefix()
         evidence = self.test(self.commits[:k])[1]
         fixed = [self.commits[k - 1]]
@@ -441,130 +422,44 @@ class Search:
         return fixed[-1], fixed[:-1], evidence
 
 
-# ---- Dropping the commit ------------------------------------------------------
+# ---- What the foreman posts and sends -----------------------------------------
 
-def trailer_block(dropped, partners, checks, run, batch, root, builds_on=None):
-    lines = ["{}: {}".format(T_DROPPED, dropped), "{}: {}".format(T_ISSUE, issue_of(dropped, root))]
+def record(bad, partners, checks, run, batch, root):
+    """The record's lines: what the change is, whose it is, and what failed."""
+    lines = ["{}: {}".format(T_BAD, bad), "{}: {}".format(T_ISSUE, issue_of(bad, root))]
     lines += ["{}: {}".format(T_CHECK, name) for name in checks]
     lines += ["{}: {} {}".format(T_WITH, sha, issue_of(sha, root)) for sha in partners]
-    if builds_on:
-        lines += ["{}: {} {}".format(T_BUILDS_ON, builds_on, issue_of(builds_on, root))]
-    lines += ["{}: {}".format(T_RUN, run.get("url") or run.get("databaseId")),
-              "{}: {}".format(T_BATCH, batch), "{}: {}".format(T_BRING_BACK, BRING_BACK)]
+    lines += ["{}: {}".format(T_RUN, run.get("url") or run.get("databaseId")), "{}: {}".format(T_BATCH, batch)]
     return "\n".join(lines)
 
 
-def revert_message(dropped, partners, checks, run, batch, root):
-    why = "it fails the Gate alone on main" if not partners else \
-        "it fails the Gate together with {}, and it landed last".format(
-            ", ".join("{} ({})".format(p[:9], issue_of(p, root)) for p in partners))
-    body = [
-        "Drop {} from landing: it turned batch {} red".format(dropped[:9], batch[:9]),
-        "",
-        "Dropped: {} ({}). The Masthead search found that {}. Failed: {}.".format(
-            subject(dropped), issue_of(dropped, root), why, ", ".join(checks)),
-        "",
-        "To bring it back, its worker reverts this commit and commits the fix on top,",
-        "and pushes both to landing at once, so no batch holds the change without its fix.",
-        "",
-        trailer_block(dropped, partners, checks, run, batch, root),
-    ]
-    return "\n".join(body) + "\n"
-
-
-def builds_on_message(later, dropped, run, batch, root):
-    body = [
-        "Drop {} from landing: it builds on {}, which turned batch {} red".format(later[:9], dropped[:9], batch[:9]),
-        "",
-        "Dropped with {} ({}): {} ({}) changes lines {} changed, or lines next to them, so".format(
-            dropped[:9], issue_of(dropped, root), subject(later), issue_of(later, root), dropped[:9]),
-        "{} could not come off landing without it. It failed no check of its own.".format(dropped[:9]),
-        "",
-        "To bring it back, its worker waits until {} is back with its fix, then reverts this".format(dropped[:9]),
-        "commit, fixes what no longer fits, and pushes both to landing at once.",
-        "",
-        trailer_block(later, [], [], run, batch, root, builds_on=dropped),
-    ]
-    return "\n".join(body) + "\n"
-
-
-def touched(sha):
-    return set(git("diff-tree", "--no-commit-id", "--name-only", "-r", sha).stdout.split())
-
-
-def revert_tree(head, sha):
-    """The tree of `head` with `sha`'s change taken off, or None when that does not apply cleanly."""
-    parents = git("rev-list", "--parents", "-n", "1", sha).stdout.split()[1:]
-    if len(parents) != 1:
-        return None
-    r = git("merge-tree", "--write-tree", "--merge-base=" + sha, head, parents[0], check=False)
-    return r.stdout.split()[0] if r.returncode == 0 else None
-
-
-def reverts_apply(tip, order):
-    """Whether reverting `order`, one after another, applies cleanly on `tip`."""
-    head = tip
-    for sha in order:
-        tree = revert_tree(head, sha)
-        if not tree:
-            return False
-        head = git("commit-tree", tree, "-p", head, "-m", "Masthead search: check").stdout.strip()
-    return True
-
-
-def take_off(main, dropped, tip):
-    """The commits to take off landing, newest first, ending with `dropped`: alone when its revert
-    applies on `tip`, else with only the later commits whose change is in the way. Those are found
-    from the later commits that change a file it, or one of them, changes: each is left on landing
-    when the rest still come off cleanly without it. Records, and commits already dropped, are never
-    taken off. None when even all of them do not come off cleanly."""
-    if revert_tree(tip, dropped):
-        return [dropped]
-    done = drops(main, tip)
-    skip = set(done) | set(done.values())
-    paths, builds = touched(dropped), []
-    for sha in git("rev-list", "--reverse", "--first-parent", "{}..{}".format(dropped, tip)).stdout.split():
-        if sha in skip:
-            continue
-        files = touched(sha)
-        if files & paths:
-            builds.append(sha)
-            paths |= files
-    if not reverts_apply(tip, list(reversed(builds)) + [dropped]):
-        return None
-    for sha in list(builds):
-        rest = [b for b in builds if b != sha]
-        if reverts_apply(tip, list(reversed(rest)) + [dropped]):
-            builds = rest
-    return list(reversed(builds)) + [dropped]
-
-
-def drop(main, dropped, message_for, tries=5):
-    """Take `dropped` off the newest landing, with the later commits that build on its lines, one
-    revert each, in one plain push. The commits taken off, newest first, and landing's new tip; or
-    None when landing already took `dropped` off."""
-    for _ in range(tries):
-        git("fetch", "--quiet", "--no-tags", REMOTE, "+refs/heads/{0}:refs/remotes/{1}/{0}".format(LANDING, REMOTE))
-        tip = rev("refs/remotes/{}/{}".format(REMOTE, LANDING))
-        if not tip:
-            raise Stop("This repository has no landing branch, so nothing is dropped.")
-        if dropped in drops(main, tip):
-            return None
-        order = take_off(main, dropped, tip)
-        if not order:
-            raise Stop("{} cannot be taken off landing cleanly, even with the later commits that change the same "
-                       "files. Nothing is dropped; hand it back by hand.".format(dropped[:9]))
-        head = tip
-        for sha in order:
-            made = subprocess.run(["git", "commit-tree", revert_tree(head, sha), "-p", head, "-F", "-"],
-                                  input=message_for(sha), capture_output=True, text=True)
-            if made.returncode != 0:
-                raise Stop("git commit-tree failed: " + made.stderr.strip())
-            head = made.stdout.strip()
-        if git("push", "--quiet", REMOTE, "{}:refs/heads/{}".format(head, LANDING), check=False).returncode == 0:
-            return order, head
-        say("  landing moved while the revert was made; trying again on the newest landing")
-    raise Stop("landing kept moving, so the revert could not be pushed after {} tries. Nothing is dropped.".format(tries))
+def hand_back(bad, partners, checks, run, batch, root):
+    """The message for the worker of the bad change's issue, with the record at its end. A returned
+    worker is a fresh session with no memory, so it carries everything the record holds."""
+    issue = issue_of(bad, root)
+    lines = ["Your commit {} ({}) for {} turned the batch ending at {} red in {}.".format(
+        bad, subject(bad), issue, batch[:9], run.get("url") or run.get("databaseId"))]
+    lines.append("Failed check: {}.".format(", ".join(checks) if checks else "not named by the run"))
+    if partners:
+        named = ", ".join("{} ({})".format(sha[:9], issue_of(sha, root)) for sha in partners)
+        keys = [k for k in (issue_of(sha, root) for sha in partners) if k != NO_ISSUE]
+        lines.append(
+            "It passes on its own and fails only together with {}, which landed earlier. It is your job to "
+            "figure out what needs to be fixed and fix it, end to end, whichever commit the fault sits in; "
+            "it is not someone else's commit to hand on. Before you change anything, read {} and every "
+            "comment on {}, which say what was done there, so your fix is not out of context. Once your fix "
+            "lands, add a comment to {} and to {} saying what you changed and why, so the issues stay in "
+            "sync.".format(named, " and ".join(keys) or "the issue of each of those commits",
+                           "them" if len(keys) != 1 else "it", issue,
+                           " and to ".join(keys) or "the issue of each of those commits"))
+    else:
+        lines.append("It fails that check on its own, on main.")
+    lines.append(
+        "Nothing was taken off landing: your commit stays on the pile, and main does not move until a later "
+        "go runs green. Fix it on top: start from the newest `origin/landing`, commit the fix naming {}, prove "
+        "it as /work-on says for {}, and land it on landing like any other commit.".format(issue, issue))
+    lines.append(record(bad, partners, checks, run, batch, root))
+    return "\n\n".join(lines)
 
 
 # ---- The command --------------------------------------------------------------
@@ -592,24 +487,24 @@ def git_new_enough():
 
 def search(run_id, root):
     if not git_new_enough():
-        raise Stop("The search needs git 2.40 or newer (git merge-tree --merge-base). Nothing is dropped.")
+        raise Stop("The search needs git 2.40 or newer (git merge-tree --merge-base). Nothing is named.")
     stored = project_fact.gate(root)
     if not stored:
-        raise Stop("No Gate is stored in .claude/gate.json, so the search does not start and drops nothing. "
+        raise Stop("No Gate is stored in .claude/gate.json, so the search does not start and names nothing. "
                    "Run /masthead:setup to store one.")
     if "workflow_dispatch" not in stored["starts"]:
         raise Stop("The stored Gate, {}, cannot be started with workflow_dispatch, which is how the search "
-                   "tests one commit. The search does not start and drops nothing.".format(stored["workflow"]))
+                   "tests one commit. The search does not start and names nothing.".format(stored["workflow"]))
     run = view(run_id)
     if run.get("status") != "completed":
         raise Stop("Run {} has not ended yet. Run the search once it is red.".format(run_id))
     if run.get("headBranch") != LANDING:
-        raise Stop("Run {} is on {}, not landing, so it is not a batch run. Nothing is dropped.".format(
+        raise Stop("Run {} is on {}, not landing, so it is not a batch run. Nothing is named.".format(
             run_id, run.get("headBranch")))
     if batch_verdict(run, run_id, verdict_names(root, stored["workflow"])) == "start":
         gh("run", "rerun", str(run_id), "--failed")
         say("Run {} went red only because a runner could not start or fetch the code. Its failed jobs run again; "
-            "no commit is dropped.".format(run_id))
+            "no change is named.".format(run_id))
         return 0
 
     git("fetch", "--quiet", "--no-tags", REMOTE,
@@ -619,74 +514,41 @@ def search(run_id, root):
     main_sha = rev("refs/remotes/{}/{}".format(REMOTE, MAIN))
     if not rev(batch) or git("merge-base", "--is-ancestor", main_sha, batch, check=False).returncode != 0:
         raise Stop("Batch {} does not sit on main, so the search cannot tell which commits are new. "
-                   "Nothing is dropped.".format(batch[:9]))
-    history = git("rev-list", "--reverse", "--first-parent", "{}..{}".format(main_sha, batch)).stdout.split()
-    if not history:
-        raise Stop("Batch {} holds no commit main does not, so nothing is dropped.".format(batch[:9]))
-    in_batch = set(history)
-    # Main does not move past a drop, so a batch can hold commits already dropped. A revert made
-    # after this run started means landing has moved on: the batch run after it is the one to search.
-    done = drops(main_sha, rev("refs/remotes/{}/{}".format(REMOTE, LANDING)))
-    later = {d: r for d, r in done.items() if d in in_batch and r not in in_batch}
-    if later:
-        say("Batch {} holds {}, which revert {} already took off landing after this run started. The batch run "
-            "on that revert tests the rest; search that run if it goes red. Nothing more is dropped.".format(
-                batch[:9], ", ".join(d[:9] for d in later), ", ".join(r[:9] for r in later.values())))
-        return 0
-    pairs = {d: r for d, r in done.items() if d in in_batch and r in in_batch}
-    commits, clean, open_drops = [], set(), set()
-    reverted_by = {r: d for d, r in pairs.items()}
-    for sha in history:
-        if sha in pairs:
-            open_drops.add(sha)
-        elif sha in reverted_by:
-            open_drops.discard(reverted_by[sha])
-        else:
-            commits.append(sha)
-            if not open_drops:
-                clean.add(sha)
+                   "Nothing is named.".format(batch[:9]))
+    commits = git("rev-list", "--reverse", "--first-parent", "{}..{}".format(main_sha, batch)).stdout.split()
     if not commits:
-        raise Stop("Every commit of batch {} was already dropped, so nothing more is dropped.".format(batch[:9]))
-    say("Batch {} holds {} commits after main {}{}. Searching with the stored Gate, {}.".format(
-        batch[:9], len(commits), main_sha[:9],
-        ", leaving out {} already dropped".format(len(pairs)) if pairs else "", stored["workflow"]))
+        raise Stop("Batch {} holds no commit main does not, so nothing is named.".format(batch[:9]))
+    say("Batch {} holds {} commits after main {}. Searching with the stored Gate, {}.".format(
+        batch[:9], len(commits), main_sha[:9], stored["workflow"]))
 
-    finder = Search(root, stored["workflow"], main_sha, commits, run, batch, clean)
-    dropped, partners, evidence = finder.find()
+    finder = Search(root, stored["workflow"], main_sha, commits, run, batch)
+    bad, partners, evidence = finder.find()
     if len(commits) > 1 and not finder.saw_red:
         # Every run the search started was green, so the only red is the batch run itself. Run the
-        # Gate once more on the batch: a red that does not come back blames no commit.
+        # Gate once more on the batch: a red that does not come back blames no change.
         verdict, again = finder.run_gate(batch, tuple(commits))
         if verdict != "red":
             raise Stop("None of the search's {} Gate runs went red, the batch itself included, so the red of "
-                       "run {} did not happen again. No commit is dropped.".format(finder.runs, run_id))
+                       "run {} did not happen again. No change is named.".format(finder.runs, run_id))
         if evidence is run:
             evidence = again
     jobs = evidence.get("jobs") or []
     checks = failed_checks([j for j in jobs if part_of(j) == "gate"] if evidence is run else jobs, finder.verdicts)
 
-    def message_for(sha):
-        if sha == dropped:
-            return revert_message(dropped, partners, checks, evidence, batch, root)
-        return builds_on_message(sha, dropped, evidence, batch, root)
-
-    result = drop(main_sha, dropped, message_for)
-    if result is None:
-        say("{} is already off landing: a revert pushed while the search ran took it off. "
-            "Nothing more is dropped.".format(dropped[:9]))
-        return 0
-    order, tip = result
+    issue = issue_of(bad, root)
     say("")
-    with_it = order[:-1]
-    say("Dropped {} from landing{}, after {} Gate runs; landing is now {}. That push starts the next batch run, "
-        "which tests the rest again.".format(
-            dropped[:9], " with {}, which build on its lines".format(", ".join(c[:9] for c in with_it))
-            if with_it else "", finder.runs, tip[:9]))
+    say("Named {} ({}) as the change that turned batch {} red, after {} Gate runs. Nothing was pushed to landing "
+        "or main: the change stays on the pile, and its worker fixes it on top.".format(
+            bad[:9], issue, batch[:9], finder.runs))
     say("")
-    say(trailer_block(dropped, partners, checks, evidence, batch, root))
-    for sha in with_it:
+    if issue == NO_ISSUE:
+        say("{} names no issue: tell the person, with this record.".format(bad[:9]))
         say("")
-        say(trailer_block(sha, [], [], evidence, batch, root, builds_on=dropped))
+        say(record(bad, partners, checks, evidence, batch, root))
+        return 0
+    say(BLOCK_START.format(issue=issue))
+    say(hand_back(bad, partners, checks, evidence, batch, root))
+    say(BLOCK_END)
     return 0
 
 

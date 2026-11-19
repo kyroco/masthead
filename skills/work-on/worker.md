@@ -184,8 +184,9 @@ In the batch way:
 Dispatched: when your foreman accepts your landing, bring down your test
 stack and tunnels and delete your branch's code index, then tell it "cleaned
 up"; the foreman closes the issue once a green batch moves main. Keep your worktree and branch: your foreman may reuse this
-session. If a batch drops your commit and the foreman hands it back, fix it
-on the same branch and land it again.
+session. If a red batch names your change and the foreman hands it back, it
+stays on landing: fix it on top, on the same branch from the newest landing,
+and land the fix.
 
 Started by the person, once the batch has moved main past your commits:
 check the issue is closed and its Status reads Done, and fix either if not.

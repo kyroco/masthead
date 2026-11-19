@@ -305,11 +305,7 @@ When a batch run ends, read it, from a checkout of the repository:
 Green, with main at its commit, it lists the issues the batch carried to main:
 each counts as merged. Close each one (on GitHub, `gh issue close <n>`, then
 set it to Done with `set-status.sh`), then each parent up the chain that has
-no open sub-issue left, set to Done the same way. An issue it lists as sent
-back is not merged, though its commit sits on main with its revert: leave it
-open and never set it Done. When that commit's closing words (`Fixes <issue>`)
-closed it or set it Done on reaching main, reopen it (`gh issue reopen <n>`)
-and set it back to In Progress, as the script's line for it says. On the first batch it may ask for `--since <the
+no open sub-issue left, set to Done the same way. On the first batch it may ask for `--since <the
 commit main was on before this batch>`. List what each closed issue blocked:
 
     gh api repos/{owner}/{repo}/issues/<n>/dependencies/blocking --jq '.[] | "#\(.number) \(.state) \(.title)"'
@@ -328,38 +324,35 @@ red run's id:
     python3 ${CLAUDE_PLUGIN_ROOT}/skills/work-on/bad-commit.py <run id>
 
 It reruns a batch that went red only because a runner could not start, or
-drops the bad commit from `landing`, with any later commit whose change is in
-the way, and writes a record for each (`references/bad-commit.md`). When it
-drops nothing, what it prints, its reason, goes to the person as it stands,
-for example when the Gate passed and only the move of main failed, or when
-the red did not happen again.
+names the bad change, its issue and the failed check
+(`references/bad-commit.md`). It pushes nothing to landing or main: the
+change stays on the pile and its worker fixes it on top, and main does not
+move until a later go runs green. Robert, November 19, 2026, on the search
+only naming the bad change: "so why are you asking me?" When it names
+nothing, what it prints, its reason, goes to the person as it stands, for
+example when the Gate passed and only the move of main failed, or when the
+red did not happen again. A bad change whose commit names no issue goes to
+the person with the record the script prints.
 
-When it dropped a commit, hand it back to its worker:
+When it names a change, it prints one block for that change's issue: the
+message for its worker, with the record at its end. A change that fails only
+together with an earlier one is the later one's, and its message tells its
+worker to own the fix end to end, to read the earlier issue and every comment
+on it first, and to comment on both issues once its fix lands. Robert,
+November 19, 2026: "it is its job to figure out what needs to be fixed and
+fix it, and not say: welp not my commit sorry, moving on". Hand it back:
 
-    python3 ${CLAUDE_PLUGIN_ROOT}/skills/work-on/batch-issues.py returned
-
-It lists every dropped commit not yet back on landing, each with its issue and
-a message for that issue's worker: which check failed, and how to bring the
-commit back. A commit that fails only together with an earlier one goes back
-to the worker of the later one, whose message tells it to own the fix end to
-end, to read the earlier issue and every comment on it first, and to comment
-on both issues once its fix lands. Robert, November 19, 2026: "it is its job
-to figure out what needs to be fixed and fix it, and not say: welp not my
-commit sorry, moving on". A dropped commit that names no issue goes to the
-person as the script prints it. For each dropped commit it lists, one whose
-drop you have not handed back already (each drop is its own revert, so a
-second drop of the same issue is handed back again):
-
-1. Never set it Done. Set it back to In Progress (`set-status.sh`).
-2. Post the message on the issue as a comment, word for word, so any session
-   that reads the issue has it.
-3. Send the message, whole and unedited, to a worker on that issue: its own
+1. Never set the issue Done. Set it back to In Progress (`set-status.sh`).
+2. Post the block on the issue as a comment, word for word. That comment is
+   the record: you and any session that reads the issue find it there.
+3. Send the block, whole and unedited, to a worker on that issue: its own
    worker when that session is still alive, otherwise a new one started as
-   **Start a worker** says, with the message added to its prompt. A returned
-   worker may remember nothing; the message carries all it needs.
+   **Start a worker** says, with the block added to its prompt. A returned
+   worker may remember nothing; the block carries all it needs.
 
-Its landing is accepted as any other, and the issue closes only once a green
-batch carries it to main and `merged` lists it.
+The fix lands on top like any other commit and its landing is accepted as any
+other. The issue closes only once a green batch carries it to main and
+`merged` lists it.
 
 Every report to the person carries the count of issues closed after a green
 batch in the run. A split is not a stop: its sub-issues join the run like any
@@ -409,8 +402,8 @@ on GitHub. Every section above holds, with these changes, shown for KOR-12:
   with `save_issue` once no `[NEEDS CLARIFICATION]` line is left.
 - **A worker's report.** A worker's report quotes a line from the project
   description, in place of the project README.
-- **A dropped commit.** Set its issue back to `In Progress` with `save_issue`
-  and post the message with `save_comment`; never `Done`.
+- **A named change.** Set its issue back to `In Progress` with `save_issue`
+  and post the block with `save_comment`; never `Done`.
 - **Park.** A second failure sets the issue's status to `Needs Human` with
   `save_issue` and adds one comment saying what happened, never a `parked`
   label.
