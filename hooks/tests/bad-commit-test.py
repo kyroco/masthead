@@ -555,6 +555,93 @@ check("v-s2-j1 it says the change is already named and handed back, and prints n
 check("v-s2-j1 still nothing is pushed", r.landing() == before)
 r.done()
 
+# ---- Re-verify round 1 ---------------------------------------------------------
+
+# r1-c3-false, state A: one change landed as two commits on one issue. Its second
+# commit is part of the change, never a fix on top.
+r = Repo()
+r.land({"a": "1\n"}, "Add a (INFRA-600)")
+x1 = r.land({"breaks": "x\n"}, "Add the part that breaks (INFRA-601)")
+r.land({"doc": "d\n"}, "Document the part (INFRA-601)")
+r.red_batch()
+out = r.search()
+check("r1-c3 a change's own second commit is not read as a fix on top: no 'Your fix on top' line",
+      record(out.stdout).get("Masthead-Bad-Change") == [x1] and "Your fix on top" not in out.stdout,
+      out.stdout + out.stderr)
+r.land({"y": "1\n"}, "Add y (INFRA-602)")
+r.red_batch()
+state = r.load()
+state["calls"] = []
+r.save(state)
+out = r.search()
+check("r1-c3 the next red batch, with no fix landed since, starts no Gate run and sends nothing again",
+      r.dispatches() == [] and "already named" in out.stdout and block(out.stdout) == ("", ""),
+      (r.dispatches(), out.stdout + out.stderr))
+r.done()
+
+# r1-c2-false: a new break lands while the named change waits for its fix, then the fix lands.
+r = Repo()
+r.land({"a": "1\n"}, "Add a (INFRA-610)")
+x = r.land({"breaks": "x\n"}, "Break it (INFRA-611)")
+r.red_batch()
+r.search()
+m = r.land({"half-a": "a\n", "half-b": "b\n"}, "Break it another way (INFRA-613)")
+r.red_batch()
+out = r.search()
+check("r1-c2 setup: while the fix has not landed, the batch is held as already named",
+      "already named" in out.stdout, out.stdout + out.stderr)
+os.remove(os.path.join(r.work, "breaks"))
+r.land({"b": "fixed\n"}, "Fix the break on top (INFRA-611)")
+r.red_batch()
+out = r.search()
+rec = record(out.stdout)
+check("r1-c2 a fix that works is not blamed for a break landed before it: the new break is named",
+      out.returncode == 0 and rec.get("Masthead-Bad-Change") == [m] and rec.get("Masthead-Issue") == ["INFRA-613"],
+      out.stdout + out.stderr)
+check("r1-c2 no one is told a working fix is still red", "still red" not in out.stdout, out.stdout)
+r.done()
+
+# r1-c3-false, state B: a fix already found red is not searched and handed back again.
+r = Repo()
+r.land({"a": "1\n"}, "Add a (INFRA-620)")
+x = r.land({"breaks": "x\n"}, "Break it (INFRA-621)")
+r.red_batch()
+r.search()
+tried = r.land({"b": "not fixed\n"}, "Try to fix the break (INFRA-621)")
+r.red_batch()
+out = r.search()
+check("r1-c3-b setup: the fix that is still red is named as tried",
+      "Your fix on top, {}".format(tried[:9]) in out.stdout, out.stdout + out.stderr)
+r.land({"z": "1\n"}, "Add z (INFRA-622)")
+r.red_batch()
+state = r.load()
+state["calls"] = []
+r.save(state)
+out = r.search()
+check("r1-c3-b with no newer fix since, the next red batch starts no Gate run and sends nothing again",
+      r.dispatches() == [] and "already named" in out.stdout and block(out.stdout) == ("", ""),
+      (r.dispatches(), out.stdout + out.stderr))
+r.done()
+
+# r1-judge-1: a bad change whose commit names no issue goes to the person and is not held
+# forever: once fixed on top, a later break is still found.
+r = Repo()
+r.land({"a": "1\n"}, "Add a (INFRA-630)")
+loose = r.land({"breaks": "x\n"}, "Break it with no issue named")
+r.red_batch()
+out = r.search()
+check("r1-judge-1 setup: the change with no issue goes to the person",
+      "names no issue: tell the person" in out.stdout, out.stdout + out.stderr)
+os.remove(os.path.join(r.work, "breaks"))
+r.land({"b": "fixed\n"}, "Fix the break by hand")
+later = r.land({"half-a": "a\n", "half-b": "b\n"}, "Break it another way (INFRA-631)")
+r.red_batch()
+out = r.search()
+check("r1-judge-1 a change with no issue is not held as waiting: the later break is searched and named",
+      "already named" not in out.stdout and record(out.stdout).get("Masthead-Bad-Change") == [later],
+      out.stdout + out.stderr)
+r.done()
+
 # ---- V-S3-1, V-S3-2: the batch run's own plan and move jobs ---------------------
 
 for part, broken in (("move", job("move / move", "failure", [("Run actions/checkout@v5", "failure")], 11, 12)),
