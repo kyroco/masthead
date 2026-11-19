@@ -217,7 +217,13 @@ PLAN_SCRIPT = step_script(PLAN, "plan")
 SHA = "a" * 40
 
 
-def plan(stored, gate_input=GATE, ref="refs/heads/landing", link=False):
+STARTER_FILE = ".github/workflows/masthead-batch.yml"
+
+
+def plan(stored, gate_input=GATE, ref="refs/heads/landing", link=False, runs=None):
+    """Run the plan step in a checkout holding `stored` as gate.json and the starter
+    as setup writes it, its Gate job running `runs` (the stored Gate by default)."""
+    runs = GATE if runs is None else runs
     with tempfile.TemporaryDirectory() as top:
         checkout = os.path.join(top, "checkout")
         os.makedirs(os.path.join(checkout, ".claude"))
@@ -232,7 +238,11 @@ def plan(stored, gate_input=GATE, ref="refs/heads/landing", link=False):
         os.makedirs(os.path.join(checkout, ".github", "workflows"))
         with open(os.path.join(checkout, ".github", "workflows", "gate.yml"), "w") as handle:
             handle.write("name: Gate\non: [pull_request, workflow_call]\n")
-        return run_script(PLAN_SCRIPT, checkout, {"GATE_INPUT": gate_input, "GITHUB_REF": ref, "GITHUB_SHA": SHA})
+        with open(os.path.join(checkout, STARTER_FILE), "w", encoding="utf-8") as handle:
+            handle.write(starter.replace("uses: ./__GATE__", "uses: ./" + runs).replace("__GATE__", gate_input))
+        return run_script(PLAN_SCRIPT, checkout, {
+            "GATE_INPUT": gate_input, "GITHUB_REF": ref, "GITHUB_SHA": SHA,
+            "GITHUB_REPOSITORY": "acme/shop", "STARTER_REF": "acme/shop/" + STARTER_FILE + "@" + ref})
 
 
 code, out, summary, output = plan({"workflow": GATE, "starts": ["workflow_call", "workflow_dispatch"]})
@@ -260,6 +270,13 @@ check("S4 a stored Gate that workflow_call cannot start stops the batch and says
       code != 0 and output.strip() == "" and "cannot be started with workflow_call" in out, out)
 code, out, _, output = plan({"workflow": ".github/workflows/checks.yml", "starts": ["workflow_call"]})
 check("S4 a starter that runs a Gate other than the stored one does not start",
+      code != 0 and output.strip() == "" and "runs only the stored Gate" in out, out)
+code, out, _, output = plan({"workflow": GATE, "starts": ["workflow_call"]}, runs=".github/workflows/checks.yml")
+check("S4 a starter whose Gate job runs another workflow than the stored one does not start (V-S4-J2)",
+      code != 0 and output.strip() == "" and "runs only the stored Gate" in out, out)
+code, out, _, output = plan({"workflow": GATE, "starts": ["workflow_call"]},
+                            runs=GATE + "\n  extra:\n    uses: ./.github/workflows/checks.yml")
+check("S4 a starter that runs a second workflow of its own beside the stored Gate does not start (V-S4-J2)",
       code != 0 and output.strip() == "" and "runs only the stored Gate" in out, out)
 code, out, _, output = plan({"workflow": GATE, "starts": ["workflow_call"]}, ref="refs/heads/feature")
 check("S4 a batch run off landing does not start", code != 0 and output.strip() == "", out)
