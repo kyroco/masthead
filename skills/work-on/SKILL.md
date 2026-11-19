@@ -1,6 +1,6 @@
 ---
 name: work-on
-description: Work on GitHub or Linear issues, one session per issue. /work-on #1418, or a Linear key such as /work-on KOR-12, makes this session the worker for that one issue in this repo, from worktree to one PR. /work-on foreman makes this session the foreman and then asks what to run (a project, milestone or issue numbers); /work-on <project or milestone> does the same with the work already named. The foreman proposes a plan, the user decides how many workers run at once, and each issue runs in a fresh session of its own (a desktop session in the Claude desktop app, a background session in the terminal) through to merge. Run it from the repo the issue lives in.
+description: Work on GitHub or Linear issues, one session per issue. /work-on #1418, or a Linear key such as /work-on KOR-12, makes this session the worker for that one issue in this repo, from worktree to commits landed on the `landing` branch, with no pull request. /work-on foreman makes this session the foreman and then asks what to run (a project, milestone or issue numbers); /work-on <project or milestone> does the same with the work already named. The foreman proposes a plan, the user decides how many workers run at once, and each issue runs in a fresh session of its own (a desktop session in the Claude desktop app, a background session in the terminal) until a green batch moves main. Run it from the repo the issue lives in.
 disable-model-invocation: true
 ---
 
@@ -50,7 +50,7 @@ Work in the repo the session was started in; this skill never moves a session
 to another repo, and every `gh` command and GitHub connector call runs
 against this one. Where the connector is loaded, issue, pull request, comment
 and Status calls go through it and `gh` is the fallback; git keeps the
-commits and pushes, and the merge queue stays on `gh` (the github-issues
+commits and pushes, and what an issue unblocks stays on `gh` (the github-issues
 skill, **Which tool makes the call**). The repo's own
 facts come first: where its `CLAUDE.md` or `docs/conventions/` sets a test
 command, a pre-push check, its changelog or a worktree
