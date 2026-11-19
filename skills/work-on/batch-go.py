@@ -65,7 +65,8 @@ OWNER_LINE = re.compile(r"\s*(fixes|closes|resolves|refs)\b", re.I)
 # ENG-6"), or in brackets at the end of the subject, as the house style writes them. A sentence such as
 # "Fixes UTF-8 decoding" names no issue (J-1).
 _KEY = r"[A-Z][A-Z0-9]{1,9}-\d+"
-ANY_KEY = re.compile(r"\b{}\b".format(_KEY))
+# Read with the same case rule as KEYS_ONLY, so a line it takes always yields a key ("refs eng-8").
+ANY_KEY = re.compile(r"\b{}\b".format(_KEY), re.I)
 KEYS_ONLY = re.compile(r"^\s*(?:fixes|closes|resolves|refs)\s+{0}(?:\s*,?\s*(?:and\s+)?{0})*\s*\.?\s*$".format(_KEY),
                        re.I)
 SUBJECT_KEY = re.compile(r"\(({})\)\s*$".format(_KEY))
@@ -129,7 +130,7 @@ def owner(body, pattern):
             return found[-1].upper()
     for line in owning:
         if KEYS_ONLY.match(line):
-            return ANY_KEY.findall(line)[-1]
+            return ANY_KEY.findall(line)[-1].upper()
     m = SUBJECT_KEY.search(lines[0]) if lines else None
     return m.group(1) if m else None
 
