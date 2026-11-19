@@ -260,7 +260,7 @@ keep a code index in Korium (off), whether to keep AI attribution out of commits
 before running on the biggest model (off). Then run `/masthead:setup`. It
 asks four questions about the repository, or three when a memory is already
 connected, and one or two more when it finds a folder of decision records or
-no ignore line for its working files, and one about the architecture doc (it names the one it finds, or offers to draft one from the code), and writes nothing until you say yes: just you or the team
+no ignore line for its working files, one about the architecture doc (it names the one it finds, or offers to draft one from the code), and one about the Gate (it works out which workflow runs your checks and stores it in `.claude/gate.json` after one yes, for the optional batch run; with no Gate or no yes, the repository ships the way it does today), and writes nothing until you say yes: just you or the team
 (whether the settings are committed with the code), tests before a push
 (it finds your test command), whether its issues live in GitHub or Linear
 (one at a time, never both), and whether to connect a memory now, later or

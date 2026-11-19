@@ -27,9 +27,9 @@ Quietly gather these, with commands that read and change nothing:
   Masthead was set up before, say so and
   offer to change answers rather than starting over. When it was set up
   before and no `ARCHITECTURE_DOC` is recorded, offer the architecture doc on
-  its own: go straight to step 8, then steps 9 and 10, and ask none of the other
+  its own: go straight to step 8, then steps 9 to 11, and ask none of the other
   questions unless the person asks to change an answer. The fact goes to the
-  settings file that already holds the other answers. On such a run, step 9
+  settings file that already holds the other answers. On such a run, step 10
   does not ask the `.gitignore` question again: it was asked the first time.
   When `ARCHITECTURE_DOC` is recorded but `project_fact.py --architecture-doc`
   prints nothing, the doc has moved or gone: say which path is recorded and
@@ -49,6 +49,9 @@ Quietly gather these, with commands that read and change nothing:
   `docs/architecture/README.md`, `docs/<folder>/architecture.md`).
 - The project's principles: the file that numbers them P1, P2 and on, usually
   `CLAUDE.md` at the top of the repository.
+- How the repository's Gate is run: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/setup/gate.py look`
+  prints it as JSON and writes nothing. A stored answer comes back as
+  `"status": "stored"` and is never worked out again; step 9 uses the rest.
 - Whether Korium memory is connected: `claude mcp list` names a server called
   `korium`, or the person tells you.
 
@@ -192,7 +195,34 @@ the doc too. If they say no, do not record the doc: say the architecture reviewe
 needs the seven rules stated to hold pull requests to them, and that running
 `/masthead:setup` again brings the question back.
 
-## 9. Write, then show what is on
+## 9. The Gate, and an optional batch run
+
+The Gate is the GitHub Actions workflow that runs this repository's checks.
+Masthead's batch run tests everything landed since the last run with one
+Gate run, and its search for a bad commit starts the Gate on the commits it
+picks. Both read how the Gate is run from `.claude/gate.json`, which only this
+step writes, and only after a yes. The batch run is an option: without it the
+repository ships the way it does today. Use what `gate.py look` printed:
+
+- `stored`: say "This repository's Gate is `<workflow>`, stored before." and
+  ask nothing, unless the person asks to change it; then run
+  `gate.py store <workflow>` with the one they name.
+- `found`: ask "This repository's Gate looks like `<workflow>` (<name>),
+  which can be started by <starts>. Shall Masthead remember that, so its
+  batch run and its search for a bad commit start this Gate?" On yes, run
+  `python3 ${CLAUDE_PLUGIN_ROOT}/skills/setup/gate.py store <workflow>`.
+- `choose`: list the choices and ask "Which of these is this repository's
+  Gate, or none?" The one they name is the yes; store it the same way.
+- `none`, a no, or `store` refusing: write nothing and say the one line
+  `look` gave (or `store` printed): "Masthead could not work out how this
+  repository's Gate is run, so it keeps shipping the way it does today." Add
+  why in one more line when `look` gave a reason.
+
+Once stored, say to commit `.claude/gate.json`: the batch run reads it on
+GitHub, where only committed files exist. Changing a workflow to make it
+startable is a change to `.github/`, so suggest it and never make it here.
+
+## 10. Write, then show what is on
 
 Show the exact env block and the file it goes to, and ask "Shall I write
 this?" On yes, merge it into the file (keep everything already there). If
@@ -204,7 +234,8 @@ Keep it to the rails this repository has: dangerous-command and secret
 refusals (always on), blind review (always on), push check (on if set), where
 issues live (GitHub or Linear, with the team key), memory (on if connected),
 decision records (on if a folder was named), architecture doc (its path, or
-none). With a push check, say to commit
+none), the Gate (its workflow when stored, or "not stored: ships the way it
+does today"). With a push check, say to commit
 `.claude/push-check.sh` and `.claude/push-check.cmd`: a branch without them
 cannot push. Check the tools the gates need with `command -v jq`, `command -v
 python3` and, where issues live on GitHub, `command -v gh`, and add one row for
@@ -226,7 +257,7 @@ keep AI attribution out of commits (on), ask for a reason before a helper runs
 on the biggest model (off), all under `/plugin configure masthead@masthead`. End with: "Run `/masthead:setup`
 again to change any of this."
 
-## 10. Bring the code in line with the doc
+## 11. Bring the code in line with the doc
 
 When an architecture doc is recorded and passes the check, and the
 repository holds code, ask whether the person wants a targeted review, a

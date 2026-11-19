@@ -1229,7 +1229,7 @@ never skills/setup/SKILL.md 'record the doc anyway'
 says  skills/setup/SKILL.md 'before and no `ARCHITECTURE_DOC` is recorded, offer the architecture doc on its own'
 says  skills/setup/SKILL.md 'ask none of the other questions unless the person asks to change an answer'
 # Round 1, finding s4.j1: the rerun does not ask the .gitignore question again either.
-says  skills/setup/SKILL.md 'On such a run, step 9 does not ask the `.gitignore` question again'
+says  skills/setup/SKILL.md 'On such a run, step 10 does not ask the `.gitignore` question again'
 # Round 1, finding s2.j2: a recorded doc that is no longer there is offered again, not skipped.
 says  skills/setup/SKILL.md 'When `ARCHITECTURE_DOC` is recorded but `project_fact.py --architecture-doc` prints nothing, the doc has moved or gone'
 # Scenario 5: the path comes from the facts reader every other fact comes from.
@@ -1449,7 +1449,10 @@ says  agents/adjudicator.md 'One that says a build would behave wrongly holds wh
 # MAST-36: /setup brings an existing project in line with its architecture doc,
 # by a targeted review or a full sweep.
 # Scenario 1: setup asks, when there is code and a doc, targeted, sweep or neither.
-says  skills/setup/SKILL.md '## 10. Bring the code in line with the doc'
+says  skills/setup/SKILL.md '## 11. Bring the code in line with the doc'
+# INFRA-268: setup stores the Gate only after a yes, and a no ships the old way.
+says  skills/setup/SKILL.md "repository's Gate is run, so it keeps shipping the way it does today."
+says  skills/setup/SKILL.md 'which only this step writes, and only after a yes'
 says  skills/setup/SKILL.md 'ask whether the person wants a targeted review, a full sweep, or neither'
 says  skills/setup/SKILL.md 'Ask on every run of `/masthead:setup`'
 says  skills/setup/SKILL.md 'skills/setup/architecture-review.md'

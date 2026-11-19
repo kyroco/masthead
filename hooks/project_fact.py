@@ -362,6 +362,43 @@ def architecture_trial(root=None):
     return "off" if value in TRIAL_OFF_WORDS else "on"
 
 
+GATE_FILE = os.path.join(".claude", "gate.json")
+GATE_STARTS = ("workflow_call", "workflow_dispatch")
+GATE_PATH = re.compile(r"\.github/workflows/[A-Za-z0-9._-]+\.ya?ml")
+
+
+def gate(root=None):
+    """How the repository's Gate is run, as setup stored it after the person's yes (INFRA-268), or None.
+
+    Read from .claude/gate.json at the top of the checkout `root` is in, a file
+    the repository commits so the batch run on GitHub reads the same answer
+    (references/gate-fact.md). Returns {"workflow": path, "starts": [...]} only
+    when the path is a workflow file that exists and at least one way to start
+    it is named; anything else is None, and the repository ships the old way.
+    """
+    root = root or project_root()
+    if not trusted(root):
+        return None
+    top = checkout_top(root)
+    try:
+        with open(os.path.join(top, GATE_FILE), encoding="utf-8") as handle:
+            data = json.load(handle)
+    except Exception:
+        return None
+    if not isinstance(data, dict):
+        return None
+    workflow = data.get("workflow")
+    starts = data.get("starts")
+    if not isinstance(workflow, str) or not GATE_PATH.fullmatch(workflow):
+        return None
+    if not isinstance(starts, list):
+        return None
+    starts = sorted({s for s in starts if s in GATE_STARTS})
+    if not starts or not os.path.isfile(os.path.join(top, workflow)):
+        return None
+    return {"workflow": workflow, "starts": starts}
+
+
 def main(argv):
     # --trusted CHECKOUT: exit 0 when the checkout is the session's repository, 1 when not.
     if len(argv) == 2 and argv[0] == "--trusted":
@@ -375,7 +412,8 @@ def main(argv):
     # Skills run these through the Bash tool, where Claude Code sets no
     # CLAUDE_PROJECT_DIR (it sets it for hooks only), so there the repository
     # the shell is in is the session's. trusted() still guards --root.
-    if argv in (["--tracker"], ["--linear-team"], ["--architecture-doc"], ["--architecture-trial"], ["--state-path"]) and root is None \
+    if argv in (["--tracker"], ["--linear-team"], ["--architecture-doc"], ["--architecture-trial"], ["--state-path"],
+                ["--gate"]) and root is None \
             and not os.environ.get("CLAUDE_PROJECT_DIR"):
         os.environ["CLAUDE_PROJECT_DIR"] = checkout_top(os.getcwd())
     # --state-path prints the full path of the checkout's state folder; the
@@ -414,6 +452,14 @@ def main(argv):
         return 0
     if argv == ["--architecture-trial"]:
         print(architecture_trial(root))
+        return 0
+    # --gate prints the stored Gate as one line of JSON, or nothing and exit 1
+    # when none is stored: the repository then ships the old way.
+    if argv == ["--gate"]:
+        stored = gate(root)
+        if not stored:
+            return 1
+        print(json.dumps(stored))
         return 0
     as_path = bool(argv) and argv[0] == "--path"
     if as_path:
