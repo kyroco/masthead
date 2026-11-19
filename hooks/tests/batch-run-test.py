@@ -301,8 +301,13 @@ for path in (PLAN, MOVE):
 # A called workflow may ask for no more than its caller job grants, or GitHub
 # refuses the whole run before any job starts. Setup fills the Gate job's grant
 # from the stored Gate's own permissions (gate.py starter).
-sys.path.insert(0, os.path.join(PLUGIN, "skills", "setup"))
-import gate as gate_py  # noqa: E402
+GATE_PY = os.path.join(PLUGIN, "skills", "setup", "gate.py")
+
+
+def gate_cli(top, *args):
+    env = dict(os.environ)
+    env.pop("CLAUDE_PROJECT_DIR", None)
+    return subprocess.run([sys.executable, GATE_PY, *args, "--root", top], capture_output=True, text=True, env=env)
 
 KYROCO_LIKE = """name: Gate
 on:
@@ -350,10 +355,8 @@ def rendered(gate_text):
         os.makedirs(os.path.join(top, ".claude"))
         with open(os.path.join(top, ".claude", "gate.json"), "w", encoding="utf-8") as handle:
             json.dump({"workflow": GATE, "starts": ["workflow_call"]}, handle)
-        try:
-            return gate_py.starter(top)
-        except Exception as error:  # the check below reports it
-            return "error: {!r}".format(error)
+        run = gate_cli(top, "starter")
+        return run.stdout if run.returncode == 0 else "error: " + run.stderr
 
 
 def gate_job(text):
@@ -370,8 +373,10 @@ check("arch-1 a Gate job asking for id-token and checks write gets them, and a j
       "    permissions: { checks: write, contents: read, id-token: write, packages: read }\n" in gate_job(text), text)
 check("arch-1 a Gate asking for write-all is granted write-all",
       "    permissions: write-all\n" in gate_job(rendered(WRITE_ALL)), rendered(WRITE_ALL))
-check("arch-1 with no Gate stored there is no starter to write", gate_py.starter(tempfile.gettempdir()) is None
-      if hasattr(gate_py, "starter") else False)
+with tempfile.TemporaryDirectory() as top:
+    run = gate_cli(top, "starter")
+    check("arch-1 with no Gate stored there is no starter to write, and setup is told why",
+          run.returncode == 1 and run.stdout == "" and "No Gate is stored" in run.stderr, run.stdout + run.stderr)
 
 # ---- arch-2: without jq the suite skips, as run-tests.sh expects --------------
 if not os.environ.get("BATCH_RUN_NO_JQ_CHILD"):
