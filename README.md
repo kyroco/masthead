@@ -352,8 +352,24 @@ Install the App:
 
 13. In the App's left sidebar, click **Install App**, then click **Install**
     next to your organization.
-14. Choose **All repositories**, or **Only select repositories** and pick this
-    repository from the **Select repositories** list. Click **Install**.
+14. Choose **Only select repositories** and pick this repository from the
+    **Select repositories** list. Click **Install**. Install it only on the
+    repositories that chose the batch run: the App can move main in every
+    repository it is installed on.
+
+Add this repository to an App you already have:
+
+One batch App serves the whole organization. For each further repository that
+chooses the batch run, skip the steps above and do these instead, then store
+the two secrets below in that repository too, with the same App ID and the
+same `.pem` file.
+
+15. Click your profile picture, click **Your organizations**, then click
+    **Settings** to the right of the organization.
+16. In the left sidebar, under **Third-party Access**, click **GitHub Apps**.
+17. Next to the batch App, click **Configure**.
+18. Under **Repository access**, keep **Only select repositories**, open the
+    **Select repositories** list, and add this repository. Click **Save**.
 
 Store the two secrets, after setup has made the `masthead-batch` environment.
 Run these in a terminal, with your App ID and the path to your `.pem` file:

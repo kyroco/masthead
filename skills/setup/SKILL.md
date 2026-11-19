@@ -251,11 +251,16 @@ Each step waits for the one before it: if any of them fails, stop there, say
 the line it printed, and do not go on to the lock. A main locked before the
 batch run can move it would never move again.
 
-1. The App. Ask whether the organization already has a batch App installed on
-   this repository. If not, print `batch.py steps` and show the person every
-   line of it as printed, with nothing left out: they register the App,
-   copy its App ID, make the key and install the App by hand. Wait until they
-   say they are done, then ask for the App ID, the number on the App's page.
+1. The App. One batch App serves the whole organization, installed only on
+   the repositories that chose the batch run (Robert, November 19, 2026: "OH
+   the app should be shared yes"). Ask whether the organization already has
+   a batch App. Print `batch.py steps` and show the person the part that
+   fits, every line of it as printed, with nothing left out. With no App yet,
+   they register it, copy its App ID, make the key and install it on this
+   repository alone. With one already, reuse it: they follow
+   "Add this repository to an App you already have" and keep its App ID and
+   `.pem` file. Wait until they say they are done, then ask for the App ID, the
+   number on the App's page.
 2. Say what the next three change, and ask one question, "Shall I make
    these?": the starter file `.github/workflows/masthead-batch.yml`, the
    `landing` branch (made from main through GitHub's API, only when missing),
