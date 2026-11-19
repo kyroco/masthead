@@ -1453,6 +1453,10 @@ says  skills/setup/SKILL.md '## 11. Bring the code in line with the doc'
 # INFRA-268: setup stores the Gate only after a yes, and a no ships the old way.
 says  skills/setup/SKILL.md "repository's Gate is run, so it keeps shipping the way it does today."
 says  skills/setup/SKILL.md 'which only this step writes, and only after a yes'
+# V-S1-1 / arch-1: a rerun reaches the Gate question whatever else is recorded.
+says  skills/setup/SKILL.md 'Ask this step on every run of `/masthead:setup`'
+# V-S5-1: a no gets its own line, not the could-not-work-it-out one.
+says  skills/setup/SKILL.md 'Masthead will not use a batch run here, so this repository keeps shipping the way it does today.'
 says  skills/setup/SKILL.md 'ask whether the person wants a targeted review, a full sweep, or neither'
 says  skills/setup/SKILL.md 'Ask on every run of `/masthead:setup`'
 says  skills/setup/SKILL.md 'skills/setup/architecture-review.md'

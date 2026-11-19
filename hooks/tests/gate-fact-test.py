@@ -213,6 +213,78 @@ write(root, ".github/workflows/gate.yml", GATE_YML)
 look(root)
 expect("s5 no yes, nothing stored", os.path.exists(os.path.join(root, ".claude", "gate.json")), False)
 
+# V-S1-J1: the pull-request workflow cannot be started alone but calls a reusable one
+# that can: the reusable one is the Gate.
+root = repo()
+write(root, ".github/workflows/ci.yml",
+      "name: CI\non:\n  pull_request:\njobs:\n  checks:\n    uses: ./.github/workflows/checks.yml\n    secrets: inherit\n")
+write(root, ".github/workflows/checks.yml", "name: Checks\non:\n  workflow_call:\njobs: {}\n")
+got = look(root)
+expect("s1 reusable workflow", (got.get("status"), got.get("workflow"), got.get("starts")),
+       ("found", ".github/workflows/checks.yml", ["workflow_call"]))
+
+# V-S1-2: a byte order mark before `on:` on the first line still reads.
+root = repo()
+write(root, ".github/workflows/gate.yml", "\ufeffon: [pull_request, workflow_dispatch]\njobs: {}\n")
+got = look(root)
+expect("s1 byte order mark", (got.get("status"), got.get("workflow")), ("found", ".github/workflows/gate.yml"))
+
+# SEC-1: a committed .claude/gate.json that is a symlink is never written through.
+root = repo()
+write(root, ".github/workflows/gate.yml", GATE_YML)
+outside = os.path.realpath(tempfile.mkdtemp(prefix="gate-outside-"))
+target = write(outside, "rcfile", "export KEEP=1\n")
+os.makedirs(os.path.join(root, ".claude"))
+os.symlink(target, os.path.join(root, ".claude", "gate.json"))
+code, out, err = run_gate(root, "store", ".github/workflows/gate.yml")
+expect("sec1 store refuses a symlinked gate.json", code, 1)
+with open(target) as handle:
+    expect("sec1 outside file untouched", handle.read(), "export KEEP=1\n")
+# Nor through a symlinked .claude folder.
+root = repo()
+write(root, ".github/workflows/gate.yml", GATE_YML)
+os.symlink(outside, os.path.join(root, ".claude"))
+code, out, err = run_gate(root, "store", ".github/workflows/gate.yml")
+expect("sec1 store refuses a symlinked .claude", (code, os.path.exists(os.path.join(outside, "gate.json"))), (1, False))
+
+# SEC-3: reading never hangs on a file that does not end, and refuses a huge one.
+root = repo()
+write(root, ".github/workflows/gate.yml", GATE_YML)
+os.makedirs(os.path.join(root, ".claude"))
+os.symlink("/dev/zero", os.path.join(root, ".claude", "gate.json"))
+try:
+    r = subprocess.run([sys.executable, FACT, "--gate"], capture_output=True, text=True,
+                       cwd=root, env=env_for(), timeout=10)
+    expect("sec3 reader does not hang", (r.returncode, r.stdout.strip()), (1, ""))
+except subprocess.TimeoutExpired:
+    expect("sec3 reader does not hang", "timed out", (1, ""))
+try:
+    r = subprocess.run([sys.executable, GATE, "look", "--root", root], capture_output=True,
+                       text=True, env=env_for(), timeout=10)
+    expect("sec3 look does not hang", r.returncode, 0)
+except subprocess.TimeoutExpired:
+    expect("sec3 look does not hang", "timed out", 0)
+root = repo()
+write(root, ".github/workflows/gate.yml", GATE_YML)
+write(root, ".claude/gate.json", json.dumps({"workflow": ".github/workflows/gate.yml",
+                                             "starts": ["workflow_dispatch"], "pad": "x" * 200000}))
+expect("sec3 reader refuses a huge file", read_fact(root), (1, ""))
+
+# SEC-2: a workflow that is a symlink, or under a symlinked folder, is never offered or read.
+root = repo()
+decoy = write(outside, "elsewhere.yml", "name: TOKEN=secret\non: [pull_request, workflow_dispatch]\n")
+os.makedirs(os.path.join(root, ".github", "workflows"))
+os.symlink(decoy, os.path.join(root, ".github", "workflows", "gate.yml"))
+got = look(root)
+expect("sec2 symlinked workflow not offered", (got.get("status"), "secret" in json.dumps(got)), ("none", False))
+write(root, ".claude/gate.json", json.dumps({"workflow": ".github/workflows/gate.yml", "starts": ["workflow_dispatch"]}))
+expect("sec2 reader refuses a symlinked workflow", read_fact(root), (1, ""))
+root = repo()
+write(outside, "wf/gate.yml", GATE_YML)
+os.makedirs(os.path.join(root, ".github"))
+os.symlink(os.path.join(outside, "wf"), os.path.join(root, ".github", "workflows"))
+expect("sec2 symlinked workflows folder not read", look(root).get("status"), "none")
+
 # The trigger reader handles each form GitHub documents.
 for label, text, want in (
         ("string", "on: workflow_dispatch\n", {"workflow_dispatch"}),
@@ -220,6 +292,7 @@ for label, text, want in (
         ("flow map", "on: {push: {branches: [main]}, workflow_dispatch: {}}\n", {"push", "workflow_dispatch"}),
         ("quoted key", '"on":\n  workflow_dispatch:\n', {"workflow_dispatch"}),
         ("yaml 1.1 true", "true:\n  pull_request:\n", {"pull_request"}),
+        ("list flush with on", "on:\n- pull_request\n- workflow_dispatch\njobs: {}\n", {"pull_request", "workflow_dispatch"}),
         ("comment", "on:  # when\n  # workflow_dispatch:\n  push:\n", {"push"}),
         ("nested keys not triggers", "on:\n  workflow_call:\n    inputs:\n      workflow_dispatch:\n        type: string\n", {"workflow_call"}),
         ("jobs key named on", "name: x\njobs:\n  on:\n    runs-on: x\n", set())):
