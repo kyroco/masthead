@@ -230,8 +230,13 @@ def permission(lines, i, rest):
     return {key: unquote(value) for _, key, value in keys(lines, children(lines, i))}
 
 
-def asked_permissions(text):
-    """What each job of a workflow asks of the token: one entry per job, its own or the workflow's."""
+def asked_permissions(text, read=None, seen=frozenset()):
+    """What each job of a workflow asks of the token: one entry per job, its own or the workflow's.
+
+    A job that names none and runs a workflow of the same repository passes its
+    caller's grant down, so what that workflow's jobs ask counts instead, read
+    with `read(path)` and followed to any depth, each file once (arch-1, round 1).
+    """
     lines = [strip_comment(l) for l in text.lstrip("﻿").splitlines()]
     top, jobs = None, None
     for i, line in enumerate(lines):
@@ -243,20 +248,30 @@ def asked_permissions(text):
     asks = []
     if jobs is not None:
         for j, _, _ in keys(lines, children(lines, jobs)):
-            own = [permission(lines, k, rest) for k, key, rest in keys(lines, children(lines, j)) if key == "permissions"]
-            asks.append(own[0] if own else top)
+            body = keys(lines, children(lines, j))
+            own = [permission(lines, k, rest) for k, key, rest in body if key == "permissions"]
+            if own or top is not None:
+                asks.append(own[0] if own else top)
+                continue
+            called = [unquote(rest)[2:] for _, key, rest in body
+                      if key == "uses" and unquote(rest).startswith("./.github/workflows/")]
+            inner = read(called[0]) if called and read and called[0] not in seen else None
+            if inner is None:
+                asks.append(None)
+            else:
+                asks.extend(asked_permissions(inner, read, seen | {called[0]}))
     if not asks:
         asks.append(top)
     return [UNDECLARED if ask is None else ask for ask in asks]
 
 
-def grant(text):
+def grant(text, read=None):
     """The permissions the starter's Gate job grants: the strongest level each Gate job asks for.
 
     A called workflow may ask for no more than its caller job grants, or GitHub
     refuses the whole run before any job starts (arch-1). Written as one line.
     """
-    asks = asked_permissions(text)
+    asks = asked_permissions(text, read)
     if "write-all" in asks:
         return "write-all"
     merged = {}
@@ -286,7 +301,11 @@ def starter(top):
         return None, "{} is not a plain file in this repository. {}".format(stored["workflow"], OLD_WAY)
     with open(STARTER, encoding="utf-8") as handle:
         template = handle.read()
-    return template.replace("__GATE_PERMISSIONS__", grant(text)).replace("__GATE__", stored["workflow"]), None
+    def read(path):
+        return project_fact.read_repo_file(top, path, limit=1024 * 1024)
+
+    permissions = grant(text, read)
+    return template.replace("__GATE_PERMISSIONS__", permissions).replace("__GATE__", stored["workflow"]), None
 
 
 def store(top, workflow):
