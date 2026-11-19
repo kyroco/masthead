@@ -35,8 +35,19 @@ import project_fact  # noqa: E402
 STARTS = project_fact.GATE_STARTS
 GATE_WORDS = ("pull_request", "pull_request_target", "merge_group")
 # A job that runs a reusable workflow of the same repository: `uses: ./.github/workflows/checks.yml`.
-# Spaces and tabs only: \s would run across line ends and stall on blank lines (SEC-R1-1).
-CALLS = re.compile(r"""^[ \t]*(?:-[ \t]+)?uses[ \t]*:[ \t]*['"]?\./(\.github/workflows/[A-Za-z0-9._-]+\.ya?ml)['"]?[ \t]*$""", re.M)
+# Matched against one line at a time, its line end and comment already gone, the
+# same cleaned line the trigger reader reads (SEC-R1-1, V3-S1-1, V3-S1-J1).
+CALLS = re.compile(r"""^[ \t]*(?:-[ \t]+)?uses[ \t]*:[ \t]*['"]?\./(\.github/workflows/[A-Za-z0-9._-]+\.ya?ml)['"]?[ \t]*$""")
+
+
+def calls(text):
+    """The workflows of this repository that `text` runs with `uses: ./...`."""
+    found = set()
+    for line in text.splitlines():
+        m = CALLS.match(strip_comment(line))
+        if m:
+            found.add(m.group(1))
+    return found
 OLD_WAY = "Masthead could not work out how this repository's Gate is run, so it keeps shipping the way it does today."
 
 
@@ -132,7 +143,7 @@ def workflows(top):
         # A byte order mark is not part of the first key, whichever key it is (V-S1-2, V2-S1-1).
         text = text.lstrip("\ufeff")
         found.append({"workflow": rel, "name": workflow_name(text), "triggers": triggers(text),
-                      "calls": set(CALLS.findall(text))})
+                      "calls": calls(text)})
     return found
 
 
