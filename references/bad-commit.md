@@ -31,7 +31,8 @@ that Gate with `gh workflow run`, so the stored Gate must list
 | No commit fails alone, but some fail together | Drops the latest-landed of them, and names each commit it fails with. Robert, November 19, 2026: "(and we send back the latest one) it is its job to figure out what needs to be fixed and fix it" |
 | No Gate run the search starts goes red, and a run of the whole batch again is green | Drops nothing, and says the red did not happen again |
 | The commit cannot be taken off cleanly, because later commits change the same lines | Drops nothing, and says to hand it back by hand |
-| The plan job stopped the batch run, or the run is not on landing | Drops nothing, and says why |
+| The batch run's own plan or move job could not start or fetch the code | Reruns the run's failed jobs and drops nothing |
+| The plan job stopped the batch run, the Gate passed and the move of main failed, or the run is not on landing | Drops nothing, and says why |
 
 How it finds the commit: the batch is the commits on landing after main, up
 to the red run's commit, oldest first. Landing is linear, so testing the first

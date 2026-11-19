@@ -116,8 +116,8 @@ def wait(run_id, attempt=None):
         time.sleep(POLL)
 
 
-def failed_jobs(run):
-    return [j for j in run.get("jobs") or [] if j.get("conclusion") in RED]
+def failed_jobs(jobs):
+    return [j for j in jobs if j.get("conclusion") in RED]
 
 
 def failed_step(job):
@@ -142,31 +142,70 @@ def is_verdict(job, jobs):
     return bool(started) and bool(others) and all(c and c <= started for c in others)
 
 
-def own_failures(run, skip=()):
-    """The failed jobs that say something: verdict jobs and the `skip` jobs left out."""
-    jobs = [j for j in run.get("jobs") or [] if not j.get("name", "").split(" / ")[0] in skip]
-    return [j for j in failed_jobs({"jobs": jobs}) if not is_verdict(j, jobs)]
+def own_failures(jobs):
+    """The failed jobs that say something of their own: verdict jobs left out."""
+    return [j for j in failed_jobs(jobs) if not is_verdict(j, jobs)]
 
 
-def classify(run, skip=()):
-    """"green", "start" (red only because a runner could not start or fetch the code), or "red"."""
+def judge(jobs):
+    """One Gate's jobs: "green", "start" (red only because a runner could not start or fetch
+    the code), or "red"."""
+    if not failed_jobs(jobs):
+        return "green"
+    failures = own_failures(jobs)
+    if failures and all(could_not_start(j) for j in failures):
+        return "start"
+    return "red"
+
+
+def classify(run):
+    """A Gate run the search started, judged as judge() says. One that ended without
+    passing and with no failed job (cancelled) counts as a run to start again."""
     if run.get("conclusion") == "success":
         return "green"
     if run.get("conclusion") == "startup_failure":
         return "start"
-    failures = own_failures(run, skip)
-    if failures and all(could_not_start(j) for j in failures):
+    verdict = judge(run.get("jobs") or [])
+    return "start" if verdict == "green" else verdict
+
+
+def part_of(job):
+    """Which part of the batch run a job is: "plan", "move", or "gate" (the starter's Gate job)."""
+    first = job.get("name", "").split(" / ")[0]
+    return first if first in ("plan", "move") else "gate"
+
+
+def batch_verdict(run, run_id):
+    """The red batch run judged part by part: the plan, then the Gate, then the move of main.
+    Only the Gate's jobs say whether the batch's code is red; a plan or move job whose runner
+    could not start or fetch the code makes the batch one to run again."""
+    parts = {"plan": [], "gate": [], "move": []}
+    for job in run.get("jobs") or []:
+        parts[part_of(job)].append(job)
+    plan_failed = failed_jobs(parts["plan"])
+    if plan_failed:
+        if all(could_not_start(j) for j in plan_failed):
+            return "start"
+        raise Stop("Run {} stopped in its plan, before the Gate ran, so no commit is to blame. "
+                   "Read the plan's message in the run.".format(run_id))
+    if run.get("conclusion") == "startup_failure":
         return "start"
-    if not failures and not failed_jobs(run):
-        # Cancelled or skipped with no failed job: nothing says the code is red.
-        return "start" if run.get("conclusion") in RED else "green"
-    return "red"
+    verdict = judge(parts["gate"])
+    if verdict != "green":
+        return verdict
+    move_failed = failed_jobs(parts["move"])
+    if move_failed and all(could_not_start(j) for j in move_failed):
+        return "start"
+    if move_failed:
+        raise Stop("In run {} the Gate passed and the move of main failed, so no commit is to blame and "
+                   "nothing is dropped. Read the move's message in the run.".format(run_id))
+    raise Stop("Run {} is not red: its Gate did not fail. Nothing is dropped.".format(run_id))
 
 
-def failed_checks(run, skip=()):
+def failed_checks(jobs):
     """The names of the checks that failed in a red run, without verdict jobs and runner failures."""
-    names = [j.get("name", "") for j in own_failures(run, skip) if not could_not_start(j)]
-    return names or [j.get("name", "") for j in failed_jobs(run)]
+    names = [j.get("name", "") for j in own_failures(jobs) if not could_not_start(j)]
+    return names or [j.get("name", "") for j in failed_jobs(jobs)]
 
 
 # ---- The commits of a batch ---------------------------------------------------
@@ -427,14 +466,7 @@ def search(run_id, root):
     if run.get("headBranch") != LANDING:
         raise Stop("Run {} is on {}, not landing, so it is not a batch run. Nothing is dropped.".format(
             run_id, run.get("headBranch")))
-    planned = [j for j in run.get("jobs") or [] if j.get("name", "").split(" / ")[0] == "plan"]
-    if any(j.get("conclusion") in RED for j in planned):
-        raise Stop("Run {} stopped in its plan, before the Gate ran, so no commit is to blame. "
-                   "Read the plan's message in the run.".format(run_id))
-    verdict = classify(run, skip=("plan", "move"))
-    if verdict == "green":
-        raise Stop("Run {} is not red: its Gate did not fail. Nothing is dropped.".format(run_id))
-    if verdict == "start":
+    if batch_verdict(run, run_id) == "start":
         gh("run", "rerun", str(run_id), "--failed")
         say("Run {} went red only because a runner could not start or fetch the code. Its failed jobs run again; "
             "no commit is dropped.".format(run_id))
@@ -465,8 +497,8 @@ def search(run_id, root):
                        "run {} did not happen again. No commit is dropped.".format(finder.runs, run_id))
         if evidence is run:
             evidence = again
-    skip = ("plan", "move") if evidence is run else ()
-    checks = failed_checks(evidence, skip)
+    jobs = evidence.get("jobs") or []
+    checks = failed_checks([j for j in jobs if part_of(j) == "gate"] if evidence is run else jobs)
     text = revert_message(dropped, partners, checks, evidence, batch, root)
     revert = drop(dropped, text)
     say("")
