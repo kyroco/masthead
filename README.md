@@ -276,6 +276,96 @@ cause. You see one row per cause and choose which become issues; nothing is
 filed unless you say so. A sweep too big for one session stops, says what it
 did not review, and the next `/masthead:setup` goes on from there.
 
+### The optional batch run
+
+With a Gate stored, setup asks whether to put the batch run into the
+repository. Say no and nothing changes: the repository ships the way it does
+today. Say yes and work lands on a branch named `landing`, one Gate run tests
+each batch, and main moves to the batch only when that run is green. Setup
+then, after your yes to each part: writes a small starter file,
+`.github/workflows/masthead-batch.yml`, which calls the batch run kept in
+this repository; makes the `landing` branch from main if it is missing; makes
+an environment named `masthead-batch` that only `landing` may use, to hold
+the App's two secrets; and, last, locks main with a ruleset whose only bypass
+is your batch App, so no person, session or pull request merge can push main
+again. Commit the starter file and `.claude/gate.json` to `landing`.
+`batch.py check` (setup runs it) says which parts are in place. Rulesets and
+environments on a private repository need a paid GitHub plan.
+
+The batch run moves main as a GitHub App you own, because a ruleset lets
+nothing else through. Registering it takes a person, once per organization,
+and storing its key takes a person too: Masthead refuses every session's
+`gh secret set`. The steps follow, and setup shows them with your repository
+filled in.
+
+### Set up the batch run's GitHub App
+
+You need to be an owner of the organization that owns the repository. Each
+button below is named as GitHub shows it.
+
+Register the App:
+
+1. On GitHub, click your profile picture in the upper-right corner, click
+   **Your organizations**, then click **Settings** to the right of the
+   organization.
+2. In the left sidebar, near the bottom, click **Developer settings**, then
+   **GitHub Apps**.
+3. Click **New GitHub App**.
+4. Under **GitHub App name**, type a name of 34 characters or fewer that no
+   one on GitHub uses yet, such as `acme-batch`.
+5. Under **Homepage URL**, paste any address of yours, such as the
+   organization's website. GitHub only needs a link.
+6. Under **Webhook**, untick **Active**. The App needs no events.
+7. Under **Permissions**, open **Repository permissions**. Set **Contents** to
+   **Read and write** and **Workflows** to **Read and write**. Leave the rest
+   at **No access**; GitHub sets Metadata to read-only by itself. Workflows is
+   needed because a batch can carry a change to a workflow file, and GitHub
+   refuses such a push without it.
+8. Under **Where can this GitHub App be installed?**, choose
+   **Only on this account**.
+9. Click **Create GitHub App**.
+
+Copy the App ID:
+
+10. The App's page opens. Near the top, under **About**, copy the number next
+    to **App ID**, such as `5832645`. It is not a secret; setup asks you for
+    it. The Client ID beside it is a different thing; do not use it.
+
+Make the private key:
+
+11. On the same page, in the left sidebar, click **Credentials**, then
+    **Key pairs**, then **New key**. If you left the page, go back to
+    **Developer settings**, **GitHub Apps**, and click **Edit** next to the
+    App first. On older GitHub pages the button is **Generate a private key**,
+    under **Private keys** at the bottom of the App's page.
+12. Your browser saves a file ending in `.private-key.pem` to your Downloads
+    folder. It downloads once, when the key is made, and GitHub keeps no copy,
+    so move it somewhere safe outside every repository. The install below does
+    not ask for it. If you lose it, make a new key the same way and delete the
+    old one.
+
+Install the App:
+
+13. In the App's left sidebar, click **Install App**, then click **Install**
+    next to your organization.
+14. Choose **All repositories**, or **Only select repositories** and pick this
+    repository from the **Select repositories** list. Click **Install**.
+
+Store the two secrets, after setup has made the `masthead-batch` environment.
+Run these in a terminal, with your App ID and the path to your `.pem` file:
+
+```
+gh secret set BATCH_APP_ID --env masthead-batch --repo OWNER/REPO --body 5832645
+gh secret set BATCH_APP_PRIVATE_KEY --env masthead-batch --repo OWNER/REPO < ~/keys/acme-batch.private-key.pem
+```
+
+Keep the two only on the environment. As a repository or organization secret
+the key would reach every workflow on every branch, the Gate included, and
+any of them could move main with it. Once the secrets are in, tell setup, and
+it locks main.
+
+### Install options
+
 To change an install option later, run `/plugin configure masthead@masthead`:
 
 | Option | Default | What it does |

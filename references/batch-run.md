@@ -54,9 +54,28 @@ only after the `gate` job passed in the same run, and that is the decision.
 
 ## What the repository needs
 
-Setup's part (INFRA-272): the starter file as `python3 skills/setup/gate.py
-starter` prints it, the lock on main whose only bypass is the batch App, and
-the App's id and key as the secrets `BATCH_APP_ID` and `BATCH_APP_PRIVATE_KEY`.
+Setup's part (INFRA-272), each after the person's yes, through
+`skills/setup/batch.py`: the starter file as `python3 skills/setup/gate.py
+starter` prints it, written to `.github/workflows/masthead-batch.yml`; the
+`landing` branch, made from main through GitHub's API when missing; an
+environment named `masthead-batch` that only `landing` may use, holding the
+App's id and key as the secrets `BATCH_APP_ID` and `BATCH_APP_PRIVATE_KEY`,
+which a person stores; and, last, the lock on main, a ruleset refusing every
+update, force push and delete of main whose only bypass is the batch App.
+`batch.py check` says which parts are in place, changes nothing, and names any
+other rule on main that would refuse the App. The README's "Set up the batch
+run's GitHub App" holds the click-by-click App steps; `batch.py steps` prints
+them for setup.
+
+The key stays out of every workflow but the move. GitHub hands an
+environment's secrets only to a job that names the environment, and only
+`move` in `batch-move.yml` names `masthead-batch`. The Gate, called with
+`secrets: inherit`, gets the repository's and organization's secrets, never the
+environment's, and a workflow on any other branch that names the environment
+is refused by its branch rule. A key stored anywhere else would undo this, so
+`batch.py check` fails while the key is also a repository secret or an
+organization secret the repository can read.
+
 `gate.py starter` fills in the stored Gate and grants the starter's Gate job
 the strongest token permission each of the Gate's jobs asks for: a called
 workflow may ask for no more than its caller job grants, or GitHub refuses

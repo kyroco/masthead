@@ -228,6 +228,54 @@ Once stored, say to commit `.claude/gate.json`: the batch run reads it on
 GitHub, where only committed files exist. Changing a workflow to make it
 startable is a change to `.github/`, so suggest it and never make it here.
 
+### Then the batch run, only with a Gate stored
+
+With no Gate stored, say nothing of the batch run. With one stored, run
+`python3 ${CLAUDE_PLUGIN_ROOT}/skills/setup/batch.py check` first: when it
+exits 0 the batch run is already in place, so say so and ask nothing. Otherwise
+ask: "Shall Masthead put its batch run into this repository? Work then lands
+on a branch named `landing`, one Gate run tests each batch, and main moves only
+when that run is green. Main gets locked, so after this nobody, not you, a
+session or a pull request merge, can push main directly; only the batch run
+moves it. Say no and this repository keeps shipping the way it does today."
+On no, write nothing and say the one line "Masthead will not use a batch run
+here, so this repository keeps shipping the way it does today." (Robert,
+November 19, 2026: "yes that's the right recommendation, keep the old way, new
+way is an option".)
+
+On yes, in this order, each `batch.py` command with `--root` the repository:
+
+1. The App. Ask whether the organization already has a batch App installed on
+   this repository. If not, print `batch.py steps` and show the person every
+   line of it as printed, with nothing left out: they register the App,
+   copy its App ID, make the key and install the App by hand. Wait until they
+   say they are done, then ask for the App ID, the number on the App's page.
+2. Say what the next three change, and ask "Shall I make these?": the starter
+   file `.github/workflows/masthead-batch.yml`, the `landing` branch (made
+   from main through GitHub's API, only when missing), and the
+   `masthead-batch` environment that only `landing` may use. On yes, run
+   `batch.py write`, `batch.py landing` and `batch.py environment`. A
+   repository that deletes a branch when its pull request merges loses
+   `landing` if anyone merges a pull request from it; the batch run never
+   does, but say so when `gh api repos/<owner>/<repo> --jq .delete_branch_on_merge`
+   prints true, and that `batch.py landing` makes it again.
+3. The secrets. Show the two `gh secret set ... --env masthead-batch` lines
+   from the steps, filled in with this repository and the App ID, and ask the
+   person to run them in their own terminal: no session may set a secret.
+   Wait until they say they are done.
+4. The lock, last, so main is never locked before the batch run can move it.
+   Ask "Shall I lock main so only the batch App (App ID <n>) can move it?" On
+   yes, run `batch.py lock --app-id <n>`.
+5. Run `batch.py check --app-id <n>` and show each part in a table with its
+   line. A part not ok says what to do; do that, or tell the person, and
+   check again. When "other rules on main" is not ok, name each rule it
+   names and say main will not move until it lets the App through; change
+   none of them here.
+
+Then say to commit `.github/workflows/masthead-batch.yml` with
+`.claude/gate.json` and land them on `landing`: GitHub runs the starter only
+from a commit on that branch.
+
 ## 10. Write, then show what is on
 
 Show the exact env block and the file it goes to, and ask "Shall I write
@@ -241,7 +289,8 @@ refusals (always on), blind review (always on), push check (on if set), where
 issues live (GitHub or Linear, with the team key), memory (on if connected),
 decision records (on if a folder was named), architecture doc (its path, or
 none), the Gate (its workflow when stored, or "not stored: ships the way it
-does today"). With a push check, say to commit
+does today"), the batch run (on when `batch.py check`
+exits 0, or "off: ships the way it does today"). With a push check, say to commit
 `.claude/push-check.sh` and `.claude/push-check.cmd`: a branch without them
 cannot push. Check the tools the gates need with `command -v jq`, `command -v
 python3` and, where issues live on GitHub, `command -v gh`, and add one row for

@@ -267,7 +267,7 @@ with tempfile.TemporaryDirectory() as top:
     run = batch(gh, work, "steps")
     steps = run.stdout
     check("S4 steps prints the README's App walkthrough", run.returncode == 0 and steps.strip() != ""
-          and steps.strip() in read(README), run.stdout + run.stderr)
+          and steps.replace(REPO, "OWNER/REPO").strip() in read(README), run.stdout + run.stderr)
     # Each button and field as GitHub's own docs name it (docs.github.com, read November 19, 2026).
     for word in ("Your organizations", "Settings", "Developer settings", "GitHub Apps", "New GitHub App",
                  "GitHub App name", "Homepage URL", "Active", "Contents", "Workflows", "Read and write",
