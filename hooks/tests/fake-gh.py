@@ -13,8 +13,10 @@ FAKE_GH_REMOTE, the way a real Gate is red or green from the code:
 A red run also fails a verdict job, `gate`, that starts after every other job
 ended, as Kyroco's Gate does. A commit listed in the state's `start_failures`
 has its Tests job fail at "Set up job" that many times first, as when a runner
-could not start. `land_during`: each started run first lands one more commit
-on landing, as a worker would while the search runs.
+could not start. `chain`: the Gate is Tests then Lint, one after the other on
+one runner, with no verdict job, and a start failure hits Lint. `land_during`:
+each started run first lands one more commit on landing, as a worker would
+while the search runs.
 """
 import json
 import os
@@ -61,6 +63,17 @@ def job(name, conclusion, steps, start, end):
 
 def jobs_for(sha, state, prefix=""):
     starts = state.setdefault("start_failures", {})
+    if state.get("chain"):
+        # Tests, then Lint on the same runner, and no verdict job; a runner failure hits Lint, the last job.
+        bad = red(sha)
+        tests = job(prefix + "Tests", "failure" if bad else "success",
+                    [step("Set up job", "success"), step("Run the tests", "failure" if bad else "success")], 0, 5)
+        if starts.get(sha, 0) > 0:
+            starts[sha] -= 1
+            lint = job(prefix + "Lint", "failure", [step("Set up job", "failure")], 6, 7)
+        else:
+            lint = job(prefix + "Lint", "success", [step("Set up job", "success"), step("Lint", "success")], 6, 8)
+        return [tests, lint]
     if starts.get(sha, 0) > 0:
         starts[sha] -= 1
         tests = job(prefix + "Tests", "failure", [step("Set up job", "failure")], 0, 1)

@@ -36,6 +36,35 @@ FAKE_GH = os.path.join(HERE, "fake-gh.py")
 STARTER = os.path.join(PLUGIN, "skills", "setup", "batch-starter.yml")
 GATE = ".github/workflows/gate.yml"
 RED_RUN = "4242"
+REAL_GIT = shutil.which("git")
+# The stored Gate's own file: its `gate` job runs always(), after the others, so it is the Gate's verdict job.
+GATE_WORKFLOW = """name: Gate
+on: [workflow_call, workflow_dispatch]
+jobs:
+  tests:
+    name: Tests
+    runs-on: ubuntu-latest
+  static:
+    name: Static
+    runs-on: ubuntu-latest
+  gate:
+    name: gate
+    needs: [tests, static]
+    if: always()
+    runs-on: ubuntu-latest
+"""
+# A Gate whose two jobs run one after another and that has no verdict job (arch-2).
+CHAIN_WORKFLOW = """name: Gate
+on: [workflow_call, workflow_dispatch]
+jobs:
+  tests:
+    name: Tests
+    runs-on: [self-hosted, macbook-air]
+  lint:
+    name: Lint
+    needs: tests
+    runs-on: [self-hosted, macbook-air]
+"""
 
 _version = re.search(r"(\d+)\.(\d+)", subprocess.run(["git", "--version"], capture_output=True, text=True).stdout)
 if not _version or (int(_version.group(1)), int(_version.group(2))) < (2, 38):
@@ -59,6 +88,16 @@ def run(cmd, cwd, env=None, inp=None):
     return subprocess.run(cmd, cwd=cwd, env=env, input=inp, capture_output=True, text=True)
 
 
+def job(name, conclusion, steps, start, end):
+    """A job as gh run view --json jobs shows it; steps are (name, conclusion) pairs."""
+    return {"name": name, "conclusion": conclusion, "steps": [{"name": n, "conclusion": c} for n, c in steps],
+            "startedAt": "2026-11-19T14:{:02d}:00Z".format(start), "completedAt": "2026-11-19T14:{:02d}:00Z".format(end)}
+
+
+PLAN_OK = job("plan / plan", "success", [("Read the stored Gate", "success")], 0, 1)
+MOVE_SKIPPED = {"name": "move / move", "conclusion": "skipped", "steps": []}
+
+
 def git(cwd, *args):
     r = run(["git", *args], cwd)
     if r.returncode != 0:
@@ -69,7 +108,8 @@ def git(cwd, *args):
 class Repo:
     """A bare remote, a checkout of it, and a fake gh whose Gate reads the remote."""
 
-    def __init__(self, gate=True, decoy=False, starts=("workflow_call", "workflow_dispatch")):
+    def __init__(self, gate=True, decoy=False, starts=("workflow_call", "workflow_dispatch"), workflow=GATE_WORKFLOW,
+                 old_git=False):
         self.tmp = tempfile.mkdtemp(prefix="bad-commit-test-")
         self.remote = os.path.join(self.tmp, "remote.git")
         self.work = os.path.join(self.tmp, "work")
@@ -82,7 +122,7 @@ class Repo:
         git(self.work, "switch", "--quiet", "-c", "main")
         self.write(".claude/settings.json", json.dumps({"env": {"ISSUE_TRACKER": "linear", "LINEAR_TEAM_KEY": "INFRA"}}))
         self.workflow = ".github/workflows/real-gate.yml" if decoy else GATE
-        self.write(self.workflow, "name: Gate\non: [workflow_call, workflow_dispatch]\n")
+        self.write(self.workflow, workflow)
         if decoy:
             self.write(GATE, "name: Not the Gate\non: [workflow_call, workflow_dispatch]\n")
         if gate:
@@ -97,6 +137,13 @@ class Repo:
         with open(shim, "w") as handle:
             handle.write("#!/bin/sh\nexec python3 '{}' \"$@\"\n".format(FAKE_GH))
         os.chmod(shim, 0o755)
+        if old_git:
+            # A git that says it is 2.39: merge-tree has --write-tree there, but not --merge-base (V-S6-J1).
+            fake_git = os.path.join(self.bin, "git")
+            with open(fake_git, "w") as handle:
+                handle.write('#!/bin/sh\nif [ "$1" = "--version" ]; then echo "git version 2.39.5"; exit 0; fi\n'
+                             'exec \'{}\' "$@"\n'.format(REAL_GIT))
+            os.chmod(fake_git, 0o755)
         self.save({"runs": {}, "calls": []})
 
     def write(self, path, text):
@@ -122,20 +169,17 @@ class Repo:
         with open(self.state, "w") as handle:
             json.dump(state, handle)
 
-    def red_batch(self, tests_step="Run the tests", sha=None, extra_jobs=()):
+    def red_batch(self, tests_step="Run the tests", sha=None, extra_jobs=(), jobs=None):
         """Record the batch run on landing's tip as red, the way the starter's run shows it."""
         sha = sha or git(self.work, "rev-parse", "origin/landing")
-        def job(name, conclusion, steps, start, end):
-            return {"name": name, "conclusion": conclusion, "steps": steps,
-                    "startedAt": "2026-11-19T14:{:02d}:00Z".format(start),
-                    "completedAt": "2026-11-19T14:{:02d}:00Z".format(end)}
-        jobs = [job("plan / plan", "success", [{"name": "Read the stored Gate", "conclusion": "success"}], 0, 1),
-                job("gate / Tests", "failure", [{"name": "Set up job", "conclusion": "success" if tests_step != "Set up job" else "failure"},
-                                               {"name": tests_step, "conclusion": "failure"}][:1 if tests_step == "Set up job" else 2], 2, 8),
-                job("gate / Static", "success", [{"name": "Static checks", "conclusion": "success"}], 2, 6)]
-        jobs += list(extra_jobs)
-        jobs += [job("gate / gate", "failure", [{"name": "Decide", "conclusion": "failure"}], 9, 10),
-                 {"name": "move / move", "conclusion": "skipped", "steps": []}]
+        if jobs is None:
+            if tests_step == "Set up job":
+                tests = job("gate / Tests", "failure", [("Set up job", "failure")], 2, 3)
+            else:
+                tests = job("gate / Tests", "failure", [("Set up job", "success"), (tests_step, "failure")], 2, 8)
+            jobs = [PLAN_OK, tests, job("gate / Static", "success", [("Static checks", "success")], 2, 6)]
+            jobs += list(extra_jobs)
+            jobs += [job("gate / gate", "failure", [("Decide", "failure")], 9, 10), MOVE_SKIPPED]
         state = self.load()
         state["runs"][RED_RUN] = {"databaseId": int(RED_RUN), "status": "completed", "conclusion": "failure",
                                   "headSha": sha, "headBranch": "landing", "attempt": 1, "workflow": "batch.yml",
@@ -147,7 +191,9 @@ class Repo:
         env = dict(os.environ)
         env.update({"PATH": self.bin + os.pathsep + env.get("PATH", ""), "FAKE_GH_STATE": self.state,
                     "FAKE_GH_REMOTE": self.remote, "MASTHEAD_SEARCH_POLL_SECONDS": "0",
-                    "MASTHEAD_SEARCH_FIND_TRIES": "2", "CLAUDE_PROJECT_DIR": self.work})
+                    "MASTHEAD_SEARCH_FIND_TRIES": "2", "CLAUDE_PROJECT_DIR": self.work,
+                    # As on CI's ubuntu-latest: no global git config, so no identity outside the work clone (arch-4).
+                    "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1"})
         return run([sys.executable, SEARCH, run_id], self.work, env)
 
     def landing(self):
@@ -296,9 +342,7 @@ for step in ("Set up job", "Run actions/checkout@v5"):
 # A runner failure next to a real failed check is a real red: it is searched, not rerun.
 r = Repo()
 r.land({"breaks": "x\n"}, "Break it (INFRA-352)")
-start_fail = {"name": "gate / Lint", "conclusion": "failure", "steps": [{"name": "Set up job", "conclusion": "failure"}],
-              "startedAt": "2026-11-19T14:02:00Z", "completedAt": "2026-11-19T14:03:00Z"}
-r.red_batch(extra_jobs=[start_fail])
+r.red_batch(extra_jobs=[job("gate / Lint", "failure", [("Set up job", "failure")], 2, 3)])
 out = r.search()
 check("s3 a runner failure beside a real failure does not hide it: the commit is dropped",
       out.returncode == 0 and r.reruns() == [] and r.records() != [], out.stdout + out.stderr)
@@ -378,15 +422,145 @@ check("a worker landing while the search runs loses nothing: the revert goes on 
       "breaks" not in r.files_on_landing(), (out.stdout + out.stderr, landed))
 r.done()
 
+# V-S1-2: later work changes the same lines as the failing commit, so the failing
+# commit cannot come off alone. It still comes off: with the commits that build on it.
 r = Repo()
 r.land({"lib": "one\n"}, "Add lib (INFRA-391)")
-r.land({"lib": "one\nbreaks\n", "breaks": "x\n"}, "Break lib (INFRA-392)")
-before = r.red_batch()
-r.land({"lib": "one\nbreaks\nthree\n"}, "Build on lib (INFRA-393)")
+bad = r.land({"lib": "one\nbreaks\n", "breaks": "x\n"}, "Break lib (INFRA-392)")
+r.red_batch()
+r.land({"other": "o\n"}, "Add other (INFRA-395)")
+later = r.land({"lib": "one\nbreaks\nthree\n"}, "Build on lib (INFRA-393)")
 after = r.landing()
 out = r.search()
-check("a commit later work builds on is not dropped by force: nothing changes and it says so",
-      out.returncode != 0 and "cannot be taken off landing cleanly" in out.stdout and r.landing() == after,
+tip = r.landing()
+files = r.files_on_landing()
+lib = git(r.remote, "show", "refs/heads/landing:lib")
+check("s1 a failing commit later work builds on still comes off landing, by a plain push",
+      out.returncode == 0 and "breaks" not in files and lib == "one" and r.is_ancestor(after, tip),
+      (out.stdout + out.stderr, files, lib))
+recs = {tuple(r.trailers(sha).get("Masthead-Dropped", [])): r.trailers(sha) for sha in r.records()}
+check("s1 the commit that builds on it comes off with it, its record saying what it builds on",
+      recs.get((later,), {}).get("Masthead-Builds-On") == ["{} INFRA-392".format(bad)] and
+      recs.get((later,), {}).get("Masthead-Issue") == ["INFRA-393"] and
+      "Masthead-Failed-Check" not in recs.get((later,), {}), recs)
+check("s1 s4 the failing commit's own record still names it, its issue and the failed check",
+      recs.get((bad,), {}).get("Masthead-Issue") == ["INFRA-392"] and
+      recs.get((bad,), {}).get("Masthead-Failed-Check") == ["Tests"], recs)
+check("s1 a commit that does not build on it stays on landing", "other" in files, files)
+r.done()
+
+# V-S1-1: a later red batch still holds a commit an earlier search dropped, with its
+# revert. The search blames the commit that fails now, not the one already dropped.
+r = Repo()
+r.land({"a": "1\n"}, "Add a (INFRA-401)")
+first_bad = r.land({"breaks": "x\n"}, "Break it (INFRA-402)")
+r.red_batch()
+out = r.search()
+check("v-s1-1 the first search drops the first bad commit", out.returncode == 0 and len(r.records()) == 1,
+      out.stdout + out.stderr)
+git(r.work, "pull", "--quiet", "--rebase", "origin", "landing")
+now_bad = r.land({"half-a": "a\n", "half-b": "b\n"}, "Break it another way (INFRA-404)")
+for n in range(4):
+    r.land({"later-{}".format(n): "1\n"}, "Add later {} (INFRA-41{})".format(n, n))
+# main..batch is a, the first bad commit, its revert, the commit that fails now and four more:
+# halving tests the prefix that ends at the first bad commit, which is red without its revert.
+r.red_batch()
+state = r.load()
+state["calls"] = []
+r.save(state)
+out = r.search()
+records = r.records()
+latest = r.trailers(records[0]) if records else {}
+check("v-s1-1 the next red batch drops the commit that fails now, not the one already dropped",
+      out.returncode == 0 and latest.get("Masthead-Dropped") == [now_bad] and len(records) == 2,
+      (out.stdout + out.stderr, latest))
+check("v-s1-1 that commit's change is off landing, and the first drop still holds",
+      not {"half-a", "half-b", "breaks"} & r.files_on_landing(), r.files_on_landing())
+r.done()
+
+# V-S1-1: the same red run searched twice, as when the batch run queued behind the red
+# one goes red on the same dropped commit. The second search pushes nothing.
+r = Repo()
+r.land({"a": "1\n"}, "Add a (INFRA-405)")
+r.land({"breaks": "x\n"}, "Break it (INFRA-406)")
+r.red_batch()
+first = r.search()
+after_first = r.landing()
+second = r.search()
+check("v-s1-1 searching a red batch whose bad commit is already off landing pushes nothing and says so",
+      first.returncode == 0 and second.returncode == 0 and r.landing() == after_first and len(r.records()) == 1 and
+      "already" in second.stdout, second.stdout + second.stderr)
+r.done()
+
+# ---- V-S3-1, V-S3-2: the batch run's own plan and move jobs ---------------------
+
+for part, broken in (("move", job("move / move", "failure", [("Run actions/checkout@v5", "failure")], 11, 12)),
+                     ("plan", job("plan / plan", "failure", [("Run actions/checkout@v5", "failure")], 0, 1))):
+    r = Repo()
+    r.land({"a": "1\n"}, "Add a (INFRA-411)")
+    r.land({"b": "1\n"}, "Add b (INFRA-412)")
+    if part == "move":
+        jobs = [PLAN_OK, job("gate / Tests", "success", [("Run the tests", "success")], 2, 8),
+                job("gate / gate", "success", [("Decide", "success")], 9, 10), broken]
+    else:
+        jobs = [broken, {"name": "gate / Tests", "conclusion": "skipped", "steps": []}, MOVE_SKIPPED]
+    before = r.red_batch(jobs=jobs)
+    out = r.search()
+    check("s3 the {} job's runner could not fetch the code: the batch is run again".format(part),
+          out.returncode == 0 and r.reruns() == [["run", "rerun", RED_RUN, "--failed"]], out.stdout + out.stderr)
+    check("s3 the {} job's runner could not fetch the code: nothing is dropped and no search runs".format(part),
+          r.landing() == before and r.dispatches() == [] and r.records() == [])
+    r.done()
+
+r = Repo()
+r.land({"a": "1\n"}, "Add a (INFRA-413)")
+before = r.red_batch(jobs=[PLAN_OK, job("gate / Tests", "success", [("Run the tests", "success")], 2, 8),
+                           job("gate / gate", "success", [("Decide", "success")], 9, 10),
+                           job("move / move", "failure", [("Set up job", "success"), ("Move main to the batch", "failure")],
+                               11, 12)])
+out = r.search()
+check("s3 a batch whose Gate passed and whose move failed is not red: nothing is dropped, nothing rerun",
+      out.returncode != 0 and r.landing() == before and r.records() == [] and r.reruns() == [] and
+      "Gate passed" in out.stdout, out.stdout + out.stderr)
+r.done()
+
+# ---- arch-2: a Gate whose jobs run one after another ---------------------------
+
+r = Repo(workflow=CHAIN_WORKFLOW)
+first = r.land({"a": "1\n"}, "Add a (INFRA-421)")
+bad = r.land({"breaks": "x\n"}, "Break it (INFRA-422)")
+r.red_batch(jobs=[PLAN_OK, job("gate / Tests", "failure", [("Run the tests", "failure")], 2, 8),
+                  job("gate / Lint", "success", [("Lint", "success")], 9, 10), MOVE_SKIPPED])
+state = r.load()
+state["chain"] = True
+state["start_failures"] = {first: 1}
+r.save(state)
+out = r.search()
+check("arch-2 the last job of a chained Gate failing at Set up job is a runner failure: run again, not blamed",
+      out.returncode == 0 and len(r.reruns()) == 1 and r.trailers(r.landing()).get("Masthead-Dropped") == [bad],
+      out.stdout + out.stderr)
+r.done()
+
+# ---- V-S4-J2: the issue a commit names last in its subject ---------------------
+
+r = Repo()
+r.land({"a": "1\n"}, "Add a (INFRA-430)")
+r.land({"breaks": "x\n"}, "Undo part of INFRA-421 so the tests fail (INFRA-431)")
+r.red_batch()
+out = r.search()
+check("s4 a subject that names another issue first: the record names the commit's own issue",
+      out.returncode == 0 and r.trailers(r.landing()).get("Masthead-Issue") == ["INFRA-431"],
+      out.stdout + out.stderr)
+r.done()
+
+# ---- V-S6-J1: the git the search needs ------------------------------------------
+
+r = Repo(old_git=True)
+r.land({"breaks": "x\n"}, "Break it (INFRA-440)")
+before = r.red_batch()
+out = r.search()
+check("v-s6-j1 git 2.39 (no merge-tree --merge-base) stops the search and says it needs 2.40",
+      out.returncode != 0 and "2.40" in out.stdout and r.landing() == before and r.load()["calls"] == [],
       out.stdout + out.stderr)
 r.done()
 
