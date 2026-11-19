@@ -239,6 +239,11 @@ check("s2 the message says how to bring it back in one push",
 check("s2 an issue whose commit was not dropped is not handed back",
       "INFRA-11 goes back" not in text and "INFRA-13 goes back" not in text, text)
 check("s1 handing back only reads", only_reads(calls) and not calls, calls)
+# INFRA-274's push gate refuses a revert and a push on one command line: every command the message
+# gives is one git command, and none of them pushes.
+commands = re.findall(r"`([^`]*)`", text)
+check("the hand-back's commands keep the revert and the push apart, as the push gate needs",
+      commands and all("push" not in c and c.count("git ") <= 1 for c in commands), commands)
 
 green = r.batch_run(green=True)
 out, calls = r.foreman("merged", green, "--since", r.base)
