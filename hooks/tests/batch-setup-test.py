@@ -483,6 +483,18 @@ with tempfile.TemporaryDirectory() as top:
           "every repository that uses the App" in steps and "before you delete the old" in steps, steps)
     check("R1 the reuse steps say what to do without the .pem file", "If no one has the `.pem` file" in steps, steps)
 
+# Round 2 fixes: a new key reaches each repository by name, and setup shows the key steps when the .pem is lost.
+with tempfile.TemporaryDirectory() as top:
+    gh = GitHub(top)
+    steps = " ".join(batch(gh, repo_with_gate(top), "steps").stdout.split())
+    check("R2-J1 the steps say where to see every repository that uses the App",
+          "Configure" in steps.split("12. ", 1)[-1].split("Install the App:", 1)[0], steps)
+    check("R2-J1 the steps say to run the key command once per repository, its name after --repo",
+          "once for each of them, with its name after `--repo`" in steps, steps)
+skill_step1 = " ".join(read(SKILL).split("### Then the batch run", 1)[-1].split("\n2. ", 1)[0].split())
+check("R2-J2 setup shows steps 11 and 12 when the organization has the App but no one has the .pem",
+      "no one has the `.pem` file" in skill_step1 and "steps 11 and 12" in skill_step1, skill_step1)
+
 # F4: a repository on a personal account gets no offer, since the App steps are for an organization.
 with tempfile.TemporaryDirectory() as top:
     gh = GitHub(top, owner_type="User")
