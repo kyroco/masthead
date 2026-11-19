@@ -1280,7 +1280,7 @@ echo more >> "$d/README.md"
 run_gate "$d" "git commit -qam 'Docs' && git push origin HEAD:landing"
 ok "$STATUS" "0" "a docs edit committed in the same line as the push goes through"
 run_gate "$d" "git merge side && git push origin HEAD:landing"
-ok "$STATUS" "0" "a merge in the same line as the push goes through when no unsent commit touches the CI checks"
+ok "$STATUS" "2" "a merge in the same line as the push is refused, since it can change what is pushed after the check reads it"
 # F2: --all, --branches and --mirror.
 d="$(ci_repo ci-push-all)"
 ( cd "$d" && git checkout -qb side && echo 'jobs: {}' >> .github/workflows/gate.yml && git commit -qam "Add a lane" \
@@ -1357,6 +1357,29 @@ run_gate "$d" "git checkout side && git push origin HEAD:landing"
 ok "$STATUS" "2" "a checkout of a branch holding an unsent CI commit, then a push, is refused"
 contains "$ERR" "can change which commits are pushed" "it says why: the command can change what is pushed after the check reads it"
 contains "$ERR" "Run 'git checkout' on its own, then push" "it says what to do next"
+
+echo "40d. INFRA-274 after round 2: a line that makes a commit from origin's, or repoints a branch, before the push"
+# F1: a revert or cherry-pick of a CI commit origin already holds.
+d="$(ci_repo ci-revert-sent)"
+( cd "$d" && echo 'jobs: {}' >> .github/workflows/gate.yml && git commit -qam "Add a lane" -m "$OKLINE" \
+    && git update-ref refs/remotes/origin/main HEAD && git update-ref refs/remotes/origin/landing HEAD \
+    && git update-ref refs/remotes/origin/old HEAD && git reset -q --hard HEAD~1 \
+    && git update-ref refs/remotes/origin/main HEAD && git update-ref refs/remotes/origin/landing HEAD ) >/dev/null 2>&1
+run_gate "$d" "git cherry-pick origin/old && git push origin HEAD:landing"
+ok "$STATUS" "2" "a cherry-pick of origin's CI commit in the same line as the push is refused"
+contains "$ERR" "Run 'git cherry-pick' on its own, then push" "it says to run the cherry-pick on its own first"
+( cd "$d" && git reset -q --hard refs/remotes/origin/old && git update-ref refs/remotes/origin/main HEAD \
+    && git update-ref refs/remotes/origin/landing HEAD ) >/dev/null 2>&1
+run_gate "$d" "git revert --no-edit HEAD && git push origin HEAD:landing"
+ok "$STATUS" "2" "a revert of origin's CI commit in the same line as the push is refused"
+# J1: a branch repointed in the same line as the push.
+d="$(ci_repo ci-branch-force)"
+( cd "$d" && git branch rel && git checkout -qb side && echo 'jobs: {}' >> .github/workflows/gate.yml \
+    && git commit -qam "Add a lane" && git checkout -q - ) >/dev/null 2>&1
+run_gate "$d" "git branch -f rel side && git push origin rel:landing"
+ok "$STATUS" "2" "a branch repointed at an unapproved CI commit in the same line as the push is refused"
+run_gate "$d" "git branch --list && git push origin HEAD:landing"
+ok "$STATUS" "0" "listing branches in the same line as the push adds nothing"
 
 echo ""
 echo "passed $pass, failed $fail"
