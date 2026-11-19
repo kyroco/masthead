@@ -7,8 +7,9 @@ blocks what, and what is already decided. Then keep the right number of
 workers busy on it, bring the person only the decisions that are theirs, one
 at a time, in the words they use, and get out of the way.
 
-You decide how the work runs: the order, who starts next, when a worker's
-landing is accepted, when a worker is done. What the product does, what it says, what it
+You decide how the work runs: the order, who starts next, when a PR is ready
+to queue (in the batch way, when a worker's landing is accepted), when a
+worker is done. What the product does, what it says, what it
 charges, and who may do what are the person's to decide. When the issue, its
 decision record and their past answers do not settle such a question, ask
 them, one question at a time; never fill the gap yourself.
@@ -56,13 +57,25 @@ show it to them.
 
 ## Agree the run
 
+First learn which way this repository ships, since the workers read the same
+fact: from the main checkout, `git fetch origin`, then
+`python3 ${CLAUDE_PLUGIN_ROOT}/hooks/project_fact.py --ships`. It prints
+`pull-request` (the pull request way: each worker opens one PR, and you queue
+it) unless the repository opted in to the batch run, when it prints `batch`
+(the batch way: each worker lands its commits on `landing`, and a green batch
+moves main). **Opening a PR** in `references/session-cliffs.md` says which
+committed files decide it. Say the way in the plan you give the person.
+
 When you understand the work, say in one sentence what you are about to do and
 ask how many workers. Say the count three ways and never mix them: how many
 issues are ready (scenarios written, no open question), how many of those can
-start now (every blocker on main), and how many wait on a blocker. "Six are ready"
+start now (every blocker merged, or on main in the batch way), and how many
+wait on a merge. "Six are ready"
 when seventy are ready and six can start is false, and the person reads it as
-a problem with the issues. That number is sessions alive: a worker counts
-from its start until you accept its landing and it answers "cleaned up". Nothing starts before the person gives it.
+a problem with the issues. That number is sessions alive, the ones waiting for the
+merge queue included: a worker counts from its start until its session is
+stopped after its merge. In the batch way, a worker counts from its start
+until you accept its landing and it answers "cleaned up". Nothing starts before the person gives it.
 
 Then name the issues that fill those slots, in order, each with what the
 customer gets from it. When one carries a question that is the person's, the
@@ -145,22 +158,25 @@ For each issue, in order, up to the person's number:
    `SendMessage` it that this session is its foreman, with `notify_when_idle`,
    and pass on the person's instructions for the run in their words.
 
-An issue whose blocker is still open waits until a green batch moves main past that blocker's commits,
-since a worker branches from main.
+An issue whose blocker is still open waits until that blocker merges; in the
+batch way, until a green batch moves main past that blocker's commits, since
+a worker branches from main.
 
 ## While they work
 
 Rely on `notify_when_idle` notices, or in the desktop app on the notes it
 sends when a worker ends a turn, and on `Monitor`, not a shell loop, for a
-batch Gate run. A worker silent past reason gets one message
+queued PR or a CI run, or in the batch way a batch Gate run. A worker silent past reason gets one message
 asking for status. Never read a worker's transcript into this session.
 
 A worker writes no plan and waits for no go: it builds as soon as it has
-read its sources. Its first message is a question, a split or its report of the commits it landed.
+read its sources. Its first message is a question, a split or its PR, or
+in the batch way its report of the commits it landed.
 
 A worker that split its issue sends the sub-issue numbers and stops, and that
 worker is free: start one worker per sub-issue, in blocked-by order. In the
-terminal, stop that session as after a landing. Pass the branch it left on
+terminal, stop that session as after a merge, or after a landing in the
+batch way. Pass the branch it left on
 GitHub to the user to delete.
 
 A worker's question: first re-read that issue's comments, then search Korium
@@ -183,7 +199,7 @@ the architecture doc and the mockups. Never write "build what the issue says".
 
 A worker's report must quote a line from the project README and give its
 agent-run count. One that does not skipped the README: send it back to read it
-before you accept its landing.
+before you queue its PR, or before you accept its landing in the batch way.
 
 Some things are not yours to settle and go to the person as they stand, one at
 a time: what the second re-verify round left on the fix list, a security finding the adjudicator could not settle, and an ADR line and a
@@ -192,7 +208,8 @@ trial is on, the adjudicator's Architecture trial section goes to the person
 too, whole and unedited: every architecture finding with its lens, smell,
 class, scores and placement, so the person can judge how the reviewer
 performs. Send the worker the person's answer word for word; it fixes only
-the findings that answer sends back. A worker with one of those unanswered
+the findings that answer sends back. A PR with one of those unanswered is not
+queued; in the batch way, a worker with one of those unanswered
 does not land its commits until it has the answer. Everything else the adjudicator placed is final for the worker and for
 you, whichever round placed it, and you rule on none of it.
 
@@ -207,12 +224,49 @@ what happened. The issues it blocks wait with it; name them when you report
 the park. Tell a worker main moved only when it has a reason to bring main in: a
 conflict, a dependency, or changes that interact. Say which.
 
-## Land and clean up
+## Merge or land, and clean up
 
 An extra, whoever found it, is settled by its worker, as `worker.md` **What
-done is** says, never by you or the person. When a worker reports its landing
-with an extra that rule says to fix and it did not fix, send it back to fix
-it, without asking the person.
+done is** says, never by you or the person. When a worker reports its PR, or
+its landing in the batch way, with an extra that rule says to fix and it did
+not fix, send it back to fix it, without asking the person.
+
+### The pull request way
+
+Queue the PR when all of these hold: CI is green; nothing is left on the
+adjudicator's fix list; every architecture finding the person sent back is fixed in it; every extra the worker's rule says to fix is fixed in it; the PR body's
+unproven list holds nothing a customer would see; and the worker, told you are
+ready to queue, has answered "cleaned up" (its test stack and code index are
+gone; its worktree and branch stay). Otherwise park it with the reason. Auto
+merge is off, so queue with the `enqueuePullRequest` GraphQL mutation, using
+the PR's node id. That goes through `gh api graphql` even where the GitHub
+connector is loaded: the connector has no call that queues a PR. Every other
+GitHub call here goes through the connector when it is loaded, as **Which
+tool makes the call** in the github-issues skill says.
+
+With no `gh` (`command -v gh` finds nothing), park an issue through the
+connector's label call. Queueing a PR and listing what a merge unblocks have
+no connector call, so at either one stop and tell the person which step waits,
+with "(brew install gh, then gh auth login)" after it: "`gh` is needed to queue
+PR #<pr>" before the merge, or "`gh` is needed to list the issues that issue
+#<n> unblocks" after it. Never skip one of these steps or report it done.
+
+Once it merges: close its issue if the `Fixes` line did not, then each parent
+up the chain that has no open sub-issue left, and set the merged issue and
+each parent to Done with `set-status.sh` (GitHub deletes the merged branch).
+List what it blocked:
+
+    gh api repos/{owner}/{repo}/issues/<n>/dependencies/blocking --jq '.[] | "#\(.number) \(.state) \(.title)"'
+
+Then give that worker its next ready issue, those first. In the terminal, stop
+the worker's session (its id and worktree come from `claude agents --json`,
+not from memory) and start the next issue in a new one.
+
+Every report to the person carries the count of issues closed by a merge in
+the run. A split is not a stop: its sub-issues join the run like any other
+issue.
+
+### The batch way
 
 A worker lands its commits on `landing` itself and opens no pull request
 (**Opening a PR**, steps 9 and 10). Accept a landing when all of these hold:
@@ -303,19 +357,20 @@ other issue.
 
 ## End the run
 
-Every issue is on main, parked or skipped. Stop any remaining workers (in the
+Every issue is merged (in the batch way, on main), parked or skipped. Stop any remaining workers (in the
 desktop app, archive them, which also removes their worktrees), remove the
 warm trees with `${CLAUDE_PLUGIN_ROOT}/skills/work-on/warm-build.sh end`, capture one
-Korium handoff (what reached main, what parked and why, and the person's answers,
+Korium handoff (what merged or reached main, what parked and why, and the person's answers,
 verbatim), and tell the person: one line per issue with its outcome, what each
-parked issue needs, and the count of issues on main.
+parked issue needs, and the count of issues merged, or on main in the batch way.
 
 ## On Linear
 
 When `python3 ${CLAUDE_PLUGIN_ROOT}/hooks/project_fact.py --tracker` prints
 `linear`, the project and its issues live in Linear, and every issue, project
 and status call goes through the Linear connector, as the `linear-issues`
-skill says. The code, CI and the decision records stay on GitHub. Every section above holds, with these changes, shown for KOR-12:
+skill says. Pull requests, CI, the merge queue and the decision records stay
+on GitHub. Every section above holds, with these changes, shown for KOR-12:
 
 - **Naming.** Say "KOR-12", never a `#` number.
 - **Understand the work.** Read the project description with `get_project`
@@ -349,7 +404,13 @@ skill says. The code, CI and the decision records stay on GitHub. Every section 
 - **Park.** A second failure sets the issue's status to `Needs Human` with
   `save_issue` and adds one comment saying what happened, never a `parked`
   label.
-- **Once a green batch moves main.** For each issue `merged` lists, set the issue to `Done` with
+- **Queue.** In the pull request way, queuing the PR is unchanged: it goes to
+  GitHub's merge queue with the `enqueuePullRequest` mutation, as above.
+- **Once it merges.** In the pull request way, set the merged issue to `Done`
+  with `save_issue` if the `Fixes` line did not, then each parent up the chain
+  with no open sub-issue left, and list what it blocked from `get_issue` with
+  `includeRelations` true, its `relations.blocks`.
+- **Once a green batch moves main.** In the batch way, for each issue `merged` lists, set the issue to `Done` with
   `save_issue`, then each parent up the chain with no open sub-issue left, and list what it blocked from `get_issue` with `includeRelations`
   true, its `relations.blocks`.
 

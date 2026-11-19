@@ -1,6 +1,6 @@
 ---
 name: work-on
-description: Work on GitHub or Linear issues, one session per issue. /work-on #1418, or a Linear key such as /work-on KOR-12, makes this session the worker for that one issue in this repo, from worktree to commits landed on the `landing` branch, with no pull request. /work-on foreman makes this session the foreman and then asks what to run (a project, milestone or issue numbers); /work-on <project or milestone> does the same with the work already named. The foreman proposes a plan, the user decides how many workers run at once, and each issue runs in a fresh session of its own (a desktop session in the Claude desktop app, a background session in the terminal) until its landing is accepted, and the issue closes once a green batch moves main. Run it from the repo the issue lives in.
+description: Work on GitHub or Linear issues, one session per issue. /work-on #1418, or a Linear key such as /work-on KOR-12, makes this session the worker for that one issue in this repo, from worktree to one PR, or, in a repo that opted in to the batch run, to commits landed on the `landing` branch with no pull request. /work-on foreman makes this session the foreman and then asks what to run (a project, milestone or issue numbers); /work-on <project or milestone> does the same with the work already named. The foreman proposes a plan, the user decides how many workers run at once, and each issue runs in a fresh session of its own (a desktop session in the Claude desktop app, a background session in the terminal) through to merge, or in the batch way until its landing is accepted, and the issue closes once a green batch moves main. Run it from the repo the issue lives in.
 disable-model-invocation: true
 ---
 
@@ -16,8 +16,8 @@ Read the text typed after `/work-on`:
 - **`#1418`**: you are the **worker** for that issue, started by the user,
   who is waiting. Read `${CLAUDE_PLUGIN_ROOT}/skills/work-on/worker.md` and follow it.
 - **`#1418 dispatched`**: you are a worker a foreman started. The word
-  `dispatched` means you write no sheet and build through to the landing
-  without waiting for a go; a question the issue, its ADR, the architecture doc, the
+  `dispatched` means you write no sheet and build through to the PR, or to
+  the landing in the batch way, without waiting for a go; a question the issue, its ADR, the architecture doc, the
   mockups and Korium do not answer goes to your foreman. Read `worker.md`.
 - **A Linear key** such as `KOR-12` (the team's key, which may hold
   letters and digits, such as `K8S-12`, then a hyphen and a number), in a repo whose issues live in Linear: the same as `#1418`, so you
@@ -50,7 +50,7 @@ Work in the repo the session was started in; this skill never moves a session
 to another repo, and every `gh` command and GitHub connector call runs
 against this one. Where the connector is loaded, issue, pull request, comment
 and Status calls go through it and `gh` is the fallback; git keeps the
-commits and pushes, and what an issue unblocks stays on `gh` (the github-issues
+commits and pushes, and the merge queue and what an issue unblocks stay on `gh` (the github-issues
 skill, **Which tool makes the call**). The repo's own
 facts come first: where its `CLAUDE.md` or `docs/conventions/` sets a test
 command, a pre-push check, its changelog or a worktree
@@ -60,7 +60,7 @@ prints them from the worktree: the repo's own version when its
 `.claude/references/session-cliffs.md` has that lead, otherwise the plugin's,
 the same steps the hook injects. When a step names a
 file this repo does not have, do what the step is for with what the repo has,
-and list in the issue's closing record each check the repo lacks. The `verifier`,
+and list in the PR body, or in the batch way the issue's record comment, each check the repo lacks. The `verifier`,
 `security-reviewer` and `architecture-reviewer` agents live in `${CLAUDE_PLUGIN_ROOT}/agents` and review every repo;
 `/code-review` is not part of the flow.
 

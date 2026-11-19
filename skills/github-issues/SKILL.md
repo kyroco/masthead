@@ -79,9 +79,10 @@ there. Four parts, in this order, under these headings:
   `needs-decision` label and is not dispatched.
 
 Done is the same for every issue and is not restated in one: every scenario
-has a passing test, and the repository's pre-push check passes on the commit it lands.
+has a passing test, and the repository's pre-push check passes on the PR's
+head, or in the batch way on the commit it lands.
 
-**Size.** One issue is one landing, built and proved by one worker in one fresh
+**Size.** One issue is one PR, or one landing in the batch way, built and proved by one worker in one fresh
 session. Split it the way scrum splits user stories, into thin slices that
 each work on their own and fit one worker session. Then merge neighbouring
 slices that share a file until each fills one worker session with room to
@@ -102,13 +103,19 @@ it: "the user"). Three things stay off the connector, whichever is loaded:
   `create_or_update_file` and `delete_file` build a commit on GitHub from file
   contents, which skips the local test receipt; `connector-commit-gate.py`
   refuses them.
+- **The merge queue goes through `gh`.** The connector has no call that adds
+  a pull request to the queue, so the foreman queues with the
+  `enqueuePullRequest` GraphQL mutation through `gh api graphql`. With no
+  `gh`, that step, and the list of issues a merge unblocks, stop and say
+  `gh` is needed; neither is skipped. The batch way queues nothing.
 - **What an issue unblocks goes through `gh`.** The connector has no call
   that lists an issue's blocking links, so the foreman lists them with
   `gh api`. With no `gh`, that step stops and says `gh` is needed; it is
   never skipped.
 - **The branch linked to the issue comes from `gh issue develop`.** The
   connector's `create_branch` makes a branch without the link; with no `gh`,
-  make the branch with git, and the record comment names the branch.
+  make the branch with git and let `Fixes #<n>` in the PR body do the
+  linking, or, in the batch way, the record comment names the branch.
 
 The connector's call for each `gh` form below:
 
@@ -168,14 +175,19 @@ the table above.
   lives in. The skill makes the worktree, reads the issue and its project
   README, makes a branch linked to the issue (`<user>/<n>-short-title`, with
   `gh issue develop`), and sets the Status to In Progress.
-- **One checkout per issue**, deleted once its commits reach main.
+- **One checkout per issue**, deleted when the pull request merges, or in the
+  batch way once its commits reach main.
 - **One issue per session.** A session works one issue and nothing else, which
   is about the quality of its answers.
 - **Status.** Nothing moves an issue's Status on its own when a branch is made
-  or pushed; `/work-on` sets In Progress. Once the worker's commits are on
+  or pushed; `/work-on` sets In Progress. In the pull request way, `Fixes #<n>` in the pull request
+  body closes the issue on merge. When a PR has merged and its `Fixes` line
+  did not close the issue, close it and set the Status to Done, and say so.
+  In the batch way, once the worker's commits are on
   the landing branch, it posts the change's record as a comment and sets In
   Review, as step 10 of **Opening a PR** says. The issue closes, and its
-  Status reads Done, once a green batch moves main.
+  Status reads Done, once a green batch moves main. `project_fact.py --ships`
+  says which way a repository ships (**Opening a PR**).
 - **`refs #<n>`** when a change touches an issue without finishing it.
 - **"Close it" means closed as completed** when the issue's work shipped.
   Closed as not planned is only for work that will not be done, and only when

@@ -277,9 +277,13 @@ batch run can move it would never move again.
    person to run them in their own terminal: no session may set a secret.
    Wait until they say they are done.
 4. Land the starter. Commit `.github/workflows/masthead-batch.yml` with
-   `.claude/gate.json` and land them on `landing` the way this repository
-   lands work. GitHub runs the starter only from a commit on that branch, and
-   that first batch is the first proof it works.
+   `.claude/gate.json` and push them to `landing` (`git push origin
+   HEAD:landing`), with no pull request. GitHub runs the starter only from a
+   commit on that branch, and that first batch is the first proof it works.
+   This push is the switch: `project_fact.py --ships` prints `batch` only
+   once both files are committed on `origin/landing`, and until then every
+   session ships the pull request way (**Opening a PR** in
+   `references/session-cliffs.md`).
 5. The lock, last, with a yes of its own. Ask "Shall I lock main so only the
    batch App (App ID <n>) can move it?" On yes, run
    `batch.py lock --app-id <n>`. It refuses until the landing branch on

@@ -70,11 +70,22 @@ To undo an edit of your own, reverse it with an Edit call, or copy the file
 to the scratchpad first and restore from the copy. Commit first, so
 HEAD is where your work is.
 
-**Opening a PR.** Every change reaches main through the landing branch, in
-this order, with no pull request: the lead keeps its old name so a repository's
-own version still replaces it. The steps live here and nowhere else; a repo
-supplies only its own facts (its pre-push check, its changelog format) in its
-`CLAUDE.md` and `docs/conventions/`.
+**Opening a PR.** Every change reaches main in this order, one of two ways,
+and the repository's committed facts say which. Run `git fetch origin`, then
+`python3 ${CLAUDE_PLUGIN_ROOT}/hooks/project_fact.py --ships`. It prints
+`batch` only when the repository opted in to Masthead's batch run: the stored
+Gate (`.claude/gate.json`) and the batch starter file
+(`.github/workflows/masthead-batch.yml`) are both committed on
+`origin/landing`. That is the batch way: commits land on the landing branch
+with no pull request. Anything else, a repository part way through setting it
+up included, prints `pull-request`: that is the pull request way, one
+reviewed PR per issue, as it always was. Robert, November 19, 2026: "yes
+that's the right recommendation, keep the old way, new way is an option".
+Steps 1 to 8 are the same for both; from step 9 on, follow only your way's
+steps. The lead keeps its old name so a repository's own version still
+replaces it. The steps live here and nowhere else; a repo supplies only its
+own facts (its pre-push check, its changelog format) in its `CLAUDE.md` and
+`docs/conventions/`.
 
 1. Build on a branch and commit. A bug gets its test first: the failing
    test in a commit of its own, then the fix. Keep one list: what you did
@@ -123,8 +134,9 @@ supplies only its own facts (its pre-push check, its changelog format) in its
    (`skills/work-on/worker.md`); one you fix is fixed as step 4 says. Its For
    the foreman section (a security finding it could not
    settle, or an ADR line and a mockup that disagree) goes to the foreman
-   unedited (to the user when there is none), who brings it to the user; your
-   commits wait for that answer before they land. So does its Architecture trial section, while
+   unedited (to the user when there is none), who brings it to the user; the
+   PR waits for that answer, and in the batch way your commits wait for that
+   answer before they land. So does its Architecture trial section, while
    the trial period is on: whenever that section lists a finding, whatever
    your brief's `Architecture trial:` line said, since the adjudicator reads
    a missing or misspelled line as on (`references/dispatch-brief.md` has
@@ -180,8 +192,9 @@ supplies only its own facts (its pre-push check, its changelog format) in its
    fix list and fixed, brought to the user, or dropped.
 7. Add the changelog entry when the repo keeps one, or its label for internal
    work.
-8. Commit, then bring your branch up to date with the landing branch before
-   you run the check, since its receipt is for the tree you push:
+8. Commit. In the batch way, then bring your branch up to date with the
+   landing branch before you run the check, since its receipt is for the tree
+   you push:
    `git fetch origin`, then `git rebase origin/landing`. When origin has no
    `landing` yet, rebase onto `origin/main` instead; your push creates it
    in step 9. When the rebase stops on a conflict, keep both sides' intent,
@@ -196,11 +209,34 @@ supplies only its own facts (its pre-push check, its changelog format) in its
    names a commit that is no longer the last one. Read
    the output, not the exit code. When it cannot reach its test stack, do what
    it prints, and stop and report only when that fails too. `hard-gate.sh`
-   refuses the push until the check's receipt matches the commit;
+   refuses the push, and in the pull request way the PR, until the check's
+   receipt matches the commit;
    it reads the receipt before its slower checks, so a refusal comes back in
    seconds. This run settles each claim the verdict lists as not proven here
    for want of a database. One it does not cover, and every claim that
    needed a private copy, goes on your did-not-prove list.
+In the pull request way (`--ships` printed `pull-request`):
+
+9. Push and open one PR to main. Its body gives the unproven list, the
+   extras fixed in it with their scores, the agent-run count (the rows added to
+   `<state>/dispatches.tsv` for this issue whose outcome is not refused;
+   `<state>` is the folder `project_fact.py --state-path` prints, the one
+   the dispatch record writes to), and
+   `Fixes #<issue>`, or `Fixes <key>`, such as `Fixes KOR-12`, when the
+   issue lives in Linear. Never
+   commit or push to main: main changes only by merging the reviewed PR once
+   its checks are green.
+10. Once it merges, clean up what your own work created, from the main
+    checkout: bring down the test stack and any tunnels as the repo's
+    procedures say, delete the branch's code index
+    (`korium-cli delete <branch>`), `git worktree remove` the worktree (never
+    forced; report what blocks it), delete the branch locally, and name the
+    remote branch for the user to delete. The irreversible-action gate
+    refuses a session that deletes a remote branch, so the user makes that
+    call.
+
+In the batch way (`--ships` printed `batch`):
+
 9. Land your commits on the landing branch, `landing`, with no pull request:
    `git push origin HEAD:landing`. Each commit message
    is a short summary that names the issue (`#<issue>`, or its key, such as
@@ -240,5 +276,8 @@ supplies only its own facts (its pre-push check, its changelog format) in its
     so the user makes that call.
 
 **Updating main.** Never commit or push directly to main. Build on a branch
-and land it on `landing` as **Opening a PR** says; main moves forward only from
-`landing`, when one run of the repo's Gate passes on the batch.
+and ship it the way `project_fact.py --ships` names, as **Opening a PR**
+says. In the pull request way, open a PR, and let main change only by merging
+the reviewed PR once its checks are green. In the batch way, land it on
+`landing`; main moves forward only from `landing`, when one run of the repo's
+Gate passes on the batch.

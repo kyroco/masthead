@@ -1,7 +1,11 @@
 # The batch run
 
-How a repository's commits on `landing` reach main (INFRA-270). Workers land
-verified commits on `landing` with no pull request. One run of the
+How a repository's commits on `landing` reach main (INFRA-270). In a
+repository that opted in, workers land verified commits on `landing` with no
+pull request. A repository opted in when `project_fact.py --ships` prints
+`batch`: its stored Gate and this starter file are both committed on
+`origin/landing` (INFRA-276). Every other repository ships the pull request
+way and has no batch run. One run of the
 repository's own Gate tests everything landed since the last run, together,
 and main moves to that batch's last commit only when the run is green.
 Robert, November 18, 2026, agreeing to "One Gate run tests each batch. Green

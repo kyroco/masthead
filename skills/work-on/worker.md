@@ -1,10 +1,14 @@
 # The worker
 
-You build one GitHub issue, from a worktree to commits landed on the
-`landing` branch, and you prove it as you go. No pull request is opened. You were started either by the person, with `/work-on #1418`,
+You build one GitHub issue, from a worktree to one pull request, and you prove
+it as you go. That is the pull request way. In a repository that opted in to
+the batch run, the batch way, you build to commits landed on the `landing`
+branch instead, and no pull request is opened. **Opening a PR** says how to
+tell which way applies: `project_fact.py --ships` prints `pull-request` or
+`batch`. You were started either by the person, with `/work-on #1418`,
 who is waiting and wants to see your brief before you build, or by a foreman,
-with `/work-on #1418 dispatched`, who wants you to build through to the landing
-and send every question and report to it with `SendMessage`. Nothing else
+with `/work-on #1418 dispatched`, who wants you to build through to the PR,
+or to the landing in the batch way, and send every question and report to it with `SendMessage`. Nothing else
 decides which you are: not running in the background, not a message from
 another session. In a repo whose issues live in Linear, the issue is a key
 such as `KOR-12` in place of `#1418`, and **On Linear** at the end of this
@@ -70,17 +74,21 @@ Delete the `worktree-<name>` branch the worktree was made on. Set the issue's
 Status to In Progress with
 `${CLAUDE_PLUGIN_ROOT}/skills/work-on/set-status.sh` unless a foreman already
 did. Where the GitHub connector is loaded, set the Status and make every other
-issue call through it instead (the github-issues skill, **Which tool
+issue and PR call through it instead (the github-issues skill, **Which tool
 makes the call**); with no `gh`, make the branch with git (`git switch -c`,
-then `git push -u origin`), and the record comment of step 10 names the branch. The push itself is
+then `git push -u origin`) and let `Fixes #<n>` link it, or, in the batch
+way, the record comment of step 10 names the branch. The push itself is
 always git.
 
 ## 4. What done is
 
-Done is five things: every scenario in the issue has a test that passes, if
-your work involves UI then every UI element related to this issue is
-functional, the repo's pre-push check passes, the commits are on `landing`,
-and the change's record is a comment on the issue. Then you stop.
+In the pull request way, done is four things: every scenario in the issue has a test that passes, if your work involves UI then every UI element related to this issue is functional,
+the repo's pre-push check passes, and the PR is open. Then you stop.
+
+In the batch way, done is five things: every scenario in the issue has a test
+that passes, if your work involves UI then every UI element related to this
+issue is functional, the repo's pre-push check passes, the commits are on
+`landing`, and the change's record is a comment on the issue. Then you stop.
 
 Reviews will always find more than the scenarios ask for, and so will you:
 each such thing is an extra. Score each one from 1 to 10 the way the person
@@ -101,7 +109,8 @@ end of your turn.
 
 Note how many rows the dispatch log holds now, not counting refused ones;
 your report counts the rows added after it. The log is
-`<state>/dispatches.tsv`, as step 10 of **Opening a PR** says.
+`<state>/dispatches.tsv`, as **Opening a PR** says (its step 9 in the pull
+request way, its step 10 in the batch way).
 
 ## 5. Build it
 
@@ -114,7 +123,7 @@ drawing of the mockup: add its data and events, and change none of its words
 or layout. A screen whose page has no template yet, or whose words or layout
 would have to change, is a question, not a redraw.
 
-## 6. Prove it, land it and close the issue
+## 6. Prove it, then open the PR or land it
 
 Follow **Opening a PR**, step by step, as this command prints it from your
 worktree:
@@ -124,14 +133,18 @@ worktree:
 It prints the same steps the hook injects: your repository's own version when
 its `.claude/references/session-cliffs.md` has that lead, otherwise the
 plugin's. Its step 8 says when to run the pre-push check.
-Its steps 9 and 10 land the commits on `landing` and put the change's
-record on the issue as a comment, which takes the place of a pull request.
-The issue closes later, when a green batch moves main.
+
+In the pull request way, once the PR is open, set the Status to In Review with `set-status.sh`.
+
+In the batch way, its steps 9 and 10 land the commits on `landing` and put
+the change's record on the issue as a comment, which takes the place of a
+pull request. The issue closes later, when a green batch moves main.
 
 ## 7. Report
 
 Report one row per scenario: done or not, and the evidence (a command and
-its result, a file:line, or a check), with the commits you landed. Then each extra
+its result, a file:line, or a PR check), with the PR number, or, in the
+batch way, the commits you landed. Then each extra
 you fixed, in plain words, with its score and its test; how many you dropped
 under 8, as a count; and how many agents you ran since the count you noted in
 step 4. Dispatched, send it to your foreman.
@@ -153,6 +166,20 @@ gate to get past it.
 
 ## After the merge
 
+In the pull request way:
+
+Dispatched: when your foreman says it is ready to queue your PR, bring down
+your test stack and tunnels and delete your branch's code index, then tell it
+"cleaned up". Keep your worktree and branch: your foreman may reuse this
+session, and GitHub deletes the branch after the merge. If the merge queue
+sends the PR back, fix it on the same branch.
+
+Started by the person, once the PR has merged: check the issue closed and
+its Status reads Done, and fix either if not. Close each parent up the chain
+that has no open sub-issue left. Then do step 10 of **Opening a PR**.
+
+In the batch way:
+
 Dispatched: when your foreman accepts your landing, bring down your test
 stack and tunnels and delete your branch's code index, then tell it "cleaned
 up"; the foreman closes the issue once a green batch moves main. Keep your worktree and branch: your foreman may reuse this
@@ -167,8 +194,8 @@ Close each parent up the chain that has no open sub-issue left. Then do step 11 
 
 When `project_fact.py --tracker` prints `linear`, the issue lives in Linear
 and every issue, project and status call goes through the Linear connector,
-as the `linear-issues` skill says. The code, CI and the decision records
-stay on GitHub. Every step above holds, with these changes,
+as the `linear-issues` skill says. The code, pull requests, CI, the merge
+queue and the decision records stay on GitHub. Every step above holds, with these changes,
 shown for KOR-12:
 
 - **Naming.** Write the key, "KOR-12", never a `#` number.
@@ -179,7 +206,8 @@ shown for KOR-12:
   brief, in place of the project README: read it with `get_project`, and the
   milestone's description where the project has milestones.
 - **Step 3.** The branch is the one `get_issue` returns as `gitBranchName`;
-  it holds the key, so Linear links the branch to the issue. Make
+  it holds the key, so Linear links the branch, and in the pull request way
+  the PR, to the issue. Make
   it with `git switch -c <gitBranchName>`, then
   `git push -u origin <gitBranchName>`, never `gh issue develop`. Set the
   status with `save_issue` with `id` the key and `state` `In Progress`, unless
@@ -187,17 +215,20 @@ shown for KOR-12:
   projects.
 - **Step 4.** A split follows the `linear-issues` skill, and the issue goes
   back to `Todo` with `save_issue`.
-- **Step 6.** Each commit message names `KOR-12`. A commit message moves
-  nothing in Linear, so step 10 of **Opening a PR** has you post the change's
-  record with `save_comment`, then set `In Review` with `save_issue` when the
-  team has that status.
+- **Step 6.** In the pull request way, the PR body says `Fixes KOR-12`; set
+  `In Review` the same way once the PR is open. In the batch way, each commit
+  message names `KOR-12`. A commit message moves nothing in Linear, so step 10
+  of **Opening a PR** has you post the change's record with `save_comment`,
+  then set `In Review` with `save_issue` when the team has that status.
 - **A question.** When nothing answers it, set the issue's status to
   `Needs Human` with `save_issue` before you ask, whether you ask the person
   or your foreman. When the answer comes back, put the answer on the issue as
   a comment in the words it came in, and set the status back to
   `In Progress`.
-- **After the merge.** Check the issue's status reads Done once the batch
-  moved main, and set it with `save_issue` if not. A parent with no open sub-issue left is set to
+- **After the merge.** In the pull request way, `Fixes KOR-12` moves the
+  issue to Done when the PR merges: check its status reads Done, and set it
+  with `save_issue` if not. In the batch way, check the issue's status reads
+  Done once the batch moved main, and set it with `save_issue` if not. A parent with no open sub-issue left is set to
   Done the same way.
 
 On a repository whose issues live on GitHub, none of this section applies.

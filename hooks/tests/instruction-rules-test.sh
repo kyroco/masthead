@@ -34,6 +34,16 @@ never() {
   fi
 }
 
+# A part of a file, read as one line: the text after START up to END (INFRA-276,
+# where one file holds the pull request way and the batch way side by side).
+part() { local t; t="$(flat "$1")"; t="${t#*"$2"}"; printf '%s' "${t%%"$3"*}"; }
+part_says() {
+  if grep -qiF -- "$3" <<<"$2"; then pass=$((pass + 1)); else fail=$((fail + 1)); printf 'FAIL %s does not say: %s\n' "$1" "$3"; fi
+}
+part_never() {
+  if grep -qiF -- "$3" <<<"$2"; then fail=$((fail + 1)); printf 'FAIL %s still says: %s\n' "$1" "$3"; else pass=$((pass + 1)); fi
+}
+
 # Issue #57: a search for what is adopted reads wider than any other search.
 says  skills/work-on/SKILL.md 'For what is adopted, use `stance: "position"` with a `limit` of 10'
 says  skills/work-on/SKILL.md 'Every other `agent_search` takes a `limit` of 5'
@@ -60,7 +70,7 @@ says  skills/github-issues/SKILL.md "issues/<parent>/sub_issues"
 says  skills/work-on/foreman.md "Pass the branch it left on GitHub to the user to delete"
 never skills/work-on/worker.md "git/refs/heads"
 says  skills/work-on/foreman.md "that worker is free"
-says  skills/work-on/foreman.md "stop that session as after a landing"
+says  skills/work-on/foreman.md "stop that session as after a merge, or after a landing in the batch way"
 says  skills/work-on/foreman.md "then each parent up the chain that has no open sub-issue left, set to Done the same way"
 says  skills/work-on/foreman.md "A worker that split its issue sends the sub-issue numbers"
 says  skills/work-on/foreman.md "Close now any parent whose sub-issues are all closed"
@@ -417,7 +427,7 @@ never skills/analyze-issues/milestone-check.md "--body-file - <<"
 says  skills/github-issues/SKILL.md "## Which tool makes the call"
 says  skills/github-issues/SKILL.md "**Commits and pushes go through git.**"
 says  skills/github-issues/SKILL.md "**What an issue unblocks goes through \`gh\`.**"
-never skills/work-on/foreman.md "That goes through \`gh api graphql\` even where the GitHub"
+says  skills/work-on/foreman.md "That goes through \`gh api graphql\` even where the GitHub"
 says  skills/github-issues/SKILL.md "\`labels\` replaces the issue's whole set"
 says  skills/github-issues/SKILL.md "No single connector call says which projects an issue is in, so find them"
 never skills/github-issues/SKILL.md "the run's own project, the number in its URL"
@@ -568,7 +578,8 @@ says  skills/work-on/foreman.md "What the product does, what it says, what it ch
 says  skills/work-on/foreman.md "one question at a time; never fill the gap yourself"
 never skills/work-on/foreman.md "**Proceed**"
 never skills/work-on/foreman.md "This is the only issue a foreman files"
-says  skills/work-on/foreman.md "That number is sessions alive: a worker counts from its start until you accept its landing"
+says  skills/work-on/foreman.md "sessions alive, the ones waiting for the merge queue"
+says  skills/work-on/foreman.md "In the batch way, a worker counts from its start until you accept its landing"
 says  skills/work-on/foreman.md "Some things are not yours to settle and go to the person as they stand"
 says  skills/work-on/foreman.md "and file no issue."
 never skills/work-on/foreman.md "file no issue except"
@@ -843,7 +854,10 @@ never "$F" "**Fix later.**"
 says  "$F" "Set the issue to \`Done\` with \`save_issue\`, then each parent up the chain with no open sub-issue left"
 says  "$F" "list what it blocked from \`get_issue\` with \`includeRelations\` true, its \`relations.blocks\`"
 # Scenario 7: the merge queue stays on GitHub.
-says  "$F" "**Once a green batch moves main.** For each issue \`merged\` lists, set the issue to \`Done\`"
+says  "$F" "**Once a green batch moves main.** In the batch way, for each issue \`merged\` lists, set the issue to \`Done\`"
+# INFRA-276: the pull request way keeps queueing and closing on merge, on Linear too.
+says  "$F" "Queuing the PR is unchanged: it goes to GitHub's merge queue"
+says  "$F" "set the merged issue to \`Done\` with \`save_issue\` if the \`Fixes\` line did not"
 # Workers start on the Linear key and the status is set through Linear.
 says  "$F" "\`/work-on KOR-12 dispatched\`"
 says  "$F" "\`--name \"KOR-12-issue\"\`"
@@ -1084,7 +1098,7 @@ says  agents/security-reviewer.md "Quote it as a false claim"
 says  agents/security-reviewer.md "Your final message is the report: each claim with its answer, false ones first"
 # MAST-37: with no gh, the foreman stops and says so for each step that has no connector call, naming that step.
 says  skills/work-on/foreman.md "With no \`gh\` (\`command -v gh\` finds nothing)"
-never skills/work-on/foreman.md "\"\`gh\` is needed to queue PR #<pr>\""
+says  skills/work-on/foreman.md "\"\`gh\` is needed to queue PR #<pr>\""
 says  skills/work-on/foreman.md "\"\`gh\` is needed to list the issues that issue #<n> unblocks"
 says  skills/work-on/foreman.md "Never skip it or report it done"
 never skills/work-on/foreman.md "\`gh\` is needed to queue PR #<n>"
@@ -1420,7 +1434,7 @@ says  references/dispatch-brief.md 'until then it is on, on a new install too'
 never references/session-cliffs.md 'the person sends back, as step 4 says, and none of the others'
 says  references/session-cliffs.md 'While the trial is on, you fix only the architecture findings the person sends back'
 # Round 1, fix F2: the waiting and the relay are pinned.
-says  references/session-cliffs.md 'who brings it to the user; your commits wait for that answer before they land'
+says  references/session-cliffs.md 'who brings it to the user; the PR waits for that answer, and in the batch way your commits wait for that answer before they land'
 says  references/session-cliffs.md 'So does its Architecture trial section, while the trial period is on'
 says  skills/work-on/foreman.md 'does not land its commits until it has the answer'
 # Round 1, fix F3: the README says the fix list rule holds once the trial is off.
@@ -1591,15 +1605,35 @@ says  "$RD" 'says only "conforms" with no word of how,'
 # INFRA-260: a worker lands its verified commits on the landing branch, with no
 # pull request and no merge queue, and closes its issue with the change's record
 # as a comment.
-# Scenario 4: no step of Opening a PR opens a pull request or waits on a queue.
-OPR="$(tr '\n' ' ' <"$ROOT/references/session-cliffs.md" | tr -s ' ' | sed -E 's/.*\*\*Opening a PR\.\*\*//; s/\*\*Updating main\.\*\*.*//')"
+# Scenario 4: no step of Opening a PR's batch way opens a pull request or waits
+# on a queue. INFRA-276: since then the batch way is one of two ways, so this
+# holds for its steps, from its own line to Updating main.
+CL=references/session-cliffs.md
+says  "$CL" "In the batch way (\`--ships\` printed \`batch\`):"
+says  "$CL" "In the pull request way (\`--ships\` printed \`pull-request\`):"
+OPR="$(part "$CL" "In the batch way (\`--ships\` printed \`batch\`):" "**Updating main.**")"
 for phrase in "open one PR" "open a PR" "open a pull request" "opens a pull request" "Push and open" "merge queue" "queue the PR" "once it merges" "PR body" "the PR waits" "in this PR"; do
-  if grep -qiF -- "$phrase" <<<"$OPR"; then
-    fail=$((fail + 1)); printf 'FAIL Opening a PR still says: %s\n' "$phrase"
-  else
-    pass=$((pass + 1))
-  fi
+  part_never "Opening a PR, the batch way," "$OPR" "$phrase"
 done
+# INFRA-276 scenario 1: the pull request way keeps Masthead 0.3.1's steps 9 and 10 word for word.
+OPP="$(part "$CL" "In the pull request way (\`--ships\` printed \`pull-request\`):" "In the batch way (\`--ships\` printed \`batch\`):")"
+OLD9="$(git -C "$ROOT" show 30b4d47:references/session-cliffs.md 2>/dev/null | tr '\n' ' ' | tr -s ' ' | sed -E 's/.*(9\. Push and open one PR to main\.)/\1/; s/ \*\*Updating main\.\*\*.*//')"
+if [ -n "$OLD9" ]; then
+  part_says "Opening a PR, the pull request way," "$OPP" "$OLD9"
+fi
+part_says "Opening a PR, the pull request way," "$OPP" "9. Push and open one PR to main."
+part_says "Opening a PR, the pull request way," "$OPP" "main changes only by merging the reviewed PR once its checks are green"
+part_says "Opening a PR, the pull request way," "$OPP" "\`Fixes <key>\`, such as \`Fixes KOR-12\`, when the issue lives in Linear"
+part_never "Opening a PR, the pull request way," "$OPP" "landing"
+# INFRA-276 scenario 3: the steps say which way applies and how a session tells which.
+says  "$CL" "python3 \${CLAUDE_PLUGIN_ROOT}/hooks/project_fact.py --ships"
+says  "$CL" "It prints \`batch\` only when the repository opted in to Masthead's batch run: the stored Gate (\`.claude/gate.json\`) and the batch starter file (\`.github/workflows/masthead-batch.yml\`) are both committed on \`origin/landing\`"
+says  "$CL" "Anything else, a repository part way through setting it up included, prints \`pull-request\`"
+says  "$CL" "Steps 1 to 8 are the same for both; from step 9 on, follow only your way's steps"
+says  "$CL" "In the batch way, then bring your branch up to date with the landing branch"
+UPD="$(part "$CL" "**Updating main.**" "@@@none@@@")"
+part_says "Updating main" "$UPD" "In the pull request way, open a PR, and let main change only by merging the reviewed PR once its checks are green"
+part_says "Updating main" "$UPD" "In the batch way, land it on \`landing\`"
 # Scenario 1: the commits land on the landing branch, and nothing else moves.
 says  references/session-cliffs.md "Land your commits on the landing branch, \`landing\`, with no pull request"
 says  references/session-cliffs.md "git push origin HEAD:landing"
@@ -1608,14 +1642,13 @@ says  references/session-cliffs.md "Never force-push \`landing\`"
 says  references/session-cliffs.md "your push creates it"
 says  references/session-cliffs.md "Never commit or push to main"
 says  references/session-cliffs.md "main moves forward only from \`landing\`"
-never references/session-cliffs.md "main changes only by merging the reviewed PR"
-never references/session-cliffs.md "let main change only by merging the reviewed PR"
+part_never "Opening a PR, the batch way," "$OPR" "main changes only by merging the reviewed PR"
 # Scenario 2: the rebase comes before the pre-push check, whose receipt is for
 # the tree that is pushed, and a refused push means a fresh check.
 says  references/session-cliffs.md "before you run the check, since its receipt is for the tree you push"
 says  references/session-cliffs.md "run the check again on the new commit, and push again"
 # Scenario 3: the steps are the plugin's own, so every repository lands this way.
-says  references/session-cliffs.md "Every change reaches main through the landing branch"
+says  references/session-cliffs.md "Every change reaches main in this order, one of two ways"
 # Scenario 5: the change's record is a comment on the issue as it closes.
 # Changed by the foreman, November 19, 2026: the record goes on when the commit
 # lands, and the issue closes only when a green batch moves main (INFRA-263).
@@ -1632,67 +1665,83 @@ says  skills/work-on/worker.md "the commits are on \`landing\`"
 says  skills/work-on/worker.md "the change's record is a comment on the issue"
 never skills/linear-issues/SKILL.md "comment and sets Done"
 never skills/github-issues/SKILL.md "closes the issue with the change's record"
-never skills/work-on/worker.md "the PR is open. Then you stop"
-never skills/work-on/worker.md "ready to queue your PR"
-never skills/work-on/worker.md "The PR body says \`Fixes KOR-12\`"
-never skills/work-on/worker.md "Once the PR is open, set the Status to In Review"
-never skills/linear-issues/SKILL.md "sets In Review once the PR is open"
-never skills/github-issues/SKILL.md "body closes the issue on merge"
+# INFRA-276: each of these is now said for the pull request way only.
+says  skills/work-on/worker.md "In the pull request way, done is four things"
+says  skills/work-on/worker.md "In the batch way, done is five things"
+says  skills/work-on/worker.md "the PR is open. Then you stop"
+says  skills/work-on/worker.md "In the pull request way: Dispatched: when your foreman says it is ready to queue your PR"
+says  skills/work-on/worker.md "In the batch way: Dispatched: when your foreman accepts your landing"
+says  skills/work-on/worker.md "In the pull request way, the PR body says \`Fixes KOR-12\`"
+says  skills/work-on/worker.md "In the pull request way, once the PR is open, set the Status to In Review"
+says  skills/work-on/worker.md "\`project_fact.py --ships\` prints \`pull-request\` or \`batch\`"
+says  skills/linear-issues/SKILL.md "In the pull request way, it sets In Review once the PR is open"
+says  skills/github-issues/SKILL.md "In the pull request way, \`Fixes #<n>\` in the pull request body closes the issue on merge"
 # INFRA-260 round 1, F1 and arch-1: the foreman takes a landed report, frees
 # the worker's slot, and closes the issue only after a green batch moves main.
+# INFRA-276: the foreman's batch way holds none of the queueing; its pull request way keeps 0.3.1's.
 F=skills/work-on/foreman.md
-never "$F" "Queue the PR when all of these hold"
-never "$F" "enqueuePullRequest"
-never "$F" "Its first message is a question, a split or its PR"
-never "$F" "before you queue its PR"
-never "$F" "close its issue if the \`Fixes\` line did not"
-never "$F" "Queuing the PR is unchanged"
-says  "$F" "Its first message is a question, a split or its report of the commits it landed"
+says  "$F" "### The pull request way"
+says  "$F" "### The batch way"
+FB="$(part "$F" "### The batch way" "## End the run")"
+FP="$(part "$F" "### The pull request way" "### The batch way")"
+for phrase in "Queue the PR when all of these hold" "enqueuePullRequest" "close its issue if the \`Fixes\` line did not"; do
+  part_never "foreman.md, the batch way," "$FB" "$phrase"
+  part_says "foreman.md, the pull request way," "$FP" "$phrase"
+done
+OLDQ="$(git -C "$ROOT" show 30b4d47:skills/work-on/foreman.md 2>/dev/null | tr '\n' ' ' | tr -s ' ' | sed -E 's/.*(Queue the PR when all of these hold)/\1/; s/ ## End the run.*//')"
+if [ -n "$OLDQ" ]; then
+  part_says "foreman.md, the pull request way," "$FP" "$OLDQ"
+fi
+says  "$F" "\`python3 \${CLAUDE_PLUGIN_ROOT}/hooks/project_fact.py --ships\`"
+says  "$F" "Say the way in the plan you give the person"
+says  "$F" "Its first message is a question, a split or its PR, or in the batch way its report of the commits it landed"
+says  "$F" "before you queue its PR, or before you accept its landing in the batch way"
 says  "$F" "Accept a landing when all of these hold"
 says  "$F" "its slot is free once it answers \"cleaned up\""
 says  "$F" "Green, with main at its commit, it lists the issues the batch carried to main"
-says  "$F" "An issue whose blocker is still open waits until a green batch moves main past that blocker's commits"
+says  "$F" "An issue whose blocker is still open waits until that blocker merges; in the batch way, until a green batch moves main past that blocker's commits"
 says  skills/work-on/worker.md "when your foreman accepts your landing"
 # arch-3: the tracker skills no longer restate Done as a pull request's.
 for f in skills/github-issues/SKILL.md skills/linear-issues/SKILL.md; do
-  never "$f" "passes on the PR's head"
-  never "$f" "One issue is one PR"
-  says  "$f" "One issue is one landing"
-  says  "$f" "passes on the commit it lands"
+  says  "$f" "One issue is one PR, or one landing in the batch way"
+  says  "$f" "passes on the PR's head, or in the batch way on the commit it lands"
+  says  "$f" "\`project_fact.py --ships\` says which way a repository ships"
 done
 # arch-5: with no gh, nothing waits on a pull request body to link the branch.
-never skills/work-on/worker.md "let \`Fixes #<n>\` link it"
-never skills/github-issues/SKILL.md "let \`Fixes #<n>\` in the PR body do the linking"
-says  skills/work-on/worker.md "the record comment of step 10 names the branch"
-says  skills/github-issues/SKILL.md "the record comment names the branch"
+says  skills/work-on/worker.md "let \`Fixes #<n>\` link it, or, in the batch way, the record comment of step 10 names the branch"
+says  skills/github-issues/SKILL.md "let \`Fixes #<n>\` in the PR body do the linking, or, in the batch way, the record comment names the branch"
 # arch-4: the README tells the landing story.
-never README.md "the push check passes and the pull request is open"
-never README.md "Then one pull request goes up"
-never README.md "the foreman queues it to be merged"
+# INFRA-276: the README tells both stories, the pull request way first.
+says  README.md "the push check passes and the pull request is open. In a repository that chose the optional batch run, it instead lands its commits on the \`landing\` branch"
+says  README.md "Then one pull request goes up"
+says  README.md "the foreman queues it to be merged"
 never README.md "fixes in the same pull request"
-never README.md "One issue is one pull request"
-says  README.md "lands its commits on the \`landing\` branch"
+says  README.md "One issue is one pull request, or one landing with the batch run"
+says  README.md "which says \`batch\` only once setup's two batch files are committed on \`landing\`"
 says  README.md "a green batch moves main"
 # F2: the README and the gate catalog name the new refusal.
 says  README.md "a command line that changes the commit before it pushes"
 says  references/gate-catalog.md "refuses a command line that changes the commit before it pushes"
 # Re-verify round 1, judge-1: the /work-on description and its tool rule tell the landing story.
-never skills/work-on/SKILL.md "from worktree to one PR"
-never skills/work-on/SKILL.md "the merge queue stays on"
-says  skills/work-on/SKILL.md "from worktree to commits landed on the \`landing\` branch, with no pull request"
-says  skills/work-on/SKILL.md "what an issue unblocks stays on \`gh\`"
+says  skills/work-on/SKILL.md "from worktree to one PR, or, in a repo that opted in to the batch run, to commits landed on the \`landing\` branch with no pull request"
+says  skills/work-on/SKILL.md "the merge queue and what an issue unblocks stay on \`gh\`"
 # Re-verify round 2, judge2-F1: a worker's session lasts until its landing is
 # accepted; the issue closes later, when a green batch moves main.
 never skills/work-on/SKILL.md "a background session in the terminal) until a green batch moves main"
-says  skills/work-on/SKILL.md "each issue runs in a fresh session of its own (a desktop session in the Claude desktop app, a background session in the terminal) until its landing is accepted, and the issue closes once a green batch moves main"
+says  skills/work-on/SKILL.md "each issue runs in a fresh session of its own (a desktop session in the Claude desktop app, a background session in the terminal) through to merge, or in the batch way until its landing is accepted, and the issue closes once a green batch moves main"
 # INFRA-263: the foreman queues nothing, and hands a dropped commit back to its worker.
 # Scenario 1: no step of the foreman's queues a pull request, merges one or opens one.
 FM=skills/work-on/foreman.md
+# INFRA-276: this holds for the batch way's part; the pull request way queues as 0.3.1 did.
 for phrase in "gh pr merge" "gh pr create" "merge queue to" "queue the PR" "queue your PR" "ready to queue" "--auto" "open a pull request"; do
+  part_never "foreman.md, the batch way," "$FB" "$phrase"
+done
+for phrase in "gh pr merge" "gh pr create" "--auto" "open a pull request"; do
   never "$FM" "$phrase"
 done
 says  "$FM" "You queue nothing and open nothing on GitHub: no pull request, no merge queue, no merge."
-never skills/work-on/worker.md "ready to queue your PR"
+WB="$(part skills/work-on/worker.md "In the batch way: Dispatched:" "## On Linear")"
+part_never "worker.md, the batch way," "$WB" "ready to queue your PR"
 # Scenario 3: an issue counts as merged when the run that carried it to main is read.
 says  "$FM" "batch-issues.py merged <run id>"
 says  "$FM" "it lists the issues the batch carried to main: each counts as merged"

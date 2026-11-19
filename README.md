@@ -102,9 +102,10 @@ the code exists, and the architecture reviewer checks the code against the
 design. Where a mockup page has become a template in the app, the
 worker starts that screen from the template and keeps its words and layout.
 A worker is done when every scenario has a test that passes, the screens the
-issue touches work, the push check passes, and it lands its commits on the
-`landing` branch and posts the change's record on the issue. No pull request
-is opened. Then it stops.
+issue touches work, the push check passes and the pull request is open. In a
+repository that chose the optional batch run, it instead lands its commits on
+the `landing` branch and posts the change's record on the issue, and no pull
+request is opened. Then it stops.
 
 ![Three workers, each with its own session and its own copy of the repository](docs/images/day-5-workers.svg)
 
@@ -171,11 +172,13 @@ anything. The worker fixes the list, test first again, and only the claims
 the fix broke go back to a verifier, and only the architecture findings it
 fixed to the architecture reviewer, at most twice. The tests run on the final commit and leave a
 receipt that names it, and nothing can be pushed until the receipt matches.
-Then the worker rebases onto the `landing` branch, runs the push check on
-that commit, and pushes it there, with no pull request. A comment on the
-issue holds the change's record: what wasn't proved, the extras it fixed with
-their scores, and the number of agent dispatches it took, and the issue moves
-to In Review.
+Then one pull request goes up, with `Fixes #41`, the list of what wasn't
+proved, the number of agent dispatches it took, and the issue moves to In
+Review. With the batch run, the worker instead rebases onto the `landing`
+branch, runs the push check on that commit, and pushes it there, with no pull
+request. A comment on the issue holds the change's record: what wasn't
+proved, the extras it fixed with their scores, and the number of agent
+dispatches it took, and the issue moves to In Review.
 
 Meanwhile you're having coffee. A worker's question lands at the foreman,
 which re-reads the issue's comments and Korium for an answer you already
@@ -189,24 +192,31 @@ happened, and the run goes on without it.
 
 ![You have coffee; questions reach you only when nothing settles them](docs/images/day-6-coffee.svg)
 
-When a worker's commits land, every extra its worker's rule says to fix is
-already fixed in them, and nothing else reaches you unless a security finding
+When a pull request is ready, or with the batch run a worker's commits land,
+every extra its worker's rule says to fix is already fixed in it, and nothing else reaches you unless a security finding
 could not be settled or the decision record and a mockup disagree; that
 comes one item at a time, and you answer it. While the architecture
 reviewer is on trial, every one of its findings reaches you too, kept or
 thrown out, with its lens, smell, class, scores and the judge's placement,
 and the worker fixes only the ones you send back. The trial is on from the
 first run until you set `"ARCHITECTURE_TRIAL": "off"` in the env block of
-`.claude/settings.json`. No issue is ever filed from a review. When its review
+`.claude/settings.json`. No issue is ever filed from a review. When its checks pass, its review
 is clean, every line is answered and the worker has cleaned up after itself,
-the foreman accepts the landing and starts the next issue in that worker in
-the desktop app or in a fresh session in the terminal. Main moves forward only
-from `landing`: once a batch of landed commits is in, one run of the repo's
-Gate tests it, and when a green batch moves main, the foreman closes each issue
-it carried, and any big issue whose pieces are now all done, and starts the
-issues that waited on them. By the end of the day every issue is on main,
+the foreman queues it to be merged. It closes the issue, and any big issue
+whose pieces are now all done, then starts the next issue, one that waited on
+this one first, in that worker in the desktop app or in a
+fresh session in the terminal. By the end of the day every issue is merged,
 parked or skipped, and you get one line per issue saying which, with how
-many reached main.
+many merged.
+
+With the batch run, the foreman instead accepts the landing and starts the
+next issue in that worker. Main moves forward only from `landing`: once a
+batch of landed commits is in, one run of the repo's Gate tests it, and when
+a green batch moves main, the foreman closes each issue it carried, and any
+big issue whose pieces are now all done, and starts the issues that waited on
+them. Every session reads which way the repository ships from one fact,
+`project_fact.py --ships`, which says `batch` only once setup's two batch
+files are committed on `landing`.
 
 ![A run: issues checked, a foreman plan, workers in parallel, merges](docs/images/workflow.svg)
 
@@ -414,7 +424,7 @@ when known), **Scenarios** (at least one line of "Given, When, Then", each
 naming the decision, README rule or your own words it rests on), **Out of
 scope** (what this issue leaves to another), and **Questions** (what the
 sources don't settle, each marked `[NEEDS CLARIFICATION]`). One issue is one
-landing, built and proved by one worker in one session. The
+pull request, or one landing with the batch run, built and proved by one worker in one session. The
 `analyze-issues` skill checks each issue against this shape and its sources,
 fixes only the part that fails, and splits the ones that are too big, so you
 don't have to write them this way yourself.

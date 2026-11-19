@@ -13,8 +13,8 @@ work in Linear.
 
 On `linear`, every issue, project and status lives in Linear, on the team whose
 key `/masthead:setup` wrote as `LINEAR_TEAM_KEY` (the letters before the number
-in an issue like `KOR-12`). The code, CI and the decision records stay on
-GitHub; only issues and projects live in Linear.
+in an issue like `KOR-12`). Pull requests, CI, the merge queue and the
+decision records stay on GitHub; only issues and projects live in Linear.
 
 ## Structure
 
@@ -82,17 +82,18 @@ and is not dispatched. When the question is answered, put the answer on the
 issue as a comment in the person's words and move it back to Todo.
 
 Done is the same for every issue and is not restated in one: every scenario
-has a passing test, and the repository's pre-push check passes on the commit it lands.
+has a passing test, and the repository's pre-push check passes on the PR's
+head, or in the batch way on the commit it lands.
 
-**Size.** One issue is one landing, built and proved by one worker in one fresh
+**Size.** One issue is one PR, or one landing in the batch way, built and proved by one worker in one fresh
 session, sliced and merged as the `github-issues` skill's Size rule says.
 
 ## Which Linear call makes each action
 
 Every call goes through the Linear connector (its tools show as
 `mcp__<server>__get_issue` and the like). An issue is named by its key, such
-as `KOR-12`. Commits and pushes still go through git, as the `github-issues`
-skill says.
+as `KOR-12`. Commits and pushes still go through git, and pull requests and
+the merge queue through GitHub, as the `github-issues` skill says.
 
 | Action | GitHub form | Linear call |
 |---|---|---|
@@ -128,14 +129,19 @@ skill says.
   session in the repository the issue belongs to.
 - **The branch** is the one Linear names: `get_issue` returns it as
   `gitBranchName`. Make it with git (`git switch -c <name>`, then
-  `git push -u origin <name>`); Linear links a branch that carries the
-  key.
-- **One checkout per issue**, deleted once its commits reach main, and **one
-  issue per session**.
-- **Status.** `/work-on` sets In Progress. Once the worker's commits are on
-  the landing branch, it posts the change's record as a comment and sets In
-  Review, as step 10 of **Opening a PR** says: a commit message moves nothing
-  in Linear. Done waits until a green batch moves main.
+  `git push -u origin <name>`); Linear links a branch, and a PR, that carry
+  the key.
+- **One checkout per issue**, deleted when the pull request merges, or in the
+  batch way once its commits reach main, and **one issue per session**.
+- **Status.** `/work-on` sets In Progress. In the pull request way, it sets
+  In Review once the PR is open: Linear does not move it there on its own.
+  `Fixes <key>` in the PR body moves the issue to Done when the PR merges.
+  When it did not, set Done yourself and say so. In the batch way, once the
+  worker's commits are on the landing branch, it posts the change's record as
+  a comment and sets In Review, as step 10 of **Opening a PR** says: a commit
+  message moves nothing in Linear. Done waits until a green batch moves main.
+  `project_fact.py --ships` says which way a repository ships (**Opening a
+  PR**).
 - **`refs <key>`** when a change touches an issue without finishing it.
 - **"Close it" means Done** when the issue's work shipped. Canceled is only
   for work that will not be done, and only when the user says so in those
