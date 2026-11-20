@@ -90,7 +90,8 @@ way, or it split its issue.
   one, as **Start a worker** says.
 - **Project:** a thread is never given a second issue. Start the next issue
   in a new thread, as **Start a worker** says. The free thread stays open
-  until **End a worker**.
+  until its issue reaches main (**A worker's issue reached main**), or until
+  **End a worker**.
 
 ## Reach the foreman
 
