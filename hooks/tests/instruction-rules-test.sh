@@ -1410,6 +1410,9 @@ says  references/session-cliffs.md 'When a fix addressed an architecture finding
 says  references/session-cliffs.md 'a round is every verifier and architecture reviewer sent between two runs of the adjudicator, however many'
 never references/session-cliffs.md 'or both under one round number'
 never references/dispatch-brief.md 'or both sent under one round number'
+# MAST-45 round 0, s4-judge-2: the round ends when the adjudicator is sent, not when it has judged.
+says  references/dispatch-brief.md 'unless it joins the round opened since the adjudicator was last sent'
+never references/dispatch-brief.md 'the one the adjudicator has not yet judged'
 says  agents/architecture-reviewer.md 'Re-check only those findings'
 says  agents/architecture-reviewer.md 'Run no lens and report nothing else'
 says  references/dispatch-brief.md 'Re-verify: round 1, findings arch-2 and arch-5'
