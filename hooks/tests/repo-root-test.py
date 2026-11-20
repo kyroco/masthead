@@ -217,8 +217,9 @@ def main():
         expect("two repos: its line says the repository is unclear and names the workspace",
                "unclear" in err and projects in err and len(err.splitlines()) == 1, True)
         expect("two repos: a skill from inside A reads A", cli(shell, ["--tracker"], a)[1], "linear")
-        expect("two repos: the session starts with the one line saying the repository is unclear",
-               "unclear" in prime(dict(env, CLAUDE_PLUGIN_OPTION_KORIUM="off"), "session-start", projects), True)
+        said = prime(dict(env, CLAUDE_PLUGIN_OPTION_KORIUM="off"), "session-start", projects)
+        expect("two repos: the session starts with the one line saying the repository is unclear, once",
+               [line for line in said.splitlines() if "unclear" in line] != [] and said.count("unclear") == 1, True)
         # With the shell in the workspace, a hook that is given a file finds its repository by the file (step 1).
         with open(os.path.join(a, ".claude", "settings.json"), "w") as handle:
             json.dump({"env": {"PROJECT_STATE_DIR": ".kyroco", "ADR_DIR": "docs/adr"}}, handle)
@@ -242,6 +243,23 @@ def main():
                hook(env, "adr-sections-gate.py",
                     write(os.path.join(a, "docs", "adr", "0001-x.md"), projects, content="# T\n\nNothing.\n"),
                     projects), "deny")
+    finally:
+        shutil.rmtree(tmp)
+
+    # One repository and a worktree of it, side by side in the workspace: still one repository (step 3).
+    tmp = fresh()
+    try:
+        home = os.path.join(tmp, "home")
+        repo = os.path.join(home, "masthead")
+        os.makedirs(repo)
+        make_repo(repo)
+        git("worktree", "add", "-q", "-b", "side", os.path.join(home, "masthead-side"), cwd=repo)
+        env = env_for(tmp, home)
+        expect("repo and sibling worktree, step 3: the shell in the workspace is the repository",
+               root_of(env, None, home), repo)
+        shell = {k: v for k, v in env.items() if k != "CLAUDE_PROJECT_DIR"}
+        expect("repo and sibling worktree: a skill from the workspace reads its tracker",
+               cli(shell, ["--tracker"], home)[1], "linear")
     finally:
         shutil.rmtree(tmp)
 
@@ -291,6 +309,22 @@ def main():
         expect("terminal: and gives no fact", cli(env, ["--root", nested, "PROJECT_PUSH_CHECK"], repo)[1], "")
         shell = {k: v for k, v in env.items() if k != "CLAUDE_PROJECT_DIR"}
         expect("terminal: a skill from inside it", cli(shell, ["--tracker"], repo)[1], "linear")
+        # A hook that names no root reads the repository from its own folder, a subfolder included.
+        os.makedirs(os.path.join(repo, "lib"))
+        expect("terminal: a hook in a subfolder reads the fact with no root",
+               cli(env, ["PROJECT_PUSH_CHECK"], os.path.join(repo, "lib"))[1], "scripts/check.sh")
+        # Its worktrees, inside or beside it, are trusted; a clone beside it is not.
+        inner = os.path.join(repo, ".claude", "worktrees", "w")
+        git("worktree", "add", "-q", "-b", "w", inner, cwd=repo)
+        expect("terminal: a worktree inside it is trusted", cli(env, ["--trusted", inner], repo)[0], 0)
+        expect("terminal: and reads the main checkout's fact", cli(env, ["--root", inner, "PROJECT_PUSH_CHECK"], repo)[1],
+               "scripts/check.sh")
+        sibling = os.path.join(tmp, "sibling")
+        os.makedirs(sibling)
+        make_repo(sibling, {"PROJECT_PUSH_CHECK": "evil.sh"})
+        expect("terminal: a clone beside it is not trusted", cli(env, ["--trusted", sibling], repo)[0], 1)
+        expect("terminal: a session started in a subfolder trusts the repository",
+               cli(dict(env, CLAUDE_PROJECT_DIR=os.path.join(repo, "lib")), ["--trusted", repo], repo)[0], 0)
     finally:
         shutil.rmtree(tmp)
 
