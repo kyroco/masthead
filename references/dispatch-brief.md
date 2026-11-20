@@ -323,8 +323,9 @@ that is exactly `Claims:` at column zero, then a `- ` bullet of at least four
 words; a variant is refused with the form. And a verifier's or an architecture
 reviewer's brief with a line that begins `Re-verify: round N` is refused
 when the change has had its rounds, as step 5 of **Opening a PR** says,
-unless it joins the round still open, the one the adjudicator has not yet
-judged; a re-verify line
+unless it joins the round opened since the adjudicator was last sent (the
+adjudicator's dispatch ends a round, even while it is still running); a
+re-verify line
 in any other spelling is refused outright.
 `MASTHEAD_BRIEF_GATE=off` in the operator's environment turns it off.
 
