@@ -279,11 +279,15 @@ CASES = [
     # Outside a branch nothing names the change, so only this session's rows count.
     # On a branch every session's rows count (MAST-38, REPO_CASES below).
     ("outside a branch, another session's re-verifies do not count", "verifier", re_verify(1),
-     [("other-se", "re-verify round 1"), ("other-se", "re-verify round 2")], "allow"),
-    ("first verifications do not count", "verifier", re_verify(1),
-     [(SESSION8, "dispatched"), (SESSION8, "dispatched"), (SESSION8, "dispatched")], "allow"),
-    ("a refused dispatch does not count", "verifier", re_verify(1),
-     [(SESSION8, "refused"), (SESSION8, "refused")], "allow"),
+     [("other-se", "re-verify round 1"), ("other-se", "dispatched", "adjudicator"),
+      ("other-se", "re-verify round 2"), ("other-se", "dispatched", "adjudicator")], "allow"),
+    # Each log below ends its rounds with JUDGE, so a row that must not count
+    # would be a round of its own if it did, and the case would read deny (MAST-45).
+    ("first verifications do not count", "verifier", re_verify(2),
+     [(SESSION8, "dispatched"), (SESSION8, "dispatched"), (SESSION8, "dispatched"), JUDGE,
+      (SESSION8, "re-verify round 1"), JUDGE], "allow"),
+    ("a refused dispatch does not count", "verifier", re_verify(2),
+     [(SESSION8, "re-verify round 1"), JUDGE, (SESSION8, "refused"), JUDGE], "allow"),
     # The security reviewer never spends a round and is never capped: it is
     # sent only beside a verifier, after that verifier's row is written.
     ("a security reviewer in round 2, after the round-2 verifier", "security-reviewer", re_verify(2),
@@ -295,7 +299,7 @@ CASES = [
     # A round is one verifier, plus the security reviewer when a security
     # finding was fixed. Only the verifier's rows spend a round (bugs-1, edge-4).
     ("a security reviewer in round 1 does not spend round 2", "verifier", re_verify(2),
-     [(SESSION8, "re-verify round 1", "verifier"), (SESSION8, "re-verify round 1", "security-reviewer")], "allow"),
+     [(SESSION8, "re-verify round 1", "verifier"), JUDGE, (SESSION8, "re-verify round 1", "security-reviewer"), JUDGE], "allow"),
     ("an adjudicator brief with a Re-verify line does not count", "verifier", re_verify(2),
      [(SESSION8, "re-verify round 1", "adjudicator"), (SESSION8, "re-verify round 1", "verifier")], "allow"),
     ("the verifier's rows count under the name Claude Code sends", "verifier", re_verify(3),
@@ -303,7 +307,8 @@ CASES = [
       (SESSION8, "re-verify round 2", "masthead:verifier"), (SESSION8, "dispatched", "masthead:adjudicator")], "deny"),
     # A reused session's next issue is on another branch and starts at zero (words-4).
     ("another branch's rounds do not count", "verifier", re_verify(1),
-     [(SESSION8, "re-verify round 1", "verifier", "robert/9-last-issue"), (SESSION8, "re-verify round 2", "verifier", "robert/9-last-issue")], "allow"),
+     [(SESSION8, "re-verify round 1", "verifier", "robert/9-last-issue"), (SESSION8, "dispatched", "adjudicator", "robert/9-last-issue"),
+      (SESSION8, "re-verify round 2", "verifier", "robert/9-last-issue"), (SESSION8, "dispatched", "adjudicator", "robert/9-last-issue")], "allow"),
     ("this branch's rounds count", "verifier", re_verify(3),
      [(SESSION8, "re-verify round 1", "verifier", "-"), JUDGE, (SESSION8, "re-verify round 2", "verifier", "-"), JUDGE], "deny"),
     # The Re-verify line is read under the same markdown prefixes as the Claims line (bugs-3).
@@ -352,12 +357,14 @@ CASES = [
      [(SESSION8, "re-verify round 1", "masthead:architecture-reviewer"), JUDGE,
       (SESSION8, "re-verify round 2", "masthead:architecture-reviewer"), JUDGE], "deny"),
     ("another plugin's architecture reviewer rows do not count", "verifier", re_verify(1),
-     [(SESSION8, "re-verify round 1", "otherplugin:architecture-reviewer"), (SESSION8, "re-verify round 2", "otherplugin:architecture-reviewer")], "allow"),
+     [(SESSION8, "re-verify round 1", "otherplugin:architecture-reviewer"), JUDGE,
+      (SESSION8, "re-verify round 2", "otherplugin:architecture-reviewer"), JUDGE], "allow"),
     ("the first architecture review does not count", "verifier", re_verify(2),
-     [(SESSION8, "dispatched", "architecture-reviewer"), (SESSION8, "re-verify round 1", "verifier")], "allow"),
+     [(SESSION8, "dispatched", "architecture-reviewer"), JUDGE, (SESSION8, "re-verify round 1", "verifier"), JUDGE], "allow"),
     # Another plugin's verifier is not masthead's; its rows do not count.
     ("another plugin's verifier rows do not count", "verifier", re_verify(1),
-     [(SESSION8, "re-verify round 1", "otherplugin:verifier"), (SESSION8, "re-verify round 2", "otherplugin:verifier")], "allow"),
+     [(SESSION8, "re-verify round 1", "otherplugin:verifier"), JUDGE,
+      (SESSION8, "re-verify round 2", "otherplugin:verifier"), JUDGE], "allow"),
 ]
 
 
@@ -445,6 +452,12 @@ REPO_CASES = [
      repo_rows((OTHER8, "dispatched", "masthead:verifier"), REPO_JUDGE,
                (OTHER8, "re-verify round 1", "masthead:verifier"), (OTHER8, "re-verify round 1", "masthead:verifier")),
      "top", "allow"),
+    # On a branch, another branch's rounds are another change's and do not count.
+    ("on a branch, another branch's judged rounds do not count", re_verify(1),
+     [(OTHER8, "re-verify round 1", "masthead:verifier", "robert/9-last-issue"),
+      (OTHER8, "dispatched", "masthead:adjudicator", "robert/9-last-issue"),
+      (OTHER8, "re-verify round 2", "masthead:verifier", "robert/9-last-issue"),
+      (OTHER8, "dispatched", "masthead:adjudicator", "robert/9-last-issue")], "top", "allow"),
     # A cap a person raised in the environment that starts Claude Code.
     ("a third round under MASTHEAD_REVERIFY_CAP=3", re_verify(3), TWO_ROUNDS,
      {"MASTHEAD_REVERIFY_CAP": "3"}, "allow"),
@@ -471,8 +484,8 @@ REPO_CASES = [
     ("a refused extra round spent nothing", re_verify_extra("E1"),
      repo_rows((OTHER8, "refused", "masthead:verifier")), "top", "allow"),
     ("an extra's round spends no scenario round", re_verify(2),
-     repo_rows((OTHER8, "re-verify round 1", "masthead:verifier"),
-               (OTHER8, "re-verify extra e1", "masthead:verifier")), "top", "allow"),
+     repo_rows((OTHER8, "re-verify round 1", "masthead:verifier"), REPO_JUDGE,
+               (OTHER8, "re-verify extra e1", "masthead:verifier"), REPO_JUDGE), "top", "allow"),
     # Round 1 fixes: a name read with a trailing period is the same extra (F2),
     # and a branch gets no more extra rounds than the cap, so a made-up name
     # cannot buy rounds past it (F1).
@@ -666,7 +679,8 @@ ARCHITECTURE_ROUND_CASES = [
     ("masthead's architecture reviewer is capped too", "masthead:architecture-reviewer", arch_re_verify(3),
      [(SESSION8, "re-verify round 1", "verifier"), JUDGE, (SESSION8, "re-verify round 2", "verifier"), JUDGE], "deny"),
     ("another branch's rounds do not count", "architecture-reviewer", arch_re_verify(1),
-     [(SESSION8, "re-verify round 1", "verifier", "robert/9-last-issue"), (SESSION8, "re-verify round 2", "verifier", "robert/9-last-issue")], "allow"),
+     [(SESSION8, "re-verify round 1", "verifier", "robert/9-last-issue"), (SESSION8, "dispatched", "adjudicator", "robert/9-last-issue"),
+      (SESSION8, "re-verify round 2", "verifier", "robert/9-last-issue"), (SESSION8, "dispatched", "adjudicator", "robert/9-last-issue")], "allow"),
     ("HELD an architecture re-verify line as a list item is not the form", "architecture-reviewer",
      arch_re_verify(1, marker="- "), [], "deny"),
     ("HELD a bold architecture Re-verify label is not the form", "architecture-reviewer",
