@@ -343,6 +343,10 @@ def main():
         expect("s2 shell: --state-path from inside a stranger clone is not its folder",
                flag("--state-path", stranger), os.path.join(stranger, ".claude/state"))
         expect("s1 shell: --tracker from inside the attached repository", flag("--tracker", repo), "linear")
+        expect("s1 shell: --tracker from the clones folder, one repository attached", flag("--tracker", home),
+               "linear")
+        expect("s1 shell: --state-path from the clones folder, one repository attached",
+               flag("--state-path", home), os.path.join(repo, ".claude/state"))
         terminal = {k: v for k, v in shell.items() if k != "CLAUDE_CODE_REMOTE"}
         expect("s3 shell: in a terminal, the shell's checkout is the session's, as before",
                subprocess.run([sys.executable, FACT, "--state-path"], env=terminal, capture_output=True, text=True,
