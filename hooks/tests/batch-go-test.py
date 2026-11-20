@@ -489,6 +489,10 @@ with tempfile.TemporaryDirectory() as top:
     call = runs[0] if runs else ["workflow", "run", "", "--ref", "hotfix"]
     inputs = repo.inputs(call)
     check("286-S2 the hotfix's go starts exactly one run", code == 0 and len(runs) == 1, out)
+    # INFRA-287 on the hotfix pile: the go reads the earlier runs of the hotfix branch, not of landing.
+    listed = [c for c in repo.calls() if c[:2] == ["run", "list"]]
+    check("INFRA-287 a hotfix's go reads the earlier batch runs on hotfix",
+          listed and listed[-1][listed[-1].index("--branch") + 1] == "hotfix", listed)
     check("286-S2 the run is the starter on hotfix, not on landing",
           call[2:5] == ["masthead-batch.yml", "--ref", "hotfix"], call)
     check("286-S2 the run tests the hotfix's last commit and says it is a hotfix",
