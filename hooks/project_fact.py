@@ -96,9 +96,9 @@ def project_root():
     the repository holding the path the hook judges (focus()), else the attached repository the working
     folder is in, else the only one attached; with several and none of these, it stays the session's folder,
     so no repository is guessed (MAST-48)."""
-    session = os.environ.get("CLAUDE_PROJECT_DIR")
-    if not session:
-        return os.getcwd()
+    # A skill through the Bash tool has no CLAUDE_PROJECT_DIR: its shell's folder stands in, and in a cloud
+    # session that may be the clones folder, which is handled below like a hook's (MAST-48).
+    session = os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()
     if os.environ.get("CLAUDE_CODE_REMOTE") != "true" or \
             os.path.exists(os.path.join(checkout_top(session), ".git")):
         return session
