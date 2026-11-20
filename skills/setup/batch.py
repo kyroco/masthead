@@ -421,7 +421,10 @@ def main(argv):
     except project_fact.RepoUnclear as unclear:
         print(unclear, file=sys.stderr)
         return 2
-    os.environ["CLAUDE_PROJECT_DIR"] = top
+    # A folder named with --root is the one the person asked to set up, so it is the session's. With none,
+    # trust stays the workspace's (project_fact.trusted), so a clone the shell is in is not read.
+    if root:
+        os.environ["CLAUDE_PROJECT_DIR"] = top
     if app_id is not None and not re.fullmatch(r"[1-9][0-9]{0,11}", app_id):
         print("The App id is the number GitHub shows as App ID on the App's page, such as 5832645; '{}' is not one.".format(
             app_id), file=sys.stderr)

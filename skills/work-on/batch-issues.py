@@ -146,6 +146,8 @@ def main(argv):
     except project_fact.RepoUnclear as unclear:
         say(str(unclear))
         return 2
+    # git and gh act on the folder they run in, so run them in the repository.
+    os.chdir(root)
     try:
         if argv[:1] == ["merged"] and len(argv) in (2, 4) and argv[1].isdigit():
             since = None

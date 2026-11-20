@@ -684,8 +684,10 @@ def main(argv):
     except project_fact.RepoUnclear as unclear:
         print(unclear, file=sys.stderr)
         return 2
-    # Setup runs this on the repository it was asked to set up, so that one is the session's.
-    os.environ["CLAUDE_PROJECT_DIR"] = top
+    # A folder named with --root is the one the person asked to set up, so it is the session's. With none,
+    # trust stays the workspace's (project_fact.trusted), so a clone the shell is in is not read.
+    if root:
+        os.environ["CLAUDE_PROJECT_DIR"] = top
     if argv == ["look"]:
         print(json.dumps(look(top), indent=2))
         return 0

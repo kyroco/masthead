@@ -535,6 +535,8 @@ def main(argv):
     except project_fact.RepoUnclear as unclear:
         say(str(unclear))
         return 2
+    # git and gh act on the folder they run in, so run them in the repository.
+    os.chdir(root)
     try:
         return search(run_id, root)
     except Stop as stop:
