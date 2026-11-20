@@ -1943,5 +1943,7 @@ says  skills/work-on/foreman.md "A repo that names no \`PROJECT_WARM_BUILD\` run
 # MAST-49 round 0, F2 and F3: the batch way tells a carried issue's worker, and a red run is searched.
 part_says "foreman.md, the batch way," "$(part skills/work-on/foreman.md "### The batch way" "## End the run")" "and start those first. Tell each one's worker as **A worker's issue reached main** in \`hosts.md\` says."
 says  skills/work-on/foreman.md "When a batch goes red, run the search for the commit that broke it, with the red run's id: python3 \${CLAUDE_PLUGIN_ROOT}/skills/work-on/bad-commit.py <run id>"
+# MAST-49 round 0, F1: every way to be the foreman, several issues included, goes through Start the foreman.
+says  skills/work-on/SKILL.md "Every way to be the foreman below, several issues included, starts with **Start the foreman**"
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
