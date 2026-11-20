@@ -530,8 +530,11 @@ def main(argv):
         say("Usage: bad-commit.py <id of the red batch run on landing>")
         return 2
     run_id = argv[0]
-    root = project_fact.checkout_top(os.getcwd())
-    os.environ.setdefault("CLAUDE_PROJECT_DIR", root)
+    try:
+        root = project_fact.repo_root(None, os.getcwd())
+    except project_fact.RepoUnclear as unclear:
+        say(str(unclear))
+        return 2
     try:
         return search(run_id, root)
     except Stop as stop:

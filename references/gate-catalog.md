@@ -25,6 +25,9 @@ file the call names; else the checkout that holds the shell's folder; else the
 workspace's one repository, when it holds exactly one. The workspace is the
 folder the session started in: a repository (a terminal started in one), or a
 folder that holds repositories (a Project thread's `/home/user`, a `~/projects`).
+Hooks have it as `CLAUDE_PROJECT_DIR`; session start hands it to every shell
+command of the session as `MASTHEAD_WORKSPACE` through `CLAUDE_ENV_FILE`, since
+Claude Code sets `CLAUDE_PROJECT_DIR` for hooks only.
 When it holds none or several and the shell is in none, the repository is
 unclear: the session is told so in one line at its start, each skill stops with
 that line, a per-call hook goes on with no repository's facts, and the push gate
@@ -108,7 +111,7 @@ install too; the brief check's own off switch is `MASTHEAD_BRIEF_GATE`.
 | `hooks/review-write-fence.py` | Refuses a write from `verifier`, `security-reviewer` or `architecture-reviewer` to anything but its own findings file in `<checkout>/<state>/review/` or a scratch file under `<state>/review/scratch/` | Not covered: a shell write. Proven by `tests/review-write-fence-test.sh` |
 | `hooks/bash-scope-diagnoser.sh` | Allowlists the `diagnoser` and `reader` shells to test runners and read-only inspection, and the write and run flags it names (sort's `-o` and `--compress-program`, git's `-O`, `--output`, `--exec`, `--ext-diff`, `--upload-pack`, `--no-index` and `--open-files-in-pager`, `rg --pre`, `file -C`, `tree -o`, `date -s`) are refused in every spelling: bundled, with its value joined, shortened, or after a `--`. It holds the `architecture-reviewer` shell to exact command shapes, each the whole command: `git diff`, `git show` or `git log` with plain revisions and paths (no flag but a lone `--`, no path out of the checkout), this plugin's `project_fact.py` with `--tracker` or `--architecture-doc`, and `gh issue view <n>`, bare or with `--comments`; it refuses every other command | Scoped by `agent_type`. Proven by `tests/bash-scope-diagnoser-test.sh` |
 | `verdict-gate.sh` | Refuses a Stop when a changed case file has no `file:line` in its verdict or fewer than two numbered observations | Project-wide on Stop |
-| `hooks/prime-context.py` | At SessionStart, prints one line when the repository is unclear and one when `ADR_DIR` names a folder outside the repository, then, with the Korium memory option on, prints the Korium memory protocol; on each user prompt, injects the procedure from `session-cliffs.md` whose bold lead matches the prompt (a commit, a push, a PR, a test result) | Injects, never refuses, and fails open; a subagent's report, another session's message or a task notice gets no procedure |
+| `hooks/prime-context.py` | At SessionStart, writes the workspace to `CLAUDE_ENV_FILE` as `MASTHEAD_WORKSPACE`, prints one line when the repository is unclear and one when `ADR_DIR` names a folder outside the repository, then, with the Korium memory option on, prints the Korium memory protocol; on each user prompt, injects the procedure from `session-cliffs.md` whose bold lead matches the prompt (a commit, a push, a PR, a test result) | Injects, never refuses, and fails open; a subagent's report, another session's message or a task notice gets no procedure |
 
 
 

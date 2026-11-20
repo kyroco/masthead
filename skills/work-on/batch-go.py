@@ -485,9 +485,11 @@ def go(argv):
     if hotfix and milestone:
         raise Stop("A hotfix has its own pile and is not part of a milestone; name only its issues with --hotfix.")
 
-    top = git("rev-parse", "--show-toplevel").stdout.strip()
+    try:
+        top = project_fact.repo_root(None, os.getcwd())
+    except project_fact.RepoUnclear as unclear:
+        raise Stop(str(unclear))
     os.chdir(top)
-    os.environ.setdefault("CLAUDE_PROJECT_DIR", top)
     if want_base:
         ref, what = base(branch)
         print(ref)

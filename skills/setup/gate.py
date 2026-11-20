@@ -670,7 +670,7 @@ def store_documents(top, patterns):
 
 
 def main(argv):
-    root = os.getcwd()
+    root = None
     if "--root" in argv:
         i = argv.index("--root")
         if i + 1 >= len(argv):
@@ -678,7 +678,12 @@ def main(argv):
             return 2
         root = argv[i + 1]
         argv = argv[:i] + argv[i + 2:]
-    top = project_fact.checkout_top(root)
+    # The repository setup was asked to set up (--root), else the one the shell is about (repo_root).
+    try:
+        top = project_fact.checkout_top(root) if root else project_fact.repo_root(None, os.getcwd())
+    except project_fact.RepoUnclear as unclear:
+        print(unclear, file=sys.stderr)
+        return 2
     # Setup runs this on the repository it was asked to set up, so that one is the session's.
     os.environ["CLAUDE_PROJECT_DIR"] = top
     if argv == ["look"]:

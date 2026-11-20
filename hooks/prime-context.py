@@ -3,6 +3,7 @@
 import json
 import os
 import re
+import shlex
 import sys
 
 # One entry per cliff that carries a command: the exact bold lead in the procedure source, and the narrow trigger that matches a prompt.
@@ -143,7 +144,18 @@ def held_worktree_notice(cwd):
     )
 
 
+def hand_workspace():
+    """Write the workspace to CLAUDE_ENV_FILE, so every later shell command of the session, where Claude Code
+    sets no CLAUDE_PROJECT_DIR, knows it as MASTHEAD_WORKSPACE (project_fact.workspace)."""
+    target, space = os.environ.get("CLAUDE_ENV_FILE"), os.environ.get("CLAUDE_PROJECT_DIR")
+    if not target or not space:
+        return
+    with open(target, "a") as handle:
+        handle.write("export MASTHEAD_WORKSPACE={}\n".format(shlex.quote(os.path.realpath(space))))
+
+
 def session_start(data):
+    hand_workspace()
     # When the repository is unclear, say so once, here; each skill then stops with the same line.
     unclear = repo_unclear(data.get("cwd"))
     if unclear:

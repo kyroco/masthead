@@ -415,7 +415,12 @@ def main(argv):
     argv, root = option(argv, "--root")
     argv, given = option(argv, "--repo")
     argv, app_id = option(argv, "--app-id")
-    top = project_fact.checkout_top(root or os.getcwd())
+    # The repository setup was asked to set up (--root), else the one the shell is about (repo_root).
+    try:
+        top = project_fact.checkout_top(root) if root else project_fact.repo_root(None, os.getcwd())
+    except project_fact.RepoUnclear as unclear:
+        print(unclear, file=sys.stderr)
+        return 2
     os.environ["CLAUDE_PROJECT_DIR"] = top
     if app_id is not None and not re.fullmatch(r"[1-9][0-9]{0,11}", app_id):
         print("The App id is the number GitHub shows as App ID on the App's page, such as 5832645; '{}' is not one.".format(

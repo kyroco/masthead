@@ -141,8 +141,11 @@ def merged(run_id, since, root):
 
 
 def main(argv):
-    root = project_fact.checkout_top(os.getcwd())
-    os.environ.setdefault("CLAUDE_PROJECT_DIR", root)
+    try:
+        root = project_fact.repo_root(None, os.getcwd())
+    except project_fact.RepoUnclear as unclear:
+        say(str(unclear))
+        return 2
     try:
         if argv[:1] == ["merged"] and len(argv) in (2, 4) and argv[1].isdigit():
             since = None

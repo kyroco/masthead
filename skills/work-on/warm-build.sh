@@ -32,15 +32,15 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 fact_py="$here/../../hooks/project_fact.py"
 mode="${1:-}"
 
-top="$(git rev-parse --show-toplevel 2>/dev/null)" || { echo "not in a git checkout" >&2; exit 3; }
+# The repository this run is about (project_fact.py repo_root): this checkout, else the workspace's one.
+top="$(python3 "$fact_py" --repo-root)" || exit 3
+cd "$top" || exit 3
 common="$(git rev-parse --path-format=absolute --git-common-dir)"
 main="$(dirname "$common")"
 warm_dir="$main/.claude/worktrees"
 
-# A fact from the main checkout's settings. Skills run through the Bash tool,
-# where Claude Code sets no CLAUDE_PROJECT_DIR, so the checkout this shell is
-# in is the session's (project_fact.py --tracker does the same).
-fact() { CLAUDE_PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$top}" python3 "$fact_py" --root "$top" "$1" 2>/dev/null; }
+# A fact from the main checkout's settings, read only when it is one of the workspace's repositories.
+fact() { python3 "$fact_py" --root "$top" "$1" 2>/dev/null; }
 
 device() { python3 -c 'import os,sys; print(os.stat(sys.argv[1]).st_dev)' "$1"; }
 

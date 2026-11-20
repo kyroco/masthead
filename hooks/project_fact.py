@@ -162,10 +162,14 @@ def repo_key(path):
     return os.path.realpath(main_checkout(top) or top)
 
 
+WORKSPACE_ENV = "MASTHEAD_WORKSPACE"
+
+
 def workspace():
-    """The folder the session started in: CLAUDE_PROJECT_DIR for a hook, the shell's folder for a skill's
-    script (Claude Code sets CLAUDE_PROJECT_DIR for hooks only). It may hold repositories or be one."""
-    return os.path.realpath(os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd())
+    """The folder the session started in, which may hold repositories or be one. A hook has it as
+    CLAUDE_PROJECT_DIR. Claude Code sets that for hooks only, so session start hands it to the skills' shell as
+    MASTHEAD_WORKSPACE through CLAUDE_ENV_FILE (prime-context.py). Outside a session, the shell's folder."""
+    return os.path.realpath(os.environ.get("CLAUDE_PROJECT_DIR") or os.environ.get(WORKSPACE_ENV) or os.getcwd())
 
 
 def checkout_of(path):
@@ -185,8 +189,13 @@ def workspace_repos():
         names = sorted(os.listdir(space))
     except OSError:
         return []
-    return [os.path.join(space, name) for name in names
-            if os.path.isdir(os.path.join(space, name)) and os.path.exists(os.path.join(space, name, ".git"))]
+    # A worktree counts as its main checkout, so a repository and its worktree beside it are one repository.
+    repos = {}
+    for name in names:
+        path = os.path.join(space, name)
+        if os.path.isdir(path) and os.path.exists(os.path.join(path, ".git")):
+            repos.setdefault(repo_key(path), path)
+    return [main if os.path.isdir(main) else path for main, path in repos.items()]
 
 
 class RepoUnclear(Exception):
