@@ -45,5 +45,16 @@ if grep -q -e "pull" -e "extraHeader" "$FAKE_LOG" 2>/dev/null; then bad "an unre
 FAKE_ORIGIN="https://github.com/example/wiki.git" run "$T/r3"
 grep -q "pull" "$FAKE_LOG" 2>/dev/null && ok || bad "the right clone should be pulled: $(cat "$FAKE_LOG")"
 
+# 5. MAST-48: a cloud thread's first start, with the repository in the clones folder and no list of attached
+# repositories yet. wiki-refresh runs beside attached-repos.py, in no set order, so it must find the repository
+# itself: the repository's wiki is cloned though no other hook wrote the list first.
+mkdir -p "$T/cloud/home" "$T/cloud/config"
+repo "$T/cloud/home/app" "$T/home/wiki-c/ADR" "https://github.com/example/wiki-c.git"
+: > "$FAKE_LOG"
+printf '{"hook_event_name":"SessionStart","source":"startup"}' | env CLAUDE_CODE_REMOTE=true \
+  CLAUDE_PROJECT_DIR="$T/cloud/home" CLAUDE_CONFIG_DIR="$T/cloud/config" HOME="$T/home" bash "$HOOK" 2>"$T/err"; sleep 1
+grep -q "clone.*wiki-c" "$FAKE_LOG" 2>/dev/null && ok || bad "a cloud thread's first start should clone its repository's wiki: $(cat "$FAKE_LOG")"
+[ -s "$T/err" ] && bad "a cloud thread's first start printed: $(cat "$T/err")" || ok
+
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
