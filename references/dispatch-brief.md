@@ -101,12 +101,13 @@ Re-verify: round 1, claims 2 and 3
 
 That line is exact too: it begins `Re-verify: round N` at column zero, N
 the number of this round, with no marker before it; any other spelling is
-refused. A round is the verifier, the architecture reviewer re-checking the
-architecture findings a fix addressed, or both sent under one round number.
+refused. A round is every verifier, and the architecture reviewer
+re-checking the architecture findings a fix addressed, sent between two runs
+of the adjudicator, however many there are.
 The check counts the rounds already in the dispatch log for this change, as
 step 5 of **Opening a PR** in `references/session-cliffs.md` says, and
-refuses a third round, whatever the brief says; the number only says which
-round a dispatch joins. The security reviewer sent in the same round does
+refuses a third round, whatever the brief says; the number in the brief is
+not counted. The security reviewer sent in the same round does
 not spend one; an agent that died or was declined did, since its row was
 written before it ran. A verifier re-checking the fix of one extra opens
 with `Re-verify: extra <name>, ...` instead, the extra's name one word,
@@ -322,7 +323,8 @@ that is exactly `Claims:` at column zero, then a `- ` bullet of at least four
 words; a variant is refused with the form. And a verifier's or an architecture
 reviewer's brief with a line that begins `Re-verify: round N` is refused
 when the change has had its rounds, as step 5 of **Opening a PR** says,
-unless it joins a round the other agent was sent in alone; a re-verify line
+unless it joins the round still open, the one the adjudicator has not yet
+judged; a re-verify line
 in any other spelling is refused outright.
 `MASTHEAD_BRIEF_GATE=off` in the operator's environment turns it off.
 

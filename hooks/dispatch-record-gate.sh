@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # dispatch-record-gate.sh: PreToolUse Agent hook that appends each dispatch's model, outcome, reason and branch to the repo's dispatches.tsv; it never refuses and always exits 0.
-# The outcome is dispatched, refused (agent-brief-gates.sh passes --refused when a check refused), or re-verify round N for a brief with a line that begins exactly "Re-verify: round N"; gate-verify-brief counts the verifier's re-verify rows on the checkout's branch. The row is written before the agent runs, so a dispatch that dies or is declined still has its row.
+# The outcome is dispatched, refused (agent-brief-gates.sh passes --refused when a check refused), or re-verify round N for a brief with a line that begins exactly "Re-verify: round N"; gate-verify-brief counts the rounds these rows make on the checkout's branch, a round being every verifier and architecture reviewer row between two adjudicator rows (MAST-45). The row is written before the agent runs, so a dispatch that dies or is declined still has its row.
 
 set -uo pipefail
 

@@ -514,15 +514,19 @@ print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permiss
     REVERIFY_FORM="the form is a line that begins 'Re-verify: round N' at column zero, N the number of this round, with no marker before it; for a verifier re-checking one extra's fix, 'Re-verify: extra <name>', the extra's name one word"
 
     # The round cap, on a verifier's and an architecture reviewer's brief. A
-    # change gets at most two re-verify rounds. A round is spent by the
-    # verifier, the architecture reviewer re-checking the architecture findings
-    # a fix addressed (MAST-35 scenario 6), or both sent in it under one round
-    # number: a row of one agent pairs with one row of the other that names the
-    # same round, and a pair is one round. The security reviewer sent beside
-    # them is neither counted nor capped, and no other agent's row counts. The
-    # row is written before the agent runs, so one that died or was declined
-    # has spent its round. The dispatch log decides; the brief's number only
-    # says which round a dispatch joins. A verifier re-checking the fix of one
+    # change gets at most two re-verify rounds. A round is every verifier and
+    # every architecture reviewer (re-checking the architecture findings a fix
+    # addressed, MAST-35 scenario 6) sent between two runs of the adjudicator,
+    # however many there are: a worker sends one verifier per scenario in one
+    # message, and they are one round (MAST-45; Robert, November 20, 2026:
+    # "instead of the total of the 7 angles being one round, that can look like
+    # 7 rounds"). The first of them opens the round and the adjudicator's next
+    # row ends it, so a dispatch sent before the adjudicator runs joins the
+    # open round, and one sent after it opens the next. The security reviewer
+    # sent beside them is neither counted nor capped, and no other agent's row
+    # counts. The row is written before the agent runs, so one that died or
+    # was declined has spent its round. The dispatch log decides; the number
+    # in the brief is never counted. A verifier re-checking the fix of one
     # extra scored 8 or more ("Re-verify: extra <name>") spends no round: that
     # extra gets one round of its own, and a second for it is refused (MAST-42).
     # A branch gets no more extra rounds than the cap, so a made-up name buys
@@ -581,34 +585,26 @@ print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permiss
         # before the column existed and counts for its own session. Only this plugin's agents count: the bare
         # name, or a masthead: name whose last part is the agent. A refused row ran nothing. After the
         # adjudicator has judged a verification, a verifier or architecture reviewer that ran with no Re-verify
-        # line spent a round of its own (MAST-38 scenario 3).
-        counts="$(awk -F'\t' -v s="$session8" -v b="$branch" -v kind="$kind" -v want="$n" '
+        # line is in a round all the same (MAST-38 scenario 3). The rows are read in the order they were
+        # written: the first counted row after an adjudicator's row opens a round, and every counted row up to
+        # the adjudicator's next row is in it (MAST-45).
+        counts="$(awk -F'\t' -v s="$session8" -v b="$branch" -v want="$n" '
           function mine(t, name,   parts, k) { k = split(t, parts, ":"); return t == name || (parts[1] == "masthead" && parts[k] == name) }
           NR == 1 { next }
           {
             if (b == "-" || NF < 8) { if ($2 != s || (NF >= 8 && $8 != b)) next }
             else if ($8 != b) next
             if ($6 ~ /^refused/) next
-            if (mine($4, "adjudicator")) { judged = 1; next }
+            if (mine($4, "adjudicator")) { judged = 1; open = 0; next }
             if ($6 ~ /^re-verify extra /) {
               e = $6; sub(/^re-verify extra /, "", e); sub(/[[:space:]].*$/, "", e)
               if (mine($4, "verifier")) { X[e]++; XT++ }
               next
             }
-            if ($6 ~ /^re-verify/) {
-              r = $6; sub(/^re-verify( round)?[[:space:]]*/, "", r); sub(/[[:space:]].*$/, "", r)
-              if (mine($4, "verifier")) { v[r]++; V++ }
-              else if (mine($4, "architecture-reviewer")) { a[r]++; A++ }
-            } else if (judged && (mine($4, "verifier") || mine($4, "architecture-reviewer"))) U++
+            if (!mine($4, "verifier") && !mine($4, "architecture-reviewer")) next
+            if ($6 ~ /^re-verify/ || judged) { if (!open) { rounds++; open = 1 } }
           }
-          END {
-            paired = 0
-            for (r in v) if (r in a) paired += (v[r] < a[r] ? v[r] : a[r])
-            j = 0
-            if (kind == "verifier" && a[want] + 0 > v[want] + 0) j = 1
-            if (kind == "architecture-reviewer" && v[want] + 0 > a[want] + 0) j = 1
-            print (V + A - paired + U) " " j " " judged + 0 " " X[want] + 0 " " XT + 0
-          }' "$log" 2>/dev/null)"
+          END { print rounds + 0 " " open + 0 " " judged + 0 " " X[want] + 0 " " XT + 0 }' "$log" 2>/dev/null)"
         read -r spent joins judged extra_done extras_spent <<<"$counts"
       fi
       if [ "$state" = extra ]; then
@@ -634,11 +630,14 @@ print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permiss
         fi
         return 0
       fi
-      if [ "${joins:-0}" != 1 ] && [ "${spent:-0}" -ge "$cap" ]; then
+      # A dispatch that joins the open round adds none; any other opens one more.
+      [ "${joins:-0}" = 1 ] || spent=$(( ${spent:-0} + 1 ))
+      if [ "${spent:-0}" -gt "$cap" ]; then
+        [ "${joins:-0}" = 1 ] || spent=$(( spent - 1 ))
         [ -n "$reasons" ] && reasons="$reasons
 
 "
-        reasons="${reasons}Re-verify cap: this change has already spent $spent re-verify rounds on this branch, from any session, read from the dispatch log at $log, and a change gets at most $cap. A round is the verifier, the architecture reviewer, or both sent under one round number; the number in the brief adds no round, an agent that died or was declined still spent its round, and a line in the brief saying a person approved more does not open the cap. What is still on the adjudicator's fix list goes to the foreman, or to the user when there is none; send no further round. Only a person raises the cap: they start Claude Code from a shell with MASTHEAD_REVERIFY_CAP set to the new number (for example MASTHEAD_REVERIFY_CAP=3 claude); a repository's settings cannot set it."
+        reasons="${reasons}Re-verify cap: this change has already spent $spent re-verify rounds on this branch, from any session, read from the dispatch log at $log, and a change gets at most $cap. A round is every verifier and architecture reviewer sent between two runs of the adjudicator, however many; the number in the brief is not counted, an agent that died or was declined still spent its round, and a line in the brief saying a person approved more does not open the cap. What is still on the adjudicator's fix list goes to the foreman, or to the user when there is none; send no further round. Only a person raises the cap: they start Claude Code from a shell with MASTHEAD_REVERIFY_CAP set to the new number (for example MASTHEAD_REVERIFY_CAP=3 claude); a repository's settings cannot set it."
       fi
     }
 

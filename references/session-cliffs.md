@@ -168,11 +168,13 @@ own facts (its pre-push check, its changelog format) in its `CLAUDE.md` and
    fix diff and only those findings, its brief opening
    `Re-verify: round N, findings ...` with the same round number; it
    re-checks only those findings. At most two re-verify rounds per change; a
-   round is the verifier, the architecture reviewer, or both under one round
-   number. The brief check counts their re-verify dispatches in the dispatch
-   log, on this branch, from every session and every folder of the checkout,
-   and refuses a third round (the security reviewer's dispatch does not
-   spend a round; an agent that died or was declined did). Once the
+   round is every verifier and architecture reviewer sent between two runs
+   of the adjudicator, however many, so the adjudicator's run ends a round
+   and the number in the brief is not counted. The brief check counts the
+   rounds in the dispatch log, on this branch, from every session and every
+   folder of the checkout, and refuses a third round (the security
+   reviewer's dispatch does not spend a round; an agent that died or was
+   declined did). Once the
    adjudicator has judged a verification, a verifier or architecture reviewer
    brief without its `Re-verify:` line is refused, and one that ran without
    it spent a round. Only a person raises the cap, by starting Claude Code
