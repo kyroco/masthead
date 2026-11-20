@@ -19,6 +19,12 @@ verifier or the security reviewer carries a claims list, and a change gets at
 most two re-verify rounds, counted from the dispatch log, never from the
 number the brief writes.
 
+WHAT A ROUND IS (MAST-45; Robert, November 20, 2026: "instead of the total of
+the 7 angles being one round, that can look like 7 rounds"). A round is every
+verifier and architecture reviewer sent between two runs of the adjudicator,
+however many there are, so the logs below put an adjudicator row (JUDGE) after
+each round, as a real change does.
+
 READ THIS BEFORE ADDING A CASE. The hook exits 0 whether it allows or denies; a
 denial is JSON on stdout. A test that keys on the exit code passes every case
 and proves nothing. Read the decision, never the status.
@@ -145,6 +151,11 @@ Verify the fix commits.
 """
 
 
+# The adjudicator's row, which ends a round (MAST-45).
+JUDGE = (SESSION8, "dispatched", "adjudicator")
+TWO_JUDGED = [(SESSION8, "re-verify round 1"), JUDGE, (SESSION8, "re-verify round 2"), JUDGE]
+
+
 def log_rows(rows):
     """Rows of a dispatches.tsv: (session8, outcome[, type[, branch]]) tuples.
 
@@ -239,11 +250,32 @@ CASES = [
     ("round 1 with an empty log", "verifier", re_verify(1), [], "allow"),
     ("round 2 after one re-verify", "verifier", re_verify(2), [(SESSION8, "re-verify round 1")], "allow"),
     ("HELD round 3 after two re-verifies", "verifier", re_verify(3),
-     [(SESSION8, "re-verify round 1"), (SESSION8, "re-verify round 2")], "deny"),
+     TWO_JUDGED, "deny"),
     ("SPOOF a third brief written as round 2", "verifier", re_verify(2),
-     [(SESSION8, "re-verify round 1"), (SESSION8, "re-verify round 2")], "deny"),
+     TWO_JUDGED, "deny"),
     ("SPOOF a third brief written as round 1", "verifier", re_verify(1),
-     [(SESSION8, "re-verify round 1"), (SESSION8, "re-verify round 1")], "deny"),
+     [(SESSION8, "re-verify round 1"), JUDGE, (SESSION8, "re-verify round 1"), JUDGE], "deny"),
+    # MAST-45: every verifier and architecture reviewer sent between two runs of
+    # the adjudicator is one round, however many there are.
+    ("a third verifier in round 1, sent beside two others", "verifier", re_verify(1),
+     [(SESSION8, "dispatched"), JUDGE, (SESSION8, "re-verify round 1"), (SESSION8, "re-verify round 1")], "allow"),
+    ("a seventh verifier in round 1", "verifier", re_verify(1),
+     [(SESSION8, "dispatched"), JUDGE] + [(SESSION8, "re-verify round 1")] * 6, "allow"),
+    ("round 2 after a round 1 of three verifiers", "verifier", re_verify(2),
+     [(SESSION8, "re-verify round 1")] * 3 + [JUDGE], "allow"),
+    ("round 2 after a round 1 of three verifiers and the architecture reviewer", "verifier", re_verify(2),
+     [(SESSION8, "re-verify round 1")] * 3 + [(SESSION8, "re-verify round 1", "architecture-reviewer"), JUDGE], "allow"),
+    ("a third verifier in round 2, after a round 1 of three", "verifier", re_verify(2),
+     [(SESSION8, "re-verify round 1")] * 3 + [JUDGE] + [(SESSION8, "re-verify round 2")] * 2, "allow"),
+    ("HELD a third round after two rounds of several verifiers", "verifier", re_verify(3),
+     [(SESSION8, "re-verify round 1")] * 3 + [JUDGE] + [(SESSION8, "re-verify round 2")] * 2 + [JUDGE], "deny"),
+    ("SPOOF that third round written as round 2", "verifier", re_verify(2),
+     [(SESSION8, "re-verify round 1")] * 3 + [JUDGE] + [(SESSION8, "re-verify round 2")] * 2 + [JUDGE], "deny"),
+    ("SPOOF that third round written as round 1", "verifier", re_verify(1),
+     [(SESSION8, "re-verify round 1")] * 3 + [JUDGE] + [(SESSION8, "re-verify round 2")] * 2 + [JUDGE], "deny"),
+    ("HELD a round the adjudicator judged is over, whatever number comes next", "verifier", re_verify(1),
+     [(SESSION8, "re-verify round 1"), JUDGE, (SESSION8, "re-verify round 1"), JUDGE,
+      (SESSION8, "re-verify extra e1"), JUDGE], "deny"),
     # Outside a branch nothing names the change, so only this session's rows count.
     # On a branch every session's rows count (MAST-38, REPO_CASES below).
     ("outside a branch, another session's re-verifies do not count", "verifier", re_verify(1),
@@ -258,7 +290,7 @@ CASES = [
      [(SESSION8, "re-verify round 1", "verifier"), (SESSION8, "re-verify round 1", "security-reviewer"),
       (SESSION8, "re-verify round 2", "verifier")], "allow"),
     ("HELD no claims and a third round, refused once", "verifier", NO_CLAIMS_THIRD_ROUND,
-     [(SESSION8, "re-verify round 1"), (SESSION8, "re-verify round 2")], "deny"),
+     TWO_JUDGED, "deny"),
 
     # A round is one verifier, plus the security reviewer when a security
     # finding was fixed. Only the verifier's rows spend a round (bugs-1, edge-4).
@@ -267,15 +299,16 @@ CASES = [
     ("an adjudicator brief with a Re-verify line does not count", "verifier", re_verify(2),
      [(SESSION8, "re-verify round 1", "adjudicator"), (SESSION8, "re-verify round 1", "verifier")], "allow"),
     ("the verifier's rows count under the name Claude Code sends", "verifier", re_verify(3),
-     [(SESSION8, "re-verify round 1", "masthead:verifier"), (SESSION8, "re-verify round 2", "masthead:verifier")], "deny"),
+     [(SESSION8, "re-verify round 1", "masthead:verifier"), (SESSION8, "dispatched", "masthead:adjudicator"),
+      (SESSION8, "re-verify round 2", "masthead:verifier"), (SESSION8, "dispatched", "masthead:adjudicator")], "deny"),
     # A reused session's next issue is on another branch and starts at zero (words-4).
     ("another branch's rounds do not count", "verifier", re_verify(1),
      [(SESSION8, "re-verify round 1", "verifier", "robert/9-last-issue"), (SESSION8, "re-verify round 2", "verifier", "robert/9-last-issue")], "allow"),
     ("this branch's rounds count", "verifier", re_verify(3),
-     [(SESSION8, "re-verify round 1", "verifier", "-"), (SESSION8, "re-verify round 2", "verifier", "-")], "deny"),
+     [(SESSION8, "re-verify round 1", "verifier", "-"), JUDGE, (SESSION8, "re-verify round 2", "verifier", "-"), JUDGE], "deny"),
     # The Re-verify line is read under the same markdown prefixes as the Claims line (bugs-3).
     ("HELD a third round as a list item is still refused", "verifier", re_verify_marked(3),
-     [(SESSION8, "re-verify round 1"), (SESSION8, "re-verify round 2")], "deny"),
+     TWO_JUDGED, "deny"),
     # The Claims line under an ordered-list prefix, and an empty list in words (edge-3).
     ("HELD a Claims: line as a numbered item is not the form", "verifier", LISTED_CLAIMS, None, "deny"),
     ("HELD Claims: none is no list", "verifier", NONE_CLAIMS, None, "deny"),
@@ -296,27 +329,28 @@ CASES = [
     ("HELD a re-verify line as a list item is not the form, even in round 1", "verifier", re_verify_marked(1), [], "deny"),
     # Two markdown prefixes at once (a quoted list item).
     ("HELD a third round as a quoted list item is still refused", "verifier", re_verify_quoted(3),
-     [(SESSION8, "re-verify round 1"), (SESSION8, "re-verify round 2")], "deny"),
+     TWO_JUDGED, "deny"),
     # MAST-35 scenario 6: the architecture reviewer re-checks a fixed finding
     # inside the same cap of two rounds. A round is spent by the verifier, the
-    # architecture reviewer, or both sent in it under one round number.
+    # architecture reviewer, or both, sent before the adjudicator next runs.
     ("the round-1 verifier joins the architecture re-check's round", "verifier", re_verify(1),
      [(SESSION8, "re-verify round 1", "architecture-reviewer")], "allow"),
     ("round 2 after an architecture-only round 1", "verifier", re_verify(2),
      [(SESSION8, "re-verify round 1", "architecture-reviewer")], "allow"),
     ("HELD a third round after a verifier round and an architecture round", "verifier", re_verify(3),
-     [(SESSION8, "re-verify round 1", "verifier"), (SESSION8, "re-verify round 2", "architecture-reviewer")], "deny"),
+     [(SESSION8, "re-verify round 1", "verifier"), JUDGE, (SESSION8, "re-verify round 2", "architecture-reviewer"), JUDGE], "deny"),
     ("SPOOF that third round written as round 1", "verifier", re_verify(1),
-     [(SESSION8, "re-verify round 1", "verifier"), (SESSION8, "re-verify round 2", "architecture-reviewer")], "deny"),
+     [(SESSION8, "re-verify round 1", "verifier"), JUDGE, (SESSION8, "re-verify round 2", "architecture-reviewer"), JUDGE], "deny"),
     ("HELD a third round after two architecture-only rounds", "verifier", re_verify(3),
-     [(SESSION8, "re-verify round 1", "architecture-reviewer"), (SESSION8, "re-verify round 2", "architecture-reviewer")], "deny"),
+     [(SESSION8, "re-verify round 1", "architecture-reviewer"), JUDGE, (SESSION8, "re-verify round 2", "architecture-reviewer"), JUDGE], "deny"),
     ("rounds shared by both agents count once each", "verifier", re_verify(2),
      [(SESSION8, "re-verify round 1", "verifier"), (SESSION8, "re-verify round 1", "architecture-reviewer")], "allow"),
     ("HELD a third round after two shared rounds", "verifier", re_verify(3),
-     [(SESSION8, "re-verify round 1", "verifier"), (SESSION8, "re-verify round 1", "architecture-reviewer"),
-      (SESSION8, "re-verify round 2", "architecture-reviewer"), (SESSION8, "re-verify round 2", "verifier")], "deny"),
+     [(SESSION8, "re-verify round 1", "verifier"), (SESSION8, "re-verify round 1", "architecture-reviewer"), JUDGE,
+      (SESSION8, "re-verify round 2", "architecture-reviewer"), (SESSION8, "re-verify round 2", "verifier"), JUDGE], "deny"),
     ("the architecture reviewer's rows count under the name Claude Code sends", "verifier", re_verify(3),
-     [(SESSION8, "re-verify round 1", "masthead:architecture-reviewer"), (SESSION8, "re-verify round 2", "masthead:architecture-reviewer")], "deny"),
+     [(SESSION8, "re-verify round 1", "masthead:architecture-reviewer"), JUDGE,
+      (SESSION8, "re-verify round 2", "masthead:architecture-reviewer"), JUDGE], "deny"),
     ("another plugin's architecture reviewer rows do not count", "verifier", re_verify(1),
      [(SESSION8, "re-verify round 1", "otherplugin:architecture-reviewer"), (SESSION8, "re-verify round 2", "otherplugin:architecture-reviewer")], "allow"),
     ("the first architecture review does not count", "verifier", re_verify(2),
@@ -384,8 +418,9 @@ def repo_rows(*specs):
 # whichever folder PROJECT_STATE_DIR puts the log.
 # (label, prompt, rows, where, expected): where is "top", "sub" or "statedir",
 # or a dict of extra environment.
-TWO_ROUNDS = repo_rows((OTHER8, "re-verify round 1", "masthead:verifier"),
-                       (OTHER8, "re-verify round 2", "masthead:verifier"))
+REPO_JUDGE = (OTHER8, "dispatched", "masthead:adjudicator")
+TWO_ROUNDS = repo_rows((OTHER8, "re-verify round 1", "masthead:verifier"), REPO_JUDGE,
+                       (OTHER8, "re-verify round 2", "masthead:verifier"), REPO_JUDGE)
 REPO_CASES = [
     ("HELD a third round from a new session on the same branch", re_verify(3), TWO_ROUNDS, "top", "deny"),
     ("HELD a third round written as round 1 from a new session", re_verify(1), TWO_ROUNDS, "top", "deny"),
@@ -404,12 +439,17 @@ REPO_CASES = [
     ("HELD a verifier that ran with no Re-verify line after the adjudicator counts as a round", re_verify(2),
      repo_rows((OTHER8, "dispatched", "masthead:verifier"), (OTHER8, "dispatched", "masthead:adjudicator"),
                (OTHER8, "re-verify round 1", "masthead:verifier"), (OTHER8, "dispatched", "masthead:adjudicator"),
-               (OTHER8, "dispatched", "masthead:verifier")), "top", "deny"),
+               (OTHER8, "dispatched", "masthead:verifier"), REPO_JUDGE), "top", "deny"),
+    # MAST-45: from a new session too, the verifiers of one round are one round.
+    ("a third verifier in round 1 from a new session on the same branch", re_verify(1),
+     repo_rows((OTHER8, "dispatched", "masthead:verifier"), REPO_JUDGE,
+               (OTHER8, "re-verify round 1", "masthead:verifier"), (OTHER8, "re-verify round 1", "masthead:verifier")),
+     "top", "allow"),
     # A cap a person raised in the environment that starts Claude Code.
     ("a third round under MASTHEAD_REVERIFY_CAP=3", re_verify(3), TWO_ROUNDS,
      {"MASTHEAD_REVERIFY_CAP": "3"}, "allow"),
     ("HELD a fourth round under MASTHEAD_REVERIFY_CAP=3", re_verify(4),
-     TWO_ROUNDS + repo_rows((OTHER8, "re-verify round 3 (cap raised to 3)", "masthead:verifier")),
+     TWO_ROUNDS + repo_rows((OTHER8, "re-verify round 3 (cap raised to 3)", "masthead:verifier"), REPO_JUDGE),
      {"MASTHEAD_REVERIFY_CAP": "3"}, "deny"),
     ("HELD a cap that is not a number is the usual two", re_verify(3), TWO_ROUNDS,
      {"MASTHEAD_REVERIFY_CAP": "lots"}, "deny"),
@@ -421,7 +461,7 @@ REPO_CASES = [
      repo_rows((OTHER8, "dispatched", "masthead:verifier"), (OTHER8, "dispatched", "masthead:adjudicator")),
      "top", "allow"),
     ("an extra's round after both scenario rounds", re_verify_extra("E1"),
-     TWO_ROUNDS + repo_rows((OTHER8, "dispatched", "masthead:adjudicator")), "top", "allow"),
+     TWO_ROUNDS, "top", "allow"),
     ("HELD a second round for the same extra", re_verify_extra("E1"),
      TWO_ROUNDS + repo_rows((OTHER8, "re-verify extra e1", "masthead:verifier")), "top", "deny"),
     ("HELD a second round for the same extra, spelled in other letter case", re_verify_extra("e1"),
@@ -611,14 +651,20 @@ ARCHITECTURE_ROUND_CASES = [
     ("an architecture-only round 2", "architecture-reviewer", arch_re_verify(2),
      [(SESSION8, "re-verify round 1", "verifier")], "allow"),
     ("HELD an architecture re-check in a third round", "architecture-reviewer", arch_re_verify(3),
-     [(SESSION8, "re-verify round 1", "verifier"), (SESSION8, "re-verify round 2", "verifier")], "deny"),
+     [(SESSION8, "re-verify round 1", "verifier"), JUDGE, (SESSION8, "re-verify round 2", "verifier"), JUDGE], "deny"),
     ("HELD a third architecture-only round", "architecture-reviewer", arch_re_verify(3),
-     [(SESSION8, "re-verify round 1", "architecture-reviewer"), (SESSION8, "re-verify round 2", "architecture-reviewer")], "deny"),
+     [(SESSION8, "re-verify round 1", "architecture-reviewer"), JUDGE, (SESSION8, "re-verify round 2", "architecture-reviewer"), JUDGE], "deny"),
     ("SPOOF a third architecture re-check written as round 1", "architecture-reviewer", arch_re_verify(1),
-     [(SESSION8, "re-verify round 1", "architecture-reviewer"), (SESSION8, "re-verify round 1", "verifier"),
-      (SESSION8, "re-verify round 2", "verifier"), (SESSION8, "re-verify round 2", "architecture-reviewer")], "deny"),
+     [(SESSION8, "re-verify round 1", "architecture-reviewer"), (SESSION8, "re-verify round 1", "verifier"), JUDGE,
+      (SESSION8, "re-verify round 2", "verifier"), (SESSION8, "re-verify round 2", "architecture-reviewer"), JUDGE], "deny"),
+    # MAST-45: the architecture reviewer joins a round of several verifiers.
+    ("an architecture re-check beside three round-1 verifiers", "architecture-reviewer", arch_re_verify(1),
+     [(SESSION8, "re-verify round 1", "verifier")] * 3, "allow"),
+    ("an architecture re-check in round 2, after a round 1 of three verifiers", "architecture-reviewer", arch_re_verify(2),
+     [(SESSION8, "re-verify round 1", "verifier")] * 3 + [JUDGE, (SESSION8, "re-verify round 2", "verifier"),
+                                                         (SESSION8, "re-verify round 2", "verifier")], "allow"),
     ("masthead's architecture reviewer is capped too", "masthead:architecture-reviewer", arch_re_verify(3),
-     [(SESSION8, "re-verify round 1", "verifier"), (SESSION8, "re-verify round 2", "verifier")], "deny"),
+     [(SESSION8, "re-verify round 1", "verifier"), JUDGE, (SESSION8, "re-verify round 2", "verifier"), JUDGE], "deny"),
     ("another branch's rounds do not count", "architecture-reviewer", arch_re_verify(1),
      [(SESSION8, "re-verify round 1", "verifier", "robert/9-last-issue"), (SESSION8, "re-verify round 2", "verifier", "robert/9-last-issue")], "allow"),
     ("HELD an architecture re-verify line as a list item is not the form", "architecture-reviewer",
@@ -711,6 +757,14 @@ def main():
     failures += 0 if ok else 1
     print("{:4}  {:<52} the cap's refusal says how to raise it".format("ok" if ok else "FAIL", ""))
 
+    # MAST-45 scenario 4: the refusal counts rounds, not the verifiers sent in them.
+    _, reason = decision_for("verifier", re_verify(3),
+                             [(SESSION8, "re-verify round 1")] * 3 + [(SESSION8, "re-verify round 1", "architecture-reviewer"), JUDGE]
+                             + [(SESSION8, "re-verify round 2")] * 2 + [JUDGE])
+    ok = "already spent 2 re-verify rounds" in reason and "between two runs of the adjudicator" in reason
+    failures += 0 if ok else 1
+    print("{:4}  {:<52} the cap's refusal counts rounds, not verifiers".format("ok" if ok else "FAIL", ""))
+
     actual, _ = decision_for("verifier", THIN, None, {"MASTHEAD_BRIEF_GATE": "off"})
     ok = actual == "allow"
     failures += 0 if ok else 1
@@ -728,7 +782,7 @@ def main():
     if failures:
         print("{} cases wrong".format(failures))
         return 1
-    print("all {} cases correct".format(len(CASES) + len(ARCHITECTURE_CASES) + len(ARCHITECTURE_ROUND_CASES) + len(REPO_CASES) + 5))
+    print("all {} cases correct".format(len(CASES) + len(ARCHITECTURE_CASES) + len(ARCHITECTURE_ROUND_CASES) + len(REPO_CASES) + 6))
     return 0
 
 
