@@ -71,8 +71,15 @@ def private_open(path, append=False):
     return os.fdopen(os.open(path, flags, 0o600), "a" if append else "w", encoding="utf-8")
 
 
-def project_root():
-    return os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()
+def project_root(cwd=None):
+    """The repository a call that names no file is about: repo_root() from the shell's folder `cwd`. When that
+    is unclear it is the shell's folder itself, so a per-call hook goes on with that folder's facts, which are
+    the defaults unless it is the workspace (trusted())."""
+    cwd = cwd or os.getcwd()
+    try:
+        return repo_root(None, cwd)
+    except RepoUnclear:
+        return cwd
 
 
 def main_checkout(root):
@@ -155,27 +162,67 @@ def repo_key(path):
     return os.path.realpath(main_checkout(top) or top)
 
 
+def workspace():
+    """The folder the session started in: CLAUDE_PROJECT_DIR for a hook, the shell's folder for a skill's
+    script (Claude Code sets CLAUDE_PROJECT_DIR for hooks only). It may hold repositories or be one."""
+    return os.path.realpath(os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd())
+
+
+def checkout_of(path):
+    """The checkout that holds `path`, or None when no folder at or above it holds .git."""
+    top = checkout_top(path)
+    return top if os.path.exists(os.path.join(top, ".git")) else None
+
+
+def workspace_repos():
+    """The workspace's repositories: the workspace's own checkout when it is in one, else each checkout
+    directly inside it. Facts are read only from these and their worktrees."""
+    space = workspace()
+    own = checkout_of(space)
+    if own:
+        return [own]
+    try:
+        names = sorted(os.listdir(space))
+    except OSError:
+        return []
+    return [os.path.join(space, name) for name in names
+            if os.path.isdir(os.path.join(space, name)) and os.path.exists(os.path.join(space, name, ".git"))]
+
+
+class RepoUnclear(Exception):
+    """Which repository a call is about cannot be told: repo_root()'s step 4."""
+
+
+def repo_root(path=None, cwd=None):
+    """The checkout a hook or a skill is about, MAST-48 (Robert's design, November 20, 2026):
+    1. a file path: the checkout that holds it;
+    2. otherwise the checkout that holds the shell's folder;
+    3. otherwise the workspace's repository, when it holds exactly one;
+    4. otherwise RepoUnclear, whose text is the one line Masthead shows."""
+    cwd = cwd or os.getcwd()
+    if path:
+        found = checkout_of(path if os.path.isabs(path) else os.path.join(cwd, path))
+        if found:
+            return found
+    found = checkout_of(cwd)
+    if found:
+        return found
+    repos = workspace_repos()
+    if len(repos) == 1:
+        return repos[0]
+    space = workspace()
+    held = "no repository" if not repos else "{} repositories".format(len(repos))
+    raise RepoUnclear("Masthead: which repository this is about is unclear: the workspace {} holds {} and the "
+                      "shell is in none of them, so cd into the repository first.".format(space, held))
+
+
 def trusted(root):
-    """Whether facts may be read from the checkout at `root`: only the session's own repository."""
+    """Whether facts may be read from the checkout at `root`: the workspace itself, whose settings Claude Code
+    applies anyway, or one of its repositories, or a worktree of one. A clone anywhere else, or nested inside
+    one, is not."""
     if not root:
         return False
-    session = os.environ.get("CLAUDE_PROJECT_DIR")
-    if session and repo_key(root) == repo_key(session):
-        return True
-    return cloud_cloned(root)
-
-
-def cloud_cloned(root):
-    """Whether `root` is in a repo the cloud session cloned at its start."""
-    if os.environ.get("CLAUDE_CODE_REMOTE") != "true":
-        return False
-    config = os.environ.get("CLAUDE_CONFIG_DIR") or os.path.expanduser("~/.claude")
-    try:
-        with open(os.path.join(config, "cloud-session-repos")) as handle:
-            cloned = {os.path.realpath(line.strip()) for line in handle if line.strip()}
-    except OSError:
-        return False
-    return repo_key(root) in cloned
+    return repo_key(root) in {repo_key(folder) for folder in [workspace()] + workspace_repos()}
 
 
 def fact(name, default=None, root=None):
@@ -266,7 +313,7 @@ def repo_switch_keys(root=None):
     person's own and keeps its switches. Claude Code reads the shared file from
     the session's folder and the personal file from the top of the repository
     (the main checkout's, in a worktree), so each of those places is read."""
-    root = root or project_root()
+    root = root or workspace()
     top = checkout_top(root)
     main = main_checkout(top) or top
     keys, own = set(), set()
@@ -606,22 +653,39 @@ def ships(root=None):
 
 
 def main(argv):
-    # --trusted CHECKOUT: exit 0 when the checkout is the session's repository, 1 when not.
+    # --trusted CHECKOUT: exit 0 when facts may be read from the checkout (trusted()), 1 when not.
     if len(argv) == 2 and argv[0] == "--trusted":
         return 0 if trusted(argv[1]) else 1
+    # --repo-root [FOLDER]: print the repository repo_root() finds from FOLDER, else the shell's folder; when
+    # that is unclear print its one line on stderr and exit 2.
+    if argv[:1] == ["--repo-root"] and len(argv) <= 2:
+        try:
+            print(repo_root(None, argv[1] if len(argv) == 2 and argv[1] else os.getcwd()))
+        except RepoUnclear as unclear:
+            print(unclear, file=sys.stderr)
+            return 2
+        return 0
+    # --root FOLDER: the repository FOLDER is about (repo_root): its checkout, else the workspace's one
+    # repository. When that is unclear FOLDER stays as given, as project_root() keeps the shell's folder.
     root = None
     if len(argv) >= 2 and argv[0] == "--root":
         root, argv = argv[1], argv[2:]
+        try:
+            root = repo_root(None, root)
+        except RepoUnclear:
+            pass
     # --tracker prints github or linear; --linear-team prints the team key or nothing;
     # --architecture-doc prints the architecture doc's full path or nothing;
     # --architecture-trial prints on or off.
-    # Skills run these through the Bash tool, where Claude Code sets no
-    # CLAUDE_PROJECT_DIR (it sets it for hooks only), so there the repository
-    # the shell is in is the session's. trusted() still guards --root.
+    # Skills run these from the shell, so with no --root the repository is repo_root()'s. When that is
+    # unclear the skill stops with its one line, never reading the defaults of no repository.
     if argv in (["--tracker"], ["--linear-team"], ["--architecture-doc"], ["--architecture-trial"], ["--state-path"],
-                ["--gate"], ["--ships"]) and root is None \
-            and not os.environ.get("CLAUDE_PROJECT_DIR"):
-        os.environ["CLAUDE_PROJECT_DIR"] = checkout_top(os.getcwd())
+                ["--gate"], ["--ships"]) and root is None:
+        try:
+            root = repo_root(None, os.getcwd())
+        except RepoUnclear as unclear:
+            print(unclear, file=sys.stderr)
+            return 2
     # --state-path prints the full path of the checkout's state folder; the
     # dispatch log is dispatches.tsv in it.
     if argv == ["--state-path"]:

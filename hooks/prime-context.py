@@ -51,26 +51,42 @@ read the web during the task, start content with the web-access marker the
 capture gate names. If nothing durable happened, capture that and say why."""
 
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+try:
+    from project_fact import trusted, project_root, repo_root, RepoUnclear
+except Exception:
+    def trusted(_root):
+        return False
+
+    def project_root(cwd=None):
+        return cwd or os.getcwd()
+
+    def repo_root(_path, _cwd):
+        raise RepoUnclear("Masthead: project_fact.py could not be read, so the repository is unclear.")
+
+    class RepoUnclear(Exception):
+        pass
+
+
+def repo_unclear(cwd):
+    """repo_root()'s one line when the repository the shell at `cwd` is about is unclear, else None."""
+    try:
+        repo_root(None, cwd or os.getcwd())
+    except RepoUnclear as unclear:
+        return str(unclear)
+    return None
+
+
 def cliff_source(cwd):
     """Return the repo's own procedures followed by the plugin's general ones."""
-    # Read a repo's own procedures only from the session's own repository.
-    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-    # Read from the top of the checkout so a package unpacked inside the repo cannot supply procedures.
-    try:
-        from project_fact import trusted, checkout_top
-    except Exception:
-        def trusted(_root):
-            return False
-
-        def checkout_top(path):
-            return path
+    # Read a repo's own procedures only from one of the workspace's repositories, the one the shell is about
+    # (project_fact.repo_root), at the top of its checkout so a package unpacked inside it cannot supply them.
     texts = []
-    for root in (cwd, os.environ.get("CLAUDE_PROJECT_DIR")):
-        if root and trusted(root):
-            path = os.path.join(checkout_top(root), CLIFF_SOURCE_REL)
-            if os.path.isfile(path):
-                texts.append(open(path).read())
-                break
+    root = project_root(cwd)
+    if trusted(root):
+        path = os.path.join(root, CLIFF_SOURCE_REL)
+        if os.path.isfile(path):
+            texts.append(open(path).read())
     root = os.environ.get("CLAUDE_PLUGIN_ROOT") or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     plugin = os.path.join(root, "references", "session-cliffs.md")
     if os.path.isfile(plugin):
@@ -92,8 +108,7 @@ def cliff_block(text, lead):
 
 def held_worktree_notice(cwd):
     """Return a notice when check-tests-bite has the working tree reverted to the merge base, else None."""
-    root = cwd or os.environ.get("CLAUDE_PROJECT_DIR") or "."
-    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    root = project_root(cwd)
     try:
         from project_fact import state_dir
         state = state_dir(root)
@@ -128,7 +143,19 @@ def held_worktree_notice(cwd):
     )
 
 
-def session_start():
+def session_start(data):
+    # When the repository is unclear, say so once, here; each skill then stops with the same line.
+    unclear = repo_unclear(data.get("cwd"))
+    if unclear:
+        print(unclear)
+    # An ADR folder outside the repository is not checked, and the session is told so once, here.
+    try:
+        import adr_shape
+        line = adr_shape.outside_line(project_root(data.get("cwd")))
+    except Exception:
+        line = None
+    if line:
+        print(line)
     # The memory protocol is an install option; unset means on, so a copy outside a plugin keeps it.
     if os.environ.get("CLAUDE_PLUGIN_OPTION_KORIUM", "on").lower() not in ("false", "0", "no", "off"):
         print(SESSION_START)
@@ -166,11 +193,6 @@ def show(lead):
     """Print one procedure exactly as user_prompt would inject it from this folder."""
     # Only a lead the hook declares, named with or without its closing period.
     leads = [known for known, _ in CLIFFS if known.rstrip(".") == lead.rstrip(".")]
-    # A worker's Bash tool sets no CLAUDE_PROJECT_DIR, which the hook has. The worker
-    # runs show from its own worktree, so that checkout stands in for the session's
-    # repo; when CLAUDE_PROJECT_DIR is set, the hook's own rule applies unchanged.
-    if not os.environ.get("CLAUDE_PROJECT_DIR"):
-        os.environ["CLAUDE_PROJECT_DIR"] = os.getcwd()
     text = cliff_source(os.getcwd())
     block = cliff_block(text, leads[0]) if text and leads else None
     if block:
@@ -189,7 +211,7 @@ def main():
         if not isinstance(data, dict):
             return
         if mode == "session-start":
-            session_start()
+            session_start(data)
         elif mode == "user-prompt":
             user_prompt(data)
     except Exception:

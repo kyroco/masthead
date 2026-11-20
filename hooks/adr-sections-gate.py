@@ -106,9 +106,9 @@ def find_by_number(where, number):
     return None
 
 
-def pr_divergences(cwd, base, pr_text, where):
+def pr_divergences(cwd, base, pr_text, where, root):
     """The reasons opening this pull request is refused: a divergent ADR with the doc unchanged."""
-    doc = adr_shape.architecture_doc()
+    doc = adr_shape.architecture_doc(root)
     top = (git(cwd or ".", "rev-parse", "--show-toplevel") or "").strip()
     if not doc or not top:
         return []
@@ -165,28 +165,31 @@ def main():
         data = json.load(sys.stdin)
         if not isinstance(data, dict):
             return
-        where = adr_shape.folder()
-        # Not opted in: no folder named, so no record is held to this shape.
-        if not where:
-            return
         tool = str(data.get("tool_name") or "")
         ti = data.get("tool_input") or {}
         if not isinstance(ti, dict):
             return
-        reasons, pr_reasons = [], []
         cwd = data.get("cwd") or os.getcwd()
+        # The repository the call is about: the record's for a Write or an Edit, else the shell's.
+        file_path = ti.get("file_path") if tool in ("Write", "Edit") else None
+        root = adr_shape.repo_of(file_path if isinstance(file_path, str) else None, cwd)
+        where = adr_shape.folder(root) if root else None
+        # Not opted in: no folder named, so no record is held to this shape.
+        if not where:
+            return
+        reasons, pr_reasons = [], []
 
         # Opening a pull request: an ADR it carries or names may not diverge from an unchanged doc.
         if re.match(r"^mcp__.+__create_pull_request$", tool):
             text = "%s\n%s" % (ti.get("title") or "", ti.get("body") or "")
-            reasons = pr_divergences(cwd, ti.get("base") or "", text, where)
+            reasons = pr_divergences(cwd, ti.get("base") or "", text, where, root)
             if reasons:
                 refuse(reasons, PR_INTRO, PR_OUTRO)
             return
         # The same command may also write an ADR through the shell, so the check below still runs.
         if tool == "Bash" and PR_CREATE.search(ti.get("command") or ""):
             cmd = ti.get("command") or ""
-            pr_reasons = pr_divergences(cwd, pr_base(cmd), cmd + "\n" + body_file(cmd, cwd), where)
+            pr_reasons = pr_divergences(cwd, pr_base(cmd), cmd + "\n" + body_file(cmd, cwd), where, root)
 
         if tool == "Write":
             path = ti.get("file_path") or ""
@@ -205,12 +208,12 @@ def main():
             # would leave it, so an empty Write followed by Edits is held like a Write. Without a
             # doc the gate stays as it was (MAST-31 scenario 5). A committed one keeps its sections,
             # and the alignment section it is left with, where it has one, is checked whole.
-            if after is not None and adr_shape.architecture_doc() and adr_shape.committed(path) is None:
-                reasons = adr_shape.missing(after)
+            if after is not None and adr_shape.architecture_doc(root) and adr_shape.committed(path) is None:
+                reasons = adr_shape.missing(after, root=root)
             else:
-                reasons = adr_shape.removed(old, new)
+                reasons = adr_shape.removed(old, new, root)
                 if after is not None:
-                    reasons += adr_shape.kept_alignment_gaps(after)
+                    reasons += adr_shape.kept_alignment_gaps(after, root)
 
         elif tool == "Bash":
             # Refuse a new ADR created through the shell, since its sections cannot be read there.

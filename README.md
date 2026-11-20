@@ -549,7 +549,7 @@ reason Claude can act on.
 | `verdict-gate.sh` | when a session or helper stops | a diagnosis case file whose verdict names no file and line, or has fewer than two numbered observations | |
 | `scope-gate.py` | before and after a write | while a scope file exists in the checkout, writes outside its allowed paths; puts back a protected file a command changed | a background command's later writes aren't seen |
 | `skill-review-gate.py` | before a skill or helper runs | invoking a changed project skill or agent nobody in the session has read | project files only |
-| `prime-context.py` | at session start and on each prompt | nothing; injects the procedure that fits the prompt (before a commit, before a push, before reading a test result) | |
+| `prime-context.py` | at session start and on each prompt | nothing; says once when the repository is unclear or the decision records folder is outside the repository, and injects the procedure that fits the prompt (before a commit, before a push, before reading a test result) | |
 
 ### Fully on once the repository states the fact setup writes
 

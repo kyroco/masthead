@@ -71,32 +71,71 @@ BUILDS = re.compile(r"(?i)^\s*(?:[-*]\s+)?(?:\*\*|__)?\s*builds?\s*(?::\s*(?:\*\
 NAME = re.compile(r"(?i)^(adr-.+|\d{4}[-_].+)\.md$")
 
 
-def folder():
-    """The opted-in ADR folder, absolute or repo-relative, ending in a slash; None when not opted in."""
+def repo_of(path=None, cwd=None):
+    """The checkout a record belongs to (project_fact.repo_root: the file's, else the shell's), or None."""
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    try:
+        import project_fact
+        return project_fact.repo_root(path, cwd)
+    except Exception:
+        return None
+
+
+def named_folder(root=None):
+    """ADR_DIR as the checkout at `root` names it, with ~ expanded, or ""."""
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     value = os.environ.get("ADR_DIR") or ""
     try:
         from project_fact import fact
-        value = fact("ADR_DIR", value) or ""
+        value = fact("ADR_DIR", value, root) or ""
     except Exception:
         pass
-    value = os.path.expanduser(value.strip()).replace("\\", "/")
-    if not value.strip("/"):
+    return os.path.expanduser(value.strip()).replace("\\", "/")
+
+
+def outside(value, root=None):
+    """Whether the absolute folder `value` lies outside the checkout at `root`."""
+    if not value.startswith("/"):
+        return False
+    try:
+        import project_fact
+        top = os.path.realpath(project_fact.checkout_top(root or project_fact.project_root()))
+    except Exception:
+        return True
+    return not (os.path.realpath(value) + "/").startswith(top.rstrip("/") + "/")
+
+
+def folder(root=None):
+    """The opted-in ADR folder of the checkout at `root`, absolute or repo-relative, ending in a slash; None
+    when not opted in. Decision records live in the repository (MAST-48), so a folder outside it is None."""
+    value = named_folder(root)
+    if not value.strip("/") or outside(value, root):
         return None
     if value.startswith("/"):
         return value.rstrip("/") + "/"
     return value.strip("/") + "/"
 
 
-def architecture_doc():
-    """(full path, repo-relative path) of the project's recorded architecture doc, or None."""
+def outside_line(root=None):
+    """The one line that says the checkout at `root` names an ADR folder outside it, which no gate checks;
+    None when it does not."""
+    value = named_folder(root)
+    if not value.strip("/") or not outside(value, root):
+        return None
+    return ("Masthead: ADR_DIR names {}, outside the repository, so no decision record there is checked. "
+            "Decision records must live in the repository.".format(value))
+
+
+def architecture_doc(root=None):
+    """(full path, repo-relative path) of the architecture doc the checkout at `root` records, or None."""
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     try:
         import project_fact
-        path = project_fact.architecture_doc()
+        root = root or project_fact.project_root()
+        path = project_fact.architecture_doc(root)
         if not path:
             return None
-        top = project_fact.checkout_top(project_fact.project_root())
+        top = project_fact.checkout_top(root)
         return path, os.path.relpath(path, top)
     except Exception:
         return None
@@ -356,12 +395,12 @@ def criteria_count(text):
     return len(re.findall(r"(?mi)^\s*[-*]?\s*`?AC-\d+", body))
 
 
-def missing(text, doc=False):
+def missing(text, doc=False, root=None):
     """The reasons a new record is short of the shape, one per gap; empty when it has it all.
 
     `doc` is the recorded architecture doc as architecture_doc() gives it; left out, it is looked up.
     """
-    doc = architecture_doc() if doc is False else doc
+    doc = architecture_doc(root) if doc is False else doc
     reasons = ["`## %s` is absent. Add it: %s." % (title, want)
                for title, want in sections(doc) if not has_section(text, title)]
     if doc:
@@ -375,12 +414,12 @@ def missing(text, doc=False):
     return reasons
 
 
-def removed(old, new):
+def removed(old, new, root=None):
     """The reasons a change to a record drops a required section it had."""
     return ["This change removes the `## %s` section. If the section is being rewritten, keep "
             "its heading. If the decision genuinely no longer needs it, that is the user's "
             "call, not an edit's." % title
-            for title, _ in sections(architecture_doc())
+            for title, _ in sections(architecture_doc(root))
             if has_section(old, title) and not has_section(new, title)]
 
 
@@ -429,16 +468,18 @@ def check(path, text):
     entry it is left with still needs a verdict and a why.
     """
     before = committed(path)
-    return missing(text) if before is None else removed(before, text) + kept_alignment_gaps(text)
+    root = repo_of(path)
+    return missing(text, root=root) if before is None else \
+        removed(before, text, root) + kept_alignment_gaps(text, root)
 
 
-def kept_alignment_gaps(text):
+def kept_alignment_gaps(text, root=None):
     """The entries of a carried record's alignment section left with no verdict or no why.
 
     Only those: its part and build names are not held to the doc as it reads today, so a
     later rename in the doc never blocks an edit to an old record.
     """
-    doc = architecture_doc()
+    doc = architecture_doc(root)
     return alignment_gaps(text, doc, verdicts_only=True) if doc else []
 
 

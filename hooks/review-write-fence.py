@@ -21,14 +21,7 @@ AGENT_LIST_SOURCE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ba
 IDENTITY_FIELDS = ("agent_type", "subagent_type", "agent_name")
 # Only this plugin's agents are fenced; another plugin's agent of the same name is not ours to police.
 PLUGIN_PREFIX = "masthead:"
-# Take the repo's state folder from project_fact.py, else the default.
-try:
-    from project_fact import state_dir as _state_dir
-    STATE_DIR = _state_dir()
-except Exception:
-    STATE_DIR = ".claude/state"
-REVIEW_REL = STATE_DIR + "/review"
-REVIEW_PARTS = tuple(part.casefold() for part in REVIEW_REL.split("/"))
+STATE_DIR_DEFAULT = ".claude/state"
 TOOLS = {"Write", "Edit", "MultiEdit", "NotebookEdit"}
 
 
@@ -69,7 +62,21 @@ def governing_agent(payload, pattern):
     return None
 
 
-def review_file(path, cwd, pattern):
+def review_rel(path, cwd):
+    """The review folder, relative to the checkout: the state folder of the repository the file is in
+    (project_fact.repo_root), else the default."""
+    try:
+        from project_fact import repo_root, state_dir
+        return state_dir(repo_root(path, cwd)) + "/review"
+    except Exception:
+        return STATE_DIR_DEFAULT + "/review"
+
+
+def parts_of(rel):
+    return tuple(part.casefold() for part in rel.split("/"))
+
+
+def review_file(path, cwd, pattern, review):
     """The resolved review folder when the path is an allowed review file, else None."""
     if not os.path.isabs(path):
         path = os.path.join(cwd or os.getcwd(), path)
@@ -77,8 +84,9 @@ def review_file(path, cwd, pattern):
         return None
     folder = os.path.realpath(os.path.dirname(path))
     parts = folder.split(os.sep)
-    depth = len(REVIEW_PARTS)
-    if len(parts) <= depth or tuple(part.casefold() for part in parts[-depth:]) != REVIEW_PARTS:
+    want = parts_of(review)
+    depth = len(want)
+    if len(parts) <= depth or tuple(part.casefold() for part in parts[-depth:]) != want:
         return None
     checkout = os.sep.join(parts[:-depth]) or os.sep
     if not os.path.exists(os.path.join(checkout, ".git")):
@@ -86,7 +94,7 @@ def review_file(path, cwd, pattern):
     return folder
 
 
-def scratch_file(path, cwd):
+def scratch_file(path, cwd, review):
     """True when the path is inside <checkout>/<state>/review/scratch with no symlink on the way."""
     if not os.path.isabs(path):
         path = os.path.join(cwd or os.getcwd(), path)
@@ -94,7 +102,7 @@ def scratch_file(path, cwd):
     if os.path.islink(path):
         return False
     parts = path.split(os.sep)
-    window = list(REVIEW_PARTS) + [SCRATCH]
+    window = list(parts_of(review)) + [SCRATCH]
     depth = len(window)
     for i in range(len(parts) - depth):
         if [part.casefold() for part in parts[i + 1:i + 1 + depth]] != window or i + 1 + depth >= len(parts):
@@ -119,15 +127,16 @@ def check(payload, agent):
     if not isinstance(tool_input, dict):
         deny(f"{agent}'s {payload.get('tool_name')} call carried no readable tool_input.")
     path = tool_input.get("file_path") or tool_input.get("notebook_path") or ""
-    if isinstance(path, str) and path and scratch_file(path, payload.get("cwd")):
+    review = review_rel(path if isinstance(path, str) else None, payload.get("cwd"))
+    if isinstance(path, str) and path and scratch_file(path, payload.get("cwd"), review):
         return
-    folder = review_file(path, payload.get("cwd"), FILES[agent]) if isinstance(path, str) and path else None
+    folder = review_file(path, payload.get("cwd"), FILES[agent], review) if isinstance(path, str) and path else None
     if folder is None:
-        deny(f"{agent} may write only {REVIEW_REL}/{WANT[agent]}, or anything under "
-             f"{REVIEW_REL}/{SCRATCH}/, in the checkout under review, and this call writes "
+        deny(f"{agent} may write only {review}/{WANT[agent]}, or anything under "
+             f"{review}/{SCRATCH}/, in the checkout under review, and this call writes "
              f"{path or '(no path)'}. A verifier never edits the code it judges or another verifier's "
              f"file; a small file of your own (a probe script, a test file) goes under "
-             f"{REVIEW_REL}/{SCRATCH}/, never a copy of the tree. If this is the file your dispatch names and it "
+             f"{review}/{SCRATCH}/, never a copy of the tree. If this is the file your dispatch names and it "
              "was still refused, put the findings in your final reply and say the write was refused.")
 
 

@@ -6,16 +6,10 @@ set -uo pipefail
 cat >/dev/null 2>&1 || true
 
 here="$(cd "$(dirname "$0")" && pwd)"
-fact() { python3 "$here/project_fact.py" ${root:+--root "$root"} "$@" 2>/dev/null; }
+# The facts of the repository the session is about (project_fact.py repo_root); none when that is unclear.
+fact() { python3 "$here/project_fact.py" "$@" 2>/dev/null; }
 
-# In a cloud session, take the facts from the first recorded repo that names an ADR_DIR.
-root=""
 adr_dir="$(fact ADR_DIR)"
-if [ -z "$adr_dir" ] && [ "${CLAUDE_CODE_REMOTE:-}" = true ]; then
-  while IFS= read -r root; do
-    [ -n "$root" ] && adr_dir="$(fact ADR_DIR)" && [ -n "$adr_dir" ] && break
-  done < "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/cloud-session-repos"
-fi
 case "$adr_dir" in
   "~/"*) adr_dir="$HOME/${adr_dir#\~/}" ;;
   /*) ;;

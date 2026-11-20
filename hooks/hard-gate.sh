@@ -315,15 +315,20 @@ for _d in $(printf '%s' "$_CMD" | grep -oE -- '-C[[:space:]]+("[^"]+"|[^[:space:
   cd "$(_unquote "$_d")" 2>/dev/null || true
 done
 
-# Changed set: stand down outside a git repo.
+# Outside a checkout (a pull request opened from the workspace), the repository is the workspace's one
+# (project_fact.py --repo-root). When that is unclear, refuse: a push or a pull request never passes unchecked.
 if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  exit 0
+  if ! _ROOT="$(python3 "$_HOOK_DIR/project_fact.py" --repo-root 2>&1)"; then
+    echo "$_ROOT Nothing was pushed and no pull request was opened." >&2
+    exit 2
+  fi
+  cd "$_ROOT" || exit 2
 fi
 
 # List the files the branch changed since origin/main, committed or not, plus untracked files, as absolute paths.
 TOP="$(git rev-parse --show-toplevel)"
 cd "$TOP" || exit 0
-# Run checks only in the session's own repository.
+# Run checks only in one of the workspace's repositories (project_fact.py trusted()).
 if ! python3 "$_HOOK_DIR/project_fact.py" --trusted "$TOP" 2>/dev/null; then
   echo "WARN: $TOP is not this session's repository, so the push gate ran none of its checks there." >&2
   exit 0

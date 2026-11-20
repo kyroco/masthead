@@ -46,19 +46,6 @@ else
   echo "WARN (adr-structure-gate): not a git repo - cannot delta-scope; skipping cleanly." >&2
   exit 0
 fi
-# Also list the changed files of an ADR folder that lives in its own repository, as absolute paths.
-case "$ADR_DIR" in
-  /*)
-    if [ -d "$ADR_DIR" ]; then
-      ADR_TOP="$(git -C "$ADR_DIR" rev-parse --show-toplevel 2>/dev/null || true)"
-      if [ -n "$ADR_TOP" ]; then
-        CHANGED="$CHANGED
-$(git -C "$ADR_TOP" status --porcelain -z -u 2>/dev/null | tr '\0' '\n' | cut -c4- | awk -v top="$ADR_TOP" '{print top "/" $0}' || true)"
-      fi
-    fi
-    ;;
-esac
-
 # Keep only the records inside the opted-in folder.
 ADR_FILES="$(printf '%s\n' "$CHANGED" | python3 "$SHAPE" pick 2>/dev/null)"
 

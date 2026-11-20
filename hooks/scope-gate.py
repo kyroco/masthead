@@ -7,12 +7,15 @@ import re
 import sys
 import time
 
-# The repo's state folder, from project_fact.py, with a default when it is absent.
+# Each checkout's state folder and the workspace's repositories, from project_fact.py, with defaults when it is absent.
 try:
-    from project_fact import state_dir as _state_dir
-    STATE_DIR = _state_dir()
+    from project_fact import state_dir as _state_dir, workspace_repos
 except Exception:
-    STATE_DIR = ".claude/state"
+    def _state_dir(root=None):
+        return ".claude/state"
+
+    def workspace_repos():
+        return [os.environ["CLAUDE_PROJECT_DIR"]] if os.environ.get("CLAUDE_PROJECT_DIR") else []
 try:
     from project_fact import private_dir, private_open, safe_session
 except Exception:
@@ -20,13 +23,27 @@ except Exception:
         return None
 
     private_open = safe_session = None
-SCOPE_REL = STATE_DIR + "/scope.json"
-# Where reviewer and security-reviewer write their findings, whatever the task's scope.
-REVIEW_STATE_RELS = (STATE_DIR + "/review",)
 SELF_PROTECTED = (".claude/hooks/scope-gate.py", ".claude/settings.json", ".claude/settings.local.json")
-PROTECTED = (SCOPE_REL,) + SELF_PROTECTED
 TOOLS = {"Write", "Edit", "MultiEdit", "NotebookEdit", "Bash"}
 EDIT_TOOLS = TOOLS - {"Bash"}
+
+
+def state_rel(root):
+    """The state folder of the checkout at `root`, relative to it."""
+    try:
+        return _state_dir(root)
+    except Exception:
+        return ".claude/state"
+
+
+def scope_rel(root):
+    """The scope file of the checkout at `root`, relative to it."""
+    return state_rel(root) + "/scope.json"
+
+
+def protected(root):
+    """The files in the checkout at `root` that hold its scope or wire the gate."""
+    return (scope_rel(root),) + SELF_PROTECTED
 
 
 def snap_dir():
@@ -53,7 +70,7 @@ def scope_root(path):
     while True:
         git = os.path.join(d, ".git")
         if os.path.exists(git):
-            if os.path.isfile(os.path.join(d, SCOPE_REL)):
+            if os.path.isfile(os.path.join(d, scope_rel(d))):
                 return d
             if os.path.isfile(git):
                 return None  # a worktree is its own checkout
@@ -129,7 +146,7 @@ def matches(rel, patterns):
 
 
 def load_scope(root):
-    path = os.path.join(root, SCOPE_REL)
+    path = os.path.join(root, scope_rel(root))
     try:
         scope = json.load(open(path))
         allowed = scope.get("allowed_paths")
@@ -172,7 +189,7 @@ def check_user_files(target, cwd):
         return
     roots = protected_roots(cwd, None)
     if roots:
-        deny(f"{target} enforces or wires the scope set in {os.path.join(roots[0], SCOPE_REL)}, "
+        deny(f"{target} enforces or wires the scope set in {os.path.join(roots[0], scope_rel(roots[0]))}, "
              "so it is protected while that file exists. Say in one sentence why it needs "
              "changing and wait for the user.")
 
@@ -194,9 +211,11 @@ def check_edit(target, cwd):
         task = scope.get("task") or "this task"
         # Allow a write to the review folder when every spelling of the path, resolved ones included, lies inside it.
         real_rel = rel_under(real, os.path.realpath(root))
-        if real_rel is not None and any(all(r.startswith(fold(state) + "/") for r in folded) for state in REVIEW_STATE_RELS):
+        # Where the review agents write their findings, whatever the task's scope.
+        review = fold(state_rel(root) + "/review") + "/"
+        if real_rel is not None and all(r.startswith(review) for r in folded):
             continue
-        if fold(SCOPE_REL) in folded:
+        if fold(scope_rel(root)) in folded:
             deny(f"{scope_path} sets this task's scope and already exists, so only the user changes it. "
                  "If the scope is wrong, say so in one sentence and wait for the user.")
         for r in folded:
@@ -213,12 +232,13 @@ def check_edit(target, cwd):
 
 
 def protected_roots(cwd, target):
-    # Find the scoped checkouts for the call's folder and the session's own, so a call from elsewhere cannot skip the guard.
+    # Find the scoped checkouts for the call's folder and the workspace's repositories, so a call from elsewhere
+    # cannot skip the guard.
     roots = set()
-    for start in {cwd or os.getcwd(), os.environ.get("CLAUDE_PROJECT_DIR") or ""}:
+    for start in {cwd or os.getcwd(), *workspace_repos()}:
         if start:
             roots |= {c for c in repository_checkouts(start)
-                      if os.path.isfile(os.path.join(c, SCOPE_REL))}
+                      if os.path.isfile(os.path.join(c, scope_rel(c)))}
     for p in (target,):
         if p:
             r = scope_root(os.path.realpath(p))
@@ -249,7 +269,7 @@ def snap_path(payload):
 def exempt_files(root):
     """Protected files the user named literally in allowed_paths; none when the scope file does not parse."""
     try:
-        allowed = json.load(open(os.path.join(root, SCOPE_REL))).get("allowed_paths") or []
+        allowed = json.load(open(os.path.join(root, scope_rel(root)))).get("allowed_paths") or []
         named = {fold(p.strip().strip("/")) for p in allowed if isinstance(p, str)}
     except (OSError, ValueError, AttributeError):
         named = set()
@@ -273,7 +293,7 @@ def snapshot(payload, roots):
     for root in roots:
         # Snapshot each protected file, the user files by absolute path, for post() to restore.
         entries = {rel: read_state(os.path.join(root, rel))
-                   for rel in PROTECTED + user_protected()}
+                   for rel in protected(root) + user_protected()}
         state[root] = {"exempt": exempt_files(root), "files": entries}
     if not state:
         return
