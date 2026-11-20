@@ -6,21 +6,20 @@ its own session, checked, reviewed by people who weren't in the room, tested
 on the exact commit that ships, and merged. You decide the things only you
 can decide.
 
-## What's new in 0.4.0
+## What's new in 0.5.0
 
-An optional new way to ship: agents land tested changes on one shared
-`landing` branch, with no pull request per change.
+The optional `landing` branch run is now simpler and cheaper.
 
-- CI tests everything waiting there in one run. Green moves `main` forward.
-- A red batch: Masthead finds the change that broke it and hands it back to
-  the agent that wrote it, which fixes it on top. Nothing is taken out, and
-  `main` waits until a later run is green.
-- The agent's record of what it did goes on the issue, not in a pull request.
-- A change to CI files (`.github/`, `scripts/ci/`) is stopped before it is
-  pushed unless you have OKed it on the issue.
+- The batch run starts only when you say go, for a milestone or for a set of
+  issues you name. Pushes to `landing` cost nothing.
+- A hotfix gets its own `hotfix` branch and goes straight to `main`.
+- A red run names the bad change, and its worker fixes it on top. Nothing is
+  taken off `landing`.
+- Code that already passed is never tested again.
+- A pile of only documents moves with no test run, once setup knows your
+  document paths.
 
-It's opt-in. Without it, Masthead works as before, pull requests and all.
-Setup walks you through it click by click: [The optional batch
+It's opt-in. Setup walks you through it: [The optional batch
 run](#the-optional-batch-run).
 
 ## Why we built it
