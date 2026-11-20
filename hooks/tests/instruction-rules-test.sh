@@ -1961,7 +1961,11 @@ done
 # Scenario 3: the terminal and the desktop app read and write no page.
 says  "$H" "**Desktop app and terminal:** nothing here; no page is read or written."
 # Scenario 1: the foreman adds itself, with its milestone as the label.
-says  "$H" "the Artifact titled \"Project status\" that \`Artifact\` with \`action\` \"list\" shows"
+# Round 1, F1: the page is found among this project's own artifacts, not the
+# account's 25 newest, and a thread that finds none or several says so.
+says  "$H" "the artifact titled \"Project status\" among this project's own artifacts, which \`list_project_artifacts\` lists"
+never "$H" "that \`Artifact\` with \`action\` \"list\" shows"
+says  "$H" "With none, or more than one, write nothing, say so in one line in the next report, and run as before."
 says  "$H" "one document per thread in its database collection \`crew\`"
 says  "$H" "the \`id\` that \`get_session\` returns when called with no \`session_id\`"
 says  "$H" "\`role\` \"foreman\", \`session\` its session id, \`label\` the milestone it runs"
