@@ -72,7 +72,23 @@ def private_open(path, append=False):
 
 
 def project_root():
-    return os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()
+    """The folder a fact is read for when the caller names none: the session's project. In a cloud session
+    whose folder holds the clones rather than being a checkout (a Project thread starts in /home/user), it is
+    the attached repository the working folder is in, else the only one attached; with several and the
+    working folder in none of them, it stays the session's folder, so no repository is guessed (MAST-48)."""
+    session = os.environ.get("CLAUDE_PROJECT_DIR")
+    if not session:
+        return os.getcwd()
+    if os.environ.get("CLAUDE_CODE_REMOTE") != "true" or \
+            os.path.exists(os.path.join(checkout_top(session), ".git")):
+        return session
+    attached = cloud_attached()
+    here = repo_key(os.getcwd())
+    if here in attached:
+        return checkout_top(os.getcwd())
+    if len(attached) == 1:
+        return next(iter(attached))
+    return session
 
 
 def main_checkout(root):
@@ -172,16 +188,20 @@ def cloud_repos_file():
     return os.path.join(config, "cloud-session-repos")
 
 
-def cloud_cloned(root):
-    """Whether `root` is in a repo the cloud session attached, at its start or during it."""
+def cloud_attached():
+    """The repositories the cloud session attached, each as its repo_key; empty outside a cloud session."""
     if os.environ.get("CLAUDE_CODE_REMOTE") != "true":
-        return False
+        return set()
     try:
         with open(cloud_repos_file()) as handle:
-            cloned = {os.path.realpath(line.strip()) for line in handle if line.strip()}
+            return {repo_key(line.strip()) for line in handle if line.strip()}
     except OSError:
-        return False
-    return repo_key(root) in cloned
+        return set()
+
+
+def cloud_cloned(root):
+    """Whether `root` is in a repo the cloud session attached, at its start or during it."""
+    return repo_key(root) in cloud_attached()
 
 
 def fact(name, default=None, root=None):
