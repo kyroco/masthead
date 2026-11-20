@@ -100,6 +100,13 @@ def recorded(env):
         return [line.strip() for line in handle if line.strip()]
 
 
+def no_folder(env, expr, cwd):
+    """What a hook that names no folder reads, such as adr_shape.folder() or state_dir()."""
+    code = "import sys; sys.path.insert(0, sys.argv[1]); import project_fact as p; print(" + expr + ")"
+    out = subprocess.run([sys.executable, "-c", code, HOOKS], env=env, capture_output=True, text=True, cwd=cwd)
+    return out.stdout.strip()
+
+
 def register(env, directory, owner="kyroco", repo="masthead"):
     return hook(env, {"session_id": "s1", "hook_event_name": "PostToolUse",
                       "tool_name": "mcp__claude-code-remote__register_repo_root",
@@ -146,6 +153,43 @@ def main():
             make_repo(other, url)
             register(env, other)
             expect("s1: origin {} names kyroco/masthead".format(url), fact(env, other), "scripts/check.sh")
+    finally:
+        shutil.rmtree(tmp)
+
+    # Scenario 1, a hook that names no folder (adr_shape.folder(), state_dir() in scope-gate.py and
+    # review-write-fence.py): in a cloud session whose folder holds the clones, it reads the attached repository.
+    tmp = fresh()
+    try:
+        env = base_env(tmp)
+        home = os.path.join(tmp, "home")
+        repo = os.path.join(home, "masthead")
+        make_repo(repo, "https://github.com/kyroco/masthead")
+        with open(os.path.join(repo, ".claude", "settings.json"), "w") as handle:
+            json.dump({"env": {"ADR_DIR": "docs/adr", "PROJECT_STATE_DIR": ".kyroco"}}, handle)
+        expect("s1 no folder: before the attach, the default", no_folder(env, "p.fact('ADR_DIR')", home), "None")
+        register(env, repo)
+        expect("s1 no folder: from the clones folder, the one attached repository's ADR_DIR",
+               no_folder(env, "p.fact('ADR_DIR')", home), "docs/adr")
+        expect("s1 no folder: its state folder", no_folder(env, "p.state_dir()", home), ".kyroco")
+        expect("s1 no folder: its state path", no_folder(env, "p.state_path()", home), os.path.join(repo, ".kyroco"))
+        expect("s1 no folder: from inside it", no_folder(env, "p.fact('ADR_DIR')", os.path.join(repo, ".claude")),
+               "docs/adr")
+        other = os.path.join(home, "app")
+        make_repo(other, "https://github.com/kyroco/app")
+        register(env, other, repo="app")
+        expect("s1 no folder: two attached, from inside the second, the second's fact",
+               no_folder(env, "p.fact('PROJECT_PUSH_CHECK')", other), "scripts/check.sh")
+        expect("s1 no folder: two attached, from inside the first, the first's fact",
+               no_folder(env, "p.fact('ADR_DIR')", repo), "docs/adr")
+        expect("s1 no folder: two attached, from the clones folder, no guess",
+               no_folder(env, "p.fact('ADR_DIR')", home), "None")
+        stranger = os.path.join(home, "stranger")
+        make_repo(stranger, "https://github.com/someone/tool", check="evil.sh")
+        expect("s2 no folder: from inside a clone the session made, never its fact",
+               no_folder(env, "p.fact('PROJECT_PUSH_CHECK')", stranger) != "evil.sh", True)
+        env3 = base_env(tmp, cloud=False)
+        expect("s3 no folder: outside a cloud session, the session folder as before",
+               no_folder(env3, "p.project_root()", repo), home)
     finally:
         shutil.rmtree(tmp)
 
