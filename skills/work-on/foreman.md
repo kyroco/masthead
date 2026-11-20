@@ -19,6 +19,12 @@ never by this file. Nothing here fixes a format, a shape or a batch size for a
 reply. Where this file says "ask" or "tell", do it the way they have asked to
 be talked to.
 
+Some steps differ by the host you run in: starting a worker, giving a free
+worker its next issue, hearing from a worker and waiting on a run, asking
+the person, a permission prompt, and ending a worker. `${CLAUDE_PLUGIN_ROOT}/references/hosts.md`
+holds each one, a version per host, and says which host you are in. This
+file names the step and never a host's tool.
+
 You write no product code, run no tests, and file no issue. You run one build, and only when the repo names one: the
 warm-up below, which builds the repo once so the workers do not each build it
 from nothing at the same time. Run at `medium` effort. GitHub numbers issues and
@@ -143,30 +149,9 @@ worker given none builds cold.
 For each issue, in order, up to the person's number:
 
 1. `${CLAUDE_PLUGIN_ROOT}/skills/work-on/set-status.sh <n> "In Progress"`.
-2. In the Claude desktop app (the `mcp__ccd_session__start_session` tool
-   exists), the app starts a session only in a turn the person's own message
-   began, so start one session per slot in the turn they say go and reuse
-   them for the whole run. `start_session` with `initiation` "user_asked",
-   `context` "fresh", `effort` the issue's level, `use_worktree` true, and this
-   prompt: "Read ${CLAUDE_PLUGIN_ROOT}/skills/work-on/SKILL.md and follow it as
-   if `/work-on #<n> dispatched` had been typed. Your foreman is session
-   <this session's id>: send every question and report to it with
-   SendMessage." Add the person's instructions for this run in their own
-   words. A free worker gets its next issue from any turn: `clear_session`,
-   set its effort, send the same prompt with `SendMessage`; a cleared session
-   remembers nothing, so the prompt always names its foreman. A worker cannot
-   start above this session's effort: start it with "Reply ready and stop",
-   raise its effort, then send the prompt. If the app refuses to start one,
-   propose it as a card (`initiation` "own_initiative") and tell the person a
-   card for issue #<n> is waiting. The app's "archive sessions when their
-   pull request closes" setting must be off for the run.
-3. In the terminal, from this repo's main checkout, one command line per
-   worker, never a loop:
-   `claude --bg --model opus --effort <level> --name "<n>-issue" "/work-on #<n> dispatched"`.
-   A worker runs on Opus and never inherits this session's model. Never `-p`
-   or `--print`: headless mode has no inbox. Once `ListAgents` shows it,
-   `SendMessage` it that this session is its foreman, with `notify_when_idle`,
-   and pass on the person's instructions for the run in their words.
+2. Start its worker at the issue's effort, as **Start a worker** in
+   `hosts.md` says for your host, with the person's instructions for this run
+   in their own words.
 
 An issue whose blocker is still open waits until that blocker merges; in the
 batch way, until a green batch moves main past that blocker's commits, since
@@ -174,9 +159,9 @@ a worker branches from main.
 
 ## While they work
 
-Rely on `notify_when_idle` notices, or in the desktop app on the notes it
-sends when a worker ends a turn, and on `Monitor`, not a shell loop, for a
-queued PR or a CI run, or in the batch way a batch Gate run. A worker silent past reason gets one message
+Hear from your workers, and wait on a queued PR or a CI run, or in the
+batch way a batch Gate run, as **Hear from a worker, and wait on a run** in
+`hosts.md` says. A worker silent past reason gets one message
 asking for status. Never read a worker's transcript into this session.
 
 A worker writes no plan and waits for no go: it builds as soon as it has
@@ -184,10 +169,10 @@ read its sources. Its first message is a question, a split or its PR, or
 in the batch way its report of the commits it landed.
 
 A worker that split its issue sends the sub-issue numbers and stops, and that
-worker is free: start one worker per sub-issue, in blocked-by order. In the
-terminal, stop that session as after a merge, or after a landing in the
-batch way. Pass the branch it left on
-GitHub to the user to delete.
+worker is free: start one worker per sub-issue, in blocked-by order, giving
+the free worker its next issue as after a merge, or after a landing in the
+batch way (**Give a free worker its next issue**, `hosts.md`). Pass the
+branch it left on GitHub to the user to delete.
 
 A worker's question: first re-read that issue's comments, then search Korium
 for the person's earlier answer. When they already answered it, relay that
@@ -224,9 +209,8 @@ does not land its commits until it has the answer. Everything else the adjudicat
 you, whichever round placed it, and you rule on none of it.
 
 Permission prompts belong to the person: tell them which session and what it
-asks (`claude attach <id>` in the terminal; in the desktop app, a link to the
-worker's session, `[its title](#<its id>)`). Never perform the blocked action
-yourself.
+asks, as **A permission prompt** in `hosts.md` says. Never perform the
+blocked action yourself.
 
 A worker that stops on a failure gets one message naming it. A second failure
 parks the issue: `gh issue edit <n> --add-label parked` and one comment saying
@@ -268,9 +252,8 @@ List what it blocked:
 
     gh api repos/{owner}/{repo}/issues/<n>/dependencies/blocking --jq '.[] | "#\(.number) \(.state) \(.title)"'
 
-Then give that worker its next ready issue, those first. In the terminal, stop
-the worker's session (its id and worktree come from `claude agents --json`,
-not from memory) and start the next issue in a new one.
+Then give that worker its next ready issue, those first, as **Give a free
+worker its next issue** in `hosts.md` says.
 
 Every report to the person carries the count of issues closed by a merge in
 the run. A split is not a stop: its sub-issues join the run like any other
@@ -288,9 +271,8 @@ holds an unproven list with nothing a customer would see. Otherwise send it
 back with the reason; a second failure parks it. Then tell the worker its
 landing is accepted. It brings down its test stack and deletes its code
 index, and its slot is free once it answers "cleaned up" (its worktree and
-branch stay). Give that worker its next ready issue. In the terminal, stop the
-worker's session (its id and worktree come from `claude agents --json`, not
-from memory) and start the next issue in a new one.
+branch stay). Give that worker its next ready issue, as **Give a free worker
+its next issue** in `hosts.md` says.
 
 Main moves forward only from `landing`, or from `hotfix` for a hotfix, by one
 run of the repo's Gate on the batch, never by a worker and never by you. You queue nothing and open nothing
@@ -412,8 +394,8 @@ other issue.
 
 ## End the run
 
-Every issue is merged (in the batch way, on main), parked or skipped. Stop any remaining workers (in the
-desktop app, archive them, which also removes their worktrees), remove the
+Every issue is merged (in the batch way, on main), parked or skipped. End any
+remaining workers (**End a worker**, `hosts.md`), remove the
 warm trees with `${CLAUDE_PLUGIN_ROOT}/skills/work-on/warm-build.sh end`, capture one
 Korium handoff (what merged or reached main, what parked and why, and the person's answers,
 verbatim), and tell the person: one line per issue with its outcome, what each
@@ -440,8 +422,8 @@ on GitHub. Every section above holds, with these changes, shown for KOR-12:
   question or a decision, in place of the `needs-decision` label.
 - **Start a worker.** Set the status with `save_issue` with `id` the key and
   `state` `In Progress`, never `set-status.sh`, which knows only GitHub
-  projects. The worker's prompt says `/work-on KOR-12 dispatched`, and in the
-  terminal its session takes `--name "KOR-12-issue"`.
+  projects. The worker's prompt says `/work-on KOR-12 dispatched`, and its
+  session is named as `hosts.md` says.
 - **A worker's question.** The worker puts the answer on the issue and sets
   it back to `In Progress` itself (`worker.md`, On Linear), so the `haiku`
   agent that writes the answer down captures it in Korium and takes the

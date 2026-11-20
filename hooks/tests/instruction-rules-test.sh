@@ -70,7 +70,7 @@ says  skills/github-issues/SKILL.md "issues/<parent>/sub_issues"
 says  skills/work-on/foreman.md "Pass the branch it left on GitHub to the user to delete"
 never skills/work-on/worker.md "git/refs/heads"
 says  skills/work-on/foreman.md "that worker is free"
-says  skills/work-on/foreman.md "stop that session as after a merge, or after a landing in the batch way"
+says  skills/work-on/foreman.md "giving the free worker its next issue as after a merge, or after a landing in the batch way"
 says  skills/work-on/foreman.md "then each parent up the chain that has no open sub-issue left, set to Done the same way"
 says  skills/work-on/foreman.md "A worker that split its issue sends the sub-issue numbers"
 says  skills/work-on/foreman.md "Close now any parent whose sub-issues are all closed"
@@ -860,14 +860,14 @@ says  "$F" "Queuing the PR is unchanged: it goes to GitHub's merge queue"
 says  "$F" "set the merged issue to \`Done\` with \`save_issue\` if the \`Fixes\` line did not"
 # Workers start on the Linear key and the status is set through Linear.
 says  "$F" "\`/work-on KOR-12 dispatched\`"
-says  "$F" "\`--name \"KOR-12-issue\"\`"
+says  references/hosts.md "\`--name \"KOR-12-issue\"\`"
 says  "$F" "\`save_issue\` with \`id\` the key and \`state\` \`In Progress\`, never \`set-status.sh\`"
 # Scenario 8: a GitHub project runs as today.
 says  "$F" "On a repository whose issues live on GitHub, none of this section applies"
 says  "$F" "gh issue edit <n> --add-label parked"
 says  "$F" "gh api repos/{owner}/{repo}/issues/<n>/dependencies/blocking"
 says  "$F" "\`\${CLAUDE_PLUGIN_ROOT}/skills/work-on/set-status.sh <n> \"In Progress\"\`"
-says  "$F" "claude --bg --model opus --effort <level> --name \"<n>-issue\" \"/work-on #<n> dispatched\""
+says  references/hosts.md "claude --bg --model opus --effort <level> --name \"<n>-issue\" \"/work-on #<n> dispatched\""
 
 # Review S1-pagination: every page of issues and comments is read.
 says  "$F" "while the answer says \`hasNextPage\` true, call again with its \`cursor\` until no page is left"
@@ -1708,7 +1708,13 @@ for phrase in "Queue the PR when all of these hold" "enqueuePullRequest" "close 
   part_says "foreman.md, the pull request way," "$FP" "$phrase"
 done
 OLDQ="$(git -C "$ROOT" show "$OLD_REF":skills/work-on/foreman.md 2>/dev/null | tr '\n' ' ' | tr -s ' ' | sed -E 's/.*(Queue the PR when all of these hold)/\1/; s/ ## End the run.*//')"
+# MAST-47 moved the one host step in this section to references/hosts.md, which
+# its own checks pin; the rest of the section stays 0.3.1's word for word.
+OLD_HOST_STEP="Then give that worker its next ready issue, those first. In the terminal, stop the worker's session (its id and worktree come from \`claude agents --json\`, not from memory) and start the next issue in a new one."
+NEW_HOST_STEP="Then give that worker its next ready issue, those first, as **Give a free worker its next issue** in \`hosts.md\` says."
 if old_text "the foreman's queue section"; then
+  part_says "foreman.md at 0.3.1" "$OLDQ" "$OLD_HOST_STEP"
+  OLDQ="${OLDQ/"$OLD_HOST_STEP"/"$NEW_HOST_STEP"}"
   part_says "foreman.md at 0.3.1" "$OLDQ" "Queue the PR when all of these hold"
   part_says "foreman.md, the pull request way," "$FP" "$OLDQ"
 fi
@@ -1762,7 +1768,7 @@ says  skills/work-on/SKILL.md "the merge queue and what an issue unblocks stay o
 # Re-verify round 2, judge2-F1: a worker's session lasts until its landing is
 # accepted; the issue closes later, when a green batch moves main.
 never skills/work-on/SKILL.md "a background session in the terminal) until a green batch moves main"
-says  skills/work-on/SKILL.md "each issue runs in a fresh session of its own (a desktop session in the Claude desktop app, a background session in the terminal) through to merge, or in the batch way until its landing is accepted, and the issue closes once a green batch moves main"
+says  skills/work-on/SKILL.md "each issue runs in a fresh session of its own through to merge, or in the batch way until its landing is accepted, and the issue closes once a green batch moves main"
 # INFRA-263: the foreman queues nothing, and hands a dropped commit back to its worker.
 # Scenario 1: no step of the foreman's queues a pull request, merges one or opens one.
 FM=skills/work-on/foreman.md
@@ -1831,5 +1837,48 @@ done
 says  references/bad-commit.md "Main does not move until a later go runs green."
 # Scenario 3: main waits for a later go that runs green.
 says  "$FM" "main does not move until a later go runs green"
+# MAST-47: the steps that differ by host live in references/hosts.md, one
+# version per host; the three work-on files name the step and never a host.
+H=references/hosts.md
+# Scenario 4: no host's tool, command or name in SKILL.md, foreman.md or worker.md.
+for f in skills/work-on/SKILL.md skills/work-on/foreman.md skills/work-on/worker.md; do
+  for host_word in "desktop app" "desktop session" "in the terminal" "ccd_session" "start_session" \
+      "clear_session" "set_session_effort" "own_initiative" "archive" "SendMessage" "ListAgents" \
+      "notify_when_idle" "Monitor" "claude --bg" "claude attach" "claude agents" "--print"; do
+    never "$f" "$host_word"
+  done
+done
+# Each step those files name has its versions in the host file.
+for step in "## Which host you are in" "## Start a worker" "## Give a free worker its next issue" \
+    "## Reach the foreman" "## Hear from a worker, and wait on a run" "## Ask the person" \
+    "## A permission prompt" "## End a worker"; do
+  says "$H" "$step"
+done
+for step in "**Start a worker**" "**Give a free worker its next issue**" \
+    "**Hear from a worker, and wait on a run**" "**A permission prompt**" "**End a worker**"; do
+  says skills/work-on/foreman.md "$step"
+done
+says  skills/work-on/foreman.md "\`\${CLAUDE_PLUGIN_ROOT}/references/hosts.md\`"
+says  skills/work-on/foreman.md "This file names the step and never a host's tool"
+says  skills/work-on/worker.md "**Reach the foreman** in \`\${CLAUDE_PLUGIN_ROOT}/references/hosts.md\`"
+# Scenario 1: the terminal starts a worker as before, at the effort the foreman set.
+says  "$H" "**Terminal:** it does not"
+says  "$H" "from this repo's main checkout, one command line per worker, never a loop"
+says  "$H" "A worker runs on Opus and never inherits this session's model. Never \`-p\` or \`--print\`: headless mode has no inbox"
+says  "$H" "Once \`ListAgents\` shows it, \`SendMessage\` it that this session is its foreman, with \`notify_when_idle\`"
+says  "$H" "**Terminal:** rely on \`notify_when_idle\` notices"
+says  skills/work-on/foreman.md "Start its worker at the issue's effort, as **Start a worker** in \`hosts.md\` says"
+# Scenario 2: the desktop app starts, clears, messages and archives workers as before.
+says  "$H" "**Desktop app:** the \`mcp__ccd_session__start_session\` tool exists"
+says  "$H" "\`start_session\` with \`initiation\` \"user_asked\", \`context\` \"fresh\", \`effort\` the issue's level, \`use_worktree\` true"
+says  "$H" "**Desktop app:** from any turn: \`clear_session\`, set its effort, send the prompt of **Start a worker** with \`SendMessage\`"
+says  "$H" "a cleared session remembers nothing, so the prompt always names its foreman"
+says  "$H" "start it with \"Reply ready and stop\", raise its effort, then send the prompt"
+says  "$H" "The app's \"archive sessions when their pull request closes\" setting must be off for the run"
+says  "$H" "**Desktop app:** archive it, which also removes its worktree"
+says  "$H" "**Terminal:** stop the worker's session (its id and worktree come from \`claude agents --json\`, not from memory)"
+# Scenario 3: a dispatched worker reaches its foreman as before.
+says  "$H" "**Desktop app and terminal:** with \`SendMessage\`, to the session its prompt names as its foreman"
+says  "$H" "Your foreman is session <this session's id>: send every question and report to it with SendMessage."
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]

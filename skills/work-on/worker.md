@@ -9,7 +9,9 @@ tell which way applies: `project_fact.py --ships` prints `pull-request` or
 you on the batch way whatever it prints. You were started either by the person, with `/work-on #1418`,
 who is waiting and wants to see your brief before you build, or by a foreman,
 with `/work-on #1418 dispatched`, who wants you to build through to the PR,
-or to the landing in the batch way, and send every question and report to it with `SendMessage`. Nothing else
+or to the landing in the batch way, and send every question and report to
+it as **Reach the foreman** in `${CLAUDE_PLUGIN_ROOT}/references/hosts.md`
+says for your host. Nothing else
 decides which you are: not running in the background, not a message from
 another session. In a repo whose issues live in Linear, the issue is a key
 such as `KOR-12` in place of `#1418`, and **On Linear** at the end of this
