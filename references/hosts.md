@@ -68,8 +68,8 @@ The foreman starts one worker per issue. On Linear, the prompt names the key
   session is its foreman, with `notify_when_idle`, and pass on the person's
   instructions for the run in their words.
 - **Project:** a thread cannot start a thread. Ask the coordinator with
-  `message_coordinator`, one message per worker, for a new thread with this
-  prompt: "Read ${CLAUDE_PLUGIN_ROOT}/skills/work-on/SKILL.md and follow it
+  `message_coordinator`, one message per worker, for a new thread titled
+  with the issue's key or number and its title, with this prompt: "Read ${CLAUDE_PLUGIN_ROOT}/skills/work-on/SKILL.md and follow it
   as if `/work-on #<n> dispatched` had been typed. Your foreman is the thread
   <this thread's title> (<this thread's id>): send every question and report
   to it with message_thread." Attach the person's messages about the run, so
@@ -130,7 +130,7 @@ issue.
   block added to its prompt.
 - **Project:** that issue's own worker thread, with `message_thread`; a
   message reopens a resolved thread. Its id is the one its report came from,
-  or `list_threads` finds it. No new worker starts for the issue while that
+  or `list_threads` finds it by the issue in its title. No new worker starts for the issue while that
   thread exists; only when none does, start one as **Start a worker** says,
   with the block added to its prompt.
 
