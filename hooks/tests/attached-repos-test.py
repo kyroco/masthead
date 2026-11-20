@@ -107,6 +107,13 @@ def no_folder(env, expr, cwd):
     return out.stdout.strip()
 
 
+def gate(env, name, payload, cwd):
+    """'deny' or 'allow': what the hook `name`, run through run.sh, decides on `payload`."""
+    out = subprocess.run(["bash", RUN, name], input=json.dumps(payload), env=env, capture_output=True, text=True,
+                         cwd=cwd).stdout
+    return "deny" if '"deny"' in out else "allow"
+
+
 def register(env, directory, owner="kyroco", repo="masthead"):
     return hook(env, {"session_id": "s1", "hook_event_name": "PostToolUse",
                       "tool_name": "mcp__claude-code-remote__register_repo_root",
@@ -190,6 +197,71 @@ def main():
         env3 = base_env(tmp, cloud=False)
         expect("s3 no folder: outside a cloud session, the session folder as before",
                no_folder(env3, "p.project_root()", repo), home)
+    finally:
+        shutil.rmtree(tmp)
+
+    # Scenario 1, two repositories attached: a hook that checks a file reads the facts of the repository that
+    # holds that file, whichever repository it is and wherever the hook runs from (MAST-48, round 1 F1).
+    tmp = fresh()
+    try:
+        env = base_env(tmp)
+        home = os.path.join(tmp, "home")
+        a = os.path.join(home, "a")
+        b = os.path.join(home, "b")
+        make_repo(a, "https://github.com/kyroco/a")
+        make_repo(b, "https://github.com/kyroco/b")
+        with open(os.path.join(a, ".claude", "settings.json"), "w") as handle:
+            json.dump({"env": {"PROJECT_STATE_DIR": ".kyroco", "ADR_DIR": "docs/adr"}}, handle)
+        register(env, a, repo="a")
+        register(env, b, repo="b")
+        os.makedirs(os.path.join(a, ".kyroco", "review"))
+        os.makedirs(os.path.join(b, ".claude", "state", "review"))
+
+        def write(path, agent=None, content="x"):
+            payload = {"session_id": "s1", "hook_event_name": "PreToolUse", "tool_name": "Write", "cwd": home,
+                       "tool_input": {"file_path": path, "content": content}}
+            if agent:
+                payload["agent_type"] = agent
+            return payload
+        for cwd in (home, b):
+            where = "from the clones folder" if cwd == home else "from inside B"
+            expect("s1 two repos, {}: a verifier writes A's own review folder".format(where),
+                   gate(env, "review-write-fence.py",
+                        write(os.path.join(a, ".kyroco", "review", "findings-verifier-x.json"), "verifier"), cwd),
+                   "allow")
+            expect("s1 two repos, {}: and not A's default folder".format(where),
+                   gate(env, "review-write-fence.py",
+                        write(os.path.join(a, ".claude", "state", "review", "findings-verifier-x.json"), "verifier"),
+                        cwd), "deny")
+            expect("s1 two repos, {}: a verifier writes B's default review folder".format(where),
+                   gate(env, "review-write-fence.py",
+                        write(os.path.join(b, ".claude", "state", "review", "findings-verifier-y.json"), "verifier"),
+                        cwd), "allow")
+            expect("s1 two repos, {}: scratch under A's own review folder".format(where),
+                   gate(env, "review-write-fence.py",
+                        write(os.path.join(a, ".kyroco", "review", "scratch", "probe.sh"), "verifier"), cwd), "allow")
+        # A's scope file, in A's own state folder, holds an edit to A.
+        os.makedirs(os.path.join(a, "src"))
+        with open(os.path.join(a, ".kyroco", "scope.json"), "w") as handle:
+            json.dump({"allowed_paths": ["src/a.py"]}, handle)
+        for cwd in (home, b):
+            where = "from the clones folder" if cwd == home else "from inside B"
+            expect("s1 two repos, {}: A's scope allows src/a.py".format(where),
+                   gate(env, "scope-gate.py", write(os.path.join(a, "src", "a.py")), cwd), "allow")
+            expect("s1 two repos, {}: A's scope refuses src/b.py".format(where),
+                   gate(env, "scope-gate.py", write(os.path.join(a, "src", "b.py")), cwd), "deny")
+            expect("s1 two repos, {}: B has no scope file, so B is free".format(where),
+                   gate(env, "scope-gate.py", write(os.path.join(b, "src", "b.py")), cwd), "allow")
+        os.remove(os.path.join(a, ".kyroco", "scope.json"))
+        # A opted in to ADRs in docs/adr; a new record there with no sections is refused, and B is not opted in.
+        for cwd in (home, b):
+            where = "from the clones folder" if cwd == home else "from inside B"
+            expect("s1 two repos, {}: A's ADR folder holds a new record to its shape".format(where),
+                   gate(env, "adr-sections-gate.py", write(os.path.join(a, "docs", "adr", "0001-x.md"),
+                                                           content="# Title\n\nNothing else.\n"), cwd), "deny")
+            expect("s1 two repos, {}: B is not opted in".format(where),
+                   gate(env, "adr-sections-gate.py", write(os.path.join(b, "docs", "adr", "0001-x.md"),
+                                                           content="# Title\n\nNothing else.\n"), cwd), "allow")
     finally:
         shutil.rmtree(tmp)
 
