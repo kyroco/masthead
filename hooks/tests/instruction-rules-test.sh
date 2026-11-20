@@ -1715,7 +1715,10 @@ OLD_HOST_STEP="Then give that worker its next ready issue, those first. In the t
 NEW_HOST_STEP="Then give that worker its next ready issue, those first, as **Give a free worker its next issue** in \`hosts.md\` says, and tell its worker as **A worker's issue reached main** there says."
 if old_text "the foreman's queue section"; then
   part_says "foreman.md at 0.3.1" "$OLDQ" "$OLD_HOST_STEP"
-  OLDQ="${OLDQ/"$OLD_HOST_STEP"/"$NEW_HOST_STEP"}"
+  # Cut around the old step rather than ${OLDQ/x/"y"}: bash 3.2 (macOS) keeps
+  # the quotes around a replacement, and both bash 3.2 and 5 read a quoted
+  # pattern in # and % as plain text.
+  OLDQ="${OLDQ%%"$OLD_HOST_STEP"*}$NEW_HOST_STEP${OLDQ#*"$OLD_HOST_STEP"}"
   part_says "foreman.md at 0.3.1" "$OLDQ" "Queue the PR when all of these hold"
   part_says "foreman.md, the pull request way," "$FP" "$OLDQ"
 fi
