@@ -643,10 +643,12 @@ def main(argv):
     # --architecture-trial prints on or off.
     # Skills run these through the Bash tool, where Claude Code sets no
     # CLAUDE_PROJECT_DIR (it sets it for hooks only), so there the repository
-    # the shell is in is the session's. trusted() still guards --root.
+    # the shell is in is the session's. trusted() still guards --root. Not in a cloud session: there the
+    # shell may be in a clone the session made itself, and only the repositories it attached are trusted
+    # (cloud_cloned), so the shell's checkout is read only when it is one of them (MAST-48).
     if argv in (["--tracker"], ["--linear-team"], ["--architecture-doc"], ["--architecture-trial"], ["--state-path"],
                 ["--gate"], ["--ships"]) and root is None \
-            and not os.environ.get("CLAUDE_PROJECT_DIR"):
+            and not os.environ.get("CLAUDE_PROJECT_DIR") and os.environ.get("CLAUDE_CODE_REMOTE") != "true":
         os.environ["CLAUDE_PROJECT_DIR"] = checkout_top(os.getcwd())
     # --state-path prints the full path of the checkout's state folder; the
     # dispatch log is dispatches.tsv in it.
