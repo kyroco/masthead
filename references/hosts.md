@@ -54,8 +54,10 @@ way, or it split its issue.
 
 A dispatched worker sends every question and report to its foreman.
 
-- **Desktop app and terminal:** with `SendMessage`, to the session its prompt
-  names as its foreman.
+- **Desktop app:** with `SendMessage`, to the session its prompt names as its
+  foreman.
+- **Terminal:** with `SendMessage`, to the session whose first message told
+  you it is your foreman; the start prompt names none (**Start a worker**).
 
 ## Hear from a worker, and wait on a run
 
