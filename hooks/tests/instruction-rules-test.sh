@@ -1929,7 +1929,9 @@ says  skills/work-on/foreman.md "Send the block, whole and unedited, to a worker
 # Scenario 5: a worker thread stays open until a green batch moves main past its commits.
 says  "$H" "In the batch way never sooner, not at its landing: until main moves past its commits, a red batch may still hand its change back to it."
 says  "$H" "it resolves its own thread with \`set_thread_resolved\`"
-says  "$H" "The free thread stays open until **End a worker**"
+# Round 1, E1: the free thread closes when its issue reaches main, or at the end of the run.
+says  "$H" "The free thread stays open until its issue reaches main (**A worker's issue reached main**), or until **End a worker**"
+never "$H" "The free thread stays open until **End a worker**"
 # Scenario 6: the foreman reads the Gate run when it ends, with no person prompting it.
 says  "$H" "schedule a message to this thread with \`send_later\` and end the turn; when it arrives, read the run as \`foreman.md\` says, with no person prompting it"
 says  skills/work-on/foreman.md "python3 \${CLAUDE_PLUGIN_ROOT}/skills/work-on/batch-issues.py merged <run id>"
