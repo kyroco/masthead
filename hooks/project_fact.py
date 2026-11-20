@@ -71,17 +71,39 @@ def private_open(path, append=False):
     return os.fdopen(os.open(path, flags, 0o600), "a" if append else "w", encoding="utf-8")
 
 
+_FOCUS = None
+
+
+def path_checkout(path):
+    """The top of the checkout holding `path`, a file or folder that may not exist yet."""
+    d = os.path.abspath(os.path.expanduser(path))
+    while not os.path.isdir(d) and os.path.dirname(d) != d:
+        d = os.path.dirname(d)
+    return checkout_top(d)
+
+
+def focus(path):
+    """Say which file or folder this hook judges, so a fact read with no folder is about the repository that
+    holds it when the session's folder is no checkout (MAST-48). A hook judges one call, so this lasts for
+    the process. trusted() still decides whether that repository's facts are read."""
+    global _FOCUS
+    _FOCUS = path_checkout(path) if path else None
+
+
 def project_root():
     """The folder a fact is read for when the caller names none: the session's project. In a cloud session
     whose folder holds the clones rather than being a checkout (a Project thread starts in /home/user), it is
-    the attached repository the working folder is in, else the only one attached; with several and the
-    working folder in none of them, it stays the session's folder, so no repository is guessed (MAST-48)."""
+    the repository holding the path the hook judges (focus()), else the attached repository the working
+    folder is in, else the only one attached; with several and none of these, it stays the session's folder,
+    so no repository is guessed (MAST-48)."""
     session = os.environ.get("CLAUDE_PROJECT_DIR")
     if not session:
         return os.getcwd()
     if os.environ.get("CLAUDE_CODE_REMOTE") != "true" or \
             os.path.exists(os.path.join(checkout_top(session), ".git")):
         return session
+    if _FOCUS and os.path.exists(os.path.join(_FOCUS, ".git")):
+        return _FOCUS
     attached = cloud_attached()
     here = repo_key(os.getcwd())
     if here in attached:

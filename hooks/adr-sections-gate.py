@@ -165,6 +165,13 @@ def main():
         data = json.load(sys.stdin)
         if not isinstance(data, dict):
             return
+        # In a cloud session with several repositories attached, the facts are those of the repository
+        # holding the file the call writes, else of the folder it runs in (MAST-48).
+        ti_ = data.get("tool_input") if isinstance(data.get("tool_input"), dict) else {}
+        target = ti_.get("file_path") or ""
+        if target and not os.path.isabs(target):
+            target = os.path.join(data.get("cwd") or os.getcwd(), target)
+        adr_shape.focus(target or data.get("cwd") or "")
         where = adr_shape.folder()
         # Not opted in: no folder named, so no record is held to this shape.
         if not where:

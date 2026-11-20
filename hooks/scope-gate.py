@@ -7,12 +7,13 @@ import re
 import sys
 import time
 
-# The repo's state folder, from project_fact.py, with a default when it is absent.
+# The repo's state folder, from project_fact.py, with a default when it is absent. It is read once main()
+# knows the file the call touches (load_state_dir), so in a cloud session with several repositories attached
+# it is the state folder of the repository holding that file (MAST-48).
 try:
-    from project_fact import state_dir as _state_dir
-    STATE_DIR = _state_dir()
+    import project_fact as _project_fact
 except Exception:
-    STATE_DIR = ".claude/state"
+    _project_fact = None
 try:
     from project_fact import private_dir, private_open, safe_session
 except Exception:
@@ -20,11 +21,26 @@ except Exception:
         return None
 
     private_open = safe_session = None
-SCOPE_REL = STATE_DIR + "/scope.json"
-# Where reviewer and security-reviewer write their findings, whatever the task's scope.
-REVIEW_STATE_RELS = (STATE_DIR + "/review",)
 SELF_PROTECTED = (".claude/hooks/scope-gate.py", ".claude/settings.json", ".claude/settings.local.json")
-PROTECTED = (SCOPE_REL,) + SELF_PROTECTED
+
+
+def load_state_dir(path=None):
+    """Set the state folder and the paths under it, for the repository holding `path` when the session's
+    folder is no checkout, else for the session's project, as before."""
+    global STATE_DIR, SCOPE_REL, REVIEW_STATE_RELS, PROTECTED
+    try:
+        if path:
+            _project_fact.focus(path)
+        STATE_DIR = _project_fact.state_dir()
+    except Exception:
+        STATE_DIR = ".claude/state"
+    SCOPE_REL = STATE_DIR + "/scope.json"
+    # Where reviewer and security-reviewer write their findings, whatever the task's scope.
+    REVIEW_STATE_RELS = (STATE_DIR + "/review",)
+    PROTECTED = (SCOPE_REL,) + SELF_PROTECTED
+
+
+load_state_dir()
 TOOLS = {"Write", "Edit", "MultiEdit", "NotebookEdit", "Bash"}
 EDIT_TOOLS = TOOLS - {"Bash"}
 
@@ -354,6 +370,7 @@ def main():
     target = ti.get("file_path") or ti.get("notebook_path")
     if target and not os.path.isabs(target):
         target = os.path.join(cwd or os.getcwd(), target)
+    load_state_dir(target or cwd)
     if tool in EDIT_TOOLS:
         check_user_files(target, cwd)
         check_edit(target, cwd)

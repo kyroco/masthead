@@ -21,14 +21,28 @@ AGENT_LIST_SOURCE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ba
 IDENTITY_FIELDS = ("agent_type", "subagent_type", "agent_name")
 # Only this plugin's agents are fenced; another plugin's agent of the same name is not ours to police.
 PLUGIN_PREFIX = "masthead:"
-# Take the repo's state folder from project_fact.py, else the default.
+# Take the repo's state folder from project_fact.py, else the default. It is read once check() knows the file
+# being written (load_state_dir), so in a cloud session with several repositories attached it is the state
+# folder of the repository holding that file (MAST-48).
 try:
-    from project_fact import state_dir as _state_dir
-    STATE_DIR = _state_dir()
+    import project_fact as _project_fact
 except Exception:
-    STATE_DIR = ".claude/state"
-REVIEW_REL = STATE_DIR + "/review"
-REVIEW_PARTS = tuple(part.casefold() for part in REVIEW_REL.split("/"))
+    _project_fact = None
+
+
+def load_state_dir(path=None):
+    global STATE_DIR, REVIEW_REL, REVIEW_PARTS
+    try:
+        if path:
+            _project_fact.focus(path)
+        STATE_DIR = _project_fact.state_dir()
+    except Exception:
+        STATE_DIR = ".claude/state"
+    REVIEW_REL = STATE_DIR + "/review"
+    REVIEW_PARTS = tuple(part.casefold() for part in REVIEW_REL.split("/"))
+
+
+load_state_dir()
 TOOLS = {"Write", "Edit", "MultiEdit", "NotebookEdit"}
 
 
@@ -119,6 +133,8 @@ def check(payload, agent):
     if not isinstance(tool_input, dict):
         deny(f"{agent}'s {payload.get('tool_name')} call carried no readable tool_input.")
     path = tool_input.get("file_path") or tool_input.get("notebook_path") or ""
+    if isinstance(path, str) and path:
+        load_state_dir(path if os.path.isabs(path) else os.path.join(payload.get("cwd") or os.getcwd(), path))
     if isinstance(path, str) and path and scratch_file(path, payload.get("cwd")):
         return
     folder = review_file(path, payload.get("cwd"), FILES[agent]) if isinstance(path, str) and path else None

@@ -71,6 +71,17 @@ BUILDS = re.compile(r"(?i)^\s*(?:[-*]\s+)?(?:\*\*|__)?\s*builds?\s*(?::\s*(?:\*\
 NAME = re.compile(r"(?i)^(adr-.+|\d{4}[-_].+)\.md$")
 
 
+def focus(path):
+    """Read the facts below for the repository holding `path` (project_fact.focus), where the session's
+    folder is no checkout (MAST-48)."""
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    try:
+        import project_fact
+        project_fact.focus(path)
+    except Exception:
+        pass
+
+
 def folder():
     """The opted-in ADR folder, absolute or repo-relative, ending in a slash; None when not opted in."""
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
