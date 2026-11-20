@@ -1874,11 +1874,20 @@ says  "$H" "\`start_session\` with \`initiation\` \"user_asked\", \`context\` \"
 says  "$H" "**Desktop app:** from any turn: \`clear_session\`, set its effort, send the prompt of **Start a worker** with \`SendMessage\`"
 says  "$H" "a cleared session remembers nothing, so the prompt always names its foreman"
 says  "$H" "start it with \"Reply ready and stop\", raise its effort, then send the prompt"
+# Round 0, F2: every sentence of the desktop start step, as foreman.md had it at c4c9056.
+says  "$H" "**Desktop app:** the app starts a session only in a turn the person's own message began, so start one session per slot in the turn they say go and reuse them for the whole run."
+says  "$H" "and this prompt: \"Read \${CLAUDE_PLUGIN_ROOT}/skills/work-on/SKILL.md and follow it as if \`/work-on #<n> dispatched\` had been typed. Your foreman is session <this session's id>: send every question and report to it with SendMessage.\" Add the person's instructions for this run in their own words."
+says  "$H" "A worker cannot start above this session's effort"
+says  "$H" "If the app refuses to start one, propose it as a card (\`initiation\` \"own_initiative\") and tell the person a card for issue #<n> is waiting."
 says  "$H" "The app's \"archive sessions when their pull request closes\" setting must be off for the run"
 says  "$H" "**Desktop app:** archive it, which also removes its worktree"
 says  "$H" "**Terminal:** stop the worker's session (its id and worktree come from \`claude agents --json\`, not from memory)"
 # Scenario 3: a dispatched worker reaches its foreman as before.
-says  "$H" "**Desktop app and terminal:** with \`SendMessage\`, to the session its prompt names as its foreman"
+# Round 0, F1: the terminal's start prompt names no foreman; the foreman's first
+# message does, so each host says where its foreman is named.
+never "$H" "**Desktop app and terminal:** with \`SendMessage\`"
+says  "$H" "**Desktop app:** with \`SendMessage\`, to the session its prompt names as its foreman"
+says  "$H" "**Terminal:** with \`SendMessage\`, to the session whose first message told you it is your foreman"
 says  "$H" "Your foreman is session <this session's id>: send every question and report to it with SendMessage."
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
