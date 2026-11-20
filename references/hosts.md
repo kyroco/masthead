@@ -40,9 +40,10 @@ A project's status page lists who works on what: each foreman and the
 workers it started. Each one adds itself, once, when it starts.
 
 - **Desktop app and terminal:** nothing here; no page is read or written.
-- **Project:** the status page is the Artifact titled "Project status" that
-  `Artifact` with `action` "list" shows. With none, or more than one, write
-  nothing and run as before. The page reads one document per thread in its
+- **Project:** the status page is the artifact titled "Project status"
+  among this project's own artifacts, which `list_project_artifacts` lists
+  (`limit` 100). With none, or more than one, write nothing, say so in one
+  line in the next report, and run as before. The page reads one document per thread in its
   database collection `crew`, written with `ArtifactData`. A thread's
   session id is the `id` that `get_session` returns when called with no
   `session_id`; it is also the document's id, so a thread is listed once
