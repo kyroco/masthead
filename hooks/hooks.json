@@ -443,6 +443,16 @@
             "timeout": 10
           }
         ]
+      },
+      {
+        "matcher": "mcp__.*__register_repo_root",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/run.sh\" attached-repos.py",
+            "timeout": 10
+          }
+        ]
       }
     ],
     "Stop": [
@@ -530,6 +540,16 @@
       }
     ],
     "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/run.sh\" attached-repos.py",
+            "timeout": 10
+          }
+        ]
+      },
       {
         "hooks": [
           {

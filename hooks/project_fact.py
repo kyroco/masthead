@@ -165,13 +165,19 @@ def trusted(root):
     return cloud_cloned(root)
 
 
+def cloud_repos_file():
+    """The list of the repositories a cloud session attached, one checkout per line. attached-repos.py adds
+    the ones the session started with and each one register_repo_root attached during it (MAST-48)."""
+    config = os.environ.get("CLAUDE_CONFIG_DIR") or os.path.expanduser("~/.claude")
+    return os.path.join(config, "cloud-session-repos")
+
+
 def cloud_cloned(root):
-    """Whether `root` is in a repo the cloud session cloned at its start."""
+    """Whether `root` is in a repo the cloud session attached, at its start or during it."""
     if os.environ.get("CLAUDE_CODE_REMOTE") != "true":
         return False
-    config = os.environ.get("CLAUDE_CONFIG_DIR") or os.path.expanduser("~/.claude")
     try:
-        with open(os.path.join(config, "cloud-session-repos")) as handle:
+        with open(cloud_repos_file()) as handle:
             cloned = {os.path.realpath(line.strip()) for line in handle if line.strip()}
     except OSError:
         return False
