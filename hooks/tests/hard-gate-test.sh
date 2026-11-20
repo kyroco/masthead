@@ -83,10 +83,11 @@ newrepo() {
   printf '%s' "$d"
 }
 
-echo "1. outside a git repo the gate stands down"
+echo "1. outside a git repo, with no repository in the workspace, the gate refuses: which repository is unclear"
 mkdir -p "$TMP/nogit"
 run_gate "$TMP/nogit"
-ok "$STATUS" "0" "no git repo exits 0"
+ok "$STATUS" "2" "no git repo, none in the workspace: refused, never passed unchecked (MAST-48)"
+contains "$ERR" "unclear" "it says the repository is unclear"
 
 echo "2. a clean repo has no delta to gate"
 d="$(newrepo clean)"
@@ -463,7 +464,8 @@ ok "$STATUS" "2" "a deletion beside a real push does not excuse the real push"
 # gate must not run it: that would run a stranger's code from a hook.
 : > "$TMP/stranger-ran"; rm -f "$TMP/stranger-ran"
 printf '#!/usr/bin/env bash\ntouch "%s"\nexit 1\n' "$TMP/stranger-ran" > "$d/scripts/local-tests.sh"
-run_gate "$d" "git push" "$TMP"
+mkdir -p "$TMP/other-workspace"
+run_gate "$d" "git push" "$TMP/other-workspace"
 [ -e "$TMP/stranger-ran" ] && ran=yes || ran=no
 ok "$ran" "no" "a checkout outside the session's repository does not get its check script run"
 contains "$ERR" "not this session's repository" "and it says the checks were not run there"

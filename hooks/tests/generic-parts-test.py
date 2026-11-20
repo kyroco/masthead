@@ -169,8 +169,10 @@ for command in ('echo x > "docs/adr/ADR-0009 new one.md"',
     check("a shell write to a spaced name is refused: %s" % command,
           "through the shell" in sections_gate(repo, "Bash", {"command": command}), True)
 
-# A folder named with a leading "~", in a wiki clone of its own, is held, as Kyroco
-# names it: "ADR_DIR": "~/projects/kyroco.wiki/ADR".
+# A folder named with a leading "~", in a wiki clone outside the repository, as Kyroco named it:
+# "ADR_DIR": "~/projects/kyroco.wiki/ADR". Decision records must live in the repository (MAST-48; Robert,
+# November 20, 2026: "just use the local repo as ADR tracking the wiki has been causing a lot of problems").
+# No gate checks such a folder, and the session is told so once, in one line, at its start.
 home = os.path.join(T, "tilde-home")
 wiki = os.path.join(home, "projects", "wiki")
 os.makedirs(os.path.join(wiki, "ADR"))
@@ -183,23 +185,26 @@ repo = make_repo("opted-in-tilde", {"ADR_DIR": "~/projects/wiki/ADR"})
 record = os.path.join(wiki, "ADR", "ADR-0010-use-a-queue.md")
 tilde_env = dict(BASE_ENV, CLAUDE_PROJECT_DIR=repo, HOME=home)
 out = subprocess.run([sys.executable, SECTIONS_GATE],
-                     input=json.dumps({"tool_name": "Write",
+                     input=json.dumps({"tool_name": "Write", "cwd": repo,
                                        "tool_input": {"file_path": record, "content": TITLE_ONLY}}),
                      capture_output=True, text=True, cwd=repo, env=tilde_env).stdout
-check("a ~ folder: the write gate asks for every section",
-      absent(json.loads(out)["hookSpecificOutput"]["permissionDecisionReason"]) if out.strip() else [],
-      names)
+check("a ~ folder outside the repository: the write gate holds nothing there", out.strip(), "")
 out = subprocess.run([sys.executable, SECTIONS_GATE],
-                     input=json.dumps({"tool_name": "Bash", "tool_input": {
+                     input=json.dumps({"tool_name": "Bash", "cwd": repo, "tool_input": {
                          "command": "echo x > ~/projects/wiki/ADR/ADR-0011-new.md"}}),
                      capture_output=True, text=True, cwd=repo, env=tilde_env).stdout
-check("a ~ folder: a shell write named with ~ is refused", "through the shell" in out, True)
+check("a ~ folder outside the repository: nor a shell write there", out.strip(), "")
 with open(record, "w") as f:
     f.write(TITLE_ONLY)
 r = subprocess.run(["bash", STRUCTURE_GATE], input="{}", capture_output=True, text=True,
                    cwd=repo, env=tilde_env)
-check("a ~ folder: the stop gate holds the record in the wiki clone", r.returncode, 2)
-check("a ~ folder: and asks it for the same sections", absent(r.stderr), names)
+check("a ~ folder outside the repository: the stop gate holds nothing there", r.returncode, 0)
+start = subprocess.run([sys.executable, PRIME, "session-start"],
+                       input=json.dumps({"session_id": "g", "cwd": repo, "hook_event_name": "SessionStart"}),
+                       capture_output=True, text=True, cwd=repo,
+                       env=dict(tilde_env, CLAUDE_PLUGIN_OPTION_KORIUM="off")).stdout.strip()
+check("a ~ folder outside the repository: the session is told once, in one line, that records must live in it",
+      len(start.splitlines()) == 1 and "ADR_DIR" in start and "must live in the repository" in start, True)
 
 # ---------------------------------------------------------------- scenario 3
 print("--- 3. what Masthead says names nothing of Kyroco's ---")

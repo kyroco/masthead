@@ -9,8 +9,9 @@
 4. An ADR already in git history is not asked for the new section.
 5. With no architecture doc recorded, the gates behave as before.
 6. Opening a pull request whose ADR diverges from the doc is refused unless the same pull
-   request edits the doc. For an ADR folder outside the repository (a wiki clone), the
-   pull request's ADRs are the ones its title, body or commits name by number.
+   request edits the doc. An ADR folder outside the repository (a wiki clone) is not held
+   (MAST-48; Robert, November 20, 2026: "just use the local repo as ADR tracking the wiki
+   has been causing a lot of problems").
 
 Run from anywhere: python3 hooks/tests/architecture-alignment-test.py
 """
@@ -300,21 +301,16 @@ r = make_repo("s6-wiki", adr_dir=wiki)
 git(r, "switch", "-q", "-c", "feature")
 commit(r, {"lib/orders.ex": "x\n"}, "Build reports")
 check("6: a pull request that names no ADR is not held", pr(r) == "")
-why = pr(r, body="Builds ADR-0007 reports.")
-check("6: a wiki ADR named in the body that diverges is refused, saying which and where",
-      "ADR-0007, named in the pull request's title or body" in why
-      and os.path.join(wiki, "Current", "ADR-0007-take-orders.md") in why, why)
+check("6: a wiki ADR named in the body that diverges is not held: records must live in the repository",
+      pr(r, body="Builds ADR-0007 reports.") == "")
 check("6: a wiki ADR named that conforms is allowed", pr(r, body="Builds ADR-0008.") == "")
 
 body_file = os.path.join(r, "body.md")
 write(body_file, "Fixes MAST-1. Builds ADR 7.\n")
-why = pr(r, body="", extra=" --body-file body.md")
-check("6: an ADR named in a --body-file is read", "named in the pull request's title or body" in why, why)
+check("6: nor one named in a --body-file", pr(r, body="", extra=" --body-file body.md") == "")
 
 commit(r, {"lib/reports.ex": "x\n"}, "Read orders for reports (ADR-0007)")
-why = pr(r)
-check("6: a wiki ADR named in a commit message is found, naming the commit",
-      "ADR-0007, named in commit " in why, why)
+check("6: nor one named in a commit message", pr(r) == "")
 
 commit(r, {"docs/architecture.md": DOC + "\nReports read orders from the table.\n"}, "Update the doc")
 check("6: with the doc edited in the pull request it is allowed", pr(r, body="Builds ADR-0007.") == "")

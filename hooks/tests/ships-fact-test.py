@@ -205,10 +205,11 @@ base, work = repo(landing=big)
 made.append(base)
 expect("arch-2 a Gate workflow near 1 MiB", ships(work), (0, "batch"))
 
-# Outside a git repository: the pull request way, never an error.
+# Outside a git repository, with none in the workspace: which repository is unclear, so the skill stops and
+# prints nothing (MAST-48, repo_root step 4).
 plain = os.path.realpath(tempfile.mkdtemp(prefix="ships-plain-"))
 made.append(plain)
-expect("outside a repository", ships(plain), (0, "pull-request"))
+expect("outside a repository", ships(plain), (2, ""))
 
 for path in made:
     shutil.rmtree(path, ignore_errors=True)
