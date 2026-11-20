@@ -179,6 +179,11 @@ def main():
                               env=skill_env(env), cwd=home, capture_output=True, text=True)
         expect("one repo: bad-commit from the workspace reads the repository's stored Gate",
                "workflow_dispatch" in said.stdout + said.stderr, True)
+        said = subprocess.run([sys.executable, os.path.join(SKILLS, "work-on", "batch-issues.py"), "merged", "1"],
+                              env=skill_env(env), cwd=home, capture_output=True, text=True)
+        expect("one repo: batch-issues from the workspace runs git in the repository, not in the workspace",
+               "not a git repository" in said.stdout + said.stderr and "fatal: not a git" in said.stdout + said.stderr,
+               False)
         # A worktree outside the workspace counts as its main checkout.
         wt = os.path.join(tmp, "wt")
         git("worktree", "add", "-q", "-b", "wt", wt, cwd=repo)
@@ -193,6 +198,19 @@ def main():
         expect("stranger: step 1 names it", root_of(env, os.path.join(stranger, "x"), home), stranger)
         expect("stranger: not trusted", cli(env, ["--trusted", stranger], home)[0], 1)
         expect("stranger: no fact from it", cli(env, ["--root", stranger, "PROJECT_PUSH_CHECK"], home)[1], "")
+        expect("stranger: a skill whose shell is in it reads no fact", cli(skill_env(env), ["--tracker"], stranger)[1],
+               "github")
+        os.makedirs(os.path.join(stranger, ".github", "workflows"))
+        with open(os.path.join(stranger, ".github", "workflows", "evil.yml"), "w") as handle:
+            handle.write("name: Gate\non: [workflow_call]\njobs: {}\n")
+        with open(os.path.join(stranger, ".claude", "gate.json"), "w") as handle:
+            json.dump({"workflow": ".github/workflows/evil.yml", "starts": ["workflow_call"]}, handle)
+        git("-c", "user.name=t", "-c", "user.email=t@t", "add", ".", cwd=stranger)
+        git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "gate", cwd=stranger)
+        looked = subprocess.run([sys.executable, os.path.join(SKILLS, "setup", "gate.py"), "look"],
+                                env=skill_env(env), cwd=stranger, capture_output=True, text=True).stdout
+        expect("stranger: setup run with its shell in it does not take its stored Gate",
+               json.loads(looked or "{}").get("status") != "stored" and looked != "", True)
         # The review fence and the scope gate read the repository's own state folder (step 1).
         with open(os.path.join(repo, ".claude", "settings.json"), "w") as handle:
             json.dump({"env": {"PROJECT_STATE_DIR": ".kyroco", "ADR_DIR": "docs/adr"}}, handle)
@@ -351,6 +369,15 @@ def main():
                "scripts/check.sh")
         expect("terminal: a clone nested inside it is not trusted", cli(env, ["--trusted", nested], repo)[0], 1)
         expect("terminal: and gives no fact", cli(env, ["--root", nested, "PROJECT_PUSH_CHECK"], repo)[1], "")
+        make_repo_tracker = os.path.join(nested, ".claude", "settings.json")
+        with open(make_repo_tracker, "w") as handle:
+            json.dump({"env": {"ISSUE_TRACKER": "linear"}}, handle)
+        with open(os.path.join(repo, ".claude", "settings.json"), "w") as handle:
+            json.dump({"env": {"PROJECT_PUSH_CHECK": "scripts/check.sh"}}, handle)
+        expect("terminal: a skill whose shell is in the nested clone reads none of its facts",
+               cli(skill_env(env), ["--tracker"], nested)[1], "github")
+        with open(os.path.join(repo, ".claude", "settings.json"), "w") as handle:
+            json.dump({"env": {"PROJECT_PUSH_CHECK": "scripts/check.sh", "ISSUE_TRACKER": "linear"}}, handle)
         shell = {k: v for k, v in env.items() if k != "CLAUDE_PROJECT_DIR"}
         expect("terminal: a skill from inside it", cli(shell, ["--tracker"], repo)[1], "linear")
         # A hook that names no root reads the repository from its own folder, a subfolder included.
