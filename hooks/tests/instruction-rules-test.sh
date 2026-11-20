@@ -1949,5 +1949,26 @@ says  skills/work-on/SKILL.md "Every way to be the foreman, several issues inclu
 # MAST-49 round 0, E2: a worker thread is titled with its issue, so list_threads finds it.
 says  references/hosts.md "for a new thread titled with the issue's key or number and its title"
 says  references/hosts.md "or \`list_threads\` finds it by the issue in its title"
+# MAST-51: in a Project, the foreman and each worker it starts add themselves to
+# the project's status page; the terminal and the desktop app write to no page.
+says  "$H" "## Show the crew"
+for f in skills/work-on/foreman.md skills/work-on/worker.md; do
+  says "$f" "**Show the crew**"
+  for host_word in "ArtifactData" "get_session" "crew\`"; do
+    never "$f" "$host_word"
+  done
+done
+# Scenario 3: the terminal and the desktop app read and write no page.
+says  "$H" "**Desktop app and terminal:** nothing here; no page is read or written."
+# Scenario 1: the foreman adds itself, with its milestone as the label.
+says  "$H" "the Artifact titled \"Project status\" that \`Artifact\` with \`action\` \"list\" shows"
+says  "$H" "one document per thread in its database collection \`crew\`"
+says  "$H" "the \`id\` that \`get_session\` returns when called with no \`session_id\`"
+says  "$H" "\`role\` \"foreman\", \`session\` its session id, \`label\` the milestone it runs"
+says  skills/work-on/foreman.md "add this session to the project's status page, as **Show the crew** in \`hosts.md\` says"
+# Scenario 2: a worker thread adds itself under its foreman, with its issue key.
+says  "$H" "Status page: <its link>. Your foreman's session is <this session's id>."
+says  "$H" "\`role\` \"worker\", \`session\` its session id, \`parent\` the foreman's session its prompt names, \`issue\` its key or number"
+says  skills/work-on/worker.md "add this session to the project's status page, as **Show the crew** in \`\${CLAUDE_PLUGIN_ROOT}/references/hosts.md\` says"
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
