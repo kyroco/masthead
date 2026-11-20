@@ -1,0 +1,11 @@
+{
+  "workflow": ".github/workflows/tests.yml",
+  "starts": [
+    "workflow_call",
+    "workflow_dispatch"
+  ],
+  "documents": [
+    "LICENSE",
+    "NOTICE"
+  ]
+}

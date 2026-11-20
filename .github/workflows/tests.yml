@@ -1,7 +1,14 @@
 name: tests
+# The batch run calls this as the repository's Gate (workflow_call), and a
+# person can start it by hand (workflow_dispatch); .claude/gate.json names it.
 on:
+  # Not on landing or main: the batch run tests the pile on landing when the
+  # person says go, and main only ever moves to a commit that run proved.
   push:
+    branches-ignore: [landing, main]
   pull_request:
+  workflow_call:
+  workflow_dispatch:
 jobs:
   hooks:
     strategy:

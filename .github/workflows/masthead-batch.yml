@@ -1,0 +1,60 @@
+# Masthead batch run: one Gate run per batch of commits landed on `landing`,
+# and main moves to the batch only when that run is green. A push to landing
+# starts nothing: the run starts only when the person says go, for a milestone
+# or a set of issues, through skills/work-on/batch-go.py in kyroco/masthead.
+# Written by Masthead's setup; the batch run itself lives in kyroco/masthead
+# (references/batch-run.md there). `gate.py starter` fills in the Gate stored in
+# .claude/gate.json and the token permissions that Gate asks for.
+name: Masthead batch
+
+on:
+  workflow_dispatch:
+    inputs:
+      pile:
+        description: What the go was for, a milestone or a set of issues.
+        required: true
+        type: string
+      issues:
+        description: The issues on the pile.
+        required: true
+        type: string
+      sha:
+        description: Landing's last commit when the go was given; the run stops if landing moved since.
+        required: true
+        type: string
+
+# One batch at a time on each pile. A go while a batch runs waits; a newer go
+# replaces the one waiting. The hotfix pile has its own group, so a hotfix
+# never waits behind a milestone's run, and a milestone's go never replaces a
+# hotfix's waiting run (INFRA-286).
+concurrency:
+  group: masthead-batch-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    uses: kyroco/masthead/.github/workflows/batch-plan.yml@main
+    with:
+      sha: ${{ inputs.sha }}
+      pile: ${{ inputs.pile }}
+      issues: ${{ inputs.issues }}
+  gate:
+    needs: plan
+    # No Gate run when the batch changes only documents since main, or nothing (the plan says so).
+    if: needs.plan.outputs.test != 'false'
+    # What the Gate's jobs ask of the token; a called workflow may ask no more than this.
+    permissions: { contents: read, packages: read }
+    uses: ./.github/workflows/tests.yml
+    secrets: inherit
+  move:
+    needs: [plan, gate]
+    # After a Gate that passed, or a Gate the plan skipped for documents; never after a red one.
+    if: ${{ !cancelled() && needs.plan.result == 'success' && (needs.gate.result == 'success' || (needs.gate.result == 'skipped' && needs.plan.outputs.test == 'false')) }}
+    uses: kyroco/masthead/.github/workflows/batch-move.yml@main
+    with:
+      sha: ${{ needs.plan.outputs.sha }}
+      gate-result: ${{ needs.gate.result }}
+      proof: ${{ needs.plan.outputs.proof }}
+    secrets:
+      BATCH_APP_ID: ${{ secrets.BATCH_APP_ID }}
+      BATCH_APP_PRIVATE_KEY: ${{ secrets.BATCH_APP_PRIVATE_KEY }}
