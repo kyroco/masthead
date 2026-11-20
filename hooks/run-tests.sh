@@ -60,6 +60,9 @@ run "index on stop"          bash "$here/tests/korium-index-on-stop-test.sh"
 run "tool output scan"       python3 "$here/tests/run-scan-tool-output-cases.py"
 run "tool output incident"   python3 "$here/tests/incident-shape-probe.py"
 run "instruction rules"      bash "$here/tests/instruction-rules-test.sh"
+# macOS runs bash 3.2, which keeps the quotes around a replacement in ${v/x/"y"};
+# bash 5 does the same with BASH_COMPAT=4.2, so Linux catches what macOS would (MAST-47).
+run "instruction rules, bash 3" env BASH_COMPAT=4.2 bash "$here/tests/instruction-rules-test.sh"
 run "issue tracker fact"     python3 "$here/tests/tracker-fact-test.py"
 run "architecture doc"       python3 "$here/tests/architecture-doc-test.py"
 run "gate fact"              python3 "$here/tests/gate-fact-test.py"
