@@ -3,18 +3,24 @@
 
 set -uo pipefail
 
-cat >/dev/null 2>&1 || true
+payload="$(cat 2>/dev/null || true)"
 
 here="$(cd "$(dirname "$0")" && pwd)"
 fact() { python3 "$here/project_fact.py" ${root:+--root "$root"} "$@" 2>/dev/null; }
 
-# In a cloud session, take the facts from the first recorded repo that names an ADR_DIR.
+# In a cloud session, take the facts from the first recorded repo that names an ADR_DIR. attached-repos.py
+# runs beside this hook at the same SessionStart, in no set order, so record the attached repositories here
+# first; recording twice keeps one line (MAST-48).
 root=""
 adr_dir="$(fact ADR_DIR)"
 if [ -z "$adr_dir" ] && [ "${CLAUDE_CODE_REMOTE:-}" = true ]; then
-  while IFS= read -r root; do
-    [ -n "$root" ] && adr_dir="$(fact ADR_DIR)" && [ -n "$adr_dir" ] && break
-  done < "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/cloud-session-repos"
+  printf '%s' "$payload" | python3 "$here/attached-repos.py" >/dev/null 2>&1
+  list="$(python3 -c 'import sys; sys.path.insert(0, sys.argv[1]); import project_fact; print(project_fact.cloud_repos_file())' "$here" 2>/dev/null)"
+  if [ -n "$list" ] && [ -f "$list" ]; then
+    while IFS= read -r root; do
+      [ -n "$root" ] && adr_dir="$(fact ADR_DIR)" && [ -n "$adr_dir" ] && break
+    done < "$list"
+  fi
 fi
 case "$adr_dir" in
   "~/"*) adr_dir="$HOME/${adr_dir#\~/}" ;;

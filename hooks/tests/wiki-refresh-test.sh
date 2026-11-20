@@ -54,7 +54,8 @@ repo "$T/cloud/home/app" "$T/home/wiki-c/ADR" "https://github.com/example/wiki-c
 printf '{"hook_event_name":"SessionStart","source":"startup"}' | env CLAUDE_CODE_REMOTE=true \
   CLAUDE_PROJECT_DIR="$T/cloud/home" CLAUDE_CONFIG_DIR="$T/cloud/config" HOME="$T/home" bash "$HOOK" 2>"$T/err"; sleep 1
 grep -q "clone.*wiki-c" "$FAKE_LOG" 2>/dev/null && ok || bad "a cloud thread's first start should clone its repository's wiki: $(cat "$FAKE_LOG")"
-[ -s "$T/err" ] && bad "a cloud thread's first start printed: $(cat "$T/err")" || ok
+# The fake git leaves no .git/config, so keep_header's chmod complains; only the missing list matters here.
+grep -q "cloud-session-repos" "$T/err" && bad "a cloud thread's first start printed: $(cat "$T/err")" || ok
 
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
