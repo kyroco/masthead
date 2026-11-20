@@ -22,8 +22,9 @@ be talked to.
 Some steps differ by the host you run in: starting the foreman, warming up
 the build, starting a worker, giving a free worker its next issue, hearing
 from a worker and waiting on a run, handing a change back, asking the
-person, a permission prompt, ending a worker, and telling a worker its
-issue reached main. `${CLAUDE_PLUGIN_ROOT}/references/hosts.md`
+person, a permission prompt, ending a worker, telling a worker its
+issue reached main, and showing the crew on a status page.
+`${CLAUDE_PLUGIN_ROOT}/references/hosts.md`
 holds each one, a version per host, and says which host you are in. This
 file names the step and never a host's tool.
 
@@ -34,6 +35,9 @@ PRs from one sequence, so say "issue #1418" or "PR #1422", never "#1418"
 alone.
 
 ## Understand the work
+
+Once you know what you run, add this session to the project's status page,
+as **Show the crew** in `hosts.md` says.
 
 Before you plan, read what earlier sessions left in Korium about this work (a
 few focused `agent_search` queries, each with `limit` 5), the project README in

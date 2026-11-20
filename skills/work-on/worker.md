@@ -30,6 +30,9 @@ their input.
 
 ## 1. A worktree of your own
 
+Dispatched, first add this session to the project's status page, as
+**Show the crew** in `${CLAUDE_PLUGIN_ROOT}/references/hosts.md` says.
+
 Work in a worktree named after the issue, so #1418 is `1418-issue`.
 
 When your foreman's prompt names a warm build ("Warm build: <tree path>"),

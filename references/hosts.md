@@ -34,6 +34,33 @@ deferred:
   the person says about the run. A thread that reads this step is already
   the foreman.
 
+## Show the crew
+
+A project's status page lists who works on what: each foreman and the
+workers it started. Each one adds itself, once, when it starts.
+
+- **Desktop app and terminal:** nothing here; no page is read or written.
+- **Project:** the status page is the Artifact titled "Project status" that
+  `Artifact` with `action` "list" shows. With none, or more than one, write
+  nothing and run as before. The page reads one document per thread in its
+  database collection `crew`, written with `ArtifactData`. A thread's
+  session id is the `id` that `get_session` returns when called with no
+  `session_id`; it is also the document's id, so a thread is listed once
+  however often it reaches this step: `get` that document first, and when it
+  exists, leave it. A new one is written with `set`, its `order` one more
+  than the highest `order` a `list` of `crew` shows.
+  - The foreman, once it knows what it runs: `role` "foreman", `session`
+    its session id, `label` the milestone it runs, or the issue keys or
+    numbers it was given when there is no milestone, and `milestone` the
+    milestone when there is one.
+  - A worker, only when its prompt names a status page (**Start a worker**):
+    on that page, `role` "worker", `session` its session id, `parent` the
+    foreman's session its prompt names, `issue` its key or number, and
+    `label` its thread's title.
+
+  A write that fails stops nothing: say so in one line in the next report,
+  and go on.
+
 ## Warm up the build
 
 - **Desktop app and terminal:** as `foreman.md` says.
@@ -73,8 +100,10 @@ The foreman starts one worker per issue. On Linear, the prompt names the key
   as if `/work-on #<n> dispatched` had been typed. Your foreman is the thread
   <this thread's title> (<this thread's id>): send every question and report
   to it with message_thread." Attach the person's messages about the run, so
-  their instructions reach the worker in their own words. A thread's effort
-  is the project's and it changes only on the person's word, so the issue's
+  their instructions reach the worker in their own words. When **Show the
+  crew** found a status page, add "Status page: <its link>. Your foreman's
+  session is <this session's id>." to the prompt. A thread's effort is the
+  project's and it changes only on the person's word, so the issue's
   effort is not set.
 
 ## Give a free worker its next issue
