@@ -1940,5 +1940,8 @@ says  "$H" "**Desktop app and terminal:** the session \`/work-on\` was typed in 
 says  "$H" "**Desktop app and terminal:** as \`foreman.md\` says."
 says  "$H" "**Desktop app and terminal:** nothing here; the session was already given its next issue, or ends at the end of the run"
 says  skills/work-on/foreman.md "A repo that names no \`PROJECT_WARM_BUILD\` runs as before: no warm-up, and every worker builds its own."
+# MAST-49 round 0, F2 and F3: the batch way tells a carried issue's worker, and a red run is searched.
+part_says "foreman.md, the batch way," "$(part skills/work-on/foreman.md "### The batch way" "## End the run")" "and start those first. Tell each one's worker as **A worker's issue reached main** in \`hosts.md\` says."
+says  skills/work-on/foreman.md "When a batch goes red, run the search for the commit that broke it, with the red run's id: python3 \${CLAUDE_PLUGIN_ROOT}/skills/work-on/bad-commit.py <run id>"
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
