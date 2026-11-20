@@ -1905,7 +1905,6 @@ done
 for step in "**Warm up the build**" "**Hand a change back**" "**A worker's issue reached main**"; do
   says skills/work-on/foreman.md "$step"
 done
-says  skills/work-on/SKILL.md "first do **Start the foreman** in \`\${CLAUDE_PLUGIN_ROOT}/references/hosts.md\`"
 says  skills/work-on/worker.md "end as **A worker's issue reached main** and **End a worker** in \`\${CLAUDE_PLUGIN_ROOT}/references/hosts.md\`"
 # Which host: the Project is checked first, and a thread is told from the coordinator.
 says  "$H" "**Project:** the \`mcp__hearthbot__\` tools exist. With \`mcp__hearthbot__message_coordinator\` among them you are a thread; without it you are the coordinator"
@@ -1944,6 +1943,6 @@ says  skills/work-on/foreman.md "A repo that names no \`PROJECT_WARM_BUILD\` run
 part_says "foreman.md, the batch way," "$(part skills/work-on/foreman.md "### The batch way" "## End the run")" "and start those first. Tell each one's worker as **A worker's issue reached main** in \`hosts.md\` says."
 says  skills/work-on/foreman.md "When a batch goes red, run the search for the commit that broke it, with the red run's id: python3 \${CLAUDE_PLUGIN_ROOT}/skills/work-on/bad-commit.py <run id>"
 # MAST-49 round 0, F1: every way to be the foreman, several issues included, goes through Start the foreman.
-says  skills/work-on/SKILL.md "Every way to be the foreman below, several issues included, starts with **Start the foreman**"
+says  skills/work-on/SKILL.md "Every way to be the foreman, several issues included, starts with **Start the foreman** in \`\${CLAUDE_PLUGIN_ROOT}/references/hosts.md\`"
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
