@@ -194,6 +194,11 @@ Started by the person, once the batch has moved main past your commits:
 check the issue is closed and its Status reads Done, and fix either if not.
 Close each parent up the chain that has no open sub-issue left. Then do step 11 of **Opening a PR**.
 
+Dispatched, either way: when your foreman says your issue reached main, or
+that the run is over for you, end as **A worker's issue reached main** and
+**End a worker** in `${CLAUDE_PLUGIN_ROOT}/references/hosts.md` say for your
+host.
+
 ## On Linear
 
 When `project_fact.py --tracker` prints `linear`, the issue lives in Linear

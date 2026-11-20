@@ -19,9 +19,11 @@ never by this file. Nothing here fixes a format, a shape or a batch size for a
 reply. Where this file says "ask" or "tell", do it the way they have asked to
 be talked to.
 
-Some steps differ by the host you run in: starting a worker, giving a free
-worker its next issue, hearing from a worker and waiting on a run, asking
-the person, a permission prompt, and ending a worker. `${CLAUDE_PLUGIN_ROOT}/references/hosts.md`
+Some steps differ by the host you run in: starting the foreman, warming up
+the build, starting a worker, giving a free worker its next issue, hearing
+from a worker and waiting on a run, handing a change back, asking the
+person, a permission prompt, ending a worker, and telling a worker its
+issue reached main. `${CLAUDE_PLUGIN_ROOT}/references/hosts.md`
 holds each one, a version per host, and says which host you are in. This
 file names the step and never a host's tool.
 
@@ -119,7 +121,8 @@ builds, run from the top of a checkout; `PROJECT_WARM_PATHS`, if set, is the
 list of paths a worker clones (space separated, relative to the top, globs
 allowed), and with none set a worker clones every path git ignores in the
 warm tree. A repo that names no `PROJECT_WARM_BUILD` runs as before: no
-warm-up, and every worker builds its own.
+warm-up, and every worker builds its own. So does a host whose workers
+cannot read your disk, as **Warm up the build** in `hosts.md` says.
 
 As soon as you know the repo, before you plan, start it with the Bash tool's
 `run_in_background`, so it builds while you read and ask:
@@ -253,7 +256,8 @@ List what it blocked:
     gh api repos/{owner}/{repo}/issues/<n>/dependencies/blocking --jq '.[] | "#\(.number) \(.state) \(.title)"'
 
 Then give that worker its next ready issue, those first, as **Give a free
-worker its next issue** in `hosts.md` says.
+worker its next issue** in `hosts.md` says, and tell its worker as **A
+worker's issue reached main** there says.
 
 Every report to the person carries the count of issues closed by a merge in
 the run. A split is not a stop: its sub-issues join the run like any other
@@ -339,7 +343,8 @@ commit main was on before this batch>`. List what each closed issue blocked:
 
     gh api repos/{owner}/{repo}/issues/<n>/dependencies/blocking --jq '.[] | "#\(.number) \(.state) \(.title)"'
 
-and start those first. With no `gh` (`command -v gh` finds nothing), park an
+and start those first. Tell each one's worker as **A worker's issue
+reached main** in `hosts.md` says. With no `gh` (`command -v gh` finds nothing), park an
 issue through the connector's label call, and stop at the list of what an
 issue unblocks and tell the person "`gh` is needed to list the issues that
 issue #<n> unblocks (brew install gh, then gh auth login)". Never skip it or
@@ -379,10 +384,9 @@ the worker's fix on top is still red goes back the same way. Hand it back:
 1. Never set the issue Done. Set it back to In Progress (`set-status.sh`).
 2. Post the block on the issue as a comment, word for word. That comment is
    the record: you and any session that reads the issue find it there.
-3. Send the block, whole and unedited, to a worker on that issue: its own
-   worker when that session is still alive, otherwise a new one started as
-   **Start a worker** says, with the block added to its prompt. A returned
-   worker may remember nothing; the block carries all it needs.
+3. Send the block, whole and unedited, to a worker on that issue, as
+   **Hand a change back** in `hosts.md` says. A returned worker may
+   remember nothing; the block carries all it needs.
 
 The fix lands on top like any other commit and its landing is accepted as any
 other. The issue closes only once a green batch carries it to main and

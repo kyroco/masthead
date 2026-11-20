@@ -24,6 +24,9 @@ Read the text typed after `/work-on`:
   are the worker for that issue, and `KOR-12 dispatched` makes a dispatched
   worker, the same as `#1418 dispatched`. A key is never read as a project or
   milestone name. Read `worker.md`, and its **On Linear** section.
+- **`foreman`** on its own, or a project or milestone as below: first do
+  **Start the foreman** in `${CLAUDE_PLUGIN_ROOT}/references/hosts.md`,
+  which says whether this session is the foreman or starts it elsewhere.
 - **`foreman`** on its own: you are the **foreman**, with no work yet. Say so
   in one line and ask what to run: a project, a milestone, issue numbers, or a
   mix, in words or GitHub links, now or later in this session. Read

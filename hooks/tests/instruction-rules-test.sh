@@ -1711,7 +1711,8 @@ OLDQ="$(git -C "$ROOT" show "$OLD_REF":skills/work-on/foreman.md 2>/dev/null | t
 # MAST-47 moved the one host step in this section to references/hosts.md, which
 # its own checks pin; the rest of the section stays 0.3.1's word for word.
 OLD_HOST_STEP="Then give that worker its next ready issue, those first. In the terminal, stop the worker's session (its id and worktree come from \`claude agents --json\`, not from memory) and start the next issue in a new one."
-NEW_HOST_STEP="Then give that worker its next ready issue, those first, as **Give a free worker its next issue** in \`hosts.md\` says."
+# MAST-49 added the host step that tells the worker its issue reached main.
+NEW_HOST_STEP="Then give that worker its next ready issue, those first, as **Give a free worker its next issue** in \`hosts.md\` says, and tell its worker as **A worker's issue reached main** there says."
 if old_text "the foreman's queue section"; then
   part_says "foreman.md at 0.3.1" "$OLDQ" "$OLD_HOST_STEP"
   OLDQ="${OLDQ/"$OLD_HOST_STEP"/"$NEW_HOST_STEP"}"
@@ -1862,7 +1863,8 @@ says  skills/work-on/foreman.md "\`\${CLAUDE_PLUGIN_ROOT}/references/hosts.md\`"
 says  skills/work-on/foreman.md "This file names the step and never a host's tool"
 says  skills/work-on/worker.md "**Reach the foreman** in \`\${CLAUDE_PLUGIN_ROOT}/references/hosts.md\`"
 # Scenario 1: the terminal starts a worker as before, at the effort the foreman set.
-says  "$H" "**Terminal:** it does not"
+# MAST-49: with the Project checked first, the terminal is the host with neither tool.
+says  "$H" "**Terminal:** neither does"
 says  "$H" "from this repo's main checkout, one command line per worker, never a loop"
 says  "$H" "A worker runs on Opus and never inherits this session's model. Never \`-p\` or \`--print\`: headless mode has no inbox"
 says  "$H" "Once \`ListAgents\` shows it, \`SendMessage\` it that this session is its foreman, with \`notify_when_idle\`"
@@ -1889,5 +1891,54 @@ never "$H" "**Desktop app and terminal:** with \`SendMessage\`"
 says  "$H" "**Desktop app:** with \`SendMessage\`, to the session its prompt names as its foreman"
 says  "$H" "**Terminal:** with \`SendMessage\`, to the session whose first message told you it is your foreman"
 says  "$H" "Your foreman is session <this session's id>: send every question and report to it with SendMessage."
+# MAST-49: a Claude Code Project is a third host; the foreman and each worker is a thread.
+# The three work-on files still name no host's tool, the Project's included.
+for f in skills/work-on/SKILL.md skills/work-on/foreman.md skills/work-on/worker.md; do
+  for host_word in "hearthbot" "message_coordinator" "message_thread" "set_thread_resolved" \
+      "list_threads" "post_message" "send_later" "coordinator"; do
+    never "$f" "$host_word"
+  done
+done
+for step in "## Start the foreman" "## Warm up the build" "## Hand a change back" "## A worker's issue reached main"; do
+  says "$H" "$step"
+done
+for step in "**Warm up the build**" "**Hand a change back**" "**A worker's issue reached main**"; do
+  says skills/work-on/foreman.md "$step"
+done
+says  skills/work-on/SKILL.md "first do **Start the foreman** in \`\${CLAUDE_PLUGIN_ROOT}/references/hosts.md\`"
+says  skills/work-on/worker.md "end as **A worker's issue reached main** and **End a worker** in \`\${CLAUDE_PLUGIN_ROOT}/references/hosts.md\`"
+# Which host: the Project is checked first, and a thread is told from the coordinator.
+says  "$H" "**Project:** the \`mcp__hearthbot__\` tools exist. With \`mcp__hearthbot__message_coordinator\` among them you are a thread; without it you are the coordinator"
+says  "$H" "**Terminal:** neither does."
+# Scenario 1: one foreman thread runs the milestone under foreman.md's rules.
+says  "$H" "a foreman is a thread, never the coordinator"
+says  "$H" "The coordinator starts one thread for the run"
+says  "$H" "\`/work-on <what the person asked for>\` had been typed. You are the foreman thread of this run."
+says  "$H" "A thread that reads this step is already the foreman."
+# Scenario 2: a new worker thread per issue, asked of the coordinator, dispatched.
+says  "$H" "a thread cannot start a thread. Ask the coordinator with \`message_coordinator\`, one message per worker"
+says  "$H" "as if \`/work-on #<n> dispatched\` had been typed. Your foreman is the thread <this thread's title> (<this thread's id>): send every question and report to it with message_thread."
+says  "$H" "a thread is never given a second issue. Start the next issue in a new thread"
+# Scenario 3: a worker's question or report reaches its foreman thread; the foreman's rules for questions stay.
+says  "$H" "**Project:** with \`message_thread\`, to the foreman thread its prompt names"
+says  "$H" "A dispatched worker thread never asks the person: its question goes to its foreman"
+says  skills/work-on/foreman.md "A worker's question: first re-read that issue's comments, then search Korium"
+# Scenario 4: a red change goes back to the issue's own worker thread, never a new one while it exists.
+says  "$H" "that issue's own worker thread, with \`message_thread\`; a message reopens a resolved thread"
+says  "$H" "No new worker starts for the issue while that thread exists"
+says  skills/work-on/foreman.md "Send the block, whole and unedited, to a worker on that issue, as **Hand a change back** in \`hosts.md\` says"
+# Scenario 5: a worker thread stays open until a green batch moves main past its commits.
+says  "$H" "In the batch way never sooner, not at its landing: until main moves past its commits, a red batch may still hand its change back to it."
+says  "$H" "it resolves its own thread with \`set_thread_resolved\`"
+says  "$H" "The free thread stays open until **End a worker**"
+# Scenario 6: the foreman reads the Gate run when it ends, with no person prompting it.
+says  "$H" "schedule a message to this thread with \`send_later\` and end the turn; when it arrives, read the run as \`foreman.md\` says, with no person prompting it"
+says  skills/work-on/foreman.md "python3 \${CLAUDE_PLUGIN_ROOT}/skills/work-on/batch-issues.py merged <run id>"
+# Scenario 7: the terminal and the desktop app behave as before; the hand-back moved word for word.
+says  "$H" "**Desktop app and terminal:** its own worker when that session is still alive, otherwise a new one started as **Start a worker** says, with the block added to its prompt."
+says  "$H" "**Desktop app and terminal:** the session \`/work-on\` was typed in is the foreman."
+says  "$H" "**Desktop app and terminal:** as \`foreman.md\` says."
+says  "$H" "**Desktop app and terminal:** nothing here; the session was already given its next issue, or ends at the end of the run"
+says  skills/work-on/foreman.md "A repo that names no \`PROJECT_WARM_BUILD\` runs as before: no warm-up, and every worker builds its own."
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]

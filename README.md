@@ -225,6 +225,14 @@ fresh session in the terminal. By the end of the day every issue is merged,
 parked or skipped, and you get one line per issue saying which, with how
 many merged.
 
+In a Claude Code Project, you ask the project chat to work on a milestone,
+and the run gets a thread of its own for its foreman and one thread per
+issue for its workers. You can open any of them and talk to it. A worker's
+thread stays open until its work reaches main, so a change a batch finds
+broken goes back to the thread that made it. The few steps that differ
+between the terminal, the desktop app and a Project are in
+`references/hosts.md`.
+
 With the batch run, the foreman instead accepts the landing and starts the
 next issue in that worker. Main moves forward only from `landing`, or from
 `hotfix` for an urgent fix that does not wait for the milestone: once a
