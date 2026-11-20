@@ -182,8 +182,23 @@ def main():
         said = subprocess.run([sys.executable, os.path.join(SKILLS, "work-on", "batch-issues.py"), "merged", "1"],
                               env=skill_env(env), cwd=home, capture_output=True, text=True)
         expect("one repo: batch-issues from the workspace runs git in the repository, not in the workspace",
-               "not a git repository" in said.stdout + said.stderr and "fatal: not a git" in said.stdout + said.stderr,
-               False)
+               "'origin' does not appear to be a git repository" in said.stdout + said.stderr, True)
+        # bad-commit runs gh in the repository too: a stub gh records the folder it ran in.
+        with open(os.path.join(repo, ".claude", "gate.json"), "w") as handle:
+            json.dump({"workflow": ".github/workflows/gate.yml", "starts": ["workflow_call", "workflow_dispatch"]},
+                      handle)
+        git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-am", "dispatch", cwd=repo)
+        stub = os.path.join(tmp, "stubbin")
+        os.makedirs(stub)
+        with open(os.path.join(stub, "gh"), "w") as handle:
+            handle.write("#!/bin/sh\npwd -P > \"{}\"\nexit 1\n".format(os.path.join(tmp, "gh-ran-in")))
+        os.chmod(os.path.join(stub, "gh"), 0o755)
+        stub_env = dict(skill_env(env), PATH=stub + os.pathsep + env.get("PATH", ""))
+        subprocess.run([sys.executable, os.path.join(SKILLS, "work-on", "bad-commit.py"), "1"],
+                       env=stub_env, cwd=home, capture_output=True, text=True)
+        ran_in = open(os.path.join(tmp, "gh-ran-in")).read().strip() if os.path.exists(
+            os.path.join(tmp, "gh-ran-in")) else ""
+        expect("one repo: bad-commit from the workspace runs gh in the repository", ran_in, repo)
         # A worktree outside the workspace counts as its main checkout.
         wt = os.path.join(tmp, "wt")
         git("worktree", "add", "-q", "-b", "wt", wt, cwd=repo)
