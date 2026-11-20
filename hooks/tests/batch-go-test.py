@@ -853,6 +853,14 @@ with tempfile.TemporaryDirectory() as top:
     check("INFRA-287 S1 it runs only that run's failed jobs again, the move",
           ["run", "rerun", "4242", "--failed"] in calls, calls)
     check("INFRA-287 S1 it says the Gate does not run again", "with no Gate run" in out, out)
+    # r2-C1: running a move again starts no run, so a go moments later is never told one was started;
+    # GitHub still lists the same run (its move failed again), and the go runs only its move once more.
+    code, out = repo.go("INFRA-285")
+    calls = repo.calls()
+    check("r2-C1 a go just after a move was run again is not told a go started a run moments ago",
+          "moments ago" not in out, out)
+    check("r2-C1 it reads the same run and runs only its move again, starting no new run",
+          code == 0 and dispatches(calls) == [] and calls.count(["run", "rerun", "4242", "--failed"]) == 2, (out, calls))
 
 # The foreman's guard: the move is run again only when every job that failed or was cancelled is a move job.
 for label, jobs in (
