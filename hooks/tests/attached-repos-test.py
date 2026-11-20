@@ -247,6 +247,37 @@ def main():
     finally:
         shutil.rmtree(tmp)
 
+    # Scenario 2, a skill through the Bash tool, which sets no CLAUDE_PROJECT_DIR: run from inside a clone the
+    # session made, the skill flags never read that clone's settings (Korium c394a752, rule 2).
+    tmp = fresh()
+    try:
+        env = base_env(tmp)
+        home = os.path.join(tmp, "home")
+        repo = os.path.join(home, "masthead")
+        make_repo(repo, "https://github.com/kyroco/masthead")
+        register(env, repo)
+        stranger = os.path.join(home, "stranger")
+        make_repo(stranger, "https://github.com/someone/tool")
+        with open(os.path.join(stranger, ".claude", "settings.json"), "w") as handle:
+            json.dump({"env": {"ISSUE_TRACKER": "linear", "PROJECT_STATE_DIR": "stranger-state"}}, handle)
+        shell = dict(env)
+        del shell["CLAUDE_PROJECT_DIR"]
+
+        def flag(name, cwd):
+            return subprocess.run([sys.executable, FACT, name], env=shell, capture_output=True, text=True,
+                                  cwd=cwd).stdout.strip()
+        expect("s2 shell: --tracker from inside a stranger clone is not its value", flag("--tracker", stranger),
+               "github")
+        expect("s2 shell: --state-path from inside a stranger clone is not its folder",
+               flag("--state-path", stranger), os.path.join(stranger, ".claude/state"))
+        expect("s1 shell: --tracker from inside the attached repository", flag("--tracker", repo), "linear")
+        terminal = {k: v for k, v in shell.items() if k != "CLAUDE_CODE_REMOTE"}
+        expect("s3 shell: in a terminal, the shell's checkout is the session's, as before",
+               subprocess.run([sys.executable, FACT, "--state-path"], env=terminal, capture_output=True, text=True,
+                              cwd=stranger).stdout.strip(), os.path.join(stranger, "stranger-state"))
+    finally:
+        shutil.rmtree(tmp)
+
     # Scenario 3: a terminal or desktop session records nothing and reads facts as before.
     tmp = fresh()
     try:
