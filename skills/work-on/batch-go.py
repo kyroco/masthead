@@ -442,7 +442,8 @@ def earlier(head, branch):
                            "not run the move again: {}\nNothing starts, so the Gate does not test the same commit "
                            "again. Tell the person.".format(run.get("databaseId"), head[:9],
                                                              (r.stderr or r.stdout).strip()))
-            remember_go(head)
+            # Running a move again starts no run, and GitHub already lists this one, so nothing is
+            # remembered: the next go reads this same run (r2-C1).
             print("Batch run {} already passed the Gate on {}; only its move of main failed. Its move runs again, "
                   "with no Gate run: gh run watch {}".format(run.get("databaseId"), head[:9], run.get("databaseId")))
             return True
