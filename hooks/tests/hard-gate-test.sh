@@ -88,6 +88,24 @@ mkdir -p "$TMP/nogit"
 run_gate "$TMP/nogit"
 ok "$STATUS" "2" "no git repo, none in the workspace: refused, never passed unchecked (MAST-48)"
 contains "$ERR" "unclear" "it says the repository is unclear"
+# arch-5 (Robert, November 20, 2026: "fix it"): in a workspace that holds several repositories, a command that
+# only mentions a push is not refused. A real push or pull request there still is.
+mkdir -p "$TMP/multi"
+newrepo multi/a >/dev/null
+newrepo multi/b >/dev/null
+for c in "grep -rn git push ." "echo then git push" "git help push" "git log --oneline -1 && echo git push later"; do
+  run_gate "$TMP/multi" "$c"
+  ok "$STATUS" "0" "several repositories, a command that only mentions a push passes: $c"
+done
+for c in "git push origin HEAD" "gh pr create --fill" "git status; git push" "bash a/create-pr.sh"; do
+  run_gate "$TMP/multi" "$c"
+  ok "$STATUS" "2" "several repositories, a real push or pull request is refused: $c"
+done
+contains "$ERR" "unclear" "and it says the repository is unclear"
+run_gate "$TMP/multi" "git -C a push"
+contains "$ERR" "no origin/main" "a push that names its repository (git -C a) is checked there, not refused as unclear"
+run_connector "$TMP/multi" "mcp__github__create_pull_request"
+ok "$STATUS" "2" "several repositories, a connector pull request is refused"
 
 echo "2. a clean repo has no delta to gate"
 d="$(newrepo clean)"
