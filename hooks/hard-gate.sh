@@ -316,9 +316,12 @@ for _d in $(printf '%s' "$_CMD" | grep -oE -- '-C[[:space:]]+("[^"]+"|[^[:space:
 done
 
 # Outside a checkout (a pull request opened from the workspace), the repository is the workspace's one
-# (project_fact.py --repo-root). When that is unclear, refuse: a push or a pull request never passes unchecked.
+# (project_fact.py --repo-root). When that is unclear, refuse a push or a pull request: they never pass unchecked.
+# A command the reader above finds no push or pull request in (it only mentions one, as `grep -rn git push .`
+# does) passes: it sends nothing, so it has nothing to check (arch-5, Robert, November 20, 2026: "fix it").
 if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   if ! _ROOT="$(python3 "$_HOOK_DIR/project_fact.py" --repo-root 2>&1)"; then
+    [ "$(python3 -c "$_CMD_READER" "$_CMD" "" 2>/dev/null)" = skip ] && exit 0
     echo "$_ROOT Nothing was pushed and no pull request was opened." >&2
     exit 2
   fi
