@@ -206,6 +206,30 @@ start = subprocess.run([sys.executable, PRIME, "session-start"],
 check("a ~ folder outside the repository: the session is told once, in one line, that records must live in it",
       len(start.splitlines()) == 1 and "ADR_DIR" in start and "must live in the repository" in start, True)
 
+# A folder named by a relative path that leaves the repository, such as a wiki clone beside it:
+# "ADR_DIR": "../wiki/ADR". It is outside the repository the same as a "~" folder (MAST-53).
+side = os.path.join(T, "beside")
+os.makedirs(os.path.join(side, "wiki", "ADR"))
+repo = make_repo(os.path.join("beside", "opted-in-dotdot"), {"ADR_DIR": "../wiki/ADR"})
+record = os.path.join(side, "wiki", "ADR", "ADR-0012-use-a-queue.md")
+dot_env = dict(BASE_ENV, CLAUDE_PROJECT_DIR=repo)
+out = subprocess.run([sys.executable, SECTIONS_GATE],
+                     input=json.dumps({"tool_name": "Write", "cwd": repo,
+                                       "tool_input": {"file_path": record, "content": TITLE_ONLY}}),
+                     capture_output=True, text=True, cwd=repo, env=dot_env).stdout
+check("a ../ folder outside the repository: the write gate holds nothing there", out.strip(), "")
+out = subprocess.run([sys.executable, SECTIONS_GATE],
+                     input=json.dumps({"tool_name": "Bash", "cwd": repo, "tool_input": {
+                         "command": "echo x > ../wiki/ADR/ADR-0013-new.md"}}),
+                     capture_output=True, text=True, cwd=repo, env=dot_env).stdout
+check("a ../ folder outside the repository: nor a shell write there", out.strip(), "")
+start = subprocess.run([sys.executable, PRIME, "session-start"],
+                       input=json.dumps({"session_id": "g", "cwd": repo, "hook_event_name": "SessionStart"}),
+                       capture_output=True, text=True, cwd=repo,
+                       env=dict(dot_env, CLAUDE_PLUGIN_OPTION_KORIUM="off")).stdout.strip()
+check("a ../ folder outside the repository: the session is told once, in one line, that records must live in it",
+      len(start.splitlines()) == 1 and "ADR_DIR" in start and "must live in the repository" in start, True)
+
 # ---------------------------------------------------------------- scenario 3
 print("--- 3. what Masthead says names nothing of Kyroco's ---")
 said = {
