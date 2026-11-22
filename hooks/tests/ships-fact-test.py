@@ -227,11 +227,32 @@ expect("mast-54 s1 shallow clone has no origin/landing yet",
                       capture_output=True).returncode, 1)
 expect("mast-54 s1 shallow clone of an opted-in repository", ships(shallow), (0, "batch"))
 expect("mast-54 s1 asked again", ships(shallow), (0, "batch"))
+# Round 1, arch-1: once --ships answered batch, the clone tracks landing, so the batch way's own plain
+# `git fetch origin` keeps origin/landing current when another worker lands after the first answer.
+base, _ = repo(landing=OPTED_IN)
+made.append(base)
+shallow = cloned(base, "shallow", "--depth", "1")
+expect("mast-54 arch-1 first answer", ships(shallow), (0, "batch"))
+pusher = cloned(base, "pusher")
+git(pusher, "switch", "-q", "landing")
+write(pusher, "later.txt", "another worker landed\n")
+git(pusher, "add", "-A")
+git(pusher, "commit", "-q", "-m", "later")
+git(pusher, "push", "-q", "origin", "HEAD:landing")
+newest = git(pusher, "rev-parse", "HEAD").strip()
+git(shallow, "fetch", "-q", "origin")
+expect("mast-54 arch-1 plain fetch moves origin/landing",
+       git(shallow, "rev-parse", "refs/remotes/origin/landing").strip(), newest)
 # Scenario 2: no landing branch on the remote: the pull request way, as before.
 base, _ = repo()
 made.append(base)
 shallow = cloned(base, "shallow", "--depth", "1")
 expect("mast-54 s2 shallow clone, no landing on the remote", ships(shallow), (0, "pull-request"))
+# The clone's fetch is left as it was: a plain `git fetch origin` still works.
+expect("mast-54 s2 plain fetch still works",
+       subprocess.run(["git", "-C", shallow, "fetch", "-q", "origin"], capture_output=True).returncode, 0)
+expect("mast-54 s2 fetch config untouched",
+       git(shallow, "config", "--get-all", "remote.origin.fetch").split(), ["+refs/heads/main:refs/remotes/origin/main"])
 # A landing with nothing of the batch run on it is still the pull request way.
 base, _ = repo(landing={"notes.txt": "hand run\n"})
 made.append(base)
