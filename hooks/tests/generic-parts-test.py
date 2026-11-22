@@ -230,6 +230,20 @@ start = subprocess.run([sys.executable, PRIME, "session-start"],
 check("a ../ folder outside the repository: the session is told once, in one line, that records must live in it",
       len(start.splitlines()) == 1 and "ADR_DIR" in start and "must live in the repository" in start, True)
 
+# A session started in a workspace of several repositories, as Robert's ~/projects, where one of them names
+# an ADR folder outside itself: the session is told at its start, naming that repository (MAST-53).
+space = os.path.join(T, "space")
+os.makedirs(space)
+make_repo(os.path.join("space", "plain"))
+make_repo(os.path.join("space", "app"), {"ADR_DIR": "../wiki/ADR"})
+start = subprocess.run([sys.executable, PRIME, "session-start"],
+                       input=json.dumps({"session_id": "g", "cwd": space, "hook_event_name": "SessionStart"}),
+                       capture_output=True, text=True, cwd=space,
+                       env=dict(BASE_ENV, CLAUDE_PROJECT_DIR=space, CLAUDE_PLUGIN_OPTION_KORIUM="off")).stdout
+said = [l for l in start.splitlines() if "must live in the repository" in l]
+check("a workspace of several repositories: the session is told, in one line, of the one naming an ADR folder outside it",
+      len(said) == 1 and "app" in said[0] and "../wiki/ADR" in said[0], True)
+
 # ---------------------------------------------------------------- scenario 3
 print("--- 3. what Masthead says names nothing of Kyroco's ---")
 said = {
