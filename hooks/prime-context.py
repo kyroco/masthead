@@ -160,14 +160,16 @@ def session_start(data):
     unclear = repo_unclear(data.get("cwd"))
     if unclear:
         print(unclear)
-    # An ADR folder outside the repository is not checked, and the session is told so once, here.
+    # An ADR folder outside the repository is not checked, and the session is told so once, here: for the
+    # repository the session is about, or, when that is unclear, for each repository of the workspace.
     try:
         import adr_shape
-        line = adr_shape.outside_line(project_root(data.get("cwd")))
+        import project_fact
+        roots = project_fact.workspace_repos() if unclear else [project_root(data.get("cwd"))]
+        for line in filter(None, (adr_shape.outside_line(r) for r in roots)):
+            print(line)
     except Exception:
-        line = None
-    if line:
-        print(line)
+        pass
     # The memory protocol is an install option; unset means on, so a copy outside a plugin keeps it.
     if os.environ.get("CLAUDE_PLUGIN_OPTION_KORIUM", "on").lower() not in ("false", "0", "no", "off"):
         print(SESSION_START)

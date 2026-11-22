@@ -120,8 +120,13 @@ def outside_line(root=None):
     value = named_folder(root)
     if not value.strip("/") or not outside(value, root):
         return None
-    return ("Masthead: ADR_DIR names {}, outside the repository, so no decision record there is checked. "
-            "Decision records must live in the repository.".format(value))
+    try:
+        import project_fact
+        name = os.path.basename(project_fact.checkout_top(root or project_fact.project_root()))
+    except Exception:
+        name = "this repository"
+    return ("Masthead: ADR_DIR in {} names {}, outside the repository, so no decision record there is checked. "
+            "Decision records must live in the repository.".format(name, value))
 
 
 def architecture_doc(root=None):
