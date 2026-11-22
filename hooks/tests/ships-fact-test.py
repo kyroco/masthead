@@ -237,14 +237,18 @@ base, _ = repo(landing={"notes.txt": "hand run\n"})
 made.append(base)
 shallow = cloned(base, "shallow", "--depth", "1")
 expect("mast-54 s2 shallow clone, landing without batch files", ships(shallow), (0, "pull-request"))
-# Scenario 3: a full clone answers as before, and a full single-branch clone that never fetched
-# landing is not made shallow by the fetch.
+# Scenario 3: a full clone answers as before, from landing as last fetched: no fetch is made for it.
+# Round 1 fix (verifier s3): a full single-branch clone that never fetched landing still answers the
+# pull request way, as it did before MAST-54, and is left untouched.
 base, _ = repo(landing=OPTED_IN)
 made.append(base)
 full = cloned(base, "full")
 expect("mast-54 s3 full clone", ships(full), (0, "batch"))
 single = cloned(base, "single", "--single-branch", "--no-tags")
-expect("mast-54 s3 full single-branch clone", ships(single), (0, "batch"))
+expect("mast-54 s3 full single-branch clone answers as before", ships(single), (0, "pull-request"))
+expect("mast-54 s3 full single-branch clone fetched nothing",
+       subprocess.run(["git", "-C", single, "rev-parse", "-q", "--verify", "refs/remotes/origin/landing"],
+                      capture_output=True).returncode, 1)
 expect("mast-54 s3 full single-branch clone stays full", is_shallow(single), "false")
 
 # Outside a git repository, with none in the workspace: which repository is unclear, so the skill stops and
