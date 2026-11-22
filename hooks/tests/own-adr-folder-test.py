@@ -7,7 +7,6 @@
 Rests on Robert, November 20, 2026: "just use the local repo as ADR tracking the wiki has been causing a lot
 of problems". Run: python3 hooks/tests/own-adr-folder-test.py
 """
-import json
 import os
 import sys
 
@@ -17,6 +16,7 @@ TOP = os.path.dirname(HOOKS)
 os.environ["CLAUDE_PROJECT_DIR"] = TOP
 sys.path.insert(0, HOOKS)
 import adr_shape  # noqa: E402
+import project_fact  # noqa: E402
 
 passed = failed = 0
 
@@ -31,8 +31,8 @@ def check(name, ok):
         print("FAIL - " + name)
 
 
-with open(os.path.join(TOP, ".claude", "settings.json")) as f:
-    named = (json.load(f).get("env") or {}).get("ADR_DIR") or ""
+# The committed settings file only, read the one way Masthead reads settings (docs/architecture.md).
+named = project_fact.settings_env(os.path.join(TOP, ".claude", "settings.json")).get("ADR_DIR") or ""
 check("1: this repository's settings name ADR_DIR", bool(named.strip()))
 check("1: ADR_DIR names no folder outside the repository", not adr_shape.outside(os.path.expanduser(named), TOP))
 where = adr_shape.folder(TOP)
