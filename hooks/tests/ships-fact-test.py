@@ -205,6 +205,48 @@ base, work = repo(landing=big)
 made.append(base)
 expect("arch-2 a Gate workflow near 1 MiB", ships(work), (0, "batch"))
 
+# MAST-54: a cloud thread clones shallow and single-branch (`git clone --depth 1`), so origin/landing
+# was never fetched. A ref this checkout never fetched says nothing about the remote: --ships fetches
+# landing by name, then decides.
+def cloned(base, name, *flags):
+    path = os.path.join(base, name)
+    git(base, "clone", "-q", *flags, "file://" + os.path.join(base, "origin"), path)
+    return path
+
+
+def is_shallow(path):
+    return git(path, "rev-parse", "--is-shallow-repository").strip()
+
+
+# Scenario 1: a shallow single-branch clone of a repository that opted in ships the batch way.
+base, _ = repo(landing=OPTED_IN)
+made.append(base)
+shallow = cloned(base, "shallow", "--depth", "1")
+expect("mast-54 s1 shallow clone has no origin/landing yet",
+       subprocess.run(["git", "-C", shallow, "rev-parse", "-q", "--verify", "refs/remotes/origin/landing"],
+                      capture_output=True).returncode, 1)
+expect("mast-54 s1 shallow clone of an opted-in repository", ships(shallow), (0, "batch"))
+expect("mast-54 s1 asked again", ships(shallow), (0, "batch"))
+# Scenario 2: no landing branch on the remote: the pull request way, as before.
+base, _ = repo()
+made.append(base)
+shallow = cloned(base, "shallow", "--depth", "1")
+expect("mast-54 s2 shallow clone, no landing on the remote", ships(shallow), (0, "pull-request"))
+# A landing with nothing of the batch run on it is still the pull request way.
+base, _ = repo(landing={"notes.txt": "hand run\n"})
+made.append(base)
+shallow = cloned(base, "shallow", "--depth", "1")
+expect("mast-54 s2 shallow clone, landing without batch files", ships(shallow), (0, "pull-request"))
+# Scenario 3: a full clone answers as before, and a full single-branch clone that never fetched
+# landing is not made shallow by the fetch.
+base, _ = repo(landing=OPTED_IN)
+made.append(base)
+full = cloned(base, "full")
+expect("mast-54 s3 full clone", ships(full), (0, "batch"))
+single = cloned(base, "single", "--single-branch", "--no-tags")
+expect("mast-54 s3 full single-branch clone", ships(single), (0, "batch"))
+expect("mast-54 s3 full single-branch clone stays full", is_shallow(single), "false")
+
 # Outside a git repository, with none in the workspace: which repository is unclear, so the skill stops and
 # prints nothing (MAST-48, repo_root step 4).
 plain = os.path.realpath(tempfile.mkdtemp(prefix="ships-plain-"))
