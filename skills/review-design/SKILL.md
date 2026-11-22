@@ -93,8 +93,8 @@ After each answer, and for each finding a source settled, change every
 artifact that should say it so they all say the same thing: the decision
 record, with a dated line in the user's words under the decision it changes;
 the architecture doc; the mockup page and its model; the rubric or test
-support file. The mockups change too. Save and push each the way its home
-asks: the wiki by a push, the repo by a PR.
+support file. The mockups change too. Commit each in the repository and ship
+it the way the repository ships a change.
 
 ## Report, and capture
 

@@ -547,16 +547,6 @@
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/run.sh\" elixir-toolchain-env.sh"
           }
         ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/run.sh\" wiki-refresh.sh",
-            "timeout": 10,
-            "statusMessage": "Updating the local ADR wiki copy"
-          }
-        ]
       }
     ],
     "CwdChanged": [

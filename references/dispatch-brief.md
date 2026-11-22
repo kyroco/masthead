@@ -132,8 +132,7 @@ This is an architecture review; you change no code.
 Issue: <the key, such as MAST-34, or the number>.
 Review <the diff command, with the head commit>. Write your findings to
 <state>/review/findings-architecture-reviewer-<name>.json (the real path).
-ADR: <the ADR's path in this checkout, or in the local clone the repo's
-ADR_DIR fact names, pulled first>, or "none"; never a link, which the reviewer cannot open.
+ADR: <the ADR's path in this checkout>, or "none"; never a link, which the reviewer cannot open.
 ADR alignment:
 - <each line of the ADR on how it applies the architecture doc and which
   builds it must work in, quoted>

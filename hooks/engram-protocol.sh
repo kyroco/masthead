@@ -685,7 +685,7 @@ print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permiss
           [ -n "$reasons" ] && reasons="$reasons
 
 "
-          reasons="${reasons}Architecture review brief rule: the reviewer reads the ADR from a file and cannot open a link, so the brief has a line that is exactly 'ADR: <path>' at column zero, the ADR's path in this checkout or in the local clone the repo's ADR_DIR fact names (pull it first), or 'ADR: none' when the issue builds no ADR. Then retry." ;;
+          reasons="${reasons}Architecture review brief rule: the reviewer reads the ADR from a file and cannot open a link, so the brief has a line that is exactly 'ADR: <path>' at column zero, the ADR's path in this checkout, or 'ADR: none' when the issue builds no ADR. Then retry." ;;
       esac
 
       # The doc line names what the project records: project_fact.py --architecture-doc, read for the checkout the dispatch comes from.

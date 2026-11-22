@@ -25,7 +25,6 @@ PR_OUTRO = ("A divergence changes the target shape, so the same pull request edi
             "its Architecture Alignment entry to conforms and its design to match.")
 
 PR_CREATE = re.compile(r"\bgh\s+pr\s+create\b")
-ADR_NUMBER = re.compile(r"(?i)\bADR[-_ ]?0*(\d{1,5})\b")
 
 
 def refuse(reasons, intro=SHAPE_INTRO, outro=SHAPE_OUTRO):
@@ -65,19 +64,6 @@ def pr_base(cmd):
     return m.group(1).strip("'\"") if m else ""
 
 
-def body_file(cmd, cwd):
-    """The text of a --body-file / -F the command names, or ''."""
-    m = re.search(r"(?:--body-file|-F)(?:\s+|=)(\"[^\"]+\"|'[^']+'|\S+)", cmd)
-    if not m:
-        return ""
-    path = os.path.join(cwd, os.path.expanduser(m.group(1).strip("'\"")))
-    try:
-        with open(path) as handle:
-            return handle.read()
-    except OSError:
-        return ""
-
-
 def edited(path, old, new, every):
     """The file as this Edit would leave it, or None when that cannot be told.
 
@@ -95,18 +81,7 @@ def edited(path, old, new, every):
     return text.replace(old, new) if every else text.replace(old, new, 1)
 
 
-def find_by_number(where, number):
-    """The record in the folder `where` (or a folder below it) whose name carries `number`."""
-    for d, subs, files in os.walk(where):
-        subs[:] = [x for x in subs if not x.startswith(".")]
-        for name in sorted(files):
-            m = re.match(r"(?i)^(?:adr[-_]?)?0*(\d+)[-_]", name)
-            if m and int(m.group(1)) == number and adr_shape.NAME.match(name):
-                return os.path.join(d, name)
-    return None
-
-
-def pr_divergences(cwd, base, pr_text, where, root):
+def pr_divergences(cwd, base, where, root):
     """The reasons opening this pull request is refused: a divergent ADR with the doc unchanged."""
     doc = adr_shape.architecture_doc(root)
     top = (git(cwd or ".", "rev-parse", "--show-toplevel") or "").strip()
@@ -133,30 +108,6 @@ def pr_divergences(cwd, base, pr_text, where, root):
         if new:
             reasons.append("`%s` diverges from %s of the architecture doc (%s), which this pull "
                            "request does not change." % (rel, ", ".join("`%s`" % p for p in new), doc_rel))
-    # An ADR folder outside the repository (a wiki clone): the ADRs the pull request names by number.
-    outside = where.startswith("/") and not (os.path.realpath(where) + "/").startswith(os.path.realpath(top) + "/")
-    if outside and os.path.isdir(where):
-        named = {}
-        for source, text in [("the pull request's title or body", pr_text)] + [
-                ("commit %s" % c[:12], git(top, "log", "-1", "--format=%B", c) or "")
-                for c in (git(top, "rev-list", "%s..HEAD" % mb) or "").split()]:
-            for m in ADR_NUMBER.finditer(text or ""):
-                named.setdefault(int(m.group(1)), (m.group(0), source))
-        cited = set(int(m.group(1)) for m in ADR_NUMBER.finditer(git(top, "show", "%s:%s" % (mb, doc_rel)) or ""))
-        for number, (label, source) in sorted(named.items()):
-            path = find_by_number(where, number)
-            if not path or number in cited:
-                continue
-            try:
-                with open(path) as handle:
-                    text = handle.read()
-            except OSError:
-                continue
-            apart = adr_shape.diverging(text, parts)
-            if apart:
-                reasons.append("%s, named in %s and found at %s, diverges from %s of the "
-                               "architecture doc (%s), which this pull request does not change."
-                               % (label, source, path, ", ".join("`%s`" % p for p in apart), doc_rel))
     return reasons
 
 
@@ -179,17 +130,16 @@ def main():
             return
         reasons, pr_reasons = [], []
 
-        # Opening a pull request: an ADR it carries or names may not diverge from an unchanged doc.
+        # Opening a pull request: an ADR it carries may not diverge from an unchanged doc.
         if re.match(r"^mcp__.+__create_pull_request$", tool):
-            text = "%s\n%s" % (ti.get("title") or "", ti.get("body") or "")
-            reasons = pr_divergences(cwd, ti.get("base") or "", text, where, root)
+            reasons = pr_divergences(cwd, ti.get("base") or "", where, root)
             if reasons:
                 refuse(reasons, PR_INTRO, PR_OUTRO)
             return
         # The same command may also write an ADR through the shell, so the check below still runs.
         if tool == "Bash" and PR_CREATE.search(ti.get("command") or ""):
             cmd = ti.get("command") or ""
-            pr_reasons = pr_divergences(cwd, pr_base(cmd), cmd + "\n" + body_file(cmd, cwd), where, root)
+            pr_reasons = pr_divergences(cwd, pr_base(cmd), where, root)
 
         if tool == "Write":
             path = ti.get("file_path") or ""

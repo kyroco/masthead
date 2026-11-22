@@ -560,9 +560,6 @@ says  references/dispatch-brief.md "Not covered when the call names no model"
 # A signed-out korium-cli refuses every grep until the index is asked.
 says  README.md "every grep while korium-cli is signed out"
 says  docs/explainer.template.html "every grep while korium-cli is signed out"
-# The wiki refresh has no docs/adr fallback.
-says  README.md "the refresh only with"
-says  docs/explainer.template.html "the refresh only with"
 # Setup asks three questions when a memory is already connected (four with the
 # tracker question, MAST-1).
 says  README.md "or three when a memory is already connected"

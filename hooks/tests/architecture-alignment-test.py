@@ -294,31 +294,13 @@ check("6: an edit that adds no new divergence is allowed", pr(r) == "")
 
 # ------------------------------------------------------------------ scenario 6, an ADR folder outside the repository
 wiki = os.path.join(T, "wiki", "ADR")
-write(os.path.join(wiki, "Current", "ADR-0007-take-orders.md"), adr(DIVERGES))
-write(os.path.join(wiki, "Current", "ADR-0008-ship-orders.md"), adr(ALIGNED, "ADR-0008: ship"))
+write(os.path.join(wiki, "ADR-0007-take-orders.md"), adr(DIVERGES))
 
-r = make_repo("s6-wiki", adr_dir=wiki)
+r = make_repo("s6-outside", adr_dir=wiki)
 git(r, "switch", "-q", "-c", "feature")
-commit(r, {"lib/orders.ex": "x\n"}, "Build reports")
-check("6: a pull request that names no ADR is not held", pr(r) == "")
-check("6: a wiki ADR named in the body that diverges is not held: records must live in the repository",
+commit(r, {"lib/orders.ex": "x\n"}, "Build reports (ADR-0007)")
+check("6: a diverging ADR in a folder outside the repository is not held: records must live in the repository",
       pr(r, body="Builds ADR-0007 reports.") == "")
-check("6: a wiki ADR named that conforms is allowed", pr(r, body="Builds ADR-0008.") == "")
-
-body_file = os.path.join(r, "body.md")
-write(body_file, "Fixes MAST-1. Builds ADR 7.\n")
-check("6: nor one named in a --body-file", pr(r, body="", extra=" --body-file body.md") == "")
-
-commit(r, {"lib/reports.ex": "x\n"}, "Read orders for reports (ADR-0007)")
-check("6: nor one named in a commit message", pr(r) == "")
-
-commit(r, {"docs/architecture.md": DOC + "\nReports read orders from the table.\n"}, "Update the doc")
-check("6: with the doc edited in the pull request it is allowed", pr(r, body="Builds ADR-0007.") == "")
-
-r = make_repo("s6-wiki-cited", adr_dir=wiki, base_doc=DOC + "\nReports read orders from the table (ADR-0007).\n")
-git(r, "switch", "-q", "-c", "feature")
-commit(r, {"lib/orders.ex": "x\n"}, "More reports")
-check("6: a wiki ADR whose divergence the doc already cites is allowed", pr(r, body="Builds ADR-0007.") == "")
 
 r = make_repo("s6-no-doc", adr_dir=wiki, doc=False)
 git(r, "switch", "-q", "-c", "feature")

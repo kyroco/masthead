@@ -1,7 +1,6 @@
 {
   "env": {
-    "ADR_DIR": "~/projects/masthead.wiki/ADR",
-    "ADR_REMOTE": "https://github.com/kyroco/masthead.wiki.git",
+    "ADR_DIR": "docs/adr",
     "ARCHITECTURE_DOC": "docs/architecture.md",
     "ISSUE_TRACKER": "linear",
     "LINEAR_TEAM_KEY": "MAST",
