@@ -17,6 +17,11 @@ set -uo pipefail
 GATE="$(cd "$(dirname "$0")/.." && pwd)/hard-gate.sh"
 [ -f "$GATE" ] || { echo "FAIL: no hard-gate.sh at $GATE" >&2; exit 1; }
 
+# The runner's own GIT_ variables never reach the gate under test: a Claude Code
+# cloud machine sets several (MAST-52), and each case below sets exactly the ones
+# it is about.
+while IFS= read -r name; do unset "$name"; done < <(compgen -e | grep '^GIT_')
+
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/hard-gate-test.XXXXXX")"
 trap 'rm -rf "$TMP"' EXIT
 
@@ -819,7 +824,7 @@ run_counted() {
   : > "$TMP/mixlog"
   payload="$(python3 -c 'import json,sys; print(json.dumps({"hook_event_name":"PreToolUse","tool_name":"Bash","cwd":sys.argv[1],"tool_input":{"command":sys.argv[2]}}))' "$1" "${2:-git push -u origin HEAD}")"
   ( cd "$1" && printf '%s' "$payload" \
-      | env CLAUDE_PROJECT_DIR="$1" PATH="$TMP/countbin:$PATH" GIT_CEILING_DIRECTORIES="$TMP" ${3:+"$3"} \
+      | env CLAUDE_PROJECT_DIR="$1" PATH="$TMP/countbin:$PATH" GIT_CEILING_DIRECTORIES="$TMP" "${@:3}" \
         bash "${GATE_UNDER_TEST:-$GATE}" 2>"$TMP/err" ; echo $? > "$TMP/status" )
   STATUS="$(cat "$TMP/status")"
   ERR="$(cat "$TMP/err")"
@@ -1037,12 +1042,45 @@ ran yes "and the record the changed script wrote does not count for this one"
 # The environment. A variable that can point git somewhere else switches the
 # reuse off; it cannot point the gate at another record.
 for setting in "GIT_DIR=$d/.git" "GIT_WORK_TREE=$d" "GIT_INDEX_FILE=$d/.git/index" \
-    "GIT_CONFIG_GLOBAL=/dev/null" "GIT_CONFIG_COUNT=0" "GIT_A_NAME_NOBODY_KNOWS=1"; do
+    "GIT_CONFIG_GLOBAL=/dev/null" "GIT_CONFIG_PARAMETERS='core.worktree'='/elsewhere'" "GIT_A_NAME_NOBODY_KNOWS=1"; do
   run_counted "$d" "" "$setting"
   ran yes "${setting%%=*} in the gate's environment switches the reuse off"
 done
 run_counted "$d" "" "GIT_EDITOR=true"
 ran no "GIT_EDITOR, which moves nothing, leaves the reuse on"
+# A Claude Code cloud machine passes 4 git settings in the environment (MAST-52):
+# the proxy's certificates, and 3 config entries that move nothing the checks read.
+# Robert, 2026-11-22: accept GIT_SSL_CAINFO, and GIT_CONFIG_* only when every key
+# is credential.interactive or url.*.insteadOf.
+cloud=(GIT_SSL_CAINFO=/root/.ccr/ca-bundle.crt GIT_CONFIG_COUNT=3
+  GIT_CONFIG_KEY_0=credential.interactive GIT_CONFIG_VALUE_0=false
+  GIT_CONFIG_KEY_1=url.https://github.com/.insteadOf GIT_CONFIG_VALUE_1=git@github.com:
+  GIT_CONFIG_KEY_2=url.https://github.com/.insteadOf GIT_CONFIG_VALUE_2=ssh://git@github.com/)
+run_counted "$d" "" GIT_SSL_CAINFO=/root/.ccr/ca-bundle.crt
+ran no "GIT_SSL_CAINFO, which only changes the certificates git trusts, leaves the reuse on"
+run_counted "$d" "" "${cloud[@]}"
+ran no "the cloud machine's 4 settings together leave the reuse on"
+run_counted "$d" "" GIT_CONFIG_COUNT=0
+ran no "an empty GIT_CONFIG_COUNT, which passes no setting, leaves the reuse on"
+refused_config() {
+  # $1 = what the case shows, then the settings.
+  local what="$1"; shift
+  run_counted "$d" "" "$@"
+  ran yes "$what switches the reuse off"
+}
+refused_config "a config key outside the list (core.worktree)" \
+  GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.worktree GIT_CONFIG_VALUE_0=/elsewhere
+refused_config "one key outside the list among allowed ones (core.hooksPath)" "${cloud[@]}" \
+  GIT_CONFIG_COUNT=4 GIT_CONFIG_KEY_3=core.hooksPath GIT_CONFIG_VALUE_3=/elsewhere
+refused_config "a key under another credential name (credential.helper)" \
+  GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=credential.helper GIT_CONFIG_VALUE_0=store
+refused_config "a url key that is not insteadOf (url.x.pushInsteadOf)" \
+  GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=url.https://x/.pushInsteadOf GIT_CONFIG_VALUE_0=y
+refused_config "a key outside the count, which git skips (core.worktree)" "${cloud[@]}" \
+  GIT_CONFIG_KEY_3=core.worktree GIT_CONFIG_VALUE_3=/elsewhere
+refused_config "an allowed set beside another GIT_ variable (GIT_DIR)" "${cloud[@]}" "GIT_DIR=$d/.git"
+run_counted "$d"
+ran no "with the environment clean again, the pass still stands"
 ok "$(grep -o 'MASTHEAD_[A-Z_]*' "$GATE" | sort -u | tr '\n' ' ')" "MASTHEAD_DONE_GATE " "the gate reads no switch but the one that turns the whole gate off"
 cp "$record" "$TMP/record-elsewhere"
 rm -f "$record"
