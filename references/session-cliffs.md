@@ -79,6 +79,7 @@ Gate (`.claude/gate.json`) and the batch starter file
 `origin/landing`. That is the batch way: commits land on the landing branch
 with no pull request. When a shallow checkout never fetched `landing`,
 as a single-branch cloud clone has not, `--ships` fetches it by name first
+and, when origin has it, adds it to the branches `git fetch origin` brings
 (MAST-54). Anything else, a repository part way through setting it
 up included, prints `pull-request`: that is the pull request way, one
 reviewed PR per issue, as it always was. Robert, November 19, 2026: "yes

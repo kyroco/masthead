@@ -639,13 +639,15 @@ def committed_file(top, ref, relative, limit=REPO_FILE_LIMIT):
 
 
 def fetch_landing_once(top):
-    """Fetch origin's landing branch by name when this shallow checkout has never fetched it (MAST-54).
+    """Track origin's landing branch when this shallow checkout has never fetched it (MAST-54).
 
     A cloud thread clones shallow and single-branch, so there a missing origin/landing
     says nothing about the remote. A full clone, and a checkout that already has the
-    ref, keep landing as last fetched, as before. Only landing's tip is fetched. A
-    remote with no landing, or no network, leaves the ref missing, and the answer stays
-    the pull request way."""
+    ref, keep landing as last fetched, as before. Landing's tip is fetched by name, and
+    when the remote has it, landing joins the branches the clone fetches, so every later
+    plain `git fetch origin` of the batch way keeps origin/landing current (arch-1). A
+    remote with no landing, or no network, leaves the ref missing and the clone's fetch
+    as it was, and the answer stays the pull request way."""
     known = subprocess.run(["git", "-C", top, "rev-parse", "-q", "--verify", "refs/remotes/" + SHIPS_REF],
                            capture_output=True, timeout=10)
     if known.returncode == 0:
@@ -657,8 +659,11 @@ def fetch_landing_once(top):
     remote, branch = SHIPS_REF.split("/", 1)
     command = ["git", "-C", top, "fetch", "-q", "--no-tags", "--depth", "1"]
     command += [remote, "+refs/heads/{0}:refs/remotes/{1}/{0}".format(branch, remote)]
-    subprocess.run(command, capture_output=True, timeout=SHIPS_FETCH_TIMEOUT,
-                   env=dict(os.environ, GIT_TERMINAL_PROMPT="0"))
+    fetched = subprocess.run(command, capture_output=True, timeout=SHIPS_FETCH_TIMEOUT,
+                             env=dict(os.environ, GIT_TERMINAL_PROMPT="0"))
+    if fetched.returncode == 0:
+        subprocess.run(["git", "-C", top, "remote", "set-branches", "--add", remote, branch],
+                       capture_output=True, timeout=10)
 
 
 def ships(root=None):
