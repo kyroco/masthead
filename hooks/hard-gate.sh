@@ -357,6 +357,16 @@ pass_key() {
     case "$name" in
       GIT_EDITOR|GIT_SEQUENCE_EDITOR|GIT_PAGER|GIT_TERMINAL_PROMPT|GIT_ASKPASS|GIT_SSH|GIT_SSH_COMMAND) ;;
       GIT_CEILING_DIRECTORIES|GIT_OPTIONAL_LOCKS|GIT_AUTHOR_*|GIT_COMMITTER_*|GIT_TRACE*) ;;
+      # A Claude Code cloud machine sets these (MAST-52). GIT_SSL_CAINFO only changes the certificates git
+      # trusts. Config passed as GIT_CONFIG_COUNT with GIT_CONFIG_KEY_n and GIT_CONFIG_VALUE_n is let through
+      # only when every key is credential.interactive or a url.<base>.insteadOf rewrite: neither changes what
+      # the checks read. Any other key gives no key, as does a malformed set, which git itself refuses to run.
+      GIT_SSL_CAINFO|GIT_CONFIG_COUNT|GIT_CONFIG_VALUE_*) ;;
+      GIT_CONFIG_KEY_*)
+        case "${!name}" in
+          credential.interactive|url.*.insteadOf) ;;
+          *) return 0 ;;
+        esac ;;
       *) return 0 ;;
     esac
   done
