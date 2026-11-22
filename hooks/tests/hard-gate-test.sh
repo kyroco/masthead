@@ -824,7 +824,7 @@ run_counted() {
   : > "$TMP/mixlog"
   payload="$(python3 -c 'import json,sys; print(json.dumps({"hook_event_name":"PreToolUse","tool_name":"Bash","cwd":sys.argv[1],"tool_input":{"command":sys.argv[2]}}))' "$1" "${2:-git push -u origin HEAD}")"
   ( cd "$1" && printf '%s' "$payload" \
-      | env CLAUDE_PROJECT_DIR="$1" PATH="$TMP/countbin:$PATH" GIT_CEILING_DIRECTORIES="$TMP" "${@:3}" \
+      | env CLAUDE_PROJECT_DIR="$1" PATH="$TMP/countbin:$PATH" GIT_CEILING_DIRECTORIES="$TMP" ${3+"${@:3}"} \
         bash "${GATE_UNDER_TEST:-$GATE}" 2>"$TMP/err" ; echo $? > "$TMP/status" )
   STATUS="$(cat "$TMP/status")"
   ERR="$(cat "$TMP/err")"
