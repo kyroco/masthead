@@ -591,6 +591,8 @@ def documents_only(top, base, head):
 STARTER_FILE = ".github/workflows/masthead-batch.yml"
 # Where a session reads whether the repository opted in: the landing branch as last fetched from origin.
 SHIPS_REF = "origin/landing"
+# A checkout that never fetched landing (a shallow single-branch cloud clone, MAST-54) fetches it by name once.
+SHIPS_FETCH_TIMEOUT = 60
 SHIPS_BATCH = "batch"
 SHIPS_PR = "pull-request"
 
@@ -636,12 +638,34 @@ def committed_file(top, ref, relative, limit=REPO_FILE_LIMIT):
         return None
 
 
+def fetch_landing_once(top):
+    """Fetch origin's landing branch by name when this checkout has never fetched it (MAST-54).
+
+    A cloud thread clones shallow and single-branch, so a missing origin/landing says
+    nothing about the remote. A checkout that already has the ref keeps it as last
+    fetched. A shallow checkout fetches only landing's tip; a full one fetches it in
+    full, so it never becomes shallow. A remote with no landing, or no network, leaves
+    the ref missing, and the answer stays the pull request way."""
+    known = subprocess.run(["git", "-C", top, "rev-parse", "-q", "--verify", "refs/remotes/" + SHIPS_REF],
+                           capture_output=True, timeout=10)
+    if known.returncode == 0:
+        return
+    shallow = subprocess.run(["git", "-C", top, "rev-parse", "--is-shallow-repository"],
+                             capture_output=True, text=True, timeout=10).stdout.strip() == "true"
+    remote, branch = SHIPS_REF.split("/", 1)
+    command = ["git", "-C", top, "fetch", "-q", "--no-tags"] + (["--depth", "1"] if shallow else [])
+    command += [remote, "+refs/heads/{0}:refs/remotes/{1}/{0}".format(branch, remote)]
+    subprocess.run(command, capture_output=True, timeout=SHIPS_FETCH_TIMEOUT,
+                   env=dict(os.environ, GIT_TERMINAL_PROMPT="0"))
+
+
 def ships(root=None):
     """Which way a change reaches main here (INFRA-276): "batch" or "pull-request".
 
     "batch" only when the repository opted in to the batch run: the stored Gate
     (.claude/gate.json, naming a workflow that is there too) and the starter
-    file setup writes are both committed on origin/landing, as last fetched.
+    file setup writes are both committed on origin/landing, as last fetched, or
+    fetched now when this checkout never fetched it (MAST-54).
     Anything else, a part-way setup included, is "pull-request", the way
     Masthead 0.3.1 ships. Robert, November 19, 2026: "yes that's the right
     recommendation, keep the old way, new way is an option".
@@ -650,6 +674,10 @@ def ships(root=None):
     if not trusted(root):
         return SHIPS_PR
     top = checkout_top(root)
+    try:
+        fetch_landing_once(top)
+    except (OSError, subprocess.SubprocessError):
+        pass
 
     # The starter and the Gate's workflow need only be plain files, at any size, as gate()
     # asks of the workflow on disk (INFRA-276 arch-2); gate.json is read, as gate() reads it.

@@ -77,7 +77,9 @@ and the repository's committed facts say which. Run `git fetch origin`, then
 Gate (`.claude/gate.json`) and the batch starter file
 (`.github/workflows/masthead-batch.yml`) are both committed on
 `origin/landing`. That is the batch way: commits land on the landing branch
-with no pull request. Anything else, a repository part way through setting it
+with no pull request. When the checkout never fetched `landing`, as a
+shallow single-branch cloud clone has not, `--ships` fetches it by name
+first (MAST-54). Anything else, a repository part way through setting it
 up included, prints `pull-request`: that is the pull request way, one
 reviewed PR per issue, as it always was. Robert, November 19, 2026: "yes
 that's the right recommendation, keep the old way, new way is an option".
