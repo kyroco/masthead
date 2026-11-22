@@ -94,15 +94,13 @@ def named_folder(root=None):
 
 
 def outside(value, root=None):
-    """Whether the absolute folder `value` lies outside the checkout at `root`."""
-    if not value.startswith("/"):
-        return False
+    """Whether the folder `value`, absolute or relative to the checkout at `root`, lies outside that checkout."""
     try:
         import project_fact
         top = os.path.realpath(project_fact.checkout_top(root or project_fact.project_root()))
     except Exception:
-        return True
-    return not (os.path.realpath(value) + "/").startswith(top.rstrip("/") + "/")
+        return value.startswith("/")
+    return not (os.path.realpath(os.path.join(top, value)) + "/").startswith(top.rstrip("/") + "/")
 
 
 def folder(root=None):
