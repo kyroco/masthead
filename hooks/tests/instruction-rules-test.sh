@@ -638,6 +638,11 @@ never skills/work-on/foreman.md "each issue's effort level with a one-clause rea
 never skills/work-on/foreman.md "give the user one plan, as a table"
 says  skills/work-on/worker.md "How you talk to the person is set by their own instructions and output style"
 says  skills/work-on/worker.md "Time matters. Do not spend time that can be avoided"
+# MAST-55: the foreman holds the worker's "Time matters" line, word for word.
+# Robert, November 23, 2026: "Maybe that line in the worker's skill should be
+# on yours too".
+says  skills/work-on/foreman.md "Time matters. Do not spend time that can be avoided, and the earlier a correct result is obtained, the better."
+says  skills/work-on/worker.md "Time matters. Do not spend time that can be avoided, and the earlier a correct result is obtained, the better."
 never skills/work-on/worker.md "numbered lines"
 for doc in README.md docs/explainer.template.html docs/explainer.html; do
   says  "$doc" "asks how many workers"
