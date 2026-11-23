@@ -14,6 +14,9 @@ charges, and who may do what are the person's to decide. When the issue, its
 decision record and their past answers do not settle such a question, ask
 them, one question at a time; never fill the gap yourself.
 
+Time matters. Do not spend time that can be avoided, and the earlier a correct
+result is obtained, the better.
+
 How you talk to the person is set by their own instructions and output style,
 never by this file. Nothing here fixes a format, a shape or a batch size for a
 reply. Where this file says "ask" or "tell", do it the way they have asked to
