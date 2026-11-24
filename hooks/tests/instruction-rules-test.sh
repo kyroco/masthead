@@ -96,6 +96,15 @@ says  skills/work-on/foreman.md "warm-build.sh build"
 says  skills/work-on/foreman.md "Start no worker while the warm-up is still running"
 says  skills/work-on/worker.md "warm-build.sh clone <tree path>"
 says  references/gate-catalog.md "\`PROJECT_WARM_BUILD\`"
+# A person's answer is saved once, by one agent, after a search (Robert, November 24, 2026).
+says  skills/work-on/foreman.md "Only that agent saves a person's answer"
+says  skills/work-on/foreman.md "so it decides nothing"
+says  skills/work-on/foreman.md "the ids of the notes that hold the person's answers"
+never skills/work-on/foreman.md "into Korium, so no session asks it"
+never skills/work-on/foreman.md "and the person's answers, verbatim"
+says  skills/korium-memory/SKILL.md "Search before you save"
+says  skills/korium-memory/SKILL.md "then we don't just re-save it"
+never skills/korium-memory/SKILL.md "Save what the next task needs, then search"
 
 # 4. No scenario count. The check is exact on purpose, not a prose scanner: it
 # holds the lines where the rule now lives, and refuses the three phrases this
@@ -113,7 +122,7 @@ never docs/explainer.html "writes a plan, one line per scenario"
 never docs/explainer.html "its plan, one line per scenario"
 never docs/images/day-5-workers.svg "its plan, one line per scenario"
 never scripts/diagrams.py "its plan, one line per scenario"
-says  .claude-plugin/plugin.json '"version": "0.6.0"'
+says  .claude-plugin/plugin.json '"version": "0.6.1"'
 
 never_phrase() {
   local hit
