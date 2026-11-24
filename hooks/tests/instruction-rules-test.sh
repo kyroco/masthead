@@ -759,7 +759,8 @@ says  "$W" "the Linear project's description is the brief, in place of the proje
 # Scenario 3: worktree KOR-12-issue, branch named by Linear and holding the key.
 says  "$W" "the worktree for KOR-12 is \`KOR-12-issue\`"
 says  "$W" "the branch is the one \`get_issue\` returns as \`gitBranchName\`"
-says  "$W" "\`git switch -c <gitBranchName>\`, then \`git push -u origin <gitBranchName>\`"
+says  "$W" "\`git switch -c <gitBranchName> origin/main\`, or in the batch way"
+says  "$W" "after \`git fetch origin\`, then \`git push -u origin <gitBranchName>\`"
 says  "$W" "never \`gh issue develop\`"
 # Scenario 4: In Progress through the Linear connector, never set-status.sh.
 says  "$W" "\`save_issue\` with \`id\` the key and \`state\` \`In Progress\`"
@@ -1740,7 +1741,7 @@ says  "$F" "before you queue its PR, or before you accept its landing in the bat
 says  "$F" "Accept a landing when all of these hold"
 says  "$F" "its slot is free once it answers \"cleaned up\""
 says  "$F" "Green, with main at its commit, it lists the issues the batch carried to main"
-says  "$F" "An issue whose blocker is still open waits until that blocker merges; in the batch way, until a green batch moves main past that blocker's commits"
+says  "$F" "An issue whose blocker is still open waits until that blocker merges. In the batch way it waits only until you accept that blocker's landing"
 says  skills/work-on/worker.md "when your foreman accepts your landing"
 # arch-3: the tracker skills no longer restate Done as a pull request's.
 for f in skills/github-issues/SKILL.md skills/linear-issues/SKILL.md; do
@@ -1956,7 +1957,7 @@ says  "$H" "**Desktop app and terminal:** as \`foreman.md\` says."
 says  "$H" "**Desktop app and terminal:** nothing here; the session was already given its next issue, or ends at the end of the run"
 says  skills/work-on/foreman.md "A repo that names no \`PROJECT_WARM_BUILD\` runs as before: no warm-up, and every worker builds its own."
 # MAST-49 round 0, F2 and F3: the batch way tells a carried issue's worker, and a red run is searched.
-part_says "foreman.md, the batch way," "$(part skills/work-on/foreman.md "### The batch way" "## End the run")" "and start those first. Tell each one's worker as **A worker's issue reached main** in \`hosts.md\` says."
+part_says "foreman.md, the batch way," "$(part skills/work-on/foreman.md "### The batch way" "## End the run")" "and start any of those not already started at a landing. Tell each one's worker as **A worker's issue reached main** in \`hosts.md\` says."
 says  skills/work-on/foreman.md "When a batch goes red, run the search for the commit that broke it, with the red run's id: python3 \${CLAUDE_PLUGIN_ROOT}/skills/work-on/bad-commit.py <run id>"
 # MAST-49 round 0, F1: every way to be the foreman, several issues included, goes through Start the foreman.
 says  skills/work-on/SKILL.md "Every way to be the foreman, several issues included, starts with **Start the foreman** in \`\${CLAUDE_PLUGIN_ROOT}/references/hosts.md\`"
@@ -1988,5 +1989,17 @@ says  skills/work-on/foreman.md "add this session to the project's status page, 
 says  "$H" "Status page: <its link>. Your foreman's session is <this session's id>."
 says  "$H" "\`role\` \"worker\", \`session\` its session id, \`parent\` the foreman's session its prompt names, \`issue\` its key or number"
 says  skills/work-on/worker.md "add this session to the project's status page, as **Show the crew** in \`\${CLAUDE_PLUGIN_ROOT}/references/hosts.md\` says"
+# KOR-756 run, November 24, 2026: in the batch way an issue waits only until
+# its blocker's landing is accepted, never for a batch run to move main, and a
+# worker starts its branch from landing, which already holds that blocker.
+never skills/work-on/foreman.md "until a green batch moves main past that blocker's commits"
+never skills/work-on/foreman.md "every blocker merged, or on main in the batch way"
+says  skills/work-on/foreman.md "waits only until you accept that blocker's landing"
+says  skills/work-on/foreman.md "never ask the person for a go to unblock an issue"
+part_says  skills/work-on/foreman.md "$(part skills/work-on/foreman.md '### The batch way' 'Main moves forward only')" "List what it blocked"
+part_says  skills/work-on/foreman.md "$(part skills/work-on/foreman.md '- **Once it merges.**' 'On a repository whose issues')" "**Once a landing is accepted.**"
+says  skills/work-on/worker.md "--base landing"
+says  skills/work-on/worker.md "git switch -c <gitBranchName> origin/landing"
+says  skills/work-on/worker.md "A hotfix always starts from main, never from \`landing\`"
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
