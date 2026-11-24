@@ -75,6 +75,11 @@ fetch it and switch to it, each as its own command:
     git fetch origin <user>/1418-<short-slug>
     git switch <user>/1418-<short-slug>
 
+In the batch way, use `--base landing` instead, so your branch starts with
+every issue already landed, the ones that blocked yours among them. When
+origin has no `landing` yet, use `--base main`. A hotfix always starts from
+main, never from `landing`, since it reaches main alone.
+
 The slug is three to six words of the title, lowercase, joined by hyphens.
 Delete the `worktree-<name>` branch the worktree was made on. Set the issue's
 Status to In Progress with
@@ -220,7 +225,9 @@ shown for KOR-12:
 - **Step 3.** The branch is the one `get_issue` returns as `gitBranchName`;
   it holds the key, so Linear links the branch, and in the pull request way
   the PR, to the issue. Make
-  it with `git switch -c <gitBranchName>`, then
+  it with `git switch -c <gitBranchName> origin/main`, or in the batch way
+  `git switch -c <gitBranchName> origin/landing` (`origin/main` when origin
+  has no `landing` yet, and always for a hotfix), after `git fetch origin`, then
   `git push -u origin <gitBranchName>`, never `gh issue develop`. Set the
   status with `save_issue` with `id` the key and `state` `In Progress`, unless
   a foreman already did, and never `set-status.sh`, which knows only GitHub

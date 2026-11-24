@@ -94,8 +94,8 @@ prints `pull-request` ships the pull request way.
 When you understand the work, say in one sentence what you are about to do and
 ask how many workers. Say the count three ways and never mix them: how many
 issues are ready (scenarios written, no open question), how many of those can
-start now (every blocker merged, or on main in the batch way), and how many
-wait on a merge. "Six are ready"
+start now (every blocker merged, or in the batch way, every blocker's landing
+accepted), and how many wait on a merge or a landing. "Six are ready"
 when seventy are ready and six can start is false, and the person reads it as
 a problem with the issues. That number is sessions alive, the ones waiting for the
 merge queue included: a worker counts from its start until its session is
@@ -163,9 +163,13 @@ For each issue, in order, up to the person's number:
    `hosts.md` says for your host, with the person's instructions for this run
    in their own words.
 
-An issue whose blocker is still open waits until that blocker merges; in the
-batch way, until a green batch moves main past that blocker's commits, since
-a worker branches from main.
+An issue whose blocker is still open waits until that blocker merges. In the
+batch way it waits only until you accept that blocker's landing: a worker
+starts its branch from `landing`, which already holds the blocker's commits,
+so no batch run has to move main first. Only the person starts a batch run,
+so never ask the person for a go to unblock an issue in a run they handed
+you (Robert, November 24, 2026: "Why do I need to get anything on main and
+not pile them on landing.").
 
 ## While they work
 
@@ -287,8 +291,12 @@ holds an unproven list with nothing a customer would see. Otherwise send it
 back with the reason; a second failure parks it. Then tell the worker its
 landing is accepted. It brings down its test stack and deletes its code
 index, and its slot is free once it answers "cleaned up" (its worktree and
-branch stay). Give that worker its next ready issue, as **Give a free worker
-its next issue** in `hosts.md` says.
+branch stay). List what it blocked:
+
+    gh api repos/{owner}/{repo}/issues/<n>/dependencies/blocking --jq '.[] | "#\(.number) \(.state) \(.title)"'
+
+Then give that worker its next ready issue, those first, as **Give a free
+worker its next issue** in `hosts.md` says.
 
 Main moves forward only from `landing`, or from `hotfix` for a hotfix, by one
 run of the repo's Gate on the batch, never by a worker and never by you. You queue nothing and open nothing
@@ -355,8 +363,8 @@ commit main was on before this batch>`. List what each closed issue blocked:
 
     gh api repos/{owner}/{repo}/issues/<n>/dependencies/blocking --jq '.[] | "#\(.number) \(.state) \(.title)"'
 
-and start those first. Tell each one's worker as **A worker's issue
-reached main** in `hosts.md` says. With no `gh` (`command -v gh` finds nothing), park an
+and start any of those not already started at a landing. Tell each one's
+worker as **A worker's issue reached main** in `hosts.md` says. With no `gh` (`command -v gh` finds nothing), park an
 issue through the connector's label call, and stop at the list of what an
 issue unblocks and tell the person "`gh` is needed to list the issues that
 issue #<n> unblocks (brew install gh, then gh auth login)". Never skip it or
@@ -464,6 +472,10 @@ on GitHub. Every section above holds, with these changes, shown for KOR-12:
   with `save_issue` if the `Fixes` line did not, then each parent up the chain
   with no open sub-issue left, and list what it blocked from `get_issue` with
   `includeRelations` true, its `relations.blocks`.
+- **Once a landing is accepted.** In the batch way, list what it blocked
+  from `get_issue` with `includeRelations` true, its `relations.blocks`, and
+  start those first. The landed issue keeps its status until a green batch
+  moves main, but it counts as finished for every issue it blocks.
 - **Once a green batch moves main.** In the batch way, for each issue `merged` lists, set the issue to `Done` with
   `save_issue`, then each parent up the chain with no open sub-issue left, and list what it blocked from `get_issue` with `includeRelations`
   true, its `relations.blocks`.
