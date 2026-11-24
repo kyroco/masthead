@@ -9,8 +9,14 @@ Korium holds what your team decided and why. Two tools do almost all the work: o
 searches, one saves. Their full names depend on how the connection was added, so
 they are named here by their endings, `agent_search` and `agent_capture`.
 
-Reading and writing work together. Save what the next task needs, then search
-before making the next decision. An empty result does not prove that nobody
+Reading and writing work together. Search before you save, and search again
+before making the next decision. Robert, November 24, 2026: "If the lesson
+exists, and it doesn't need to be superseded with something new and updated,
+then we don't just re-save it. If the save ads anything meaningful, a new
+lesson of some type, then we save it." So when the search finds the same
+memory, save nothing and point to its id; when what you have updates it, save
+it with a `supersedes` relation to that id; save on its own only what is new.
+An empty result does not prove that nobody
 wrote the memory: check the workspace, scope, query and processing state.
 
 ## Searching

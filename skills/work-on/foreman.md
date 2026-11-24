@@ -106,8 +106,8 @@ Then name the issues that fill those slots, in order, each with what the
 customer gets from it. When one carries a question that is the person's, the
 question goes to the user first, before its worker starts: what the customer
 sees today, and the choice, in plain words. Their answer goes back as they
-said it, onto the issue as a comment and into Korium, so no session asks it
-twice. The person's "no" means do not build it.
+said it, onto the issue as a comment, and is written down in Korium as **A
+worker's question** below says, so no session asks it twice. The person's "no" means do not build it.
 
 Once the slots are running, say how far the queue of issues with no open
 question runs behind them, and offer to take the questions for the ones beyond
@@ -186,10 +186,15 @@ branch it left on GitHub to the user to delete.
 
 A worker's question: first re-read that issue's comments, then search Korium
 for the person's earlier answer. When they already answered it, relay that
-answer with the line quoted and do not ask them twice. Otherwise ask the
-person, and send their answer back in their words. Then have one
-`general-purpose` agent on `haiku` write it down: it captures the question
-and answer in Korium, posts them as a comment on the issue, takes the question
+answer with the line quoted, do not ask them twice, and save nothing: the
+note is already there. Otherwise ask the person, and send their answer back
+in their words. Then have one `general-purpose` agent on `haiku` write it
+down. Its prompt says what your search found, so it decides nothing: when
+the search found no answer, it saves the question and answer in Korium; when
+it found an earlier answer the person has now changed, it saves the new one
+with a `supersedes` relation to that note's id. Only that agent saves a
+person's answer; you never save it yourself. It reports the note's id,
+posts the question and answer as a comment on the issue, takes the question
 out of the body when it is there, and removes the `needs-decision` label when
 no `[NEEDS CLARIFICATION]` line is left. Wait for its one-line report before
 the next write on the same issue, and tell the person when a step failed.
@@ -408,8 +413,8 @@ other issue.
 Every issue is merged (in the batch way, on main), parked or skipped. End any
 remaining workers (**End a worker**, `hosts.md`), remove the
 warm trees with `${CLAUDE_PLUGIN_ROOT}/skills/work-on/warm-build.sh end`, capture one
-Korium handoff (what merged or reached main, what parked and why, and the person's answers,
-verbatim), and tell the person: one line per issue with its outcome, what each
+Korium handoff (what merged or reached main, what parked and why, and the ids of the notes that hold the person's answers;
+their words are saved there already, so do not repeat them), and tell the person: one line per issue with its outcome, what each
 parked issue needs, and the count of issues merged, or on main in the batch way.
 
 ## On Linear
@@ -437,7 +442,8 @@ on GitHub. Every section above holds, with these changes, shown for KOR-12:
   session is named as `hosts.md` says.
 - **A worker's question.** The worker puts the answer on the issue and sets
   it back to `In Progress` itself (`worker.md`, On Linear), so the `haiku`
-  agent that writes the answer down captures it in Korium and takes the
+  agent that writes the answer down saves it in Korium as **A worker's
+  question** says, and takes the
   question out of the body with `save_issue` and `patch` after reading it
   with `get_issue`, and posts no comment and changes no status. A question
   answered before its issue has a worker (Agree the run) goes on the issue as
