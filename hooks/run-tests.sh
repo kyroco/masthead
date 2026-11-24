@@ -7,7 +7,11 @@
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 unset CLAUDE_PROJECT_DIR MASTHEAD_WORKSPACE
-cd "${TMPDIR:-/tmp}" || exit 1
+# A fresh empty folder, not TMPDIR itself: a hook with no workspace set reads the shell's folder as the
+# workspace and checks every repository in it, and a long-lived TMPDIR can hold thousands left by old runs.
+work="$(mktemp -d "${TMPDIR:-/tmp}/masthead-tests.XXXXXX")" || exit 1
+trap 'rm -rf "$work"' EXIT
+cd "$work" || exit 1
 
 failed=0
 skipped=0
