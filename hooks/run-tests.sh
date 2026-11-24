@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 # Run every test suite for the shared hooks in this folder; CI runs this on Linux and macOS (.github/workflows/tests.yml).
 # Usage: bash hooks/run-tests.sh (CLAUDE_PROJECT_DIR is unset so the calling repo cannot make a hook stand down).
+# MASTHEAD_WORKSPACE is unset for the same reason: since MAST-48 the hooks read it as the workspace when
+# CLAUDE_PROJECT_DIR is empty, and a session's own value would point every suite at the real repository.
 # RUN_ONLY="<label>" runs that one suite. A suite that exits 77 was skipped: its last line says why, and it is not a failure.
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-unset CLAUDE_PROJECT_DIR
+unset CLAUDE_PROJECT_DIR MASTHEAD_WORKSPACE
 cd "${TMPDIR:-/tmp}" || exit 1
 
 failed=0
